@@ -255,6 +255,8 @@ canvas { display: block; width: 100%; height: 100%; }
     </div>
     <span class="sep"></span>
     <div id="connection-dot" title="Disconnected"></div>
+    <span id="topbar-prompt" style="font-size:12px;color:var(--text-dim);max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title=""></span>
+    <span class="sep"></span>
     <div class="stat-group">
       <div class="stat"><span class="stat-dot" style="background:var(--tool)"></span><span id="stat-tools" class="stat-val">0</span> tools</div>
       <div class="stat"><span class="stat-dot" style="background:var(--agent)"></span><span id="stat-agents" class="stat-val">0</span> agents</div>
@@ -750,21 +752,40 @@ function draw() {
   }
 }
 
+// Pre-rendered grid tile
+const _gridTile = document.createElement('canvas');
+const _gridCtx = _gridTile.getContext('2d');
+let _gridPattern = null;
+let _gridZoomSnap = -1;
+
+function ensureGridPattern() {
+  const gridSize = 40;
+  const snap = Math.round(vis.camera.zoom * 20) / 20; // quantize to 5%
+  if (snap === _gridZoomSnap && _gridPattern) return;
+  _gridZoomSnap = snap;
+  const step = Math.max(4, Math.round(gridSize * snap));
+  _gridTile.width = step;
+  _gridTile.height = step;
+  _gridCtx.clearRect(0, 0, step, step);
+  _gridCtx.fillStyle = COLORS.grid;
+  _gridCtx.beginPath();
+  _gridCtx.arc(0, 0, 0.8, 0, Math.PI * 2);
+  _gridCtx.fill();
+  _gridPattern = ctx.createPattern(_gridTile, 'repeat');
+}
+
 function drawGrid() {
+  ensureGridPattern();
+  if (!_gridPattern) return;
   const cam = vis.camera;
   const gridSize = 40;
   const ox = (cam.x * cam.zoom) % (gridSize * cam.zoom);
   const oy = (cam.y * cam.zoom) % (gridSize * cam.zoom);
-  const step = gridSize * cam.zoom;
-
-  ctx.fillStyle = COLORS.grid;
-  for (let x = ox; x < W; x += step) {
-    for (let y = oy; y < H; y += step) {
-      ctx.beginPath();
-      ctx.arc(x, y, 0.8, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
+  ctx.save();
+  ctx.translate(ox, oy);
+  ctx.fillStyle = _gridPattern;
+  ctx.fillRect(-gridSize * cam.zoom, -gridSize * cam.zoom, W + gridSize * cam.zoom * 2, H + gridSize * cam.zoom * 2);
+  ctx.restore();
 }
 
 function drawEdge(from, to, active) {
@@ -1088,12 +1109,20 @@ function lerp(a, b, t) { return a + (b - a) * t; }
 // ═══════════════════════════════════════════════
 // HELPERS
 // ═══════════════════════════════════════════════
+const _haCache = new Map();
 function hexAlpha(hex, alpha) {
-  if (hex.startsWith('rgba')) return hex; // passthrough
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r},${g},${b},${Math.max(0, Math.min(1, alpha))})`;
+  if (hex.startsWith('rgba')) return hex;
+  const a = Math.round(Math.max(0, Math.min(1, alpha)) * 100) / 100;
+  const key = hex + a;
+  let v = _haCache.get(key);
+  if (!v) {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    v = `rgba(${r},${g},${b},${a})`;
+    _haCache.set(key, v);
+  }
+  return v;
 }
 
 function roundRect(ctx, x, y, w, h, r) {
@@ -1116,29 +1145,50 @@ function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').
 // ═══════════════════════════════════════════════
 // FEED (Activity panel)
 // ═══════════════════════════════════════════════
+let _feedRenderedCount = 0;
+let _feedNeedsFullRebuild = true;
+
+function feedItemHTML(e) {
+  const n = state.nodes.get(e.nodeId);
+  const dur = n && n.duration ? n.duration : '';
+  const isRunning = n && n.status === 'running';
+  const color = getTypeColor(e.type);
+  const isActive = state.selected === e.nodeId;
+  return `<div class="feed-item${isActive ? ' active' : ''}${isRunning ? ' running' : ''}" data-node="${e.nodeId}">
+    <div class="feed-dot" style="background:${color};box-shadow:0 0 6px ${hexAlpha(color, 0.4)}"></div>
+    <div class="feed-info">
+      <div class="feed-label" style="color:${hexAlpha(color, 0.9)}">${esc(e.label)}</div>
+      ${e.sub ? `<div class="feed-sub">${esc(e.sub)}</div>` : ''}
+    </div>
+    <div class="feed-dur">${dur}</div>
+  </div>`;
+}
+
 function renderFeed() {
   const list = document.getElementById('feed-list');
-  const entries = state.timelineEntries.slice(-100);
-  document.getElementById('feed-count').textContent = `${state.timelineEntries.length} events`;
+  const total = state.timelineEntries.length;
+  document.getElementById('feed-count').textContent = `${total} events`;
 
-  // Only render last 60 for perf
-  const visible = entries.slice(-60);
-  list.innerHTML = visible.map(e => {
-    const n = state.nodes.get(e.nodeId);
-    const dur = n && n.duration ? n.duration : '';
-    const isRunning = n && n.status === 'running';
-    const color = getTypeColor(e.type);
-    const isActive = state.selected === e.nodeId;
-
-    return `<div class="feed-item${isActive ? ' active' : ''}${isRunning ? ' running' : ''}" data-node="${e.nodeId}">
-      <div class="feed-dot" style="background:${color};box-shadow:0 0 6px ${hexAlpha(color, 0.4)}"></div>
-      <div class="feed-info">
-        <div class="feed-label" style="color:${hexAlpha(color, 0.9)}">${esc(e.label)}</div>
-        ${e.sub ? `<div class="feed-sub">${esc(e.sub)}</div>` : ''}
-      </div>
-      <div class="feed-dur">${dur}</div>
-    </div>`;
-  }).join('');
+  if (_feedNeedsFullRebuild || total < _feedRenderedCount) {
+    // Full rebuild
+    const visible = state.timelineEntries.slice(-60);
+    list.innerHTML = visible.map(feedItemHTML).join('');
+    _feedRenderedCount = total;
+    _feedNeedsFullRebuild = false;
+  } else if (total > _feedRenderedCount) {
+    // Incremental: append only new items
+    const newEntries = state.timelineEntries.slice(_feedRenderedCount);
+    const fragment = document.createDocumentFragment();
+    const tmp = document.createElement('div');
+    for (const e of newEntries) {
+      tmp.innerHTML = feedItemHTML(e);
+      fragment.appendChild(tmp.firstElementChild);
+    }
+    list.appendChild(fragment);
+    _feedRenderedCount = total;
+    // Trim old items to keep max 60 in DOM
+    while (list.children.length > 60) list.removeChild(list.firstChild);
+  }
 
   list.scrollTop = list.scrollHeight;
 }
@@ -1270,15 +1320,12 @@ async function loadSessions() {
     const res = await fetch('/sessions');
     const sessions = await res.json();
 
-    // Cache titles and update session node labels
+    // Cache prompts for topbar display
     for (const s of sessions) {
-      if (s.title) sessionTitles.set(s.id, s.title);
-      const node = state.nodes.get(`s:${s.id}`);
-      if (node && s.title) {
-        node.label = truncate(s.title, 20);
-        node.sub = '';
-      }
+      if (s.prompt) sessionTitles.set(s.id, s.prompt);
     }
+    // Update topbar prompt for current session
+    updateTopbarPrompt();
 
     document.getElementById('sessions-list').innerHTML =
       `<div class="session-card${!currentSessionId ? ' active' : ''}" data-sid="">
@@ -1287,7 +1334,7 @@ async function loadSessions() {
       </div>` +
       sessions.map(s => `
         <div class="session-card${currentSessionId === s.id ? ' active' : ''}" data-sid="${s.id}">
-          <div class="s-title">${esc(s.title)}</div>
+          <div class="s-title">${esc(s.id.slice(0, 8))}</div>
           ${s.prompt ? `<div class="s-prompt">${esc(s.prompt)}</div>` : ''}
           <div class="s-meta">
             <span>${s.eventCount || 0} events</span>
@@ -1296,6 +1343,14 @@ async function loadSessions() {
         </div>
       `).join('');
   } catch {}
+}
+
+function updateTopbarPrompt() {
+  const sid = currentSessionId || state._lastServerId;
+  const el = document.getElementById('topbar-prompt');
+  const prompt = sid ? sessionTitles.get(sid) : null;
+  el.textContent = prompt || '';
+  el.title = prompt || '';
 }
 
 function formatAge(mtime) {
@@ -1312,7 +1367,7 @@ document.getElementById('sessions-list').addEventListener('click', e => {
   currentSessionId = card.dataset.sid || null;
   clearState();
   firstBatch = true;
-  poll();
+  poll(true);
   loadSessions();
   document.getElementById('sessions-overlay').classList.remove('visible');
 });
@@ -1323,6 +1378,7 @@ function clearState() {
   state.timelineEntries = []; state.startTimes.clear();
   state._lastServerId = null;
   vis.nodes.clear(); vis.particles = [];
+  _feedRenderedCount = 0; _feedNeedsFullRebuild = true;
   renderFeed(); updateStats();
 }
 
@@ -1371,20 +1427,21 @@ searchBox.addEventListener('input', () => {
 // SSE + POLLING
 // ═══════════════════════════════════════════════
 let sseSource = null;
+let sseConnected = false;
 const connDot = document.getElementById('connection-dot');
 
 function connectSSE() {
   if (sseSource) sseSource.close();
   sseSource = new EventSource('/stream');
-  sseSource.onopen = () => { connDot.classList.add('connected'); connDot.title = 'Connected'; };
-  sseSource.onerror = () => { connDot.classList.remove('connected'); connDot.title = 'Disconnected'; };
+  sseSource.onopen = () => { sseConnected = true; connDot.classList.add('connected'); connDot.title = 'Connected'; };
+  sseSource.onerror = () => { sseConnected = false; connDot.classList.remove('connected'); connDot.title = 'Disconnected'; };
   sseSource.onmessage = (msg) => {
     try {
       const data = JSON.parse(msg.data);
       if (data.type === 'event') {
         const target = currentSessionId || state._lastServerId;
         if (!target || data.session === target) {
-          if (!currentSessionId && !state._lastServerId) state._lastServerId = data.session;
+          if (!currentSessionId && !state._lastServerId) { state._lastServerId = data.session; updateTopbarPrompt(); }
           state.events.push(data.event);
           processEvent(data.event);
           layout();
@@ -1399,8 +1456,8 @@ function connectSSE() {
 
 let firstBatch = true, clearing = false;
 
-async function poll() {
-  if (clearing) return;
+async function poll(force) {
+  if (clearing || (!force && sseConnected)) return;
   try {
     const sp = currentSessionId ? `&session=${currentSessionId}` : '';
     const res = await fetch(`/events?offset=${state.offset}${sp}`);
@@ -1431,7 +1488,15 @@ function updateLiveDurations() {
       n.duration = ms < 1000 ? `${ms}ms` : ms < 60000 ? `${(ms / 1000).toFixed(1)}s` : `${(ms / 60000).toFixed(1)}m`;
     }
   }
-  renderFeed();
+  // Surgical update: only touch duration text of running items
+  for (const el of document.querySelectorAll('.feed-item.running')) {
+    const nodeId = el.dataset.node;
+    const n = state.nodes.get(nodeId);
+    if (n) {
+      const durEl = el.querySelector('.feed-dur');
+      if (durEl) durEl.textContent = n.duration || '';
+    }
+  }
 }
 
 // ═══════════════════════════════════════════════
@@ -1441,7 +1506,7 @@ loadSessions();
 connectSSE();
 poll();
 setInterval(loadSessions, 5000);
-setInterval(poll, 2000);
+setInterval(poll, 5000);
 setInterval(updateLiveDurations, 1000);
 requestAnimationFrame(animate);
 </script>

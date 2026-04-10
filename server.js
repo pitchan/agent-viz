@@ -26,29 +26,41 @@ function broadcastSSE(data) {
 const watchers = new Map();
 const fileOffsets = new Map();
 
+// Read new bytes from a session file and broadcast via SSE
+function readAndBroadcast(filePath) {
+  try {
+    const newStat = fs.statSync(filePath);
+    const offset = fileOffsets.get(filePath) || 0;
+    if (newStat.size <= offset) return;
+    const buf = Buffer.alloc(newStat.size - offset);
+    const fd = fs.openSync(filePath, 'r');
+    fs.readSync(fd, buf, 0, buf.length, offset);
+    fs.closeSync(fd);
+    fileOffsets.set(filePath, newStat.size);
+    const lines = buf.toString('utf8').trim().split('\n');
+    for (const line of lines) {
+      try {
+        const evt = JSON.parse(line);
+        broadcastSSE({ type: 'event', session: path.basename(filePath, '.jsonl'), event: evt });
+      } catch {}
+    }
+  } catch {}
+}
+
+const debounceTimers = new Map();
+
 function watchSession(filePath) {
   if (watchers.has(filePath)) return;
   const stat = fs.statSync(filePath);
   fileOffsets.set(filePath, stat.size);
 
   const watcher = fs.watch(filePath, () => {
-    try {
-      const newStat = fs.statSync(filePath);
-      const offset = fileOffsets.get(filePath) || 0;
-      if (newStat.size <= offset) return;
-      const buf = Buffer.alloc(newStat.size - offset);
-      const fd = fs.openSync(filePath, 'r');
-      fs.readSync(fd, buf, 0, buf.length, offset);
-      fs.closeSync(fd);
-      fileOffsets.set(filePath, newStat.size);
-      const lines = buf.toString('utf8').trim().split('\n');
-      for (const line of lines) {
-        try {
-          const evt = JSON.parse(line);
-          broadcastSSE({ type: 'event', session: path.basename(filePath, '.jsonl'), event: evt });
-        } catch {}
-      }
-    } catch {}
+    // Debounce 50ms — Windows fires multiple change events per write
+    if (debounceTimers.has(filePath)) clearTimeout(debounceTimers.get(filePath));
+    debounceTimers.set(filePath, setTimeout(() => {
+      debounceTimers.delete(filePath);
+      readAndBroadcast(filePath);
+    }, 50));
   });
   watchers.set(filePath, watcher);
 }
@@ -104,46 +116,17 @@ function getTranscriptPath(sessionFile) {
   return null;
 }
 
-// Extract session title: ai-title > summary > first user message
-function getSessionTitle(sessionFile) {
-  const tp = getTranscriptPath(sessionFile);
-  if (!tp || !fs.existsSync(tp)) return null;
-  try {
-    const content = fs.readFileSync(tp, 'utf8');
-    const lines = content.split('\n');
-    // Pass 1: look for summary (appears early after context compression)
-    for (const line of lines.slice(0, 30)) {
-      try {
-        const o = JSON.parse(line);
-        if (o.type === 'summary' && o.summary) return o.summary.slice(0, 80);
-      } catch {}
-    }
-    // Pass 2: first real user text (skip IDE/system context)
-    for (const line of lines) {
-      try {
-        const o = JSON.parse(line);
-        if (o.type === 'user' || o.type === 'human') {
-          const content = o.message?.content || o.content;
-          if (typeof content === 'string') {
-            const clean = content.replace(/<[^>]+>/g, '').trim();
-            if (clean && clean.length > 5) return clean.slice(0, 80);
-          }
-          if (Array.isArray(content)) {
-            for (const block of content) {
-              if (block.type === 'text') {
-                const text = block.text.replace(/<[^>]+>/g, '').trim();
-                if (text && text.length > 5 && !text.startsWith('{')) return text.slice(0, 80);
-              }
-            }
-          }
-        }
-      } catch {}
-    }
-  } catch {}
-  return null;
+// Strip tagged blocks (<tag>content</tag>) and standalone tags, then trim
+function cleanUserText(raw) {
+  return raw.replace(/<(\w[\w-]*)[\s>][\s\S]*?<\/\1>/g, '').replace(/<[^>]+>/g, '').trim();
 }
 
-// Get first user message (for session card subtitle)
+// Check if text is IDE/system noise rather than a real user prompt
+function isNoise(text) {
+  return /^(The user (opened|is viewing|has selected|scrolled)|ide_selection|gitStatus:|Current branch:)/i.test(text);
+}
+
+// Get first real user prompt (skips IDE/system noise)
 function getFirstPrompt(sessionFile) {
   const tp = getTranscriptPath(sessionFile);
   if (!tp || !fs.existsSync(tp)) return null;
@@ -156,14 +139,14 @@ function getFirstPrompt(sessionFile) {
         if (o.type === 'user' || o.type === 'human') {
           const c = o.message?.content || o.content;
           if (typeof c === 'string') {
-            const clean = c.replace(/<[^>]+>/g, '').trim();
-            if (clean && clean.length > 5) return clean.slice(0, 120);
+            const clean = cleanUserText(c);
+            if (clean && clean.length > 5 && !isNoise(clean)) return clean.slice(0, 120);
           }
           if (Array.isArray(c)) {
             for (const block of c) {
               if (block.type === 'text') {
-                const text = block.text.replace(/<[^>]+>/g, '').trim();
-                if (text && text.length > 5 && !text.startsWith('{')) return text.slice(0, 120);
+                const text = cleanUserText(block.text);
+                if (text && text.length > 5 && !text.startsWith('{') && !isNoise(text)) return text.slice(0, 120);
               }
             }
           }
@@ -196,6 +179,27 @@ function startServer() {
 
     // CORS for SSE
     res.setHeader('Access-Control-Allow-Origin', '*');
+
+    // Instant push from hook.js — bypasses fs.watch latency
+    if (url.pathname === '/notify' && req.method === 'POST') {
+      let body = '';
+      req.on('data', c => { body += c; });
+      req.on('end', () => {
+        try {
+          const { session } = JSON.parse(body);
+          if (session) {
+            const fp = path.join(DIR, `${session}.jsonl`);
+            if (fs.existsSync(fp)) {
+              if (!watchers.has(fp)) watchSession(fp);
+              readAndBroadcast(fp);
+            }
+          }
+        } catch {}
+        res.writeHead(200, { 'Content-Type': 'text/plain' });
+        res.end('ok');
+      });
+      return;
+    }
 
     if (url.pathname === '/shutdown') {
       res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -286,7 +290,6 @@ function startServer() {
           const fp = path.join(DIR, f);
           const stat = fs.statSync(fp);
           const id = f.replace('.jsonl', '');
-          const title = getSessionTitle(fp);
           const prompt = getFirstPrompt(fp);
           // Count events
           let eventCount = 0;
@@ -294,7 +297,7 @@ function startServer() {
             const content = fs.readFileSync(fp, 'utf8');
             eventCount = content.trim().split('\n').length;
           } catch {}
-          sessions.push({ id, title: title || `Session ${id.slice(0, 8)}`, prompt, eventCount, size: stat.size, mtime: stat.mtimeMs });
+          sessions.push({ id, prompt, eventCount, size: stat.size, mtime: stat.mtimeMs });
         }
         sessions.sort((a, b) => b.mtime - a.mtime);
       } catch {}
