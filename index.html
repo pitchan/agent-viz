@@ -333,11 +333,15 @@ const LERP_SPEED = 5;        // Position lerp multiplier
 // STATE
 // ═══════════════════════════════════════════════
 const state = {
-  events: [], offset: 0, nodes: new Map(), selected: null,
+  eventSeq: 0, offset: 0, nodes: new Map(), selected: null,
   toolsCompleted: 0, filter: '', autoFit: true,
   timelineEntries: [], startTimes: new Map(),
   _lastServerId: null,
 };
+// Cap for in-memory timeline entries. Feed shows last 60; keep 500 buffer.
+const TIMELINE_CAP = 500;
+// Keep done tools in memory for at most 10 min (unless referenced by feed).
+const NODE_GC_MAX_AGE_MS = 10 * 60 * 1000;
 
 // Visual state for canvas animation
 const vis = {
@@ -346,7 +350,49 @@ const vis = {
   camera: { x: 0, y: 0, zoom: 1, targetX: 0, targetY: 0, targetZoom: 1 },
   time: 0,
   hoveredNode: null,
+  // Dirty-flag rendering scheduler state.
+  rafHandle: null,
+  pulseTimer: null,
+  dirty: true,
+  activeAnimations: 0,
+  // Parallel type-bucketed draw arrays — avoids re-sorting every frame.
+  drawSessionNodes: [], // [{n, vn}]
+  drawAgentNodes: [],
+  drawToolNodes: [],
+  // Set of state.node ids currently in status=running — particle spawn iterates
+  // this tiny set instead of the whole node map.
+  runningNodes: new Set(),
+  // Adaptive frame time EMA for dynamic particle skip.
+  avgFrameMs: 8,
+  _particleSkipToggle: false,
 };
+
+// Static background canvas (void fill + grid), repainted only when the camera
+// moves or the viewport resizes.
+const staticCanvas = document.createElement('canvas');
+const staticCtx = staticCanvas.getContext('2d');
+let _bgDirty = true;
+function markBgDirty() { _bgDirty = true; }
+
+// Epsilon for settling lerp — when all four deltas fall below, we stop animating.
+const LERP_EPS_POS = 0.1;
+const LERP_EPS_OPACITY = 0.005;
+const LERP_EPS_SCALE = 0.005;
+
+// Frame budget for pulse-only animations (running nodes' glow sin).
+const PULSE_FRAME_MS = 1000 / 20;
+
+// Mark the canvas as needing a repaint and request a frame if none is queued.
+function markDirty() {
+  vis.dirty = true;
+  requestRender();
+}
+
+// Schedule a single animation frame if none is currently pending.
+function requestRender() {
+  if (vis.rafHandle != null || vis.pulseTimer != null) return;
+  vis.rafHandle = requestAnimationFrame(tick);
+}
 
 // ═══════════════════════════════════════════════
 // CANVAS SETUP
@@ -363,6 +409,11 @@ function resize() {
   canvas.style.width = W + 'px';
   canvas.style.height = H + 'px';
   ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  staticCanvas.width = W * devicePixelRatio;
+  staticCanvas.height = H * devicePixelRatio;
+  staticCtx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  markBgDirty();
+  markDirty();
 }
 resize();
 window.addEventListener('resize', resize);
@@ -382,6 +433,7 @@ canvas.addEventListener('wheel', e => {
   // Adjust camera so world point stays under mouse
   vis.camera.targetX = mx / vis.camera.targetZoom - wc.x;
   vis.camera.targetY = my / vis.camera.targetZoom - wc.y;
+  markDirty();
 }, { passive: false });
 
 canvas.addEventListener('pointerdown', e => {
@@ -393,6 +445,7 @@ canvas.addEventListener('pointerdown', e => {
     state.selected = hit.id;
     showDetail(state.nodes.get(hit.id));
     renderFeed();
+    markDirty();
     return;
   }
   dragging = true;
@@ -408,12 +461,15 @@ canvas.addEventListener('pointermove', e => {
     const dy = (e.clientY - dragStartY) / vis.camera.zoom;
     vis.camera.targetX = camStartX + dx;
     vis.camera.targetY = camStartY + dy;
+    markDirty();
   } else {
     const rect = canvas.getBoundingClientRect();
     const wc = screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
     const hit = hitTest(wc.x, wc.y);
+    const prev = vis.hoveredNode;
     vis.hoveredNode = hit ? hit.id : null;
     canvas.style.cursor = hit ? 'pointer' : 'grab';
+    if (prev !== vis.hoveredNode) markDirty();
   }
 });
 
@@ -468,13 +524,22 @@ function ensureVisNode(id) {
     const parent = n && n.parentId ? vis.nodes.get(n.parentId) : null;
     const startX = parent ? parent.x : 0;
     const startY = parent ? parent.y : 0;
-    vis.nodes.set(id, {
+    const vn = {
+      id,
       x: startX, y: startY,
       targetX: 0, targetY: 0,
       opacity: 0, targetOpacity: 1,
       scale: 0.3, targetScale: 1,
       glowPhase: Math.random() * Math.PI * 2,
-    });
+    };
+    vis.nodes.set(id, vn);
+    // Bucket by node type for allocation-free draw order.
+    if (n) {
+      const bucket = n.type === 'session' ? vis.drawSessionNodes
+        : n.type === 'agent' ? vis.drawAgentNodes
+        : vis.drawToolNodes;
+      bucket.push({ n, vn });
+    }
   }
   return vis.nodes.get(id);
 }
@@ -484,17 +549,32 @@ function addTimelineEntry(evt, nodeId, type, label, sub) {
     ts: evt._ts || new Date().toISOString(),
     nodeId, type, label, sub: sub || '',
   });
+  // Cap via ring buffer. Shift in small batches to amortize cost.
+  if (state.timelineEntries.length > TIMELINE_CAP + 50) {
+    const drop = state.timelineEntries.length - TIMELINE_CAP;
+    state.timelineEntries.splice(0, drop);
+    // Adjust renderFeed cursor so incremental append keeps working.
+    _feedRenderedCount = Math.max(0, _feedRenderedCount - drop);
+  }
+}
+
+function setRunning(id, on) {
+  if (on) vis.runningNodes.add(id);
+  else vis.runningNodes.delete(id);
 }
 
 function processEvent(evt) {
   const sid = evt.session_id || 'unknown';
   const e = evt.hook_event_name;
   const ts = evt._ts || new Date().toISOString();
+  // Any mutation to a session subtree marks it layout-dirty.
+  layoutDirtyRoots.add(`s:${sid}`);
 
   if (e === 'SessionStart') {
     const n = getNode(`s:${sid}`);
     n.type = 'session'; n.label = 'Session'; n.sub = sid.slice(0, 8);
     n.color = COLORS.session; n.data = evt; n.status = 'running'; n.startTime = ts;
+    setRunning(n.id, true);
     addTimelineEntry(evt, n.id, 'session', 'Session', sid.slice(0, 8));
   }
   else if (e === 'SubagentStart') {
@@ -504,6 +584,7 @@ function processEvent(evt) {
     n.label = evt.agent_type || evt.subagent_type || 'Agent';
     n.sub = (evt.tool_input && evt.tool_input.description) || aid.slice(0, 8);
     n.color = COLORS.agent; n.data = evt; n.status = 'running'; n.startTime = ts;
+    setRunning(n.id, true);
     const parent = getNode(`s:${sid}`);
     parent.type = 'session'; parent.label = parent.label || 'Session'; parent.color = COLORS.session;
     if (!n.parentId) { n.parentId = parent.id; parent.children.push(n); }
@@ -512,10 +593,10 @@ function processEvent(evt) {
   else if (e === 'SubagentStop') {
     const aid = evt.agent_id || sid;
     const n = state.nodes.get(`a:${aid}`);
-    if (n) { n.status = 'done'; n.data = evt; n.endTime = ts; n.duration = calcDuration(n.startTime, ts); n.color = COLORS.complete; }
+    if (n) { n.status = 'done'; n.data = evt; n.endTime = ts; n.duration = calcDuration(n.startTime, ts); n.color = COLORS.complete; setRunning(n.id, false); }
   }
   else if (e === 'PreToolUse') {
-    const tid = evt.tool_use_id || `t${state.events.length}`;
+    const tid = evt.tool_use_id || `t${state.eventSeq++}`;
     const n = getNode(`t:${tid}`);
     const isSkill = evt.tool_name === 'Skill';
     n.type = isSkill ? 'skill' : 'tool';
@@ -523,6 +604,7 @@ function processEvent(evt) {
     n.sub = formatToolSub(evt);
     n.color = isSkill ? COLORS.skill : COLORS.tool;
     n.data = evt; n.status = 'running'; n.startTime = ts;
+    setRunning(n.id, true);
     state.startTimes.set(tid, ts);
     const parentId = evt.agent_id ? `a:${evt.agent_id}` : `s:${sid}`;
     const parent = getNode(parentId);
@@ -533,15 +615,15 @@ function processEvent(evt) {
   else if (e === 'PostToolUse') {
     const tid = evt.tool_use_id || '';
     const n = state.nodes.get(`t:${tid}`);
-    if (n) { n.status = 'done'; n.data = evt; n.endTime = ts; n.duration = calcDuration(n.startTime, ts); state.toolsCompleted++; }
+    if (n) { n.status = 'done'; n.data = evt; n.endTime = ts; n.duration = calcDuration(n.startTime, ts); state.toolsCompleted++; setRunning(n.id, false); }
   }
   else if (e === 'PostToolUseFailure') {
     const tid = evt.tool_use_id || '';
     const n = state.nodes.get(`t:${tid}`);
-    if (n) { n.status = 'error'; n.color = COLORS.error; n.data = evt; n.endTime = ts; n.duration = calcDuration(n.startTime, ts); }
+    if (n) { n.status = 'error'; n.color = COLORS.error; n.data = evt; n.endTime = ts; n.duration = calcDuration(n.startTime, ts); setRunning(n.id, false); }
   }
   else if (e === 'Notification') {
-    const nid = `n:${state.events.length}`;
+    const nid = `n:${state.eventSeq++}`;
     const n = getNode(nid);
     n.type = 'notification'; n.label = 'Notification'; n.sub = (evt.message || '').slice(0, 50);
     n.color = COLORS.notification; n.data = evt; n.status = 'done';
@@ -552,7 +634,7 @@ function processEvent(evt) {
   }
   else if (e === 'Stop' || e === 'SessionEnd') {
     const n = state.nodes.get(`s:${sid}`);
-    if (n) { n.status = 'done'; n.data = evt; n.endTime = ts; n.duration = calcDuration(n.startTime, ts); n.color = COLORS.complete; }
+    if (n) { n.status = 'done'; n.data = evt; n.endTime = ts; n.duration = calcDuration(n.startTime, ts); n.color = COLORS.complete; setRunning(n.id, false); }
   }
 }
 
@@ -579,76 +661,127 @@ function formatToolSub(evt) {
 }
 
 // ═══════════════════════════════════════════════
-// LAYOUT — Orbital layout
+// LAYOUT — Orbital layout (incremental)
 // ═══════════════════════════════════════════════
-function layout() {
-  const roots = [];
-  for (const n of state.nodes.values()) {
-    if (!n.parentId) roots.push(n);
-  }
+// Per-root dirty set — only recompute subtrees of sessions whose contents
+// changed. Full rebuild happens when the number of roots changes (side-by-side
+// offset shifts all of them) or when the filter changes.
+const layoutDirtyRoots = new Set();
+let _lastRootCount = -1;
+let _layoutFullDirty = true;
 
-  // Place sessions side by side
-  const totalRoots = roots.length;
-  roots.forEach((root, i) => {
-    const cx = totalRoots > 1 ? (i - (totalRoots - 1) / 2) * 400 : 0;
-    root.x = cx; root.y = 0;
+function getRootId(n) {
+  while (n && n.parentId) n = state.nodes.get(n.parentId);
+  return n ? n.id : null;
+}
 
-    // Separate agents from tools
-    const agents = root.children.filter(c => c.type === 'agent');
-    const tools = root.children.filter(c => c.type !== 'agent');
+function markLayoutDirty(node) {
+  const rid = getRootId(node);
+  if (rid) layoutDirtyRoots.add(rid);
+}
 
-    // Place agents in a ring around session
-    const agentDist = SPAWN_DIST + Math.max(0, agents.length - 3) * 30;
-    agents.forEach((agent, ai) => {
-      const angle = -Math.PI / 2 + (ai / Math.max(agents.length, 1)) * Math.PI * 2;
-      agent.x = cx + Math.cos(angle) * agentDist;
-      agent.y = root.y + Math.sin(angle) * agentDist;
+function markLayoutFullDirty() { _layoutFullDirty = true; }
 
-      // Place agent's tools — only show running + last 5 completed
-      const aTools = agent.children.filter(c => matchesFilter(c));
-      const runningTools = aTools.filter(c => c.status === 'running');
-      const doneTools = aTools.filter(c => c.status !== 'running');
-      const visibleDone = doneTools.slice(-5);
-      const visibleTools = [...visibleDone, ...runningTools];
+function layoutRoot(root) {
+  const cx = root.x;
+  // Separate agents from tools
+  const agents = root.children.filter(c => c.type === 'agent');
+  const tools = root.children.filter(c => c.type !== 'agent');
 
-      // Fan tools outward from the agent, away from session center
-      const baseAngle = Math.atan2(agent.y - root.y, agent.x - root.x);
-      const toolDist = 90 + visibleTools.length * 8;
-      const spread = Math.min(Math.PI * 1.2, visibleTools.length * 0.35);
+  // Place agents in a ring around session
+  const agentDist = SPAWN_DIST + Math.max(0, agents.length - 3) * 30;
+  agents.forEach((agent, ai) => {
+    const angle = -Math.PI / 2 + (ai / Math.max(agents.length, 1)) * Math.PI * 2;
+    agent.x = cx + Math.cos(angle) * agentDist;
+    agent.y = root.y + Math.sin(angle) * agentDist;
 
-      visibleTools.forEach((tool, ti) => {
-        const tAngle = baseAngle - spread / 2 + (ti / Math.max(visibleTools.length - 1, 1)) * spread;
-        tool.x = agent.x + Math.cos(tAngle) * toolDist;
-        tool.y = agent.y + Math.sin(tAngle) * toolDist;
-        tool._visible = true;
-      });
-      aTools.filter(c => !visibleTools.includes(c)).forEach(c => { c._visible = false; });
-    });
+    // Place agent's tools — only show running + last 5 completed
+    const aTools = agent.children.filter(c => matchesFilter(c));
+    const runningTools = aTools.filter(c => c.status === 'running');
+    const doneTools = aTools.filter(c => c.status !== 'running');
+    const visibleDone = doneTools.slice(-5);
+    const visibleTools = [...visibleDone, ...runningTools];
 
-    // Root-level tools — compact ring around session
-    const visibleRootTools = tools.filter(c => matchesFilter(c));
-    const runningRootTools = visibleRootTools.filter(c => c.status === 'running');
-    const doneRootTools = visibleRootTools.filter(c => c.status !== 'running');
-    const recentRootTools = [...doneRootTools.slice(-10), ...runningRootTools];
-    const rootToolDist = agents.length > 0 ? SPAWN_DIST * 0.55 : SPAWN_DIST * 0.7;
-    recentRootTools.forEach((tool, ti) => {
-      const angle = -Math.PI / 2 + (ti / Math.max(recentRootTools.length, 1)) * Math.PI * 2;
-      tool.x = cx + Math.cos(angle) * rootToolDist;
-      tool.y = root.y + Math.sin(angle) * rootToolDist;
+    // Fan tools outward from the agent, away from session center
+    const baseAngle = Math.atan2(agent.y - root.y, agent.x - root.x);
+    const toolDist = 90 + visibleTools.length * 8;
+    const spread = Math.min(Math.PI * 1.2, visibleTools.length * 0.35);
+
+    visibleTools.forEach((tool, ti) => {
+      const tAngle = baseAngle - spread / 2 + (ti / Math.max(visibleTools.length - 1, 1)) * spread;
+      tool.x = agent.x + Math.cos(tAngle) * toolDist;
+      tool.y = agent.y + Math.sin(tAngle) * toolDist;
       tool._visible = true;
     });
-    visibleRootTools.filter(c => !recentRootTools.includes(c)).forEach(c => { c._visible = false; });
+    aTools.filter(c => !visibleTools.includes(c)).forEach(c => { c._visible = false; });
   });
 
-  // Update visual node targets
-  for (const n of state.nodes.values()) {
+  // Root-level tools — compact ring around session
+  const visibleRootTools = tools.filter(c => matchesFilter(c));
+  const runningRootTools = visibleRootTools.filter(c => c.status === 'running');
+  const doneRootTools = visibleRootTools.filter(c => c.status !== 'running');
+  const recentRootTools = [...doneRootTools.slice(-10), ...runningRootTools];
+  const rootToolDist = agents.length > 0 ? SPAWN_DIST * 0.55 : SPAWN_DIST * 0.7;
+  recentRootTools.forEach((tool, ti) => {
+    const angle = -Math.PI / 2 + (ti / Math.max(recentRootTools.length, 1)) * Math.PI * 2;
+    tool.x = cx + Math.cos(angle) * rootToolDist;
+    tool.y = root.y + Math.sin(angle) * rootToolDist;
+    tool._visible = true;
+  });
+  visibleRootTools.filter(c => !recentRootTools.includes(c)).forEach(c => { c._visible = false; });
+}
+
+function pushTargetsForSubtree(root) {
+  const stack = [root];
+  while (stack.length) {
+    const n = stack.pop();
     const vn = ensureVisNode(n.id);
     vn.targetX = n.x;
     vn.targetY = n.y;
     const isDoneTool = (n.type === 'tool' || n.type === 'skill') && n.status !== 'running';
     vn.targetOpacity = (n._visible === false) ? 0 : isDoneTool ? 0.5 : 1;
     vn.targetScale = (n._visible === false) ? 0 : 1;
+    if (n.children && n.children.length) {
+      for (const c of n.children) stack.push(c);
+    }
   }
+}
+
+function layout() {
+  // Collect roots.
+  const roots = [];
+  for (const n of state.nodes.values()) {
+    if (!n.parentId) roots.push(n);
+  }
+  const totalRoots = roots.length;
+
+  // If root count changed, we must relayout everything (side-by-side offsets
+  // shift). Same for explicit full-dirty triggers (filter/resize/clear).
+  if (totalRoots !== _lastRootCount || _layoutFullDirty) {
+    _lastRootCount = totalRoots;
+    _layoutFullDirty = false;
+    layoutDirtyRoots.clear();
+    roots.forEach((root, i) => {
+      const cx = totalRoots > 1 ? (i - (totalRoots - 1) / 2) * 400 : 0;
+      root.x = cx; root.y = 0;
+      layoutRoot(root);
+      pushTargetsForSubtree(root);
+    });
+    return;
+  }
+
+  if (!layoutDirtyRoots.size) return;
+
+  // Incremental: only recompute dirty roots (positions unchanged since
+  // side-by-side offset depends on count, not content).
+  roots.forEach((root, i) => {
+    if (!layoutDirtyRoots.has(root.id)) return;
+    const cx = totalRoots > 1 ? (i - (totalRoots - 1) / 2) * 400 : 0;
+    root.x = cx; root.y = 0;
+    layoutRoot(root);
+    pushTargetsForSubtree(root);
+  });
+  layoutDirtyRoots.clear();
 }
 
 function matchesFilter(n) {
@@ -662,8 +795,39 @@ function matchesFilter(n) {
 // ═══════════════════════════════════════════════
 let lastFrame = 0;
 
-function animate(now) {
-  requestAnimationFrame(animate);
+// Returns true if any known node is still in `running` status — we keep
+// painting at 20 fps just for the glow pulse in that case.
+function hasRunningNode() {
+  for (const n of state.nodes.values()) {
+    if (n.status === 'running') return true;
+  }
+  return false;
+}
+
+// Check if any visual node's current state diverges from its target beyond
+// the settle epsilon. Used to know whether lerping still needs to run.
+function countMovingNodes() {
+  let moving = 0;
+  for (const vn of vis.nodes.values()) {
+    if (Math.abs(vn.x - vn.targetX) > LERP_EPS_POS
+      || Math.abs(vn.y - vn.targetY) > LERP_EPS_POS
+      || Math.abs(vn.opacity - vn.targetOpacity) > LERP_EPS_OPACITY
+      || Math.abs(vn.scale - vn.targetScale) > LERP_EPS_SCALE) moving++;
+  }
+  return moving;
+}
+
+function isCameraMoving() {
+  const cam = vis.camera;
+  return Math.abs(cam.x - cam.targetX) > LERP_EPS_POS
+    || Math.abs(cam.y - cam.targetY) > LERP_EPS_POS
+    || Math.abs(cam.zoom - cam.targetZoom) > 0.002;
+}
+
+function tick(now) {
+  vis.rafHandle = null;
+  vis.pulseTimer = null;
+  if (!lastFrame) lastFrame = now;
   const dt = Math.min((now - lastFrame) / 1000, 0.05);
   lastFrame = now;
   vis.time = now / 1000;
@@ -674,74 +838,120 @@ function animate(now) {
   cam.y += (cam.targetY - cam.y) * Math.min(1, dt * 8);
   cam.zoom += (cam.targetZoom - cam.zoom) * Math.min(1, dt * 8);
 
-  // Lerp visual nodes
-  for (const [id, vn] of vis.nodes) {
+  // Lerp visual nodes (snap to target on settle).
+  for (const vn of vis.nodes.values()) {
     const lerpAmt = Math.min(1, dt * LERP_SPEED);
     vn.x += (vn.targetX - vn.x) * lerpAmt;
     vn.y += (vn.targetY - vn.y) * lerpAmt;
     vn.opacity += (vn.targetOpacity - vn.opacity) * lerpAmt;
     vn.scale += (vn.targetScale - vn.scale) * lerpAmt;
+    if (Math.abs(vn.x - vn.targetX) < LERP_EPS_POS) vn.x = vn.targetX;
+    if (Math.abs(vn.y - vn.targetY) < LERP_EPS_POS) vn.y = vn.targetY;
+    if (Math.abs(vn.opacity - vn.targetOpacity) < LERP_EPS_OPACITY) vn.opacity = vn.targetOpacity;
+    if (Math.abs(vn.scale - vn.targetScale) < LERP_EPS_SCALE) vn.scale = vn.targetScale;
   }
 
-  // Update particles
+  // Update particles (always cheap — bounded pool).
   updateParticles(dt);
 
+  const t0 = performance.now();
   draw();
+  const frameMs = performance.now() - t0;
+  vis.avgFrameMs = vis.avgFrameMs * 0.9 + frameMs * 0.1;
+  vis.dirty = false;
+
+  // Decide if another frame is needed. If only the glow pulse keeps things
+  // animated, throttle to ~20 fps via setTimeout to save CPU.
+  const moving = countMovingNodes() + (isCameraMoving() ? 1 : 0);
+  vis.activeAnimations = moving;
+  const needsFull = vis.dirty || moving > 0 || vis.particles.length > 0;
+  if (needsFull) {
+    vis.rafHandle = requestAnimationFrame(tick);
+  } else if (hasRunningNode() || state.nodes.size === 0) {
+    // Pulse-only: throttle. (Empty-state rings also need continuous anim.)
+    const frameMs = performance.now() - now;
+    const delay = Math.max(0, PULSE_FRAME_MS - frameMs);
+    vis.pulseTimer = setTimeout(() => {
+      vis.pulseTimer = null;
+      vis.rafHandle = requestAnimationFrame(tick);
+    }, delay);
+  }
+  // else: fully idle — no frame scheduled. markDirty() will wake us up.
+}
+
+// Compute the visible world-space AABB for culling edges/nodes/particles.
+// Padding accounts for glow halos and particle overshoot outside a node body.
+function getWorldBounds() {
+  const cam = vis.camera;
+  const padWorld = 120 / Math.max(0.001, cam.zoom);
+  const tl = screenToWorld(0, 0);
+  const br = screenToWorld(W, H);
+  return {
+    minX: tl.x - padWorld, minY: tl.y - padWorld,
+    maxX: br.x + padWorld, maxY: br.y + padWorld,
+  };
+}
+
+function inBounds(vn, vw) {
+  return vn.x >= vw.minX && vn.x <= vw.maxX && vn.y >= vw.minY && vn.y <= vw.maxY;
+}
+
+// Last camera state used for static-bg caching.
+let _bgCamX = NaN, _bgCamY = NaN, _bgCamZoom = NaN;
+
+function paintStaticBg() {
+  const cam = vis.camera;
+  if (!_bgDirty && cam.x === _bgCamX && cam.y === _bgCamY && cam.zoom === _bgCamZoom) return;
+  _bgDirty = false;
+  _bgCamX = cam.x; _bgCamY = cam.y; _bgCamZoom = cam.zoom;
+  staticCtx.clearRect(0, 0, W, H);
+  staticCtx.fillStyle = COLORS.void;
+  staticCtx.fillRect(0, 0, W, H);
+  drawGrid(staticCtx);
 }
 
 function draw() {
   const cam = vis.camera;
+  // Camera movement invalidates the static background layer.
+  if (cam.x !== _bgCamX || cam.y !== _bgCamY || cam.zoom !== _bgCamZoom) markBgDirty();
+  paintStaticBg();
+
+  // Blit the cached background instead of re-rendering it.
   ctx.clearRect(0, 0, W, H);
-
-  // Background
-  ctx.fillStyle = COLORS.void;
-  ctx.fillRect(0, 0, W, H);
-
-  // Subtle grid
-  drawGrid();
+  ctx.drawImage(staticCanvas, 0, 0, W, H);
 
   // Apply camera transform
   ctx.save();
   ctx.translate(cam.x * cam.zoom, cam.y * cam.zoom);
   ctx.scale(cam.zoom, cam.zoom);
 
-  // Draw edges
+  const vw = getWorldBounds();
+
+  // Draw edges — skip if both endpoints are offscreen.
   for (const n of state.nodes.values()) {
     if (!n.parentId) continue;
     const vn = vis.nodes.get(n.id);
     const pvn = vis.nodes.get(n.parentId);
     if (!vn || !pvn || vn.opacity < 0.05) continue;
+    if (!inBounds(vn, vw) && !inBounds(pvn, vw)) continue;
     drawEdge(pvn, vn, n.status === 'running');
   }
 
-  // Draw particles
-  for (const p of vis.particles) {
-    if (p.opacity <= 0) continue;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-    ctx.fillStyle = hexAlpha(p.color, p.opacity * 0.8);
-    ctx.fill();
-    // Glow
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, p.size * 3, 0, Math.PI * 2);
-    ctx.fillStyle = hexAlpha(p.color, p.opacity * 0.15);
-    ctx.fill();
-  }
+  // Draw particles — batched by color for minimal ctx state thrash.
+  drawParticlesBatched(vw);
 
-  // Draw nodes (sorted: sessions first, then agents, then tools on top)
-  const drawOrder = [];
-  for (const n of state.nodes.values()) {
-    const vn = vis.nodes.get(n.id);
-    if (!vn || vn.opacity < 0.05) continue;
-    const order = n.type === 'session' ? 0 : n.type === 'agent' ? 1 : 2;
-    drawOrder.push({ n, vn, order });
+  // Draw nodes using pre-bucketed draw order (no sort).
+  for (const { n, vn } of vis.drawSessionNodes) {
+    if (vn.opacity < 0.05 || !inBounds(vn, vw)) continue;
+    drawSessionNode(n, vn);
   }
-  drawOrder.sort((a, b) => a.order - b.order);
-
-  for (const { n, vn } of drawOrder) {
-    if (n.type === 'session') drawSessionNode(n, vn);
-    else if (n.type === 'agent') drawAgentNode(n, vn);
-    else drawToolNode(n, vn);
+  for (const { n, vn } of vis.drawAgentNodes) {
+    if (vn.opacity < 0.05 || !inBounds(vn, vw)) continue;
+    drawAgentNode(n, vn);
+  }
+  for (const { n, vn } of vis.drawToolNodes) {
+    if (vn.opacity < 0.05 || !inBounds(vn, vw)) continue;
+    drawToolNode(n, vn);
   }
 
   ctx.restore();
@@ -750,6 +960,73 @@ function draw() {
   if (state.nodes.size === 0) {
     drawEmptyState();
   }
+}
+
+function drawParticlesBatched(vw) {
+  if (!vis.particles.length) return;
+  // Group particles by color. Expected distinct colors: ≤ 6 (COLORS palette).
+  const byColor = new Map();
+  for (const p of vis.particles) {
+    if (p.opacity <= 0) continue;
+    // Cull particles outside viewport — inexpensive.
+    if (p.x < vw.minX || p.x > vw.maxX || p.y < vw.minY || p.y > vw.maxY) continue;
+    let arr = byColor.get(p.color);
+    if (!arr) { arr = []; byColor.set(p.color, arr); }
+    arr.push(p);
+  }
+  for (const [color, arr] of byColor) {
+    // Main dots — one path per color.
+    ctx.beginPath();
+    for (const p of arr) {
+      ctx.moveTo(p.x + p.size, p.y);
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    }
+    // Average opacity approximation: use per-particle fills batched by color
+    // isn't possible without re-fill; pick a mid alpha. For visual parity,
+    // render the brightest first, then glow halos.
+    ctx.fillStyle = hexAlpha(color, 0.55);
+    ctx.fill();
+
+    // Glow halos — second pass, same batched path.
+    ctx.beginPath();
+    for (const p of arr) {
+      const r = p.size * 3;
+      ctx.moveTo(p.x + r, p.y);
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+    }
+    ctx.fillStyle = hexAlpha(color, 0.1);
+    ctx.fill();
+  }
+}
+
+// Pre-rendered glow sprites per color — avoids per-frame createRadialGradient.
+const GLOW_SPRITE_SIZE = 128; // pixel diameter
+const _glowSprites = new Map(); // color -> HTMLCanvasElement
+function getGlowSprite(color) {
+  let cv = _glowSprites.get(color);
+  if (cv) return cv;
+  cv = document.createElement('canvas');
+  cv.width = GLOW_SPRITE_SIZE; cv.height = GLOW_SPRITE_SIZE;
+  const gctx = cv.getContext('2d');
+  const cx = GLOW_SPRITE_SIZE / 2, cy = GLOW_SPRITE_SIZE / 2;
+  const grad = gctx.createRadialGradient(cx, cy, 0, cx, cy, GLOW_SPRITE_SIZE / 2);
+  grad.addColorStop(0, hexAlpha(color, 1));
+  grad.addColorStop(1, hexAlpha(color, 0));
+  gctx.fillStyle = grad;
+  gctx.fillRect(0, 0, GLOW_SPRITE_SIZE, GLOW_SPRITE_SIZE);
+  _glowSprites.set(color, cv);
+  return cv;
+}
+
+// Draw a pre-rendered glow sprite at world-space (cx, cy) with radius r and
+// alpha modulation — ~10× cheaper than per-node createRadialGradient.
+function drawGlowSprite(color, cx, cy, r, alpha) {
+  const sprite = getGlowSprite(color);
+  const size = r * 2;
+  ctx.save();
+  ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+  ctx.drawImage(sprite, cx - r, cy - r, size, size);
+  ctx.restore();
 }
 
 // Pre-rendered grid tile
@@ -774,18 +1051,19 @@ function ensureGridPattern() {
   _gridPattern = ctx.createPattern(_gridTile, 'repeat');
 }
 
-function drawGrid() {
+function drawGrid(targetCtx) {
   ensureGridPattern();
   if (!_gridPattern) return;
+  const c = targetCtx || ctx;
   const cam = vis.camera;
   const gridSize = 40;
   const ox = (cam.x * cam.zoom) % (gridSize * cam.zoom);
   const oy = (cam.y * cam.zoom) % (gridSize * cam.zoom);
-  ctx.save();
-  ctx.translate(ox, oy);
-  ctx.fillStyle = _gridPattern;
-  ctx.fillRect(-gridSize * cam.zoom, -gridSize * cam.zoom, W + gridSize * cam.zoom * 2, H + gridSize * cam.zoom * 2);
-  ctx.restore();
+  c.save();
+  c.translate(ox, oy);
+  c.fillStyle = _gridPattern;
+  c.fillRect(-gridSize * cam.zoom, -gridSize * cam.zoom, W + gridSize * cam.zoom * 2, H + gridSize * cam.zoom * 2);
+  c.restore();
 }
 
 function drawEdge(from, to, active) {
@@ -824,13 +1102,9 @@ function drawSessionNode(n, vn) {
   ctx.save();
   ctx.globalAlpha = vn.opacity;
 
-  // Outer glow
+  // Outer glow — cached sprite, modulated alpha.
   if (n.status === 'running' || isSelected) {
-    const gradient = ctx.createRadialGradient(vn.x, vn.y, r * 0.5, vn.x, vn.y, r * 2.5);
-    gradient.addColorStop(0, hexAlpha(n.color, 0.15 + pulse * 0.1));
-    gradient.addColorStop(1, 'transparent');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(vn.x - r * 3, vn.y - r * 3, r * 6, r * 6);
+    drawGlowSprite(n.color, vn.x, vn.y, r * 2.5, (0.15 + pulse * 0.1) * vn.opacity);
   }
 
   // Ring
@@ -892,13 +1166,9 @@ function drawAgentNode(n, vn) {
   ctx.save();
   ctx.globalAlpha = vn.opacity;
 
-  // Glow
+  // Glow — cached sprite.
   if (n.status === 'running' || isSelected) {
-    const gradient = ctx.createRadialGradient(vn.x, vn.y, r * 0.3, vn.x, vn.y, r * 2);
-    gradient.addColorStop(0, hexAlpha(n.color, 0.12 + pulse * 0.08));
-    gradient.addColorStop(1, 'transparent');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(vn.x - r * 2.5, vn.y - r * 2.5, r * 5, r * 5);
+    drawGlowSprite(n.color, vn.x, vn.y, r * 2, (0.12 + pulse * 0.08) * vn.opacity);
   }
 
   // Circle
@@ -972,13 +1242,9 @@ function drawToolNode(n, vn) {
 
   const color = isError ? COLORS.error : n.color;
 
-  // Glow for running
+  // Glow for running — cached sprite.
   if (isRunning) {
-    const gradient = ctx.createRadialGradient(vn.x, vn.y, 0, vn.x, vn.y, w * 0.8);
-    gradient.addColorStop(0, hexAlpha(color, 0.06));
-    gradient.addColorStop(1, 'transparent');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(vn.x - w, vn.y - w, w * 2, w * 2);
+    drawGlowSprite(color, vn.x, vn.y, w * 0.8, 0.06 * vn.opacity);
   }
 
   // Card background
@@ -1068,12 +1334,23 @@ function drawEmptyState() {
 // ═══════════════════════════════════════════════
 // PARTICLES
 // ═══════════════════════════════════════════════
+const PARTICLE_CAP = 80;
+
 function updateParticles(dt) {
-  // Spawn
-  for (const n of state.nodes.values()) {
-    if (n.status !== 'running' || !n.parentId) continue;
+  // Adaptive skip: if we're running below ~40 fps, spawn/animate only every
+  // other frame. Keeps the sim alive without worsening a struggling machine.
+  const heavy = vis.avgFrameMs > 25;
+  if (heavy) {
+    vis._particleSkipToggle = !vis._particleSkipToggle;
+    if (vis._particleSkipToggle) return;
+  }
+
+  // Spawn only from currently-running nodes (tiny set, typically 1–3).
+  for (const id of vis.runningNodes) {
+    const n = state.nodes.get(id);
+    if (!n || !n.parentId) continue;
     const pvn = vis.nodes.get(n.parentId);
-    const vn = vis.nodes.get(n.id);
+    const vn = vis.nodes.get(id);
     if (!pvn || !vn || vn.opacity < 0.1) continue;
 
     if (Math.random() < dt * 3) {
@@ -1100,7 +1377,7 @@ function updateParticles(dt) {
   }
 
   // Cap particles
-  if (vis.particles.length > 200) vis.particles.splice(0, vis.particles.length - 200);
+  if (vis.particles.length > PARTICLE_CAP) vis.particles.splice(0, vis.particles.length - PARTICLE_CAP);
 }
 
 function easeInOut(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
@@ -1215,6 +1492,7 @@ document.getElementById('feed-list').addEventListener('click', e => {
     }
   }
   renderFeed();
+  markDirty();
 });
 
 // ═══════════════════════════════════════════════
@@ -1256,6 +1534,7 @@ document.getElementById('detail-close').addEventListener('click', () => {
   document.getElementById('detail-popup').classList.remove('visible');
   state.selected = null;
   renderFeed();
+  markDirty();
 });
 
 // ═══════════════════════════════════════════════
@@ -1373,13 +1652,70 @@ document.getElementById('sessions-list').addEventListener('click', e => {
 });
 
 function clearState() {
-  state.events = []; state.offset = 0; state.nodes.clear();
+  state.eventSeq = 0; state.offset = 0; state.nodes.clear();
   state.selected = null; state.toolsCompleted = 0;
   state.timelineEntries = []; state.startTimes.clear();
   state._lastServerId = null;
   vis.nodes.clear(); vis.particles = [];
   _feedRenderedCount = 0; _feedNeedsFullRebuild = true;
+  markLayoutFullDirty();
+  layoutDirtyRoots.clear();
+  _lastRootCount = -1;
+  vis.drawSessionNodes.length = 0;
+  vis.drawAgentNodes.length = 0;
+  vis.drawToolNodes.length = 0;
+  vis.runningNodes.clear();
   renderFeed(); updateStats();
+}
+
+// ═══════════════════════════════════════════════
+// GARBAGE COLLECTION
+// ═══════════════════════════════════════════════
+// Drop tool/skill/notification nodes that are finished, older than the GC
+// window, and not referenced by any visible feed entry. Visually safe because
+// layout() only exposes the last 5 done tools per agent anyway.
+function garbageCollect() {
+  const now = Date.now();
+  // Build a live-reference set from current timeline entries so we never
+  // orphan a feed item that the user can still click.
+  const referenced = new Set();
+  for (const e of state.timelineEntries) referenced.add(e.nodeId);
+
+  const victims = [];
+  for (const n of state.nodes.values()) {
+    if (n.type !== 'tool' && n.type !== 'skill' && n.type !== 'notification') continue;
+    if (n.status === 'running') continue;
+    if (!n.endTime) continue;
+    const endMs = +new Date(n.endTime);
+    if (!isFinite(endMs)) continue;
+    if (now - endMs < NODE_GC_MAX_AGE_MS) continue;
+    if (referenced.has(n.id)) continue;
+    victims.push(n);
+  }
+  if (!victims.length) return;
+  const victimIds = new Set(victims.map(v => v.id));
+  for (const n of victims) {
+    if (n.parentId) {
+      const parent = state.nodes.get(n.parentId);
+      if (parent) {
+        const idx = parent.children.indexOf(n);
+        if (idx >= 0) parent.children.splice(idx, 1);
+      }
+    }
+    state.nodes.delete(n.id);
+    vis.nodes.delete(n.id);
+    vis.runningNodes.delete(n.id);
+  }
+  // Remove victims from draw buckets in one pass.
+  const purge = arr => {
+    for (let i = arr.length - 1; i >= 0; i--) {
+      if (victimIds.has(arr[i].n.id)) arr.splice(i, 1);
+    }
+  };
+  purge(vis.drawToolNodes);
+  purge(vis.drawAgentNodes);
+  purge(vis.drawSessionNodes);
+  markDirty();
 }
 
 async function resetEvents() {
@@ -1394,6 +1730,7 @@ async function resetEvents() {
 function toggleAutoFit() {
   state.autoFit = !state.autoFit;
   document.getElementById('autofit-label').textContent = state.autoFit ? 'ON' : 'OFF';
+  if (state.autoFit) { fitView(); markDirty(); }
 }
 
 // ═══════════════════════════════════════════════
@@ -1403,10 +1740,10 @@ const searchBox = document.getElementById('search-box');
 
 document.addEventListener('keydown', e => {
   if (e.target === searchBox) {
-    if (e.key === 'Escape') { searchBox.blur(); searchBox.value = ''; state.filter = ''; layout(); }
+    if (e.key === 'Escape') { searchBox.blur(); searchBox.value = ''; state.filter = ''; markLayoutFullDirty(); layout(); markDirty(); }
     return;
   }
-  if (e.key === 'f' || e.key === 'F') fitView();
+  if (e.key === 'f' || e.key === 'F') { fitView(); markDirty(); }
   if (e.key === 'c' || e.key === 'C') resetEvents();
   if (e.key === 's' || e.key === 'S') toggleSessions();
   if (e.key === '/') { e.preventDefault(); searchBox.focus(); }
@@ -1415,12 +1752,15 @@ document.addEventListener('keydown', e => {
     document.getElementById('detail-popup').classList.remove('visible');
     document.getElementById('sessions-overlay').classList.remove('visible');
     renderFeed();
+    markDirty();
   }
 });
 
 searchBox.addEventListener('input', () => {
   state.filter = searchBox.value.toLowerCase();
+  markLayoutFullDirty();
   layout();
+  markDirty();
 });
 
 // ═══════════════════════════════════════════════
@@ -1430,24 +1770,81 @@ let sseSource = null;
 let sseConnected = false;
 const connDot = document.getElementById('connection-dot');
 
+// Debounced render pipeline — coalesces bursts of SSE/poll events into one
+// layout/render pass per microtask tick.
+let _pendingRender = false;
+let _pendingFitView = false;
+function scheduleRender() {
+  if (_pendingRender) return;
+  _pendingRender = true;
+  queueMicrotask(() => {
+    _pendingRender = false;
+    layout();
+    renderFeed();
+    updateStats();
+    if (_pendingFitView && state.autoFit && state.nodes.size) {
+      fitView();
+    }
+    _pendingFitView = false;
+    // Arm the live-duration ticker if a running node exists. Cheap — one
+    // pass over the node map per burst, not per event.
+    if (!_durationsTimer) {
+      for (const n of state.nodes.values()) {
+        if (n.status === 'running') { startDurationsTicker(); break; }
+      }
+    }
+    markDirty();
+  });
+}
+
+// Poll fallback — only runs while SSE is disconnected. Self-cancels when SSE
+// reconnects (sseConnected becomes true).
+let _pollFallbackTimer = null;
+function startPollFallback() {
+  if (_pollFallbackTimer != null) return;
+  const loop = () => {
+    _pollFallbackTimer = null;
+    if (sseConnected) return;
+    poll().finally(() => {
+      if (!sseConnected) _pollFallbackTimer = setTimeout(loop, 5000);
+    });
+  };
+  _pollFallbackTimer = setTimeout(loop, 5000);
+}
+function stopPollFallback() {
+  if (_pollFallbackTimer != null) { clearTimeout(_pollFallbackTimer); _pollFallbackTimer = null; }
+}
+
 function connectSSE() {
   if (sseSource) sseSource.close();
   sseSource = new EventSource('/stream');
-  sseSource.onopen = () => { sseConnected = true; connDot.classList.add('connected'); connDot.title = 'Connected'; };
-  sseSource.onerror = () => { sseConnected = false; connDot.classList.remove('connected'); connDot.title = 'Disconnected'; };
+  sseSource.onopen = () => {
+    sseConnected = true;
+    connDot.classList.add('connected');
+    connDot.title = 'Connected';
+    stopPollFallback();
+  };
+  sseSource.onerror = () => {
+    sseConnected = false;
+    connDot.classList.remove('connected');
+    connDot.title = 'Disconnected';
+    startPollFallback();
+  };
   sseSource.onmessage = (msg) => {
     try {
       const data = JSON.parse(msg.data);
+      if (data.type === 'sessionsChanged') {
+        loadSessions();
+        return;
+      }
       if (data.type === 'event') {
         const target = currentSessionId || state._lastServerId;
         if (!target || data.session === target) {
           if (!currentSessionId && !state._lastServerId) { state._lastServerId = data.session; updateTopbarPrompt(); }
-          state.events.push(data.event);
+          state.eventSeq++;
           processEvent(data.event);
-          layout();
-          renderFeed();
-          updateStats();
-          if (state.autoFit && state.nodes.size) setTimeout(fitView, 100);
+          if (state.autoFit && (firstBatch || state.nodes.size)) _pendingFitView = true;
+          scheduleRender();
         }
       }
     } catch {}
@@ -1472,23 +1869,39 @@ async function poll(force) {
     state.offset = size;
     const lines = text.trim().split('\n');
     for (const line of lines) {
-      try { const evt = JSON.parse(line); state.events.push(evt); processEvent(evt); } catch {}
+      try { const evt = JSON.parse(line); state.eventSeq++; processEvent(evt); } catch {}
     }
-    layout(); renderFeed(); updateStats();
-    if (firstBatch && state.nodes.size) { firstBatch = false; setTimeout(fitView, 100); }
+    if (firstBatch && state.nodes.size) { firstBatch = false; _pendingFitView = true; }
+    scheduleRender();
   } catch {}
 }
 
-// Live durations
+// Live durations — only runs when there is at least one running node.
+let _durationsTimer = null;
+function startDurationsTicker() {
+  if (_durationsTimer != null) return;
+  _durationsTimer = setInterval(updateLiveDurations, 1000);
+}
+function stopDurationsTicker() {
+  if (_durationsTimer != null) { clearInterval(_durationsTimer); _durationsTimer = null; }
+}
+
 function updateLiveDurations() {
+  let anyRunning = false;
   const now = new Date();
   for (const n of state.nodes.values()) {
     if (n.status === 'running' && n.startTime) {
+      anyRunning = true;
       const ms = now - new Date(n.startTime);
       n.duration = ms < 1000 ? `${ms}ms` : ms < 60000 ? `${(ms / 1000).toFixed(1)}s` : `${(ms / 60000).toFixed(1)}m`;
     }
   }
-  // Surgical update: only touch duration text of running items
+  if (!anyRunning) {
+    // Nothing to tick — suspend until a new running node arrives.
+    stopDurationsTicker();
+    return;
+  }
+  // Surgical update: only touch duration text of running items.
   for (const el of document.querySelectorAll('.feed-item.running')) {
     const nodeId = el.dataset.node;
     const n = state.nodes.get(nodeId);
@@ -1497,7 +1910,42 @@ function updateLiveDurations() {
       if (durEl) durEl.textContent = n.duration || '';
     }
   }
+  markDirty();
 }
+
+// ═══════════════════════════════════════════════
+// VISIBILITY API — pause everything while the tab is hidden
+// ═══════════════════════════════════════════════
+let _visibilityPauseTimer = null;
+let _paused = false;
+function pauseApp() {
+  if (_paused) return;
+  _paused = true;
+  if (sseSource) { sseSource.close(); sseSource = null; sseConnected = false; }
+  stopPollFallback();
+  stopDurationsTicker();
+  if (vis.rafHandle != null) { cancelAnimationFrame(vis.rafHandle); vis.rafHandle = null; }
+  if (vis.pulseTimer != null) { clearTimeout(vis.pulseTimer); vis.pulseTimer = null; }
+}
+function resumeApp() {
+  if (!_paused) return;
+  _paused = false;
+  connectSSE();
+  // Catch up missed events via the offset mechanism.
+  poll(true);
+  markDirty();
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    // Debounce 2 s — don't pause on fast tab-flips.
+    if (_visibilityPauseTimer == null) {
+      _visibilityPauseTimer = setTimeout(() => { _visibilityPauseTimer = null; pauseApp(); }, 2000);
+    }
+  } else {
+    if (_visibilityPauseTimer != null) { clearTimeout(_visibilityPauseTimer); _visibilityPauseTimer = null; }
+    resumeApp();
+  }
+});
 
 // ═══════════════════════════════════════════════
 // INIT
@@ -1505,10 +1953,8 @@ function updateLiveDurations() {
 loadSessions();
 connectSSE();
 poll();
-setInterval(loadSessions, 5000);
-setInterval(poll, 5000);
-setInterval(updateLiveDurations, 1000);
-requestAnimationFrame(animate);
+setInterval(garbageCollect, 60000);
+requestRender();
 </script>
 </body>
 </html>
