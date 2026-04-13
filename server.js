@@ -501,6 +501,24 @@ function startServer() {
       return;
     }
 
+    // Serve static ES modules from /public. No directory traversal.
+    if (req.method === 'GET' && url.pathname.startsWith('/public/')) {
+      const safe = url.pathname.replace(/\.\.+/g, '');
+      const p = path.join(__dirname, safe);
+      const root = path.join(__dirname, 'public');
+      if (p.startsWith(root + path.sep) || p === root) {
+        try {
+          const data = await fsp.readFile(p);
+          res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8' });
+          res.end(data);
+        } catch {
+          res.writeHead(404);
+          res.end('Not found');
+        }
+        return;
+      }
+    }
+
     if (url.pathname === '/' || url.pathname === '/index.html') {
       try {
         const html = await fsp.readFile(HTML);
