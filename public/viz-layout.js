@@ -73,6 +73,30 @@ export function setRunning(id, on) {
   else vis.runningNodes.delete(id);
 }
 
+// Lazy-promote a node created by getNode('a:<aid>') with default type='tool'
+// into a real agent node. Claude Code does not emit SubagentStart hooks today,
+// so the first child PreToolUse carrying agent_id is our spawn signal.
+// Child events also carry agent_type, so we have a real label immediately.
+function promoteAgentNode(n, evt, sid, ts) {
+  n.type = 'agent';
+  n.label = evt.agent_type || evt.subagent_type || 'Agent';
+  if (!n.sub) n.sub = (evt.agent_id || '').slice(0, 8);
+  n.color = COLORS.agent;
+  n.status = 'running';
+  if (!n.startTime) n.startTime = ts;
+  setRunning(n.id, true);
+  if (!n.parentId) {
+    const parent = getNode(`s:${sid}`);
+    parent.type = 'session';
+    parent.label = parent.label || 'Session';
+    parent.color = COLORS.session;
+    n.parentId = parent.id;
+    parent.children.push(n);
+    recomputeParallelFlags(parent.id);
+  }
+  addTimelineEntry(evt, n.id, 'agent', n.label, n.sub);
+}
+
 // Mark all running agents under this session as parallel if 2+ run at once.
 // Sticky: once flagged, an agent keeps isParallel=true for the rest of its life.
 export function recomputeParallelFlags(sessionId) {
@@ -163,7 +187,11 @@ export function processEvent(evt) {
     state.startTimes.set(tid, ts);
     const parentId = evt.agent_id ? `a:${evt.agent_id}` : `s:${sid}`;
     const parent = getNode(parentId);
-    if (parentId.startsWith('s:')) { parent.type = 'session'; parent.label = parent.label || 'Session'; parent.color = COLORS.session; }
+    if (parentId.startsWith('s:')) {
+      parent.type = 'session'; parent.label = parent.label || 'Session'; parent.color = COLORS.session;
+    } else if (parent.type !== 'agent') {
+      promoteAgentNode(parent, evt, sid, ts);
+    }
     if (!n.parentId) { n.parentId = parent.id; parent.children.push(n); }
     addTimelineEntry(evt, n.id, n.type, n.label, n.sub);
   }
@@ -171,11 +199,38 @@ export function processEvent(evt) {
     const tid = evt.tool_use_id || '';
     const n = state.nodes.get(`t:${tid}`);
     if (n) { n.status = 'done'; n.data = evt; n.endTime = ts; n.duration = calcDuration(n.startTime, ts); state.toolsCompleted++; setRunning(n.id, false); }
+    // Subagent completion: PostToolUse on the main-thread Agent tool carries
+    // tool_response.agentId. This is the canonical "subagent done" signal,
+    // since SubagentStop hooks are not reliably emitted.
+    if (evt.tool_name === 'Agent') {
+      const aid = evt.tool_response && evt.tool_response.agentId;
+      const an = aid ? state.nodes.get(`a:${aid}`) : null;
+      if (an && an.status === 'running') {
+        an.status = 'done';
+        an.endTime = ts;
+        an.duration = calcDuration(an.startTime, ts);
+        an.color = COLORS.complete;
+        setRunning(an.id, false);
+        const desc = evt.tool_input && evt.tool_input.description;
+        if (desc) an.sub = desc.slice(0, 45);
+        if (an.parentId) recomputeParallelFlags(an.parentId);
+      }
+    }
   }
   else if (e === 'PostToolUseFailure') {
     const tid = evt.tool_use_id || '';
     const n = state.nodes.get(`t:${tid}`);
     if (n) { n.status = 'error'; n.color = COLORS.error; n.data = evt; n.endTime = ts; n.duration = calcDuration(n.startTime, ts); setRunning(n.id, false); }
+    if (evt.tool_name === 'Agent') {
+      const aid = evt.tool_response && evt.tool_response.agentId;
+      const an = aid ? state.nodes.get(`a:${aid}`) : null;
+      if (an && an.status === 'running') {
+        an.status = 'error'; an.color = COLORS.error;
+        an.endTime = ts; an.duration = calcDuration(an.startTime, ts);
+        setRunning(an.id, false);
+        if (an.parentId) recomputeParallelFlags(an.parentId);
+      }
+    }
   }
   else if (e === 'Notification') {
     const nid = `n:${state.eventSeq++}`;
