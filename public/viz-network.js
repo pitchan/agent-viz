@@ -86,6 +86,20 @@ export function connectSSE() {
         loadSessions();
         return;
       }
+      if (data.type === 'tokens') {
+        const target = currentSessionId || state._lastServerId;
+        if (!target || data.session === target) {
+          state.tokens.main = data.main || null;
+          state.tokens.perAgent.clear();
+          if (data.perAgent) {
+            for (const [aid, bucket] of Object.entries(data.perAgent)) {
+              state.tokens.perAgent.set(aid, bucket);
+            }
+          }
+          markDirty();
+        }
+        return;
+      }
       if (data.type === 'event') {
         const target = currentSessionId || state._lastServerId;
         if (!target || data.session === target) {
@@ -190,12 +204,15 @@ export function clearState() {
   state.selected = null; state.toolsCompleted = 0;
   state.timelineEntries = []; state.startTimes.clear();
   state._lastServerId = null;
+  state.tokens.main = null; state.tokens.perAgent.clear();
   vis.nodes.clear(); vis.particles = [];
   _feedResetHook();
   resetLayout();
   vis.drawSessionNodes.length = 0;
   vis.drawAgentNodes.length = 0;
   vis.drawToolNodes.length = 0;
+  vis.drawSkillNodes.length = 0;
+  vis.drawMcpNodes.length = 0;
   vis.runningNodes.clear();
   renderFeed(); updateStats();
 }

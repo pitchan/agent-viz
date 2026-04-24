@@ -240,6 +240,24 @@ canvas { display: block; width: 100%; height: 100%; }
 @keyframes slide-in { from{opacity:0;transform:translateX(10px)}to{opacity:1;transform:translateX(0)} }
 @keyframes slide-up { from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)} }
 
+/* ─── Node hover tooltip ─── */
+#node-tooltip {
+  position: fixed; z-index: 200; pointer-events: none;
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px; padding: 8px 12px;
+  font-size: 11px; color: var(--text-primary);
+  max-width: 340px; word-break: break-all;
+  opacity: 0; transition: opacity 0.12s;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5), inset 0 1px 0 rgba(102,204,255,0.05);
+}
+#node-tooltip.visible { opacity: 1; }
+#node-tooltip .nt-type { font-size: 9px; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 4px; font-weight: 600; }
+#node-tooltip .nt-label { font-weight: 600; font-size: 12px; margin-bottom: 3px; color: var(--text-primary); word-break: break-word; }
+#node-tooltip .nt-sub { font-size: 10px; color: var(--text-dim); word-break: break-all; }
+#node-tooltip .nt-meta { font-size: 9px; color: var(--text-muted); margin-top: 4px; font-variant-numeric: tabular-nums; }
+
 /* ─── Scrollbar global ─── */
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -308,6 +326,7 @@ canvas { display: block; width: 100%; height: 100%; }
     </div>
   </div>
 </div>
+<div id="node-tooltip"></div>
 
 <!-- Modularized JS — see ./public/viz-*.js -->
 <script type="module">

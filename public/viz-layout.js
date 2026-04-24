@@ -6,7 +6,7 @@
 
 import {
   COLORS, SPAWN_DIST, TIMELINE_CAP, NODE_GC_MAX_AGE_MS,
-  state, vis, markDirty,
+  state, vis, markDirty, parseMcpName,
 } from './viz-state.js';
 
 // ─── Feed-cursor adjust hook ──────────────────────────────────────────────
@@ -23,6 +23,7 @@ export function getNode(id) {
       id, type: 'tool', label: '', sub: '', color: COLORS.tool,
       children: [], parentId: null, data: null, status: 'running',
       x: 0, y: 0, duration: null, startTime: null, endTime: null,
+      isIsolated: false, isParallel: false,
     });
   }
   return state.nodes.get(id);
@@ -46,6 +47,8 @@ export function ensureVisNode(id) {
     if (n) {
       const bucket = n.type === 'session' ? vis.drawSessionNodes
         : n.type === 'agent' ? vis.drawAgentNodes
+        : n.type === 'skill' ? vis.drawSkillNodes
+        : n.type === 'mcp' ? vis.drawMcpNodes
         : vis.drawToolNodes;
       bucket.push({ n, vn });
     }
@@ -70,6 +73,39 @@ export function setRunning(id, on) {
   else vis.runningNodes.delete(id);
 }
 
+// Mark all running agents under this session as parallel if 2+ run at once.
+// Sticky: once flagged, an agent keeps isParallel=true for the rest of its life.
+export function recomputeParallelFlags(sessionId) {
+  const session = state.nodes.get(sessionId);
+  if (!session) return;
+  const runningAgents = session.children.filter(c =>
+    c.type === 'agent' && c.status === 'running'
+  );
+  if (runningAgents.length >= 2) {
+    for (const a of runningAgents) a.isParallel = true;
+  }
+}
+
+// On SessionEnd, close every descendant that was still running so particle
+// generation (which iterates vis.runningNodes) stops immediately.
+export function cascadeTerminate(rootNodeId, ts) {
+  const root = state.nodes.get(rootNodeId);
+  if (!root) return;
+  const stack = [...(root.children || [])];
+  while (stack.length) {
+    const n = stack.pop();
+    if (n.status === 'running') {
+      n.status = 'done';
+      n.endTime = ts;
+      n.duration = calcDuration(n.startTime, ts);
+      setRunning(n.id, false);
+    }
+    if (n.children && n.children.length) {
+      for (const c of n.children) stack.push(c);
+    }
+  }
+}
+
 // ─── Event → graph mutation ───────────────────────────────────────────────
 export function processEvent(evt) {
   const sid = evt.session_id || 'unknown';
@@ -91,25 +127,37 @@ export function processEvent(evt) {
     n.label = evt.agent_type || evt.subagent_type || 'Agent';
     n.sub = (evt.tool_input && evt.tool_input.description) || aid.slice(0, 8);
     n.color = COLORS.agent; n.data = evt; n.status = 'running'; n.startTime = ts;
+    if (evt.tool_input && evt.tool_input.isolation === 'worktree') n.isIsolated = true;
     setRunning(n.id, true);
     const parent = getNode(`s:${sid}`);
     parent.type = 'session'; parent.label = parent.label || 'Session'; parent.color = COLORS.session;
     if (!n.parentId) { n.parentId = parent.id; parent.children.push(n); }
+    recomputeParallelFlags(parent.id);
     addTimelineEntry(evt, n.id, 'agent', n.label, n.sub);
   }
   else if (e === 'SubagentStop') {
     const aid = evt.agent_id || sid;
     const n = state.nodes.get(`a:${aid}`);
-    if (n) { n.status = 'done'; n.data = evt; n.endTime = ts; n.duration = calcDuration(n.startTime, ts); n.color = COLORS.complete; setRunning(n.id, false); }
+    if (n) {
+      n.status = 'done'; n.data = evt; n.endTime = ts; n.duration = calcDuration(n.startTime, ts); n.color = COLORS.complete; setRunning(n.id, false);
+      if (n.parentId) recomputeParallelFlags(n.parentId);
+    }
   }
   else if (e === 'PreToolUse') {
     const tid = evt.tool_use_id || `t${state.eventSeq++}`;
     const n = getNode(`t:${tid}`);
     const isSkill = evt.tool_name === 'Skill';
-    n.type = isSkill ? 'skill' : 'tool';
-    n.label = isSkill ? ((evt.tool_input && evt.tool_input.skill) || 'Skill') : (evt.tool_name || 'Tool');
-    n.sub = formatToolSub(evt);
-    n.color = isSkill ? COLORS.skill : COLORS.tool;
+    const isMcp = typeof evt.tool_name === 'string' && evt.tool_name.startsWith('mcp__');
+    n.type = isSkill ? 'skill' : isMcp ? 'mcp' : 'tool';
+    if (isMcp) {
+      const parsed = parseMcpName(evt.tool_name);
+      n.label = parsed.label;
+      n.sub = parsed.sub;
+    } else {
+      n.label = isSkill ? ((evt.tool_input && evt.tool_input.skill) || 'Skill') : (evt.tool_name || 'Tool');
+      n.sub = formatToolSub(evt);
+    }
+    n.color = isSkill ? COLORS.skill : isMcp ? COLORS.mcp : COLORS.tool;
     n.data = evt; n.status = 'running'; n.startTime = ts;
     setRunning(n.id, true);
     state.startTimes.set(tid, ts);
@@ -141,7 +189,10 @@ export function processEvent(evt) {
   }
   else if (e === 'Stop' || e === 'SessionEnd') {
     const n = state.nodes.get(`s:${sid}`);
-    if (n) { n.status = 'done'; n.data = evt; n.endTime = ts; n.duration = calcDuration(n.startTime, ts); n.color = COLORS.complete; setRunning(n.id, false); }
+    if (n) {
+      n.status = 'done'; n.data = evt; n.endTime = ts; n.duration = calcDuration(n.startTime, ts); n.color = COLORS.complete; setRunning(n.id, false);
+      cascadeTerminate(n.id, ts);
+    }
   }
 }
 
@@ -242,7 +293,7 @@ function pushTargetsForSubtree(root) {
     const vn = ensureVisNode(n.id);
     vn.targetX = n.x;
     vn.targetY = n.y;
-    const isDoneTool = (n.type === 'tool' || n.type === 'skill') && n.status !== 'running';
+    const isDoneTool = (n.type === 'tool' || n.type === 'skill' || n.type === 'mcp') && n.status !== 'running';
     vn.targetOpacity = (n._visible === false) ? 0 : isDoneTool ? 0.5 : 1;
     vn.targetScale = (n._visible === false) ? 0 : 1;
     if (n.children && n.children.length) {
@@ -299,7 +350,7 @@ export function garbageCollect() {
 
   const victims = [];
   for (const n of state.nodes.values()) {
-    if (n.type !== 'tool' && n.type !== 'skill' && n.type !== 'notification') continue;
+    if (n.type !== 'tool' && n.type !== 'skill' && n.type !== 'mcp' && n.type !== 'notification') continue;
     if (n.status === 'running') continue;
     if (!n.endTime) continue;
     const endMs = +new Date(n.endTime);
@@ -328,6 +379,8 @@ export function garbageCollect() {
     }
   };
   purge(vis.drawToolNodes);
+  purge(vis.drawSkillNodes);
+  purge(vis.drawMcpNodes);
   purge(vis.drawAgentNodes);
   purge(vis.drawSessionNodes);
   markDirty();

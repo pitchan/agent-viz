@@ -8,6 +8,7 @@
 
 import {
   COLORS, state, vis, markDirty, hexAlpha, esc,
+  formatTokens, tokenTotal, tokenContext, agentIdFromNode,
 } from './viz-state.js';
 import {
   layout, matchesFilter, markLayoutFullDirty, setFeedCursorAdjust,
@@ -65,7 +66,7 @@ export function renderFeed() {
 }
 
 function getTypeColor(type) {
-  const map = { session: COLORS.session, agent: COLORS.agent, tool: COLORS.tool, skill: COLORS.skill, notification: COLORS.notification, error: COLORS.error };
+  const map = { session: COLORS.session, agent: COLORS.agent, tool: COLORS.tool, skill: COLORS.skill, mcp: COLORS.mcp, notification: COLORS.notification, error: COLORS.error };
   return map[type] || COLORS.tool;
 }
 
@@ -115,9 +116,44 @@ export function showDetail(n) {
       <div class="meta-label">Type</div>
       <div class="meta-value">${n.type}</div>
     </div>
+    ${tokenCardsHTML(n)}
   `;
 
   document.getElementById('detail-json').textContent = n.data ? JSON.stringify(n.data, null, 2) : '';
+}
+
+// For session/agent nodes, render meta-cards with the token breakdown:
+// one "Context" card (current window size, matches /context) + 4 cumulative
+// cards (total processed over the session lifetime). Returns '' otherwise.
+function tokenCardsHTML(n) {
+  let bucket = null;
+  let contextSize = 0;
+  if (n.type === 'session') {
+    // Session's cumulative = main + all subagents (useful for raw volume view).
+    bucket = { in: 0, out: 0, cacheCreate: 0, cacheRead: 0 };
+    const add = b => { if (!b) return;
+      bucket.in += b.in || 0; bucket.out += b.out || 0;
+      bucket.cacheCreate += b.cacheCreate || 0; bucket.cacheRead += b.cacheRead || 0; };
+    add(state.tokens.main);
+    for (const b of state.tokens.perAgent.values()) add(b);
+    // Context size = main thread only (matches what /context reports).
+    contextSize = tokenContext(state.tokens.main);
+  } else if (n.type === 'agent') {
+    const aid = agentIdFromNode(n.id);
+    bucket = aid ? state.tokens.perAgent.get(aid) : null;
+    contextSize = tokenContext(bucket);
+  }
+  if (!bucket || tokenTotal(bucket) === 0) return '';
+  const ctxCard = contextSize > 0
+    ? `<div class="meta-card"><div class="meta-label">Context (current)</div><div class="meta-value">${formatTokens(contextSize)}</div></div>`
+    : '';
+  return `
+    ${ctxCard}
+    <div class="meta-card"><div class="meta-label">Input (cumul.)</div><div class="meta-value">${formatTokens(bucket.in)}</div></div>
+    <div class="meta-card"><div class="meta-label">Output (cumul.)</div><div class="meta-value">${formatTokens(bucket.out)}</div></div>
+    <div class="meta-card"><div class="meta-label">Cache read (cumul.)</div><div class="meta-value">${formatTokens(bucket.cacheRead)}</div></div>
+    <div class="meta-card"><div class="meta-label">Cache create (cumul.)</div><div class="meta-value">${formatTokens(bucket.cacheCreate)}</div></div>
+  `;
 }
 
 document.getElementById('detail-close').addEventListener('click', () => {

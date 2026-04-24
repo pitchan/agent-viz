@@ -9,7 +9,8 @@ export const COLORS = {
   void: '#050510',
   grid: 'rgba(102, 204, 255, 0.03)',
   session: '#66ccff', agent: '#bc8cff', tool: '#ffbb44',
-  skill: '#56d6e2', error: '#ff5566', notification: '#ffaa33',
+  skill: '#56d6e2', mcp: '#ff8cc8',
+  error: '#ff5566', notification: '#ffaa33',
   complete: '#66ffaa', stop: '#8b949e',
   edge: 'rgba(102, 204, 255, 0.15)', edgeActive: 'rgba(102, 204, 255, 0.4)',
   particle: '#66ccff',
@@ -19,6 +20,8 @@ export const COLORS = {
 export const AGENT_R = 36;
 export const SESSION_R = 44;
 export const TOOL_W = 130, TOOL_H = 28;
+export const SKILL_R = 22;
+export const MCP_R = 24;
 export const SPAWN_DIST = 220;
 export const LERP_SPEED = 5;
 
@@ -40,6 +43,10 @@ export const state = {
   toolsCompleted: 0, filter: '', autoFit: true,
   timelineEntries: [], startTimes: new Map(),
   _lastServerId: null,
+  // Token usage — populated by SSE `tokens` events. Shape:
+  //   main: { in, out, cacheCreate, cacheRead } | null
+  //   perAgent: Map<agentId, { in, out, cacheCreate, cacheRead }>
+  tokens: { main: null, perAgent: new Map() },
 };
 
 // Visual/animation state.
@@ -56,6 +63,8 @@ export const vis = {
   drawSessionNodes: [],
   drawAgentNodes: [],
   drawToolNodes: [],
+  drawSkillNodes: [],
+  drawMcpNodes: [],
   runningNodes: new Set(),
   avgFrameMs: 8,
   _particleSkipToggle: false,
@@ -109,7 +118,78 @@ export function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
+// Regular hexagon with a vertex pointing up, circumscribed radius r.
+export function traceHexagon(ctx, cx, cy, r) {
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const a = -Math.PI / 2 + i * (Math.PI / 3);
+    const x = cx + Math.cos(a) * r;
+    const y = cy + Math.sin(a) * r;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+}
+
+// Diamond (losange) — square rotated 45°, half-diagonal r.
+export function traceDiamond(ctx, cx, cy, r) {
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - r);
+  ctx.lineTo(cx + r, cy);
+  ctx.lineTo(cx, cy + r);
+  ctx.lineTo(cx - r, cy);
+  ctx.closePath();
+}
+
+// Parse an MCP tool name "mcp__<server>__<action>" into readable label/sub.
+// Examples:
+//   mcp__plugin_playwright_playwright__browser_click → {label:"browser_click", sub:"playwright"}
+//   mcp__claude_ai_Gmail__authenticate              → {label:"authenticate", sub:"Gmail"}
+export function parseMcpName(toolName) {
+  if (!toolName || !toolName.startsWith('mcp__')) return { label: toolName || 'MCP', sub: '' };
+  const parts = toolName.split('__');
+  const action = parts[parts.length - 1] || toolName;
+  // Middle segment holds the server id; drop common prefixes + dedup repeats.
+  let server = parts.length >= 3 ? parts.slice(1, -1).join('_') : '';
+  server = server.replace(/^plugin_/, '').replace(/^claude_ai_/, '');
+  const segs = server.split('_').filter(Boolean);
+  const dedup = [];
+  for (const s of segs) if (dedup[dedup.length - 1] !== s) dedup.push(s);
+  return { label: action, sub: dedup.join('_') };
+}
+
 export function truncate(s, max) { return s.length > max ? s.slice(0, max - 1) + '…' : s; }
 export function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 export function easeInOut(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
 export function lerp(a, b, t) { return a + (b - a) * t; }
+
+// Compact token display — "850" / "12.4k" / "1.3M".
+export function formatTokens(n) {
+  if (!n || n < 1000) return String(n || 0);
+  if (n < 10_000) return (n / 1000).toFixed(1) + 'k';
+  if (n < 1_000_000) return Math.round(n / 1000) + 'k';
+  return (n / 1_000_000).toFixed(1) + 'M';
+}
+
+// Sum of the 4 cumulative counters in a token bucket. Safe on null/undefined.
+export function tokenTotal(t) {
+  if (!t) return 0;
+  return (t.in || 0) + (t.out || 0) + (t.cacheCreate || 0) + (t.cacheRead || 0);
+}
+
+// Context window size = last message's input + cache_creation + cache_read.
+// Matches Claude Code's /context semantics (not cumulative).
+export function tokenContext(t) {
+  if (!t) return 0;
+  return (t.lastIn || 0) + (t.lastCacheCreate || 0) + (t.lastCacheRead || 0);
+}
+
+// Extract the bare agent id from a node id of the form "a:<agentId>".
+export function agentIdFromNode(nodeId) {
+  return nodeId && nodeId.startsWith('a:') ? nodeId.slice(2) : null;
+}
+
+// Extract the bare session id from a node id of the form "s:<sid>".
+export function sessionIdFromNode(nodeId) {
+  return nodeId && nodeId.startsWith('s:') ? nodeId.slice(2) : null;
+}

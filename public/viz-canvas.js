@@ -7,16 +7,52 @@
 // `setCanvasCallbacks` (UI wires showDetail/renderFeed for pointer clicks).
 
 import {
-  COLORS, AGENT_R, SESSION_R, TOOL_W, TOOL_H,
+  COLORS, AGENT_R, SESSION_R, TOOL_W, TOOL_H, SKILL_R, MCP_R,
   LERP_SPEED, LERP_EPS_POS, LERP_EPS_OPACITY, LERP_EPS_SCALE, PULSE_FRAME_MS,
   state, vis,
   markDirty, setTickFn,
-  hexAlpha, roundRect, truncate, easeInOut,
+  hexAlpha, roundRect, traceHexagon, traceDiamond, truncate, easeInOut, esc,
+  formatTokens, tokenContext, agentIdFromNode,
 } from './viz-state.js';
+
+// Session node displays main-thread context window size (matches /context).
+function sessionContextSize() {
+  return tokenContext(state.tokens.main);
+}
 
 // ─── Canvas setup ─────────────────────────────────────────────────────────
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
+const tooltipEl = document.getElementById('node-tooltip');
+
+// Update the hover tooltip. nodeId=null hides it. Positions the tooltip at
+// the cursor with a small offset, flipping across the cursor if it would
+// otherwise overflow the viewport.
+function updateTooltip(clientX, clientY, nodeId) {
+  if (!nodeId) { tooltipEl.classList.remove('visible'); return; }
+  const n = state.nodes.get(nodeId);
+  if (!n) { tooltipEl.classList.remove('visible'); return; }
+  const typeColor = n.color || '#66ccff';
+  const meta = [n.duration, n.status].filter(Boolean).join(' · ');
+  tooltipEl.innerHTML = `
+    <div class="nt-type" style="color:${typeColor}">${esc(n.type)}</div>
+    <div class="nt-label">${esc(n.label || '')}</div>
+    ${n.sub ? `<div class="nt-sub">${esc(n.sub)}</div>` : ''}
+    ${meta ? `<div class="nt-meta">${esc(meta)}</div>` : ''}
+  `;
+  tooltipEl.classList.add('visible');
+  // Measure after show, then position with viewport clamping.
+  const tw = tooltipEl.offsetWidth, th = tooltipEl.offsetHeight;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  let x = clientX + 14;
+  let y = clientY + 16;
+  if (x + tw > vw - 8) x = clientX - tw - 14;
+  if (y + th > vh - 8) y = clientY - th - 16;
+  tooltipEl.style.left = Math.max(4, x) + 'px';
+  tooltipEl.style.top = Math.max(4, y) + 'px';
+}
+
+function hideTooltip() { tooltipEl.classList.remove('visible'); }
 
 // Live-binding exports — importers read the current value after each resize.
 export let W = 0, H = 0;
@@ -92,6 +128,7 @@ canvas.addEventListener('pointermove', e => {
     vis.camera.targetX = camStartX + dx;
     vis.camera.targetY = camStartY + dy;
     markDirty();
+    hideTooltip();
   } else {
     const rect = canvas.getBoundingClientRect();
     const wc = screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
@@ -100,12 +137,19 @@ canvas.addEventListener('pointermove', e => {
     vis.hoveredNode = hit ? hit.id : null;
     canvas.style.cursor = hit ? 'pointer' : 'grab';
     if (prev !== vis.hoveredNode) markDirty();
+    updateTooltip(e.clientX, e.clientY, vis.hoveredNode);
   }
 });
 
 canvas.addEventListener('pointerup', () => {
   dragging = false;
   canvas.style.cursor = 'grab';
+});
+
+canvas.addEventListener('pointerleave', () => {
+  vis.hoveredNode = null;
+  hideTooltip();
+  markDirty();
 });
 
 function screenToWorld(sx, sy) {
@@ -121,6 +165,13 @@ function hitTest(wx, wy) {
       const r = n.type === 'session' ? SESSION_R : AGENT_R;
       const dist = Math.hypot(wx - vn.x, wy - vn.y);
       if (dist <= r * vn.scale) return { id };
+    } else if (n.type === 'skill') {
+      const dist = Math.hypot(wx - vn.x, wy - vn.y);
+      if (dist <= SKILL_R * vn.scale) return { id };
+    } else if (n.type === 'mcp') {
+      // Diamond hit test: |dx| + |dy| <= r (Manhattan distance).
+      const r = MCP_R * vn.scale;
+      if (Math.abs(wx - vn.x) + Math.abs(wy - vn.y) <= r) return { id };
     } else {
       const hw = TOOL_W / 2, hh = TOOL_H / 2;
       if (wx >= vn.x - hw && wx <= vn.x + hw && wy >= vn.y - hh && wy <= vn.y + hh) return { id };
@@ -272,7 +323,41 @@ function drawSessionNode(n, vn) {
     ctx.fillText(n.duration, vn.x, vn.y + r + 14);
   }
 
+  const sessionCtx = sessionContextSize();
+  if (sessionCtx > 0) {
+    ctx.fillStyle = hexAlpha(n.color, 0.55);
+    ctx.font = '9px -apple-system, system-ui, sans-serif';
+    ctx.fillText(`${formatTokens(sessionCtx)} ctx`, vn.x, vn.y + r + (n.duration ? 26 : 14));
+  }
+
   ctx.restore();
+}
+
+// Overlay markers for agent flags — dashed ring when isolated (worktree),
+// concentric ring when running as part of a parallel batch. Kept out of
+// drawAgentNode so the base renderer stays untouched by this concern.
+function drawAgentDecorations(n, vn, r) {
+  if (n.isParallel) {
+    ctx.save();
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.arc(vn.x, vn.y, r + 3, 0, Math.PI * 2);
+    ctx.strokeStyle = hexAlpha(n.color, 0.45);
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.restore();
+  }
+  if (n.isIsolated) {
+    ctx.save();
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    ctx.arc(vn.x, vn.y, r + 7, 0, Math.PI * 2);
+    ctx.strokeStyle = hexAlpha(n.color, 0.7);
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
 }
 
 function drawAgentNode(n, vn) {
@@ -295,6 +380,8 @@ function drawAgentNode(n, vn) {
   ctx.strokeStyle = hexAlpha(n.color, 0.5 + pulse * 0.3 + (isHovered ? 0.2 : 0));
   ctx.lineWidth = isSelected ? 2.5 : 1.5;
   ctx.stroke();
+
+  drawAgentDecorations(n, vn, r);
 
   if (n.status === 'running') {
     ctx.beginPath();
@@ -336,6 +423,16 @@ function drawAgentNode(n, vn) {
     ctx.font = '9px -apple-system, system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(n.duration, vn.x, vn.y + r + 12);
+  }
+
+  const aid = agentIdFromNode(n.id);
+  const agentBucket = aid ? state.tokens.perAgent.get(aid) : null;
+  const agentCtx = tokenContext(agentBucket);
+  if (agentCtx > 0) {
+    ctx.fillStyle = hexAlpha(n.color, 0.55);
+    ctx.font = '9px -apple-system, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(`${formatTokens(agentCtx)} ctx`, vn.x, vn.y + r + (n.duration ? 24 : 12));
   }
 
   ctx.restore();
@@ -398,6 +495,114 @@ function drawToolNode(n, vn) {
     ctx.font = `${8 * vn.scale}px -apple-system, system-ui, sans-serif`;
     ctx.textAlign = 'right';
     ctx.fillText(n.duration, vn.x + w / 2 - 8 * vn.scale, vn.y);
+  }
+
+  ctx.restore();
+}
+
+function drawMcpNode(n, vn) {
+  const r = MCP_R * vn.scale;
+  const isSelected = state.selected === n.id;
+  const isHovered = vis.hoveredNode === n.id;
+  const isRunning = n.status === 'running';
+  const isError = n.status === 'error';
+  const color = isError ? COLORS.error : n.color;
+
+  ctx.save();
+  ctx.globalAlpha = vn.opacity;
+
+  if (isRunning) {
+    drawGlowSprite(color, vn.x, vn.y, r * 2.2, 0.09 * vn.opacity);
+  }
+
+  traceDiamond(ctx, vn.x, vn.y, r);
+  ctx.fillStyle = hexAlpha(color, isHovered ? 0.14 : 0.08);
+  ctx.fill();
+  ctx.strokeStyle = hexAlpha(color, isSelected ? 0.7 : isHovered ? 0.5 : 0.3);
+  ctx.lineWidth = isSelected ? 2 : 1.2;
+  ctx.stroke();
+
+  const dotR = 2.5 * vn.scale;
+  const dotY = vn.y - r * 0.58;
+  const dotColor = isError ? COLORS.error : isRunning ? COLORS.notification : COLORS.complete;
+  ctx.beginPath();
+  ctx.arc(vn.x, dotY, dotR, 0, Math.PI * 2);
+  ctx.fillStyle = dotColor;
+  ctx.fill();
+  if (isRunning) {
+    ctx.beginPath();
+    ctx.arc(vn.x, dotY, dotR * 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = hexAlpha(dotColor, 0.15 + 0.1 * Math.sin(vis.time * 3));
+    ctx.fill();
+  }
+
+  ctx.fillStyle = hexAlpha('#ffffff', 0.9);
+  ctx.font = `bold ${9 * vn.scale}px -apple-system, system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(truncate(n.label, 12), vn.x, vn.y - (n.sub ? 3 : 0) * vn.scale);
+
+  if (n.sub) {
+    ctx.fillStyle = hexAlpha(color, 0.55);
+    ctx.font = `${7 * vn.scale}px -apple-system, system-ui, sans-serif`;
+    ctx.fillText(truncate(n.sub, 14), vn.x, vn.y + 7 * vn.scale);
+  }
+
+  if (n.duration) {
+    ctx.fillStyle = hexAlpha('#ffffff', 0.4);
+    ctx.font = `${8 * vn.scale}px -apple-system, system-ui, sans-serif`;
+    ctx.fillText(n.duration, vn.x, vn.y + r + 9);
+  }
+
+  ctx.restore();
+}
+
+function drawSkillNode(n, vn) {
+  const r = SKILL_R * vn.scale;
+  const isSelected = state.selected === n.id;
+  const isHovered = vis.hoveredNode === n.id;
+  const isRunning = n.status === 'running';
+  const isError = n.status === 'error';
+  const color = isError ? COLORS.error : n.color;
+
+  ctx.save();
+  ctx.globalAlpha = vn.opacity;
+
+  if (isRunning) {
+    drawGlowSprite(color, vn.x, vn.y, r * 2.2, 0.08 * vn.opacity);
+  }
+
+  traceHexagon(ctx, vn.x, vn.y, r);
+  ctx.fillStyle = hexAlpha(color, isHovered ? 0.14 : 0.08);
+  ctx.fill();
+  ctx.strokeStyle = hexAlpha(color, isSelected ? 0.7 : isHovered ? 0.5 : 0.3);
+  ctx.lineWidth = isSelected ? 2 : 1.2;
+  ctx.stroke();
+
+  const dotR = 2.5 * vn.scale;
+  const dotY = vn.y - r * 0.55;
+  const dotColor = isError ? COLORS.error : isRunning ? COLORS.notification : COLORS.complete;
+  ctx.beginPath();
+  ctx.arc(vn.x, dotY, dotR, 0, Math.PI * 2);
+  ctx.fillStyle = dotColor;
+  ctx.fill();
+  if (isRunning) {
+    ctx.beginPath();
+    ctx.arc(vn.x, dotY, dotR * 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = hexAlpha(dotColor, 0.15 + 0.1 * Math.sin(vis.time * 3));
+    ctx.fill();
+  }
+
+  ctx.fillStyle = hexAlpha('#ffffff', 0.9);
+  ctx.font = `bold ${10 * vn.scale}px -apple-system, system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(truncate(n.label, 10), vn.x, vn.y + 2 * vn.scale);
+
+  if (n.duration) {
+    ctx.fillStyle = hexAlpha('#ffffff', 0.4);
+    ctx.font = `${8 * vn.scale}px -apple-system, system-ui, sans-serif`;
+    ctx.fillText(n.duration, vn.x, vn.y + r + 9);
   }
 
   ctx.restore();
@@ -646,6 +851,14 @@ function draw() {
   for (const { n, vn } of vis.drawToolNodes) {
     if (vn.opacity < 0.05 || !inBounds(vn, vw)) continue;
     drawToolNode(n, vn);
+  }
+  for (const { n, vn } of vis.drawSkillNodes) {
+    if (vn.opacity < 0.05 || !inBounds(vn, vw)) continue;
+    drawSkillNode(n, vn);
+  }
+  for (const { n, vn } of vis.drawMcpNodes) {
+    if (vn.opacity < 0.05 || !inBounds(vn, vw)) continue;
+    drawMcpNode(n, vn);
   }
 
   ctx.restore();

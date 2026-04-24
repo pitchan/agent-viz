@@ -106,17 +106,28 @@ const debounceTimers = new Map();
 const readInFlight = new Set();
 const readPending = new Set();
 
-// Read transcript path from first event in session file (first 4 KB only).
+// Read transcript path from the first event of a session file. The first line
+// can be arbitrarily large (e.g. a PreToolUse Write with inline content), so
+// we try a JSON.parse on the first line, and fall back to a regex scan of the
+// first 16 KB — the transcript_path appears near the top of every event.
 async function getTranscriptPath(sessionFile) {
   let fh;
   try {
     fh = await fsp.open(sessionFile, 'r');
-    const buf = Buffer.alloc(4096);
-    await fh.read(buf, 0, buf.length, 0);
+    const buf = Buffer.alloc(16384);
+    const { bytesRead } = await fh.read(buf, 0, buf.length, 0);
     await fh.close();
-    const firstLine = buf.toString('utf8').split('\n')[0];
-    const evt = JSON.parse(firstLine);
-    return evt.transcript_path || null;
+    fh = null;
+    const text = buf.slice(0, bytesRead).toString('utf8');
+    const firstLine = text.split('\n')[0];
+    try {
+      const evt = JSON.parse(firstLine);
+      if (evt.transcript_path) return evt.transcript_path;
+    } catch {}
+    // Fallback: regex scan for "transcript_path":"..." (handles escaped \").
+    const m = text.match(/"transcript_path":"((?:\\.|[^"\\])*)"/);
+    if (m) { try { return JSON.parse('"' + m[1] + '"'); } catch { return m[1]; } }
+    return null;
   } catch {
     if (fh) { try { await fh.close(); } catch {} }
     return null;
@@ -228,18 +239,38 @@ async function readAndBroadcast(filePath) {
     touchIndex(filePath, len, newlines);
     const sessionName = path.basename(filePath, '.jsonl');
     const lines = text.trim().split('\n');
+    const rec = sessionIndex.get(sessionName);
+    let tokensChanged = false;
     for (const line of lines) {
       try {
         const evt = JSON.parse(line);
         broadcastSSE({ type: 'event', session: sessionName, event: evt });
+        // Reconciliation: PostToolUse on the Agent tool carries the subagent's
+        // final usage. Use as fallback when the transcript stream has no data.
+        if (rec && evt.hook_event_name === 'PostToolUse' && evt.tool_name === 'Agent'
+            && evt.tool_response && evt.tool_response.agentId && evt.tool_response.usage) {
+          ensureTokens(rec);
+          const aid = evt.tool_response.agentId;
+          const existing = rec.tokens.perAgent.get(aid);
+          const isEmpty = !existing || (existing.in + existing.out + existing.cacheCreate + existing.cacheRead) === 0;
+          if (isEmpty) {
+            const u = evt.tool_response.usage;
+            const bucket = newBucket();
+            accumulateUsage(bucket, u);
+            rec.tokens.perAgent.set(aid, bucket);
+            tokensChanged = true;
+          }
+        }
       } catch {}
     }
+    if (tokensChanged && rec) scheduleTokensBroadcast(sessionName, rec);
     // Warm the first-prompt cache if we haven't yet.
-    const rec = sessionIndex.get(sessionName);
     if (rec && rec.promptCache === undefined) {
       // Fire-and-forget, small delay to let more text land on disk.
       setTimeout(() => { ensureFirstPrompt(filePath).catch(() => {}); }, 500);
     }
+    // Discover transcript_path and start watching it for token usage.
+    ensureTranscriptWatcher(filePath).catch(() => {});
   } catch {
     if (fh) { try { await fh.close(); } catch {} }
   } finally {
@@ -250,6 +281,170 @@ async function readAndBroadcast(filePath) {
       setImmediate(() => readAndBroadcast(filePath));
     }
   }
+}
+
+// ── Token tracking ──
+// Each session accumulates token usage from its transcript (main thread +
+// per-subagent). `PostToolUse(Agent)` hook events provide a fallback when the
+// transcript has no data for that agent id yet. See design spec.
+
+// Bucket shape:
+//   { in, out, cacheCreate, cacheRead } — cumulative sums (for detailed popup).
+//   { lastIn, lastCacheCreate, lastCacheRead } — most recent message's usage
+//     values (not summed). The sum of these three = current context window size
+//     (matches Claude Code's /context output).
+function newBucket() {
+  return { in:0, out:0, cacheCreate:0, cacheRead:0, lastIn:0, lastCacheCreate:0, lastCacheRead:0 };
+}
+
+function ensureTokens(rec) {
+  if (!rec.tokens) {
+    rec.tokens = {
+      main: newBucket(),
+      perAgent: new Map(),
+    };
+  }
+}
+
+function tokenSum(b) {
+  if (!b) return 0;
+  return (b.in || 0) + (b.out || 0) + (b.cacheCreate || 0) + (b.cacheRead || 0);
+}
+
+function accumulateUsage(bucket, usage) {
+  bucket.in += usage.input_tokens || 0;
+  bucket.out += usage.output_tokens || 0;
+  bucket.cacheCreate += usage.cache_creation_input_tokens || 0;
+  bucket.cacheRead += usage.cache_read_input_tokens || 0;
+  // Track the most recent message's values. Transcript/hook events are parsed
+  // in chronological order, so "last wins" gives the current context size.
+  bucket.lastIn = usage.input_tokens || 0;
+  bucket.lastCacheCreate = usage.cache_creation_input_tokens || 0;
+  bucket.lastCacheRead = usage.cache_read_input_tokens || 0;
+}
+
+// Parse one transcript line; return true if any token bucket was updated.
+function parseTranscriptEvent(line, rec) {
+  let evt;
+  try { evt = JSON.parse(line); } catch { return false; }
+  let usage = null, key = null;
+  // Main thread assistant message.
+  if (evt.isSidechain === false && evt.type === 'assistant'
+      && evt.message && evt.message.usage) {
+    usage = evt.message.usage;
+    key = '__main__';
+  }
+  // Subagent streaming progress event. Structure observed in transcripts:
+  //   evt.data = { type:"agent_progress", agentId, message:{ type:"assistant",
+  //                message:{ ..., usage:{...} } } }
+  else if (evt.type === 'progress' && evt.data
+      && evt.data.type === 'agent_progress' && evt.data.agentId
+      && evt.data.message && evt.data.message.message && evt.data.message.message.usage) {
+    usage = evt.data.message.message.usage;
+    key = evt.data.agentId;
+  }
+  if (!usage) return false;
+  ensureTokens(rec);
+  let bucket;
+  if (key === '__main__') {
+    bucket = rec.tokens.main;
+  } else {
+    bucket = rec.tokens.perAgent.get(key);
+    if (!bucket) {
+      bucket = { in: 0, out: 0, cacheCreate: 0, cacheRead: 0 };
+      rec.tokens.perAgent.set(key, bucket);
+    }
+  }
+  accumulateUsage(bucket, usage);
+  return true;
+}
+
+// Append-only streaming read of the transcript. Preserves a line leftover for
+// partial trailing writes. Same concurrency guard pattern as readAndBroadcast.
+async function readTranscriptDelta(transcriptPath, rec) {
+  if (rec._transcriptReadInFlight) { rec._transcriptReadPending = true; return; }
+  rec._transcriptReadInFlight = true;
+  let fh;
+  try {
+    const stat = await fsp.stat(transcriptPath);
+    const offset = rec.transcriptOffset || 0;
+    if (stat.size <= offset) return;
+    const len = stat.size - offset;
+    const buf = Buffer.alloc(len);
+    fh = await fsp.open(transcriptPath, 'r');
+    await fh.read(buf, 0, len, offset);
+    await fh.close();
+    fh = null;
+    rec.transcriptOffset = stat.size;
+    const text = (rec.transcriptLeftover || '') + buf.toString('utf8');
+    const lines = text.split('\n');
+    rec.transcriptLeftover = lines.pop(); // possibly incomplete tail
+    let changed = false;
+    for (const line of lines) {
+      if (!line) continue;
+      if (parseTranscriptEvent(line, rec)) changed = true;
+    }
+    if (changed) scheduleTokensBroadcast(rec.id, rec);
+  } catch {
+    if (fh) { try { await fh.close(); } catch {} }
+  } finally {
+    rec._transcriptReadInFlight = false;
+    if (rec._transcriptReadPending) {
+      rec._transcriptReadPending = false;
+      setImmediate(() => readTranscriptDelta(transcriptPath, rec).catch(() => {}));
+    }
+  }
+}
+
+// Discover transcript_path, do an initial full-file read to catch up, then
+// open fs.watch for live updates. Idempotent — re-calls are no-op.
+async function ensureTranscriptWatcher(sessionFile) {
+  const id = idFromPath(sessionFile);
+  const rec = sessionIndex.get(id);
+  if (!rec) return;
+  if (rec.transcriptWatcher || rec._transcriptDiscoveryFailed) return;
+  const tp = await getTranscriptPath(sessionFile);
+  if (!tp) { console.error(`[tokens] ${id.slice(0,8)}: no transcript_path in hook events yet`); return; }
+  try { await fsp.access(tp); } catch { console.error(`[tokens] ${id.slice(0,8)}: transcript inaccessible at ${tp}`); rec._transcriptDiscoveryFailed = true; return; }
+  rec.transcriptPath = tp;
+  rec.transcriptOffset = 0;
+  rec.transcriptLeftover = '';
+  ensureTokens(rec);
+  await readTranscriptDelta(tp, rec);
+  console.error(`[tokens] ${id.slice(0,8)}: main=${tokenSum(rec.tokens.main)} perAgent=${rec.tokens.perAgent.size}`);
+  try {
+    const watcher = fs.watch(tp, () => {
+      if (rec._transcriptWatchTimer) clearTimeout(rec._transcriptWatchTimer);
+      rec._transcriptWatchTimer = setTimeout(() => {
+        rec._transcriptWatchTimer = null;
+        readTranscriptDelta(tp, rec).catch(() => {});
+      }, 50);
+    });
+    rec.transcriptWatcher = watcher;
+  } catch {
+    rec._transcriptDiscoveryFailed = true;
+  }
+}
+
+function scheduleTokensBroadcast(sid, rec) {
+  if (rec._tokensBroadcastTimer) return;
+  rec._tokensBroadcastTimer = setTimeout(() => {
+    rec._tokensBroadcastTimer = null;
+    broadcastTokens(sid, rec);
+  }, 250);
+}
+
+function tokensSnapshot(rec) {
+  if (!rec.tokens) return null;
+  const perAgent = {};
+  for (const [aid, bucket] of rec.tokens.perAgent) perAgent[aid] = bucket;
+  return { main: rec.tokens.main, perAgent };
+}
+
+function broadcastTokens(sid, rec) {
+  const snap = tokensSnapshot(rec);
+  if (!snap) return;
+  broadcastSSE({ type: 'tokens', session: sid, main: snap.main, perAgent: snap.perAgent });
 }
 
 function watchSession(filePath) {
@@ -282,6 +477,12 @@ function unwatchSession(fp) {
 // Delete a session file + summary + clean everything related.
 async function deleteSession(fp) {
   const id = idFromPath(fp);
+  const rec = sessionIndex.get(id);
+  if (rec) {
+    if (rec.transcriptWatcher) { try { rec.transcriptWatcher.close(); } catch {} }
+    if (rec._transcriptWatchTimer) clearTimeout(rec._transcriptWatchTimer);
+    if (rec._tokensBroadcastTimer) clearTimeout(rec._tokensBroadcastTimer);
+  }
   unwatchSession(fp);
   sessionIndex.delete(id);
   readInFlight.delete(fp);
@@ -413,6 +614,8 @@ async function scanAndWatch() {
       const rec = sessionIndex.get(idFromPath(fp));
       if (rec && (Date.now() - rec.mtime) < WATCH_WINDOW_MS) {
         watchSession(fp);
+        // Kick off transcript discovery + token catch-up (fire-and-forget).
+        ensureTranscriptWatcher(fp).catch(() => {});
       }
     }
   } catch {}
@@ -540,6 +743,15 @@ function startServer() {
       });
       res.write(':ok\n\n');
       sseClients.add(res);
+      // Replay current token snapshots so a fresh client sees state immediately.
+      for (const [sid, rec] of sessionIndex) {
+        const snap = tokensSnapshot(rec);
+        if (snap) {
+          try {
+            res.write(`data: ${JSON.stringify({ type: 'tokens', session: sid, main: snap.main, perAgent: snap.perAgent })}\n\n`);
+          } catch {}
+        }
+      }
       req.on('close', () => sseClients.delete(res));
       return;
     }
