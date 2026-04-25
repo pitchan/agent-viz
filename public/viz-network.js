@@ -205,6 +205,7 @@ export function clearState() {
   state.timelineEntries = []; state.startTimes.clear();
   state._lastServerId = null;
   state.tokens.main = null; state.tokens.perAgent.clear();
+  state.forkedAgentParents.clear();
   vis.nodes.clear(); vis.particles = [];
   _feedResetHook();
   resetLayout();

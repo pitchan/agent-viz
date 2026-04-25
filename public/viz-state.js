@@ -47,6 +47,11 @@ export const state = {
   //   main: { in, out, cacheCreate, cacheRead } | null
   //   perAgent: Map<agentId, { in, out, cacheCreate, cacheRead }>
   tokens: { main: null, perAgent: new Map() },
+  // Map<forkedChildAgentId, parentAgentId>. Filled by PostToolUse(Skill) events
+  // with tool_response.status === 'forked'. Used to attach forked sub-agents
+  // under their launching agent instead of the session root — the forked
+  // child's own PreToolUse events carry no parent_agent_id.
+  forkedAgentParents: new Map(),
 };
 
 // Visual/animation state.

@@ -86,15 +86,41 @@ function promoteAgentNode(n, evt, sid, ts) {
   if (!n.startTime) n.startTime = ts;
   setRunning(n.id, true);
   if (!n.parentId) {
-    const parent = getNode(`s:${sid}`);
-    parent.type = 'session';
-    parent.label = parent.label || 'Session';
-    parent.color = COLORS.session;
+    const aid = (evt.agent_id || n.id.slice(2));
+    const forkedParentAid = state.forkedAgentParents.get(aid);
+    const forkedParent = forkedParentAid ? state.nodes.get(`a:${forkedParentAid}`) : null;
+    let parent;
+    if (forkedParent) {
+      parent = forkedParent;
+    } else {
+      parent = getNode(`s:${sid}`);
+      parent.type = 'session';
+      parent.label = parent.label || 'Session';
+      parent.color = COLORS.session;
+    }
     n.parentId = parent.id;
     parent.children.push(n);
     recomputeParallelFlags(parent.id);
   }
   addTimelineEntry(evt, n.id, 'agent', n.label, n.sub);
+}
+
+// Detach `n` from its current parent's children list and attach it under
+// `newParentId`. No-op if newParent is unknown or already the parent.
+function reparentNode(n, newParentId) {
+  if (!n || !newParentId || n.parentId === newParentId) return;
+  const newParent = state.nodes.get(newParentId);
+  if (!newParent) return;
+  const oldParent = n.parentId ? state.nodes.get(n.parentId) : null;
+  if (oldParent) {
+    const idx = oldParent.children.indexOf(n);
+    if (idx >= 0) oldParent.children.splice(idx, 1);
+  }
+  n.parentId = newParent.id;
+  newParent.children.push(n);
+  if (oldParent) recomputeParallelFlags(oldParent.id);
+  recomputeParallelFlags(newParent.id);
+  markLayoutDirty(n);
 }
 
 // Mark all running agents under this session as parallel if 2+ run at once.
@@ -216,6 +242,19 @@ export function processEvent(evt) {
         if (an.parentId) recomputeParallelFlags(an.parentId);
       }
     }
+    // Skill fork → record the parent mapping and reparent the forked sub-agent
+    // under its launching agent. The child's first PreToolUse arrives before
+    // this PostToolUse, so the child is initially attached to the session by
+    // promoteAgentNode and must be moved retroactively here.
+    if (evt.tool_name === 'Skill' && evt.tool_response
+        && evt.tool_response.status === 'forked' && evt.tool_response.agentId
+        && evt.agent_id) {
+      const childAid = evt.tool_response.agentId;
+      const parentAid = evt.agent_id;
+      state.forkedAgentParents.set(childAid, parentAid);
+      const childNode = state.nodes.get(`a:${childAid}`);
+      if (childNode) reparentNode(childNode, `a:${parentAid}`);
+    }
   }
   else if (e === 'PostToolUseFailure') {
     const tid = evt.tool_use_id || '';
@@ -297,34 +336,87 @@ export function resetLayout() {
   layoutDirtyRoots.clear();
 }
 
+// Count agent nodes in a subtree (the node + all transitively-reachable agent
+// children). Used by the root layout to inflate the agent ring proportionally
+// to how much room each branch needs.
+function subtreeAgentCount(n) {
+  let w = 1;
+  for (const c of n.children) if (c.type === 'agent') w += subtreeAgentCount(c);
+  return w;
+}
+
+// Position one agent's tool and sub-agent children outward from the agent
+// (along `dirFromParent`), then recurse into each sub-agent. Sub-agents fan
+// out on an outer arc; tools either fan along the parent axis (no sub-agents)
+// or split into two short lateral fans (sub-agents present) so they avoid
+// both the sub-agent ring and the path back to the parent.
+function layoutAgent(agent, dirFromParent) {
+  const filtered = agent.children.filter(c => matchesFilter(c));
+  const subAgents = filtered.filter(c => c.type === 'agent');
+  const tools = filtered.filter(c => c.type !== 'agent');
+
+  const runningTools = tools.filter(c => c.status === 'running');
+  const doneTools = tools.filter(c => c.status !== 'running');
+  const visibleDone = doneTools.slice(-5);
+  const visibleTools = [...visibleDone, ...runningTools];
+
+  const subDist = 160 + Math.max(0, subAgents.length - 2) * 26;
+  const subSpread = Math.min(Math.PI * 1.4, Math.max(Math.PI * 0.45, subAgents.length * 0.5));
+  subAgents.forEach((sa, i) => {
+    const t = subAgents.length === 1 ? 0 : (i / (subAgents.length - 1) - 0.5);
+    const angle = dirFromParent + t * subSpread;
+    sa.x = agent.x + Math.cos(angle) * subDist;
+    sa.y = agent.y + Math.sin(angle) * subDist;
+    layoutAgent(sa, angle);
+  });
+
+  if (subAgents.length === 0) {
+    // No sub-agents → tools fan along the outward axis (legacy behaviour).
+    const toolDist = 90 + visibleTools.length * 8;
+    const toolSpread = Math.min(Math.PI * 1.2, visibleTools.length * 0.35);
+    visibleTools.forEach((tool, ti) => {
+      const tAngle = dirFromParent - toolSpread / 2
+        + (ti / Math.max(visibleTools.length - 1, 1)) * toolSpread;
+      tool.x = agent.x + Math.cos(tAngle) * toolDist;
+      tool.y = agent.y + Math.sin(tAngle) * toolDist;
+      tool._visible = true;
+    });
+  } else {
+    // Sub-agents take the outward fan; place tools in two short side-fans
+    // perpendicular to the parent axis so they avoid both the sub-agent ring
+    // and the path back to the parent (which has its own tools).
+    const half = Math.ceil(visibleTools.length / 2);
+    const toolDist = 80 + half * 10;
+    const fanSpread = Math.min(Math.PI * 0.6, Math.max(Math.PI * 0.2, half * 0.3));
+    visibleTools.forEach((tool, ti) => {
+      const onLeft = ti < half;
+      const sideIdx = onLeft ? ti : ti - half;
+      const sideCount = onLeft ? half : Math.max(1, visibleTools.length - half);
+      const sideBase = dirFromParent + (onLeft ? -Math.PI / 2 : Math.PI / 2);
+      const t = sideCount === 1 ? 0 : (sideIdx / (sideCount - 1) - 0.5);
+      const angle = sideBase + t * fanSpread;
+      tool.x = agent.x + Math.cos(angle) * toolDist;
+      tool.y = agent.y + Math.sin(angle) * toolDist;
+      tool._visible = true;
+    });
+  }
+  tools.filter(c => !visibleTools.includes(c)).forEach(c => { c._visible = false; });
+}
+
 function layoutRoot(root) {
   const cx = root.x;
   const agents = root.children.filter(c => c.type === 'agent');
   const tools = root.children.filter(c => c.type !== 'agent');
 
-  const agentDist = SPAWN_DIST + Math.max(0, agents.length - 3) * 30;
+  // Push agents farther out when any branch has its own sub-agents, so the
+  // recursive sub-agent fans have room without colliding with the session ring.
+  const branchInflation = agents.reduce((s, a) => s + Math.max(0, subtreeAgentCount(a) - 1), 0);
+  const agentDist = SPAWN_DIST + Math.max(0, agents.length - 3) * 30 + branchInflation * 60;
   agents.forEach((agent, ai) => {
     const angle = -Math.PI / 2 + (ai / Math.max(agents.length, 1)) * Math.PI * 2;
     agent.x = cx + Math.cos(angle) * agentDist;
     agent.y = root.y + Math.sin(angle) * agentDist;
-
-    const aTools = agent.children.filter(c => matchesFilter(c));
-    const runningTools = aTools.filter(c => c.status === 'running');
-    const doneTools = aTools.filter(c => c.status !== 'running');
-    const visibleDone = doneTools.slice(-5);
-    const visibleTools = [...visibleDone, ...runningTools];
-
-    const baseAngle = Math.atan2(agent.y - root.y, agent.x - root.x);
-    const toolDist = 90 + visibleTools.length * 8;
-    const spread = Math.min(Math.PI * 1.2, visibleTools.length * 0.35);
-
-    visibleTools.forEach((tool, ti) => {
-      const tAngle = baseAngle - spread / 2 + (ti / Math.max(visibleTools.length - 1, 1)) * spread;
-      tool.x = agent.x + Math.cos(tAngle) * toolDist;
-      tool.y = agent.y + Math.sin(tAngle) * toolDist;
-      tool._visible = true;
-    });
-    aTools.filter(c => !visibleTools.includes(c)).forEach(c => { c._visible = false; });
+    layoutAgent(agent, angle);
   });
 
   const visibleRootTools = tools.filter(c => matchesFilter(c));
