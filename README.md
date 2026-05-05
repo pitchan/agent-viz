@@ -23,8 +23,6 @@ Open http://localhost:3333, run Claude Code in any other terminal, watch events 
 agent-viz stop
 ```
 
-> No separate `agent-viz install-hooks` step required. The hooks are auto-installed on first `agent-viz` run. You only need `install-hooks` if you want to override the scope (see [Hook scope](#hook-scope) below).
-
 ## Other ways to run it
 
 ### Try it once without installing
@@ -58,28 +56,34 @@ Adds `agent-viz` as a dev dependency. The hook command embedded in `settings.jso
 
 ## Hook management
 
-You **don't** normally need these — `agent-viz` installs hooks for you on first run. Use them only to override scope or to clean up.
+The first time you run `agent-viz`, it auto-registers Claude Code hooks. By default they go to:
 
-| Command | What it does |
-|---|---|
-| `agent-viz install-hooks` | Re-run hook install (idempotent). Defaults: project-local if in a git/npm project, user-level otherwise. |
-| `agent-viz install-hooks --user` | Force install at `~/.claude/settings.json`. |
-| `agent-viz install-hooks --project` | Force install at `<root>/.claude/settings.json` (committed, shared with team). |
-| `agent-viz install-hooks --local` | Force install at `<root>/.claude/settings.local.json` (gitignored). |
-| `agent-viz install-hooks --check` | Read-only audit: list which events are wired up. |
-| `agent-viz uninstall-hooks` | Remove agent-viz hooks. Without scope flag, scans all three locations. |
+- `<project>/.claude/settings.local.json` (gitignored) when launched inside a git or npm project,
+- `~/.claude/settings.json` (user-level) otherwise.
 
-### Hook scope
+You only need the commands below in three situations:
 
-When you run `agent-viz` from inside a git or npm project, hooks are installed **per-project** in `.claude/settings.local.json` (gitignored). Outside a project, they go to **user-level** `~/.claude/settings.json`.
+**1. You want to share the hook with your team.** The default install is gitignored so each teammate manages their own. To commit it instead:
 
-| Situation | Default destination |
-|---|---|
-| Inside a git/npm project | `<root>/.claude/settings.local.json` (gitignored) |
-| Outside a project | `~/.claude/settings.json` (user-level) |
-| `--user` / `--project` / `--local` | Always honored, overrides the default |
+```bash
+agent-viz install-hooks --project   # writes <root>/.claude/settings.json (committed)
+```
 
-When writing to `settings.local.json`, agent-viz also appends the file to your `.gitignore` (only if a `.gitignore` already exists, never creates one).
+**2. You globally installed agent-viz from inside a project but want the hook user-wide.** Default scope detection picked `--local`; force user scope:
+
+```bash
+agent-viz install-hooks --user      # writes ~/.claude/settings.json
+```
+
+**3. You want to check or remove the hooks.**
+
+```bash
+agent-viz install-hooks --check     # read-only audit: which events are wired up?
+agent-viz uninstall-hooks           # remove from all scopes
+agent-viz uninstall-hooks --user    # remove from user scope only
+```
+
+When writing to `settings.local.json`, agent-viz appends the file to your `.gitignore` (only if a `.gitignore` already exists, never creates one).
 
 ## Captured events
 
