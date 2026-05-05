@@ -1,6 +1,6 @@
 {
   "name": "@vcueto/agent-viz",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Real-time visualizer for Claude Code sessions: live event stream, token tracking, multi-agent topology.",
   "bin": {
     "agent-viz": "bin/agent-viz.js"

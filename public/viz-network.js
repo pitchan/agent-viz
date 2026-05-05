@@ -224,8 +224,8 @@ export function setFeedResetHook(fn) { _feedResetHook = fn || (() => {}); }
 
 export async function resetEvents() {
   clearing = true;
-  if (currentSessionId) await fetch(`/events?clear=${currentSessionId}`);
-  else await fetch('/events?clear=1');
+  const url = currentSessionId ? `/events?clear=${currentSessionId}` : '/events?clear=1';
+  await fetch(url, { method: 'POST' });
   clearState();
   await loadSessions();
   clearing = false;
