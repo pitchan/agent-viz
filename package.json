@@ -22,6 +22,7 @@
     "start": "node bin/agent-viz.js start --foreground",
     "stop": "node bin/agent-viz.js stop",
     "status": "node bin/agent-viz.js status",
+    "preuninstall": "node lib/preuninstall.js",
     "prepublishOnly": "npm pack --dry-run"
   },
   "keywords": [

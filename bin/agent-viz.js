@@ -98,10 +98,19 @@ async function cmdStart(argv) {
     const { install } = require(path.join(PKG_ROOT, 'lib', 'install-hooks.js'));
     try {
       const result = install({ cwd: process.cwd(), packageRoot: PKG_ROOT, version: PKG_VERSION });
-      if (result.action === 'installed') {
-        console.log(`✓ Hooks installed → ${result.target.file}`);
+      if (result.action !== 'noop') {
+        const verb = result.action === 'updated' ? 'Hooks refreshed'
+                   : result.action === 'installed+updated' ? 'Hooks installed + refreshed'
+                   : 'Hooks installed';
+        console.log(`✓ ${verb} → ${result.target.file}`);
         console.log(`  scope: ${result.target.scope}, mode: ${result.command.mode}`);
-        console.log(`  events: ${result.missing.join(', ')}`);
+        if (result.missing.length > 0) console.log(`  added on: ${result.missing.join(', ')}`);
+        if (result.updated.length > 0) console.log(`  refreshed on (was stale): ${result.updated.join(', ')}`);
+        const others = Object.entries(result.coexisting || {});
+        if (others.length > 0) {
+          console.log(`  coexisting hooks (run in parallel, untouched):`);
+          for (const [ev, n] of others) console.log(`    - ${ev}: ${n} other(s)`);
+        }
         if (result.gitignore && result.gitignore.changed) {
           console.log('  + .gitignore : added .claude/settings.local.json');
         }
@@ -163,28 +172,41 @@ function cmdInstallHooks(argv) {
   const { install, audit } = require(path.join(PKG_ROOT, 'lib', 'install-hooks.js'));
 
   if (flags.check) {
-    const a = audit({ scope, cwd: process.cwd() });
+    const a = audit({ scope, cwd: process.cwd(), packageRoot: PKG_ROOT, version: PKG_VERSION });
     console.log(`settings : ${a.file}  (scope: ${a.scope})`);
-    for (const { event, installed } of a.audit) {
-      console.log(`  [${installed ? 'x' : ' '}] ${event}`);
+    for (const { event, installed, stale, others } of a.audit) {
+      const flag = installed ? (stale ? '~' : 'x') : ' ';
+      const tags = [];
+      if (stale) tags.push('stale');
+      if (others > 0) tags.push(`+${others} other`);
+      console.log(`  [${flag}] ${event}${tags.length ? '   (' + tags.join(', ') + ')' : ''}`);
     }
     const missing = a.audit.filter(x => !x.installed);
-    process.exit(missing.length === 0 ? 0 : 1);
+    const stale = a.audit.filter(x => x.stale);
+    process.exit(missing.length === 0 && stale.length === 0 ? 0 : 1);
   }
 
   const result = install({ scope, cwd: process.cwd(), packageRoot: PKG_ROOT, version: PKG_VERSION });
   console.log(`settings : ${result.target.file}  (scope: ${result.target.scope})`);
   console.log(`hook cmd : ${result.command.command}  (mode: ${result.command.mode})`);
   if (result.action === 'noop') {
-    console.log('✓ Already installed — nothing to do.');
-    return;
+    console.log('✓ Already installed and up to date — nothing to do.');
+  } else {
+    if (result.missing.length > 0) console.log(`✓ Added: ${result.missing.join(', ')}`);
+    if (result.updated.length > 0) console.log(`✓ Refreshed (was stale): ${result.updated.join(', ')}`);
+    if (result.present.length > 0) console.log(`  (already up to date: ${result.present.join(', ')})`);
   }
-  console.log(`✓ Added: ${result.missing.join(', ')}`);
-  if (result.present.length > 0) console.log(`  (already present: ${result.present.join(', ')})`);
+  const others = Object.entries(result.coexisting || {});
+  if (others.length > 0) {
+    console.log('  Coexisting hooks (run in parallel, untouched):');
+    for (const [ev, n] of others) console.log(`    - ${ev}: ${n} other(s)`);
+  }
   if (result.gitignore && result.gitignore.changed) {
     console.log('  + .gitignore : added .claude/settings.local.json');
   }
-  console.log('\n→ Reopen /hooks in Claude Code (or restart) to reload settings.');
+  if (result.action !== 'noop') {
+    console.log('\n→ Reopen /hooks in Claude Code (or restart) to reload settings.');
+  }
 }
 
 function cmdUninstallHooks(argv) {
