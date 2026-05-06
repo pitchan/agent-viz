@@ -157,27 +157,30 @@ function screenToWorld(sx, sy) {
 }
 
 function hitTest(wx, wy) {
-  const entries = [...vis.nodes.entries()].reverse();
-  for (const [id, vn] of entries) {
+  // Iterate forward and keep the last match — equivalent to "reverse +
+  // first match" (= last-inserted-on-top wins) but without allocating
+  // a new entries array on every pointermove.
+  let hitId = null;
+  for (const [id, vn] of vis.nodes) {
     const n = state.nodes.get(id);
     if (!n) continue;
     if (n.type === 'session' || n.type === 'agent') {
       const r = n.type === 'session' ? SESSION_R : AGENT_R;
       const dist = Math.hypot(wx - vn.x, wy - vn.y);
-      if (dist <= r * vn.scale) return { id };
+      if (dist <= r * vn.scale) hitId = id;
     } else if (n.type === 'skill') {
       const dist = Math.hypot(wx - vn.x, wy - vn.y);
-      if (dist <= SKILL_R * vn.scale) return { id };
+      if (dist <= SKILL_R * vn.scale) hitId = id;
     } else if (n.type === 'mcp') {
       // Diamond hit test: |dx| + |dy| <= r (Manhattan distance).
       const r = MCP_R * vn.scale;
-      if (Math.abs(wx - vn.x) + Math.abs(wy - vn.y) <= r) return { id };
+      if (Math.abs(wx - vn.x) + Math.abs(wy - vn.y) <= r) hitId = id;
     } else {
       const hw = TOOL_W / 2, hh = TOOL_H / 2;
-      if (wx >= vn.x - hw && wx <= vn.x + hw && wy >= vn.y - hh && wy <= vn.y + hh) return { id };
+      if (wx >= vn.x - hw && wx <= vn.x + hw && wy >= vn.y - hh && wy <= vn.y + hh) hitId = id;
     }
   }
-  return null;
+  return hitId ? { id: hitId } : null;
 }
 
 // ─── Glow sprites ─────────────────────────────────────────────────────────
