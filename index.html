@@ -65,6 +65,28 @@ body {
   display: flex; align-items: center; justify-content: center;
   font-size: 12px;
 }
+.agent-badge {
+  font-size: 9px; text-transform: uppercase; letter-spacing: 0.6px;
+  font-weight: 600; padding: 2px 7px; border-radius: 4px;
+  border: 1px solid currentColor;
+  background: rgba(102, 204, 255, 0.06);
+  color: var(--holo);
+  white-space: nowrap;
+}
+.agent-badge.agent-copilot {
+  color: var(--agent);
+  background: rgba(188, 140, 255, 0.06);
+}
+.agent-badge.agent-claude {
+  color: var(--holo);
+  background: rgba(102, 204, 255, 0.06);
+}
+.session-card .agent-badge {
+  margin-left: 6px;
+  vertical-align: middle;
+}
+#topbar-agent { display: none; }
+#topbar-agent.visible { display: inline-block; }
 .sep { width: 1px; height: 24px; background: var(--glass-border); }
 
 #connection-dot {
@@ -270,6 +292,7 @@ canvas { display: block; width: 100%; height: 100%; }
     <div class="logo">
       <div class="logo-icon">&#x25C8;</div>
       agent-viz
+      <span id="topbar-agent" class="agent-badge"></span>
     </div>
     <span class="sep"></span>
     <div id="connection-dot" title="Disconnected"></div>
