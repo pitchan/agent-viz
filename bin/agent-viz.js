@@ -109,7 +109,7 @@ async function cmdStart(argv) {
       const result = install({ cwd: process.cwd(), packageRoot: PKG_ROOT, version: PKG_VERSION });
       let printed = false;
       for (const [agent, r] of Object.entries(result)) {
-        if (!r || r.error || r.action === 'noop') continue;
+        if (!r || r.action === 'noop') continue;
         const label = agent === 'claude' ? 'Claude Code' : 'Copilot CLI';
         const verb = r.action === 'updated' ? 'refreshed'
                    : r.action === 'installed+updated' ? 'installed + refreshed'
@@ -203,10 +203,6 @@ function cmdInstallHooks(argv) {
   const result = install({ target, scope, cwd: process.cwd(), packageRoot: PKG_ROOT, version: PKG_VERSION });
   for (const [agent, r] of Object.entries(result)) {
     const label = agent === 'claude' ? 'Claude Code' : 'Copilot CLI';
-    if (r.error) {
-      console.log(`${label}: ! ${r.error}`);
-      continue;
-    }
     console.log(`${label}:`);
     console.log(`  settings : ${r.target.file}  (scope: ${r.target.scope})`);
     console.log(`  hook cmd : ${r.command.command}  (mode: ${r.command.mode})`);
