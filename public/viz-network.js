@@ -11,12 +11,20 @@ import {
   renderFeed, updateStats, fitView, startDurationsTicker, stopDurationsTicker,
 } from './viz-ui.js';
 
+// Render a small pill badge identifying the source agent. Returns HTML safe to
+// inline (label is fixed, no user input).
+function badgeHtml(agentSource) {
+  const src = agentSource === 'copilot' ? 'copilot' : 'claude';
+  return `<span class="agent-badge agent-${src}">${src}</span>`;
+}
+
 // ─── DOM refs ─────────────────────────────────────────────────────────────
 const connDot = document.getElementById('connection-dot');
 
 // ─── Session selection (owned here, read-only from elsewhere) ─────────────
 export let currentSessionId = null;
 export const sessionTitles = new Map();
+export const sessionAgents = new Map(); // sid → 'claude' | 'copilot'
 
 // ─── SSE + poll state ─────────────────────────────────────────────────────
 let sseSource = null;
@@ -149,6 +157,7 @@ export async function loadSessions() {
 
     for (const s of sessions) {
       if (s.prompt) sessionTitles.set(s.id, s.prompt);
+      sessionAgents.set(s.id, s.agentSource || 'claude');
     }
     updateTopbarPrompt();
 
@@ -159,7 +168,7 @@ export async function loadSessions() {
       </div>` +
       sessions.map(s => `
         <div class="session-card${currentSessionId === s.id ? ' active' : ''}" data-sid="${s.id}">
-          <div class="s-title">${esc(s.id.slice(0, 8))}</div>
+          <div class="s-title">${esc(s.id.slice(0, 8))}${badgeHtml(s.agentSource)}</div>
           ${s.prompt ? `<div class="s-prompt">${esc(s.prompt)}</div>` : ''}
           <div class="s-meta">
             <span>${s.eventCount || 0} events</span>
@@ -176,6 +185,18 @@ export function updateTopbarPrompt() {
   const prompt = sid ? sessionTitles.get(sid) : null;
   el.textContent = prompt || '';
   el.title = prompt || '';
+  // Topbar agent badge follows the active session.
+  const badge = document.getElementById('topbar-agent');
+  if (badge) {
+    const agent = sid ? sessionAgents.get(sid) : null;
+    if (agent) {
+      badge.textContent = agent;
+      badge.className = `agent-badge agent-${agent === 'copilot' ? 'copilot' : 'claude'} visible`;
+    } else {
+      badge.className = 'agent-badge';
+      badge.textContent = '';
+    }
+  }
 }
 
 function formatAge(mtime) {
