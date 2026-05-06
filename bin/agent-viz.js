@@ -25,16 +25,19 @@ Usage:
   agent-viz [start]              Start the visualizer (default).
                                    --port N           listen on port N (default 3333)
                                    --foreground       attach to terminal (don't daemonize)
-                                   --no-install-hooks don't auto-install Claude Code hooks
+                                   --no-install-hooks don't auto-install hooks
                                    --open             open browser to the URL
   agent-viz stop                 Stop the running visualizer.
   agent-viz status               Show running state + URL.
-  agent-viz install-hooks        Install Claude Code hooks. Scope flags:
-                                   --user             ~/.claude/settings.json
-                                   --project          <root>/.claude/settings.json
-                                   --local            <root>/.claude/settings.local.json (default in project)
-  agent-viz uninstall-hooks      Remove Claude Code hooks (all scopes if no flag).
+  agent-viz install-hooks        Install hooks. Default: auto-detect (Claude + Copilot if present).
+                                   --target=claude|copilot|both   force a target
+                                   --user             user-level config (~/.claude or ~/.copilot)
+                                   --project          repo-committed config
+                                   --local            repo-local gitignored config (default in project)
+                                   --check            audit instead of installing (exit 1 on stale/missing)
+  agent-viz uninstall-hooks      Remove hooks (sweeps all targets unless --target given).
   agent-viz hook                 Internal — read JSON event from stdin.
+                                   --source=claude|copilot   set the source agent tag
   agent-viz --help               Show this help.
   agent-viz --version            Print version.
 `);
@@ -75,6 +78,12 @@ function pickScopeFlag(flags) {
   return undefined;
 }
 
+function pickTargetFlag(flags) {
+  const v = flags.target;
+  if (v === 'claude' || v === 'copilot' || v === 'both') return v;
+  return undefined;
+}
+
 function openBrowser(url) {
   const { spawn } = require('child_process');
   const cmd = process.platform === 'darwin' ? 'open'
@@ -98,25 +107,23 @@ async function cmdStart(argv) {
     const { install } = require(path.join(PKG_ROOT, 'lib', 'install-hooks.js'));
     try {
       const result = install({ cwd: process.cwd(), packageRoot: PKG_ROOT, version: PKG_VERSION });
-      if (result.action !== 'noop') {
-        const verb = result.action === 'updated' ? 'Hooks refreshed'
-                   : result.action === 'installed+updated' ? 'Hooks installed + refreshed'
-                   : 'Hooks installed';
-        console.log(`✓ ${verb} → ${result.target.file}`);
-        console.log(`  scope: ${result.target.scope}, mode: ${result.command.mode}`);
-        if (result.missing.length > 0) console.log(`  added on: ${result.missing.join(', ')}`);
-        if (result.updated.length > 0) console.log(`  refreshed on (was stale): ${result.updated.join(', ')}`);
-        const others = Object.entries(result.coexisting || {});
-        if (others.length > 0) {
-          console.log(`  coexisting hooks (run in parallel, untouched):`);
-          for (const [ev, n] of others) console.log(`    - ${ev}: ${n} other(s)`);
+      let printed = false;
+      for (const [agent, r] of Object.entries(result)) {
+        if (!r || r.error || r.action === 'noop') continue;
+        const label = agent === 'claude' ? 'Claude Code' : 'Copilot CLI';
+        const verb = r.action === 'updated' ? 'refreshed'
+                   : r.action === 'installed+updated' ? 'installed + refreshed'
+                   : 'installed';
+        console.log(`✓ ${label} hooks ${verb} → ${r.target.file}`);
+        console.log(`  scope: ${r.target.scope}, mode: ${r.command.mode}`);
+        if (r.missing && r.missing.length > 0) console.log(`  added on: ${r.missing.join(', ')}`);
+        if (r.updated && r.updated.length > 0) console.log(`  refreshed on (was stale): ${r.updated.join(', ')}`);
+        if (r.gitignore && r.gitignore.changed) {
+          console.log(`  + .gitignore : added ${agent === 'claude' ? '.claude/settings.local.json' : '.github/hooks/agent-viz.local.json'}`);
         }
-        if (result.gitignore && result.gitignore.changed) {
-          console.log('  + .gitignore : added .claude/settings.local.json');
-        }
-        console.log('  → reopen /hooks in Claude Code (or restart) to reload settings.');
+        printed = true;
       }
-      // else noop — silent
+      if (printed) console.log('  → reopen /hooks in your agent (or restart) to reload settings.');
     } catch (e) {
       console.error(`! hook install skipped: ${e.message}`);
     }
@@ -167,59 +174,83 @@ async function cmdStatus() {
 }
 
 function cmdInstallHooks(argv) {
-  const flags = parseFlags(argv, { booleans: ['user', 'project', 'local', 'check'] });
+  const flags = parseFlags(argv, {
+    booleans: ['user', 'project', 'local', 'check'],
+    values: ['target'],
+  });
   const scope = pickScopeFlag(flags);
+  const target = pickTargetFlag(flags);
   const { install, audit } = require(path.join(PKG_ROOT, 'lib', 'install-hooks.js'));
 
   if (flags.check) {
-    const a = audit({ scope, cwd: process.cwd(), packageRoot: PKG_ROOT, version: PKG_VERSION });
-    console.log(`settings : ${a.file}  (scope: ${a.scope})`);
-    for (const { event, installed, stale, others } of a.audit) {
-      const flag = installed ? (stale ? '~' : 'x') : ' ';
-      const tags = [];
-      if (stale) tags.push('stale');
-      if (others > 0) tags.push(`+${others} other`);
-      console.log(`  [${flag}] ${event}${tags.length ? '   (' + tags.join(', ') + ')' : ''}`);
+    const result = audit({ target, scope, cwd: process.cwd(), packageRoot: PKG_ROOT, version: PKG_VERSION });
+    let exitCode = 0;
+    for (const [agent, a] of Object.entries(result)) {
+      console.log(`${agent === 'claude' ? 'Claude Code' : 'Copilot CLI'}:`);
+      console.log(`  settings : ${a.file}  (scope: ${a.scope})`);
+      for (const { event, installed, stale, others } of a.audit) {
+        const flag = installed ? (stale ? '~' : 'x') : ' ';
+        const tags = [];
+        if (stale) tags.push('stale');
+        if (others > 0) tags.push(`+${others} other`);
+        console.log(`  [${flag}] ${event}${tags.length ? '   (' + tags.join(', ') + ')' : ''}`);
+        if (!installed || stale) exitCode = 1;
+      }
     }
-    const missing = a.audit.filter(x => !x.installed);
-    const stale = a.audit.filter(x => x.stale);
-    process.exit(missing.length === 0 && stale.length === 0 ? 0 : 1);
+    process.exit(exitCode);
   }
 
-  const result = install({ scope, cwd: process.cwd(), packageRoot: PKG_ROOT, version: PKG_VERSION });
-  console.log(`settings : ${result.target.file}  (scope: ${result.target.scope})`);
-  console.log(`hook cmd : ${result.command.command}  (mode: ${result.command.mode})`);
-  if (result.action === 'noop') {
-    console.log('✓ Already installed and up to date — nothing to do.');
-  } else {
-    if (result.missing.length > 0) console.log(`✓ Added: ${result.missing.join(', ')}`);
-    if (result.updated.length > 0) console.log(`✓ Refreshed (was stale): ${result.updated.join(', ')}`);
-    if (result.present.length > 0) console.log(`  (already up to date: ${result.present.join(', ')})`);
+  const result = install({ target, scope, cwd: process.cwd(), packageRoot: PKG_ROOT, version: PKG_VERSION });
+  for (const [agent, r] of Object.entries(result)) {
+    const label = agent === 'claude' ? 'Claude Code' : 'Copilot CLI';
+    if (r.error) {
+      console.log(`${label}: ! ${r.error}`);
+      continue;
+    }
+    console.log(`${label}:`);
+    console.log(`  settings : ${r.target.file}  (scope: ${r.target.scope})`);
+    console.log(`  hook cmd : ${r.command.command}  (mode: ${r.command.mode})`);
+    if (r.action === 'noop') {
+      console.log('  ✓ already installed and up to date.');
+    } else {
+      if (r.missing && r.missing.length > 0) console.log(`  ✓ added: ${r.missing.join(', ')}`);
+      if (r.updated && r.updated.length > 0) console.log(`  ✓ refreshed (was stale): ${r.updated.join(', ')}`);
+      if (r.present && r.present.length > 0) console.log(`  (already up to date: ${r.present.join(', ')})`);
+    }
+    const others = Object.entries(r.coexisting || {});
+    if (others.length > 0) {
+      console.log('  Coexisting hooks (run in parallel, untouched):');
+      for (const [ev, n] of others) console.log(`    - ${ev}: ${n} other(s)`);
+    }
+    if (r.gitignore && r.gitignore.changed) {
+      console.log(`  + .gitignore : added ${agent === 'claude' ? '.claude/settings.local.json' : '.github/hooks/agent-viz.local.json'}`);
+    }
   }
-  const others = Object.entries(result.coexisting || {});
-  if (others.length > 0) {
-    console.log('  Coexisting hooks (run in parallel, untouched):');
-    for (const [ev, n] of others) console.log(`    - ${ev}: ${n} other(s)`);
-  }
-  if (result.gitignore && result.gitignore.changed) {
-    console.log('  + .gitignore : added .claude/settings.local.json');
-  }
-  if (result.action !== 'noop') {
-    console.log('\n→ Reopen /hooks in Claude Code (or restart) to reload settings.');
+  const anyChange = Object.values(result).some(r => r && r.action && r.action !== 'noop');
+  if (anyChange) {
+    console.log('\n→ Reopen /hooks in your agent (or restart) to reload settings.');
   }
 }
 
 function cmdUninstallHooks(argv) {
-  const flags = parseFlags(argv, { booleans: ['user', 'project', 'local'] });
+  const flags = parseFlags(argv, {
+    booleans: ['user', 'project', 'local'],
+    values: ['target'],
+  });
   const scope = pickScopeFlag(flags);
+  const target = pickTargetFlag(flags);
   const { uninstall } = require(path.join(PKG_ROOT, 'lib', 'install-hooks.js'));
-  const { results } = uninstall({ scope, cwd: process.cwd() });
+  const result = uninstall({ target, scope, cwd: process.cwd() });
   let total = 0;
-  for (const r of results) {
-    total += r.removed;
-    if (r.removed > 0) console.log(`✓ removed ${r.removed} from ${r.file} (${r.scope})`);
-    else if (r.exists) console.log(`  nothing to remove in ${r.file} (${r.scope})`);
-    else console.log(`  ${r.file} does not exist (${r.scope})`);
+  for (const [agent, x] of Object.entries(result)) {
+    const results = x.results || [];
+    const label = agent === 'claude' ? 'Claude Code' : 'Copilot CLI';
+    for (const r of results) {
+      total += r.removed;
+      if (r.removed > 0) console.log(`${label}: ✓ removed ${r.removed} from ${r.file} (${r.scope})`);
+      else if (r.exists) console.log(`${label}:   nothing to remove in ${r.file} (${r.scope})`);
+      else console.log(`${label}:   ${r.file} does not exist (${r.scope})`);
+    }
   }
   if (total === 0) console.log('No agent-viz hooks found.');
 }
