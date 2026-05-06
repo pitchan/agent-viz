@@ -23,6 +23,13 @@
       <div class="stat"><span class="stat-dot" style="background:var(--agent)"></span><span id="stat-agents" class="stat-val">0</span> agents</div>
       <div class="stat"><span class="stat-dot" style="background:var(--notification)"></span><span id="stat-running" class="stat-val">0</span> active</div>
       <div class="stat"><span class="stat-dot" style="background:var(--error)"></span><span id="stat-errors" class="stat-val">0</span> errors</div>
+      <div class="stat budget-pill" id="budget-pill" hidden title="">
+        <span id="budget-model" class="budget-model"></span>
+        <span class="budget-sep">·</span>
+        <span id="budget-ctx" class="stat-val"></span>
+        <span class="budget-sep">·</span>
+        <span id="budget-cost" class="stat-val"></span>
+      </div>
     </div>
     <div class="topbar-right">
       <input id="search-box" type="text" placeholder="Filter... (/)">

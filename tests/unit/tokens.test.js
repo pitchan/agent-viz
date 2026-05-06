@@ -33,3 +33,67 @@ test('accumulateUsage cumulates totals AND tracks the last message values', () =
   assert.equal(b.lastCacheCreate, 0);
   assert.equal(b.lastCacheRead, 1500);
 });
+
+test('newBucket exposes pricing fields zeroed out', () => {
+  const b = newBucket();
+  assert.equal(b.lastModel, null);
+  assert.equal(b.contextMax, 0);
+  assert.equal(b.costUsd, 0);
+});
+
+test('accumulateUsage without a model leaves pricing fields untouched', () => {
+  const b = newBucket();
+  accumulateUsage(b, { input_tokens: 100, output_tokens: 50 });
+  assert.equal(b.lastModel, null);
+  assert.equal(b.contextMax, 0);
+  assert.equal(b.costUsd, 0);
+});
+
+test('accumulateUsage with a known model populates lastModel/contextMax and accumulates costUsd', () => {
+  const b = newBucket();
+  // claude-sonnet-4-5 is in the static FALLBACK — no network needed.
+  accumulateUsage(b, {
+    input_tokens: 1_000,
+    output_tokens: 500,
+    cache_creation_input_tokens: 0,
+    cache_read_input_tokens: 0,
+  }, 'claude-sonnet-4-5');
+  assert.equal(b.lastModel, 'claude-sonnet-4-5');
+  assert.ok(b.contextMax > 0, 'contextMax should be set from the model');
+  // 1000 * 3e-6 + 500 * 1.5e-5 = 0.003 + 0.0075 = 0.0105
+  assert.ok(Math.abs(b.costUsd - 0.0105) < 1e-9, `got ${b.costUsd}`);
+
+  accumulateUsage(b, {
+    input_tokens: 200, output_tokens: 100,
+    cache_creation_input_tokens: 0, cache_read_input_tokens: 0,
+  }, 'claude-sonnet-4-5');
+  // costUsd accumulates: previous 0.0105 + 200*3e-6 + 100*1.5e-5 = 0.0105 + 0.0006 + 0.0015 = 0.0126
+  assert.ok(Math.abs(b.costUsd - 0.0126) < 1e-9, `got ${b.costUsd}`);
+});
+
+test('accumulateUsage stores the canonical id (normalized) regardless of input transport', () => {
+  // Bedrock/Vertex/dated suffixes must not leak into the bucket — the UI
+  // uses lastModel to derive a clean label and shouldn't have to handle
+  // every transport variant.
+  const cases = [
+    'anthropic.claude-sonnet-4-5-v1:0',
+    'bedrock/claude-sonnet-4-5',
+    'claude-sonnet-4-5-20250929',
+  ];
+  for (const raw of cases) {
+    const b = newBucket();
+    accumulateUsage(b, { input_tokens: 100, output_tokens: 50 }, raw);
+    assert.equal(b.lastModel, 'claude-sonnet-4-5', `failed for ${raw}`);
+  }
+});
+
+test('accumulateUsage with an unknown model leaves pricing fields untouched', () => {
+  const b = newBucket();
+  accumulateUsage(b, { input_tokens: 1000, output_tokens: 500 }, 'claude-mythical-99-99');
+  // Token counters still update, but pricing stays at zero — better than
+  // crashing or filling with NaN when a future model arrives before the
+  // pricing fetch resolves.
+  assert.equal(b.in, 1000);
+  assert.equal(b.lastModel, null);
+  assert.equal(b.costUsd, 0);
+});

@@ -106,6 +106,17 @@ body {
 .stat-val.has-errors { color: var(--error); }
 .stat-val.has-running { color: var(--notification); }
 
+/* Budget pill — model · context% · cost. Same shape as .stat. */
+.budget-pill { gap: 8px; }
+.budget-pill[hidden] { display: none; }
+.budget-model {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;
+  color: var(--holo-bright); font-weight: 600;
+}
+.budget-sep { color: var(--text-muted); }
+#budget-ctx.is-warn { color: var(--notification); }
+#budget-ctx.is-crit { color: var(--error); }
+
 .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
 #search-box {
   background: rgba(102, 204, 255, 0.04);

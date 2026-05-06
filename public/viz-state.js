@@ -43,9 +43,11 @@ export const state = {
   toolsCompleted: 0, filter: '', autoFit: true,
   timelineEntries: [], startTimes: new Map(),
   _lastServerId: null,
-  // Token usage — populated by SSE `tokens` events. Shape:
-  //   main: { in, out, cacheCreate, cacheRead } | null
-  //   perAgent: Map<agentId, { in, out, cacheCreate, cacheRead }>
+  // Token usage — populated by SSE `tokens` events. Bucket shape:
+  //   { in, out, cacheCreate, cacheRead,
+  //     lastIn, lastCacheCreate, lastCacheRead,
+  //     lastModel, contextMax, costUsd } | null
+  // (cumulative + last-message + pricing-derived; see lib/server/tokens.js)
   tokens: { main: null, perAgent: new Map() },
   // Map<forkedChildAgentId, parentAgentId>. Filled by PostToolUse(Skill) events
   // with tool_response.status === 'forked'. Used to attach forked sub-agents
@@ -187,6 +189,17 @@ export function tokenTotal(t) {
 export function tokenContext(t) {
   if (!t) return 0;
   return (t.lastIn || 0) + (t.lastCacheCreate || 0) + (t.lastCacheRead || 0);
+}
+
+// Format USD cost — "$0.42", "$12.30", "$1.2k" for very large sessions.
+// 4-decimal precision for sub-cent values so cheap exploratory runs still
+// register something visible.
+export function formatCost(usd) {
+  if (!usd || usd < 0) return '$0';
+  if (usd < 0.01) return '$' + usd.toFixed(4);
+  if (usd < 100) return '$' + usd.toFixed(2);
+  if (usd < 1000) return '$' + Math.round(usd);
+  return '$' + (usd / 1000).toFixed(1) + 'k';
 }
 
 // Extract the bare agent id from a node id of the form "a:<agentId>".

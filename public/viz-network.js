@@ -8,7 +8,7 @@
 import { state, vis, markDirty, esc } from './viz-state.js';
 import { processEvent, layout, resetLayout } from './viz-layout.js';
 import {
-  renderFeed, updateStats, fitView, startDurationsTicker, stopDurationsTicker,
+  renderFeed, updateStats, updateBudget, fitView, startDurationsTicker, stopDurationsTicker,
 } from './viz-ui.js';
 
 // Render a small pill badge identifying the source agent. Returns HTML safe to
@@ -104,6 +104,7 @@ export function connectSSE() {
               state.tokens.perAgent.set(aid, bucket);
             }
           }
+          updateBudget();
           markDirty();
         }
         return;
@@ -226,6 +227,7 @@ export function clearState() {
   state.timelineEntries = []; state.startTimes.clear();
   state._lastServerId = null;
   state.tokens.main = null; state.tokens.perAgent.clear();
+  updateBudget();
   state.forkedAgentParents.clear();
   vis.nodes.clear(); vis.particles = [];
   _feedResetHook();

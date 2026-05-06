@@ -3,3 +3,7 @@
 node_modules/
 *.tgz
 .github/hooks/agent-viz.local.json
+# Stray Playwright artifacts that escape .playwright-mcp/ when a tool call
+# is invoked with a bare filename instead of a path-prefixed one.
+/snapshot-*.yml
+/page-*.yml

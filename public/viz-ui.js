@@ -8,7 +8,7 @@
 
 import {
   COLORS, state, vis, markDirty, hexAlpha, esc,
-  formatTokens, tokenTotal, tokenContext, agentIdFromNode,
+  formatTokens, tokenTotal, tokenContext, formatCost, agentIdFromNode,
 } from './viz-state.js';
 import {
   layout, matchesFilter, markLayoutFullDirty, setFeedCursorAdjust,
@@ -123,17 +123,24 @@ export function showDetail(n) {
 }
 
 // For session/agent nodes, render meta-cards with the token breakdown:
-// one "Context" card (current window size, matches /context) + 4 cumulative
-// cards (total processed over the session lifetime). Returns '' otherwise.
+// one "Context" card (current window size, matches /context) + cost + model
+// (agents only) + 4 cumulative cards. Returns '' when no data.
+//
+// Drill-down cost lets the user verify the topbar total: clicking each
+// subagent should show a cost that, summed with the main thread's, equals
+// the topbar pill — useful when a session looks suspiciously expensive.
 function tokenCardsHTML(n) {
   let bucket = null;
   let contextSize = 0;
+  let totalCost = 0;
+  let modelLabel = '';
   if (n.type === 'session') {
     // Session's cumulative = main + all subagents (useful for raw volume view).
     bucket = { in: 0, out: 0, cacheCreate: 0, cacheRead: 0 };
     const add = b => { if (!b) return;
       bucket.in += b.in || 0; bucket.out += b.out || 0;
-      bucket.cacheCreate += b.cacheCreate || 0; bucket.cacheRead += b.cacheRead || 0; };
+      bucket.cacheCreate += b.cacheCreate || 0; bucket.cacheRead += b.cacheRead || 0;
+      totalCost += b.costUsd || 0; };
     add(state.tokens.main);
     for (const b of state.tokens.perAgent.values()) add(b);
     // Context size = main thread only (matches what /context reports).
@@ -142,13 +149,23 @@ function tokenCardsHTML(n) {
     const aid = agentIdFromNode(n.id);
     bucket = aid ? state.tokens.perAgent.get(aid) : null;
     contextSize = tokenContext(bucket);
+    totalCost = (bucket && bucket.costUsd) || 0;
+    modelLabel = (bucket && bucket.lastModel) ? labelForModel(bucket.lastModel) : '';
   }
   if (!bucket || tokenTotal(bucket) === 0) return '';
   const ctxCard = contextSize > 0
     ? `<div class="meta-card"><div class="meta-label">Context (current)</div><div class="meta-value">${formatTokens(contextSize)}</div></div>`
     : '';
+  const modelCard = modelLabel
+    ? `<div class="meta-card"><div class="meta-label">Model</div><div class="meta-value">${esc(modelLabel)}</div></div>`
+    : '';
+  const costCard = totalCost > 0
+    ? `<div class="meta-card"><div class="meta-label">Cost (cumul.)</div><div class="meta-value">${formatCost(totalCost)}</div></div>`
+    : '';
   return `
+    ${modelCard}
     ${ctxCard}
+    ${costCard}
     <div class="meta-card"><div class="meta-label">Input (cumul.)</div><div class="meta-value">${formatTokens(bucket.in)}</div></div>
     <div class="meta-card"><div class="meta-label">Output (cumul.)</div><div class="meta-value">${formatTokens(bucket.out)}</div></div>
     <div class="meta-card"><div class="meta-label">Cache read (cumul.)</div><div class="meta-value">${formatTokens(bucket.cacheRead)}</div></div>
@@ -162,6 +179,58 @@ document.getElementById('detail-close').addEventListener('click', () => {
   renderFeed();
   markDirty();
 });
+
+// ─── Budget pill (model · context% · cost) ───────────────────────────────
+// Driven by SSE `tokens` snapshots — see viz-network.js. Reads only the main
+// thread bucket (matches what /context reports); subagent costs are folded in
+// for the cumulative dollar amount.
+const _budgetEls = {
+  pill: null, model: null, ctx: null, cost: null,
+};
+function _budgetDOM() {
+  if (!_budgetEls.pill) {
+    _budgetEls.pill = document.getElementById('budget-pill');
+    _budgetEls.model = document.getElementById('budget-model');
+    _budgetEls.ctx = document.getElementById('budget-ctx');
+    _budgetEls.cost = document.getElementById('budget-cost');
+  }
+  return _budgetEls;
+}
+
+export function updateBudget() {
+  const els = _budgetDOM();
+  if (!els.pill) return;
+  const main = state.tokens.main;
+  // Hide while we have no model info yet — the pill flickering empty is worse
+  // than not appearing until the first assistant message lands.
+  if (!main || !main.lastModel || !main.contextMax) {
+    els.pill.hidden = true;
+    return;
+  }
+  const ctxNow = tokenContext(main);
+  const ratio = ctxNow / main.contextMax;
+  // Cumulative cost = main + every subagent bucket (each computed against its
+  // own model on the server side, so a multi-model session sums cleanly).
+  let totalCost = main.costUsd || 0;
+  for (const b of state.tokens.perAgent.values()) totalCost += b.costUsd || 0;
+
+  els.model.textContent = labelForModel(main.lastModel);
+  els.ctx.textContent = `${formatTokens(ctxNow)} / ${formatTokens(main.contextMax)} (${(ratio * 100).toFixed(1)}%)`;
+  els.cost.textContent = formatCost(totalCost);
+  els.ctx.classList.toggle('is-warn', ratio >= 0.7 && ratio < 0.9);
+  els.ctx.classList.toggle('is-crit', ratio >= 0.9);
+  els.pill.title = `Model: ${main.lastModel}\nContext: ${ctxNow.toLocaleString()} / ${main.contextMax.toLocaleString()} tokens\nCost (this session): ${formatCost(totalCost)}`;
+  els.pill.hidden = false;
+}
+
+// Cheap client-side label derivation — matches the server's deriveLabel() so
+// we don't have to ship the price map to the client just for display names.
+function labelForModel(id) {
+  if (!id) return '';
+  const m = id.match(/^claude-(opus|sonnet|haiku)-(\d+)-(\d+)/);
+  if (m) return `${m[1][0].toUpperCase()}${m[1].slice(1)} ${m[2]}.${m[3]}`;
+  return id;
+}
 
 // ─── Stats ────────────────────────────────────────────────────────────────
 export function updateStats() {
