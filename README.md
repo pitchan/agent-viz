@@ -154,7 +154,7 @@ If you reinstall agent-viz to a different path later (e.g. moved your dev clone)
 
 ## Captured events
 
-`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, `SessionStart`. Events land as JSONL in `${tmpdir}/agent-events/<session_id>.jsonl` (legacy `claude-events/` is still read by the server until v0.4.0) and are streamed to the dashboard via Server-Sent Events. Each event carries a `_source: "claude" | "copilot"` field set by the hook command's `--source` flag.
+`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, `SessionStart`. Events land as JSONL in `${tmpdir}/agent-events/<session_id>.jsonl` and are streamed to the dashboard via Server-Sent Events. Each event carries a `_source: "claude" | "copilot"` field set by the hook command's `--source` flag.
 
 ## Configuration
 

@@ -157,137 +157,175 @@ export function cascadeTerminate(rootNodeId, ts) {
 }
 
 // ─── Event → graph mutation ───────────────────────────────────────────────
+// Per-event handlers receive the same context bag (evt, sid, ts) and mutate
+// state/vis directly. Adding a new hook event = one entry in EVENT_HANDLERS.
+
+function ensureSessionParent(sid) {
+  const parent = getNode(`s:${sid}`);
+  parent.type = 'session';
+  parent.label = parent.label || 'Session';
+  parent.color = COLORS.session;
+  return parent;
+}
+
+function onSessionStart(evt, sid, ts) {
+  const n = getNode(`s:${sid}`);
+  n.type = 'session'; n.label = 'Session'; n.sub = sid.slice(0, 8);
+  n.color = COLORS.session; n.data = evt; n.status = 'running'; n.startTime = ts;
+  setRunning(n.id, true);
+  addTimelineEntry(evt, n.id, 'session', 'Session', sid.slice(0, 8));
+}
+
+function onSubagentStart(evt, sid, ts) {
+  const aid = evt.agent_id || sid;
+  const n = getNode(`a:${aid}`);
+  n.type = 'agent';
+  n.label = evt.agent_type || evt.subagent_type || 'Agent';
+  n.sub = (evt.tool_input && evt.tool_input.description) || aid.slice(0, 8);
+  n.color = COLORS.agent; n.data = evt; n.status = 'running'; n.startTime = ts;
+  if (evt.tool_input && evt.tool_input.isolation === 'worktree') n.isIsolated = true;
+  setRunning(n.id, true);
+  const parent = ensureSessionParent(sid);
+  if (!n.parentId) { n.parentId = parent.id; parent.children.push(n); }
+  recomputeParallelFlags(parent.id);
+  addTimelineEntry(evt, n.id, 'agent', n.label, n.sub);
+}
+
+function onSubagentStop(evt, sid, ts) {
+  const aid = evt.agent_id || sid;
+  const n = state.nodes.get(`a:${aid}`);
+  if (!n) return;
+  n.status = 'done'; n.data = evt; n.endTime = ts;
+  n.duration = calcDuration(n.startTime, ts);
+  n.color = COLORS.complete;
+  setRunning(n.id, false);
+  if (n.parentId) recomputeParallelFlags(n.parentId);
+}
+
+function onPreToolUse(evt, sid, ts) {
+  const tid = evt.tool_use_id || `t${state.eventSeq++}`;
+  const n = getNode(`t:${tid}`);
+  const isSkill = evt.tool_name === 'Skill';
+  const isMcp = typeof evt.tool_name === 'string' && evt.tool_name.startsWith('mcp__');
+  n.type = isSkill ? 'skill' : isMcp ? 'mcp' : 'tool';
+  if (isMcp) {
+    const parsed = parseMcpName(evt.tool_name);
+    n.label = parsed.label;
+    n.sub = parsed.sub;
+  } else {
+    n.label = isSkill ? ((evt.tool_input && evt.tool_input.skill) || 'Skill') : (evt.tool_name || 'Tool');
+    n.sub = formatToolSub(evt);
+  }
+  n.color = isSkill ? COLORS.skill : isMcp ? COLORS.mcp : COLORS.tool;
+  n.data = evt; n.status = 'running'; n.startTime = ts;
+  setRunning(n.id, true);
+  state.startTimes.set(tid, ts);
+  const parentId = evt.agent_id ? `a:${evt.agent_id}` : `s:${sid}`;
+  const parent = getNode(parentId);
+  if (parentId.startsWith('s:')) {
+    parent.type = 'session'; parent.label = parent.label || 'Session'; parent.color = COLORS.session;
+  } else if (parent.type !== 'agent') {
+    promoteAgentNode(parent, evt, sid, ts);
+  }
+  if (!n.parentId) { n.parentId = parent.id; parent.children.push(n); }
+  addTimelineEntry(evt, n.id, n.type, n.label, n.sub);
+}
+
+// Subagent completion: PostToolUse on the main-thread Agent tool carries
+// tool_response.agentId. This is the canonical "subagent done" signal,
+// since SubagentStop hooks are not reliably emitted. terminalStatus is
+// 'done' (PostToolUse) or 'error' (PostToolUseFailure).
+function settleAgentFromAgentToolResponse(evt, ts, terminalStatus) {
+  if (evt.tool_name !== 'Agent') return;
+  const aid = evt.tool_response && evt.tool_response.agentId;
+  const an = aid ? state.nodes.get(`a:${aid}`) : null;
+  if (!an || an.status !== 'running') return;
+  an.status = terminalStatus;
+  an.endTime = ts;
+  an.duration = calcDuration(an.startTime, ts);
+  an.color = terminalStatus === 'error' ? COLORS.error : COLORS.complete;
+  setRunning(an.id, false);
+  if (terminalStatus === 'done') {
+    const desc = evt.tool_input && evt.tool_input.description;
+    if (desc) an.sub = desc.slice(0, 45);
+  }
+  if (an.parentId) recomputeParallelFlags(an.parentId);
+}
+
+function onPostToolUse(evt, sid, ts) {
+  const tid = evt.tool_use_id || '';
+  const n = state.nodes.get(`t:${tid}`);
+  if (n) {
+    n.status = 'done'; n.data = evt; n.endTime = ts;
+    n.duration = calcDuration(n.startTime, ts);
+    state.toolsCompleted++;
+    setRunning(n.id, false);
+  }
+  settleAgentFromAgentToolResponse(evt, ts, 'done');
+  // Skill fork → record the parent mapping and reparent the forked sub-agent
+  // under its launching agent. The child's first PreToolUse arrives before
+  // this PostToolUse, so the child is initially attached to the session by
+  // promoteAgentNode and must be moved retroactively here.
+  if (evt.tool_name === 'Skill' && evt.tool_response
+      && evt.tool_response.status === 'forked' && evt.tool_response.agentId
+      && evt.agent_id) {
+    const childAid = evt.tool_response.agentId;
+    const parentAid = evt.agent_id;
+    state.forkedAgentParents.set(childAid, parentAid);
+    const childNode = state.nodes.get(`a:${childAid}`);
+    if (childNode) reparentNode(childNode, `a:${parentAid}`);
+  }
+}
+
+function onPostToolUseFailure(evt, sid, ts) {
+  const tid = evt.tool_use_id || '';
+  const n = state.nodes.get(`t:${tid}`);
+  if (n) {
+    n.status = 'error'; n.color = COLORS.error; n.data = evt;
+    n.endTime = ts; n.duration = calcDuration(n.startTime, ts);
+    setRunning(n.id, false);
+  }
+  settleAgentFromAgentToolResponse(evt, ts, 'error');
+}
+
+function onNotification(evt, sid, ts) {
+  const nid = `n:${state.eventSeq++}`;
+  const n = getNode(nid);
+  n.type = 'notification'; n.label = 'Notification'; n.sub = (evt.message || '').slice(0, 50);
+  n.color = COLORS.notification; n.data = evt; n.status = 'done';
+  const parent = ensureSessionParent(sid);
+  if (!n.parentId) { n.parentId = parent.id; parent.children.push(n); }
+  addTimelineEntry(evt, nid, 'notification', 'Notification', n.sub);
+}
+
+function onSessionEnd(evt, sid, ts) {
+  const n = state.nodes.get(`s:${sid}`);
+  if (!n) return;
+  n.status = 'done'; n.data = evt; n.endTime = ts;
+  n.duration = calcDuration(n.startTime, ts);
+  n.color = COLORS.complete;
+  setRunning(n.id, false);
+  cascadeTerminate(n.id, ts);
+}
+
+const EVENT_HANDLERS = {
+  SessionStart: onSessionStart,
+  SubagentStart: onSubagentStart,
+  SubagentStop: onSubagentStop,
+  PreToolUse: onPreToolUse,
+  PostToolUse: onPostToolUse,
+  PostToolUseFailure: onPostToolUseFailure,
+  Notification: onNotification,
+  Stop: onSessionEnd,
+  SessionEnd: onSessionEnd,
+};
+
 export function processEvent(evt) {
   const sid = evt.session_id || 'unknown';
-  const e = evt.hook_event_name;
   const ts = evt._ts || new Date().toISOString();
   layoutDirtyRoots.add(`s:${sid}`);
-
-  if (e === 'SessionStart') {
-    const n = getNode(`s:${sid}`);
-    n.type = 'session'; n.label = 'Session'; n.sub = sid.slice(0, 8);
-    n.color = COLORS.session; n.data = evt; n.status = 'running'; n.startTime = ts;
-    setRunning(n.id, true);
-    addTimelineEntry(evt, n.id, 'session', 'Session', sid.slice(0, 8));
-  }
-  else if (e === 'SubagentStart') {
-    const aid = evt.agent_id || sid;
-    const n = getNode(`a:${aid}`);
-    n.type = 'agent';
-    n.label = evt.agent_type || evt.subagent_type || 'Agent';
-    n.sub = (evt.tool_input && evt.tool_input.description) || aid.slice(0, 8);
-    n.color = COLORS.agent; n.data = evt; n.status = 'running'; n.startTime = ts;
-    if (evt.tool_input && evt.tool_input.isolation === 'worktree') n.isIsolated = true;
-    setRunning(n.id, true);
-    const parent = getNode(`s:${sid}`);
-    parent.type = 'session'; parent.label = parent.label || 'Session'; parent.color = COLORS.session;
-    if (!n.parentId) { n.parentId = parent.id; parent.children.push(n); }
-    recomputeParallelFlags(parent.id);
-    addTimelineEntry(evt, n.id, 'agent', n.label, n.sub);
-  }
-  else if (e === 'SubagentStop') {
-    const aid = evt.agent_id || sid;
-    const n = state.nodes.get(`a:${aid}`);
-    if (n) {
-      n.status = 'done'; n.data = evt; n.endTime = ts; n.duration = calcDuration(n.startTime, ts); n.color = COLORS.complete; setRunning(n.id, false);
-      if (n.parentId) recomputeParallelFlags(n.parentId);
-    }
-  }
-  else if (e === 'PreToolUse') {
-    const tid = evt.tool_use_id || `t${state.eventSeq++}`;
-    const n = getNode(`t:${tid}`);
-    const isSkill = evt.tool_name === 'Skill';
-    const isMcp = typeof evt.tool_name === 'string' && evt.tool_name.startsWith('mcp__');
-    n.type = isSkill ? 'skill' : isMcp ? 'mcp' : 'tool';
-    if (isMcp) {
-      const parsed = parseMcpName(evt.tool_name);
-      n.label = parsed.label;
-      n.sub = parsed.sub;
-    } else {
-      n.label = isSkill ? ((evt.tool_input && evt.tool_input.skill) || 'Skill') : (evt.tool_name || 'Tool');
-      n.sub = formatToolSub(evt);
-    }
-    n.color = isSkill ? COLORS.skill : isMcp ? COLORS.mcp : COLORS.tool;
-    n.data = evt; n.status = 'running'; n.startTime = ts;
-    setRunning(n.id, true);
-    state.startTimes.set(tid, ts);
-    const parentId = evt.agent_id ? `a:${evt.agent_id}` : `s:${sid}`;
-    const parent = getNode(parentId);
-    if (parentId.startsWith('s:')) {
-      parent.type = 'session'; parent.label = parent.label || 'Session'; parent.color = COLORS.session;
-    } else if (parent.type !== 'agent') {
-      promoteAgentNode(parent, evt, sid, ts);
-    }
-    if (!n.parentId) { n.parentId = parent.id; parent.children.push(n); }
-    addTimelineEntry(evt, n.id, n.type, n.label, n.sub);
-  }
-  else if (e === 'PostToolUse') {
-    const tid = evt.tool_use_id || '';
-    const n = state.nodes.get(`t:${tid}`);
-    if (n) { n.status = 'done'; n.data = evt; n.endTime = ts; n.duration = calcDuration(n.startTime, ts); state.toolsCompleted++; setRunning(n.id, false); }
-    // Subagent completion: PostToolUse on the main-thread Agent tool carries
-    // tool_response.agentId. This is the canonical "subagent done" signal,
-    // since SubagentStop hooks are not reliably emitted.
-    if (evt.tool_name === 'Agent') {
-      const aid = evt.tool_response && evt.tool_response.agentId;
-      const an = aid ? state.nodes.get(`a:${aid}`) : null;
-      if (an && an.status === 'running') {
-        an.status = 'done';
-        an.endTime = ts;
-        an.duration = calcDuration(an.startTime, ts);
-        an.color = COLORS.complete;
-        setRunning(an.id, false);
-        const desc = evt.tool_input && evt.tool_input.description;
-        if (desc) an.sub = desc.slice(0, 45);
-        if (an.parentId) recomputeParallelFlags(an.parentId);
-      }
-    }
-    // Skill fork → record the parent mapping and reparent the forked sub-agent
-    // under its launching agent. The child's first PreToolUse arrives before
-    // this PostToolUse, so the child is initially attached to the session by
-    // promoteAgentNode and must be moved retroactively here.
-    if (evt.tool_name === 'Skill' && evt.tool_response
-        && evt.tool_response.status === 'forked' && evt.tool_response.agentId
-        && evt.agent_id) {
-      const childAid = evt.tool_response.agentId;
-      const parentAid = evt.agent_id;
-      state.forkedAgentParents.set(childAid, parentAid);
-      const childNode = state.nodes.get(`a:${childAid}`);
-      if (childNode) reparentNode(childNode, `a:${parentAid}`);
-    }
-  }
-  else if (e === 'PostToolUseFailure') {
-    const tid = evt.tool_use_id || '';
-    const n = state.nodes.get(`t:${tid}`);
-    if (n) { n.status = 'error'; n.color = COLORS.error; n.data = evt; n.endTime = ts; n.duration = calcDuration(n.startTime, ts); setRunning(n.id, false); }
-    if (evt.tool_name === 'Agent') {
-      const aid = evt.tool_response && evt.tool_response.agentId;
-      const an = aid ? state.nodes.get(`a:${aid}`) : null;
-      if (an && an.status === 'running') {
-        an.status = 'error'; an.color = COLORS.error;
-        an.endTime = ts; an.duration = calcDuration(an.startTime, ts);
-        setRunning(an.id, false);
-        if (an.parentId) recomputeParallelFlags(an.parentId);
-      }
-    }
-  }
-  else if (e === 'Notification') {
-    const nid = `n:${state.eventSeq++}`;
-    const n = getNode(nid);
-    n.type = 'notification'; n.label = 'Notification'; n.sub = (evt.message || '').slice(0, 50);
-    n.color = COLORS.notification; n.data = evt; n.status = 'done';
-    const parent = getNode(`s:${sid}`);
-    parent.type = 'session'; parent.label = parent.label || 'Session'; parent.color = COLORS.session;
-    if (!n.parentId) { n.parentId = parent.id; parent.children.push(n); }
-    addTimelineEntry(evt, nid, 'notification', 'Notification', n.sub);
-  }
-  else if (e === 'Stop' || e === 'SessionEnd') {
-    const n = state.nodes.get(`s:${sid}`);
-    if (n) {
-      n.status = 'done'; n.data = evt; n.endTime = ts; n.duration = calcDuration(n.startTime, ts); n.color = COLORS.complete; setRunning(n.id, false);
-      cascadeTerminate(n.id, ts);
-    }
-  }
+  const handler = EVENT_HANDLERS[evt.hook_event_name];
+  if (handler) handler(evt, sid, ts);
 }
 
 export function calcDuration(start, end) {
