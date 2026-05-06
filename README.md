@@ -1,6 +1,6 @@
 # agent-viz
 
-Real-time visualizer for [Claude Code](https://docs.claude.com/en/docs/claude-code) sessions. Streams hook events into a live web dashboard with multi-agent topology, token usage, and tool-call timeline.
+Real-time visualizer for [Claude Code](https://docs.claude.com/en/docs/claude-code) and [GitHub Copilot CLI](https://docs.github.com/en/copilot/concepts/agents/about-copilot-cli) sessions. Streams hook events into a live web dashboard with per-agent badges, multi-agent topology, token usage, and tool-call timeline.
 
 ## Install & start (recommended)
 
@@ -54,12 +54,28 @@ Adds `agent-viz` as a dev dependency. The hook command embedded in `settings.jso
 | Open browser automatically | `agent-viz start --open` |
 | Skip auto hook install | `agent-viz start --no-install-hooks` |
 
+## Multi-agent support
+
+agent-viz captures events from **both Claude Code and GitHub Copilot CLI** simultaneously. On first run, it auto-detects which CLI agents are installed locally and registers the appropriate hooks for each. Sessions are tagged in the dashboard with a colored pill badge (cyan for Claude, violet for Copilot).
+
+To force a target explicitly:
+
+```bash
+agent-viz install-hooks --target=claude     # Claude only
+agent-viz install-hooks --target=copilot    # Copilot only
+agent-viz install-hooks --target=both       # both even if not detected
+```
+
+Detection: an agent is considered installed if its CLI binary is on your `PATH`, or if its config home (`~/.claude/` for Claude, `~/.copilot/` for Copilot) exists with at least one file inside.
+
 ## Hook management
 
-The first time you run `agent-viz`, it auto-registers Claude Code hooks. By default they go to:
+The first time you run `agent-viz`, it auto-registers hooks for each detected agent. Default paths:
 
-- `<project>/.claude/settings.local.json` (gitignored) when launched inside a git or npm project,
-- `~/.claude/settings.json` (user-level) otherwise.
+| Agent | Inside a project | Outside a project |
+|---|---|---|
+| Claude Code | `<root>/.claude/settings.local.json` (gitignored) | `~/.claude/settings.json` |
+| Copilot CLI | `<root>/.github/hooks/agent-viz.local.json` (gitignored) | `~/.copilot/hooks/agent-viz.json` |
 
 You only need the commands below in three situations:
 
@@ -138,7 +154,7 @@ If you reinstall agent-viz to a different path later (e.g. moved your dev clone)
 
 ## Captured events
 
-`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, `SessionStart`. Events land as JSONL in `${tmpdir}/claude-events/<session_id>.jsonl` and are streamed to the dashboard via Server-Sent Events.
+`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, `SessionStart`. Events land as JSONL in `${tmpdir}/agent-events/<session_id>.jsonl` (legacy `claude-events/` is still read by the server until v0.4.0) and are streamed to the dashboard via Server-Sent Events. Each event carries a `_source: "claude" | "copilot"` field set by the hook command's `--source` flag.
 
 ## Configuration
 
