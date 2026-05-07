@@ -133,14 +133,14 @@ agent-viz install-hooks     # re-add a fresh entry
 
 ## Uninstalling
 
-Removing the package via npm cleans up your Claude Code settings automatically — a `preuninstall` script strips agent-viz hook entries before the files are deleted, so you won't end up with orphaned commands pointing at a missing binary:
+Two steps, **in order** — npm 7+ no longer runs lifecycle scripts on uninstall ([official docs](https://docs.npmjs.com/misc/scripts#a-note-on-a-lack-of-npm-uninstall-scripts)), so you have to clean up the hooks before removing the package:
 
 ```bash
-npm uninstall -g agent-viz   # global install: cleans ~/.claude/settings.json
-npm uninstall agent-viz      # per-project: cleans project + local + user scopes
+agent-viz uninstall-hooks    # remove agent-viz hooks from all scopes
+npm uninstall -g agent-viz   # then remove the package
 ```
 
-If you bypass npm (e.g. `rm -rf` on a dev clone, or you uninstalled before we shipped this), Claude Code will start logging `Cannot find module` errors at every hook firing. Two ways to recover:
+If you skipped step 1 (or uninstalled an older version), Claude Code will start logging `Cannot find module` errors at every hook firing. Recover with:
 
 ```bash
 # Easiest — npx fetches a fresh agent-viz just to run the cleanup:

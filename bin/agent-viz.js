@@ -257,6 +257,8 @@ async function cmdInstallHooks(argv) {
   const anyChange = Object.values(result).some(r => r && r.action && r.action !== 'noop');
   if (anyChange) {
     console.log('\n→ Reopen /hooks in your agent (or restart) to reload settings.');
+    console.log('  To uninstall later: run `agent-viz uninstall-hooks` BEFORE `npm uninstall`');
+    console.log('  (npm 7+ does not run lifecycle scripts on uninstall — manual cleanup required).');
   }
 }
 
