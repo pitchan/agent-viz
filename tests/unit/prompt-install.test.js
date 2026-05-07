@@ -97,3 +97,34 @@ test('promptInstallParams: detection labels rendered correctly', async () => {
   assert.match(io.captured, /Claude Code \(detected\)/);
   assert.match(io.captured, /Copilot CLI \(not detected\)/);
 });
+
+test('promptInstallParams: with projectRoot, scope prompt asked, default user', async () => {
+  const io = makeMockIO();
+  const promise = promptInstallParams({
+    detected: { claude: true, copilot: true },
+    projectRoot: '/some/project',
+    io: { input: io.input, output: io.output },
+  });
+  await tick();
+  press(io.input, 'return'); await tick();    // accept Both
+  press(io.input, 'return');                   // accept user (default)
+  const result = await promise;
+  assert.deepEqual(result, { target: 'both', scope: 'user' });
+  assert.match(io.captured, /Where to install hooks\?/);
+});
+
+test('promptInstallParams: scope down twice + enter → local', async () => {
+  const io = makeMockIO();
+  const promise = promptInstallParams({
+    detected: { claude: true, copilot: true },
+    projectRoot: '/some/project',
+    io: { input: io.input, output: io.output },
+  });
+  await tick();
+  press(io.input, 'return'); await tick();    // accept Both
+  press(io.input, 'down'); await tick();       // user → project
+  press(io.input, 'down'); await tick();       // project → local
+  press(io.input, 'return');
+  const result = await promise;
+  assert.equal(result.scope, 'local');
+});
