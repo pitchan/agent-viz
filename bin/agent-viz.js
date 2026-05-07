@@ -13,10 +13,24 @@
 
 const path = require('path');
 const fs = require('fs');
+const { styleText } = require('node:util');
 
 const PKG_ROOT = path.resolve(__dirname, '..');
 let PKG_VERSION = '0.0.0';
 try { PKG_VERSION = require(path.join(PKG_ROOT, 'package.json')).version || '0.0.0'; } catch {}
+
+// Semantic color helpers. node:util.styleText auto-disables for non-TTY
+// streams and respects NO_COLOR (https://no-color.org), so call sites stay
+// clean — no manual gating. Wrapped to centralize convention: ok=green for
+// successes, hint=cyan for pointers/URLs, dim=gray for technical detail
+// (paths, pids, scopes), warn=yellow for soft warnings, err=red for errors.
+const c = {
+  ok:   (s) => styleText('green',  s),
+  hint: (s) => styleText('cyan',   s),
+  dim:  (s) => styleText('gray',   s),
+  warn: (s) => styleText('yellow', s),
+  err:  (s) => styleText('red',    s),
+};
 
 function help() {
   console.log(`agent-viz v${PKG_VERSION}
@@ -120,8 +134,8 @@ async function cmdStart(argv) {
         const verb = r.action === 'updated' ? 'refreshed'
                    : r.action === 'installed+updated' ? 'installed + refreshed'
                    : 'installed';
-        console.log(`✓ ${label} hooks ${verb} → ${r.target.file}`);
-        console.log(`  scope: ${r.target.scope}, mode: ${r.command.mode}`);
+        console.log(`${c.ok('✓')} ${label} hooks ${verb} ${c.hint('→')} ${c.dim(r.target.file)}`);
+        console.log(c.dim(`  scope: ${r.target.scope}, mode: ${r.command.mode}`));
         if (r.missing && r.missing.length > 0) console.log(`  added on: ${r.missing.join(', ')}`);
         if (r.updated && r.updated.length > 0) console.log(`  refreshed on (was stale): ${r.updated.join(', ')}`);
         if (r.gitignore && r.gitignore.changed) {
@@ -129,9 +143,9 @@ async function cmdStart(argv) {
         }
         printed = true;
       }
-      if (printed) console.log('  → reopen /hooks in your agent (or restart) to reload settings.');
+      if (printed) console.log(`  ${c.hint('→')} reopen /hooks in your agent (or restart) to reload settings.`);
     } catch (e) {
-      console.error(`! hook install skipped: ${e.message}`);
+      console.error(`${c.warn('!')} hook install skipped: ${e.message}`);
     }
   }
 
@@ -142,13 +156,13 @@ async function cmdStart(argv) {
       process.exit(res.exitCode || 0);
     }
     if (res.alreadyRunning) {
-      console.log(`agent-viz already running → http://localhost:${res.port}  (pid ${res.pid})`);
+      console.log(`agent-viz already running ${c.hint('→')} http://localhost:${res.port}  ${c.dim(`(pid ${res.pid})`)}`);
     } else {
-      console.log(`agent-viz started → http://localhost:${res.port}  (pid ${res.pid})`);
+      console.log(`${c.ok('✓')} agent-viz started ${c.hint('→')} http://localhost:${res.port}  ${c.dim(`(pid ${res.pid})`)}`);
     }
     if (flags.open) openBrowser(`http://localhost:${res.port}`);
   } catch (e) {
-    console.error(`✗ ${e.message}`);
+    console.error(`${c.err('✗')} ${e.message}`);
     process.exit(1);
   }
 }
@@ -161,21 +175,21 @@ async function cmdStop() {
     return;
   }
   const res = await stop();
-  console.log(`agent-viz stopped (port ${res.port}${res.viaShutdown ? ', graceful' : ', forced'}).`);
+  console.log(`${c.ok('✓')} agent-viz stopped ${c.dim(`(port ${res.port}${res.viaShutdown ? ', graceful' : ', forced'}).`)}`);
 }
 
 async function cmdStatus() {
   const { status } = require(path.join(PKG_ROOT, 'lib', 'lifecycle.js'));
   const s = await status();
   if (s.running) {
-    console.log(`running → http://localhost:${s.port}`);
-    if (s.pid) console.log(`pid     : ${s.pid}`);
-    if (s.startedAt) console.log(`started : ${s.startedAt}`);
-    console.log(`log     : ${s.log}`);
+    console.log(`${c.ok('running')} ${c.hint('→')} http://localhost:${s.port}`);
+    if (s.pid) console.log(c.dim(`pid     : ${s.pid}`));
+    if (s.startedAt) console.log(c.dim(`started : ${s.startedAt}`));
+    console.log(c.dim(`log     : ${s.log}`));
   } else {
-    console.log('not running.');
-    if (s.stale) console.log(`(stale pid file cleared: pid ${s.stale.pid})`);
-    console.log(`log     : ${s.log}`);
+    console.log(c.dim('not running.'));
+    if (s.stale) console.log(c.dim(`(stale pid file cleared: pid ${s.stale.pid})`));
+    console.log(c.dim(`log     : ${s.log}`));
   }
 }
 
@@ -194,9 +208,9 @@ async function cmdInstallHooks(argv) {
   const noFlags = !scope && !target && !flags.check;
   if (noFlags) {
     if (!process.stdin.isTTY) {
-      console.error('✗ install-hooks needs a TTY for interactive prompts.');
+      console.error(`${c.err('✗')} install-hooks needs a TTY for interactive prompts.`);
       console.error('  Pass flags to install non-interactively, e.g.');
-      console.error('    agent-viz install-hooks --user --target=both');
+      console.error(c.dim('    agent-viz install-hooks --user --target=both'));
       process.exit(1);
     }
     const { promptInstallParams } = require(path.join(PKG_ROOT, 'lib', 'prompt-install.js'));
@@ -219,13 +233,13 @@ async function cmdInstallHooks(argv) {
     let exitCode = 0;
     for (const [agent, a] of Object.entries(result)) {
       console.log(`${agent === 'claude' ? 'Claude Code' : 'Copilot CLI'}:`);
-      console.log(`  settings : ${a.file}  (scope: ${a.scope})`);
+      console.log(c.dim(`  settings : ${a.file}  (scope: ${a.scope})`));
       for (const { event, installed, stale, others } of a.audit) {
-        const flag = installed ? (stale ? '~' : 'x') : ' ';
+        const flag = installed ? (stale ? c.warn('~') : c.ok('x')) : c.err(' ');
         const tags = [];
         if (stale) tags.push('stale');
         if (others > 0) tags.push(`+${others} other`);
-        console.log(`  [${flag}] ${event}${tags.length ? '   (' + tags.join(', ') + ')' : ''}`);
+        console.log(`  [${flag}] ${event}${tags.length ? c.dim('   (' + tags.join(', ') + ')') : ''}`);
         if (!installed || stale) exitCode = 1;
       }
     }
@@ -236,19 +250,19 @@ async function cmdInstallHooks(argv) {
   for (const [agent, r] of Object.entries(result)) {
     const label = agent === 'claude' ? 'Claude Code' : 'Copilot CLI';
     console.log(`${label}:`);
-    console.log(`  settings : ${r.target.file}  (scope: ${r.target.scope})`);
-    console.log(`  hook cmd : ${r.command.command}  (mode: ${r.command.mode})`);
+    console.log(c.dim(`  settings : ${r.target.file}  (scope: ${r.target.scope})`));
+    console.log(c.dim(`  hook cmd : ${r.command.command}  (mode: ${r.command.mode})`));
     if (r.action === 'noop') {
-      console.log('  ✓ already installed and up to date.');
+      console.log(`  ${c.ok('✓')} already installed and up to date.`);
     } else {
-      if (r.missing && r.missing.length > 0) console.log(`  ✓ added: ${r.missing.join(', ')}`);
-      if (r.updated && r.updated.length > 0) console.log(`  ✓ refreshed (was stale): ${r.updated.join(', ')}`);
-      if (r.present && r.present.length > 0) console.log(`  (already up to date: ${r.present.join(', ')})`);
+      if (r.missing && r.missing.length > 0) console.log(`  ${c.ok('✓')} added: ${r.missing.join(', ')}`);
+      if (r.updated && r.updated.length > 0) console.log(`  ${c.ok('✓')} refreshed (was stale): ${r.updated.join(', ')}`);
+      if (r.present && r.present.length > 0) console.log(c.dim(`  (already up to date: ${r.present.join(', ')})`));
     }
     const others = Object.entries(r.coexisting || {});
     if (others.length > 0) {
       console.log('  Coexisting hooks (run in parallel, untouched):');
-      for (const [ev, n] of others) console.log(`    - ${ev}: ${n} other(s)`);
+      for (const [ev, n] of others) console.log(c.dim(`    - ${ev}: ${n} other(s)`));
     }
     if (r.gitignore && r.gitignore.changed) {
       console.log(`  + .gitignore : added ${agent === 'claude' ? '.claude/settings.local.json' : '.github/hooks/agent-viz.local.json'}`);
@@ -256,9 +270,9 @@ async function cmdInstallHooks(argv) {
   }
   const anyChange = Object.values(result).some(r => r && r.action && r.action !== 'noop');
   if (anyChange) {
-    console.log('\n→ Reopen /hooks in your agent (or restart) to reload settings.');
-    console.log('  To uninstall later: run `agent-viz uninstall-hooks` BEFORE `npm uninstall`');
-    console.log('  (npm 7+ does not run lifecycle scripts on uninstall — manual cleanup required).');
+    console.log(`\n${c.hint('→')} Reopen /hooks in your agent (or restart) to reload settings.`);
+    console.log(`  To uninstall later: run \`${c.ok('agent-viz uninstall-hooks')}\` BEFORE \`npm uninstall\``);
+    console.log(c.dim('  (npm 7+ does not run lifecycle scripts on uninstall — manual cleanup required).'));
   }
 }
 
@@ -277,12 +291,12 @@ function cmdUninstallHooks(argv) {
     const label = agent === 'claude' ? 'Claude Code' : 'Copilot CLI';
     for (const r of results) {
       total += r.removed;
-      if (r.removed > 0) console.log(`${label}: ✓ removed ${r.removed} from ${r.file} (${r.scope})`);
-      else if (r.exists) console.log(`${label}:   nothing to remove in ${r.file} (${r.scope})`);
-      else console.log(`${label}:   ${r.file} does not exist (${r.scope})`);
+      if (r.removed > 0) console.log(`${label}: ${c.ok('✓')} removed ${r.removed} from ${c.dim(r.file)} (${r.scope})`);
+      else if (r.exists) console.log(c.dim(`${label}:   nothing to remove in ${r.file} (${r.scope})`));
+      else console.log(c.dim(`${label}:   ${r.file} does not exist (${r.scope})`));
     }
   }
-  if (total === 0) console.log('No agent-viz hooks found.');
+  if (total === 0) console.log(c.dim('No agent-viz hooks found.'));
 }
 
 function cmdHook() {
@@ -306,12 +320,12 @@ function showFirstRunWelcomeIfNeeded(argv) {
   const sentinel = path.join(sentinelDir, '.welcomed');
   if (fs.existsSync(sentinel)) return;
   console.log('');
-  console.log('✓ Welcome to agent-viz!');
+  console.log(`${c.ok('✓')} Welcome to agent-viz!`);
   console.log('');
   console.log('  Get started:');
-  console.log('    agent-viz install-hooks    ← configure Claude/Copilot hooks (interactive)');
-  console.log('    agent-viz                  start the dashboard at http://localhost:3333');
-  console.log('    agent-viz --help           list all commands');
+  console.log(`    ${c.ok('agent-viz install-hooks')}    ${c.hint('←')} configure Claude/Copilot hooks (interactive)`);
+  console.log(`    ${c.ok('agent-viz')}                  start the dashboard at http://localhost:3333`);
+  console.log(`    ${c.dim('agent-viz --help')}           list all commands`);
   console.log('');
   try {
     fs.mkdirSync(sentinelDir, { recursive: true });
@@ -343,13 +357,13 @@ async function main() {
     case 'uninstall-hooks':  return cmdUninstallHooks(rest);
     case 'hook':             return cmdHook();
     default:
-      console.error(`Unknown command: ${cmd}\n`);
+      console.error(`${c.err('Unknown command:')} ${cmd}\n`);
       help();
       process.exit(2);
   }
 }
 
 main().catch(e => {
-  console.error(`✗ ${e.stack || e.message}`);
+  console.error(`${c.err('✗')} ${e.stack || e.message}`);
   process.exit(1);
 });
