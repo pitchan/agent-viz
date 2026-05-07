@@ -1,6 +1,7 @@
 .playwright-mcp/
 .claude/settings.local.json
 .superpowers/
+docs/superpowers/
 node_modules/
 *.tgz
 .github/hooks/agent-viz.local.json
