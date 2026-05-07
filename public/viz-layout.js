@@ -321,7 +321,11 @@ const EVENT_HANDLERS = {
 };
 
 export function processEvent(evt) {
-  const sid = evt.session_id || 'unknown';
+  const sid = evt.session_id;
+  if (typeof sid !== 'string' || !sid) {
+    console.warn('[viz] event without session_id — ignored', evt.hook_event_name);
+    return;
+  }
   const ts = evt._ts || new Date().toISOString();
   layoutDirtyRoots.add(`s:${sid}`);
   const handler = EVENT_HANDLERS[evt.hook_event_name];

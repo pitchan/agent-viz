@@ -14,7 +14,8 @@ import {
 // Render a small pill badge identifying the source agent. Returns HTML safe to
 // inline (label is fixed, no user input).
 function badgeHtml(agentSource) {
-  const src = agentSource === 'copilot' ? 'copilot' : 'claude';
+  if (agentSource !== 'claude' && agentSource !== 'copilot') return '';
+  const src = agentSource;
   return `<span class="agent-badge agent-${src}">${src}</span>`;
 }
 
@@ -158,7 +159,7 @@ export async function loadSessions() {
 
     for (const s of sessions) {
       if (s.prompt) sessionTitles.set(s.id, s.prompt);
-      sessionAgents.set(s.id, s.agentSource || 'claude');
+      if (s.agentSource) sessionAgents.set(s.id, s.agentSource);
     }
     updateTopbarPrompt();
 
