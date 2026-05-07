@@ -179,14 +179,40 @@ async function cmdStatus() {
   }
 }
 
-function cmdInstallHooks(argv) {
+async function cmdInstallHooks(argv) {
   const flags = parseFlags(argv, {
     booleans: ['user', 'project', 'local', 'check'],
     values: ['target'],
   });
-  const scope = pickScopeFlag(flags);
-  const target = pickTargetFlag(flags);
-  const { install, audit } = require(path.join(PKG_ROOT, 'lib', 'install-hooks.js'));
+  let scope = pickScopeFlag(flags);
+  let target = pickTargetFlag(flags);
+  const { install, audit, detectAgents, findProjectRoot } = require(path.join(PKG_ROOT, 'lib', 'install-hooks.js'));
+
+  // Zero-flag invocation (no scope, no target, not --check) opens an
+  // interactive prompt asking which agent + which scope. --check stays
+  // non-interactive (audit mode). Any flag bypasses the prompt entirely.
+  const noFlags = !scope && !target && !flags.check;
+  if (noFlags) {
+    if (!process.stdin.isTTY) {
+      console.error('✗ install-hooks needs a TTY for interactive prompts.');
+      console.error('  Pass flags to install non-interactively, e.g.');
+      console.error('    agent-viz install-hooks --user --target=both');
+      process.exit(1);
+    }
+    const { promptInstallParams } = require(path.join(PKG_ROOT, 'lib', 'prompt-install.js'));
+    const detected = detectAgents();
+    const projectRoot = findProjectRoot(process.cwd(), { packageRoot: PKG_ROOT });
+    try {
+      ({ target, scope } = await promptInstallParams({
+        detected,
+        projectRoot,
+        io: { input: process.stdin, output: process.stdout },
+      }));
+    } catch (e) {
+      if (e.message === 'aborted') process.exit(130);
+      throw e;
+    }
+  }
 
   if (flags.check) {
     const result = audit({ target, scope, cwd: process.cwd(), packageRoot: PKG_ROOT, version: PKG_VERSION });
