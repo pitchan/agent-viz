@@ -289,12 +289,13 @@ function cmdHook() {
   runHook();
 }
 
-// First-run welcome: npm 9+ silences postinstall stdout by default
-// (--foreground-scripts is opt-in), so the postinstall message is invisible
-// in practice. We surface the same onboarding here on the first agent-viz
-// invocation, persisted via a sentinel file in ~/.agent-viz/. Skipped for
-// the internal `hook` subcommand (would pollute the event hot path) and
-// for --version (often parsed by tooling).
+// First-run welcome: npm 9+ silences install-script stdout by default
+// (foreground-scripts=false), and an increasing share of users disable
+// install scripts entirely (--ignore-scripts, pnpm 10+, Bun by default).
+// So we don't ship a postinstall hook — onboarding is surfaced here on
+// the first agent-viz invocation, persisted via a sentinel file in
+// ~/.agent-viz/. Skipped for the internal `hook` subcommand (would
+// pollute the event hot path) and for --version (often parsed by tooling).
 function showFirstRunWelcomeIfNeeded(argv) {
   if (argv.includes('--version') || argv.includes('-v')) return;
   if (argv[0] === 'hook') return;

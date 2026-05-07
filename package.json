@@ -23,7 +23,6 @@
     "stop": "node bin/agent-viz.js stop",
     "status": "node bin/agent-viz.js status",
     "test": "node --test",
-    "postinstall": "node lib/postinstall.js",
     "preuninstall": "node lib/preuninstall.js",
     "prepublishOnly": "npm pack --dry-run"
   },
