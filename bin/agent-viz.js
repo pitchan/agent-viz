@@ -289,8 +289,36 @@ function cmdHook() {
   runHook();
 }
 
+// First-run welcome: npm 9+ silences postinstall stdout by default
+// (--foreground-scripts is opt-in), so the postinstall message is invisible
+// in practice. We surface the same onboarding here on the first agent-viz
+// invocation, persisted via a sentinel file in ~/.agent-viz/. Skipped for
+// the internal `hook` subcommand (would pollute the event hot path) and
+// for --version (often parsed by tooling).
+function showFirstRunWelcomeIfNeeded(argv) {
+  if (argv.includes('--version') || argv.includes('-v')) return;
+  if (argv[0] === 'hook') return;
+  const os = require('os');
+  const sentinelDir = path.join(os.homedir(), '.agent-viz');
+  const sentinel = path.join(sentinelDir, '.welcomed');
+  if (fs.existsSync(sentinel)) return;
+  console.log('');
+  console.log('✓ Welcome to agent-viz!');
+  console.log('');
+  console.log('  Get started:');
+  console.log('    agent-viz install-hooks    ← configure Claude/Copilot hooks (interactive)');
+  console.log('    agent-viz                  start the dashboard at http://localhost:3333');
+  console.log('    agent-viz --help           list all commands');
+  console.log('');
+  try {
+    fs.mkdirSync(sentinelDir, { recursive: true });
+    fs.writeFileSync(sentinel, new Date().toISOString());
+  } catch {}
+}
+
 async function main() {
   const argv = process.argv.slice(2);
+  showFirstRunWelcomeIfNeeded(argv);
   // Top-level flags
   if (argv[0] === '--version' || argv[0] === '-v') {
     console.log(PKG_VERSION);
