@@ -86,12 +86,18 @@ function pickTargetFlag(flags) {
 
 function openBrowser(url) {
   const { spawn } = require('child_process');
+  const isWin = process.platform === 'win32';
   const cmd = process.platform === 'darwin' ? 'open'
-            : process.platform === 'win32' ? 'start'
+            : isWin ? 'cmd'
             : 'xdg-open';
-  try {
-    spawn(cmd, [url], { stdio: 'ignore', detached: true }).unref();
-  } catch {}
+  // On Windows, `start` is a cmd.exe builtin (not an executable), and the
+  // empty "" arg is the title slot required when the URL itself is quoted.
+  const args = isWin ? ['/c', 'start', '', url] : [url];
+  const child = spawn(cmd, args, { stdio: 'ignore', detached: true });
+  // ENOENT and friends arrive asynchronously on the 'error' event, not as a
+  // sync throw — silence them so a missing browser launcher never kills the CLI.
+  child.on('error', () => {});
+  child.unref();
 }
 
 async function cmdStart(argv) {
