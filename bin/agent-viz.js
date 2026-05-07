@@ -242,7 +242,7 @@ function cmdUninstallHooks(argv) {
   const scope = pickScopeFlag(flags);
   const target = pickTargetFlag(flags);
   const { uninstall } = require(path.join(PKG_ROOT, 'lib', 'install-hooks.js'));
-  const result = uninstall({ target, scope, cwd: process.cwd() });
+  const result = uninstall({ target, scope, cwd: process.cwd(), packageRoot: PKG_ROOT });
   let total = 0;
   for (const [agent, x] of Object.entries(result)) {
     const results = x.results || [];
