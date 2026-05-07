@@ -18,6 +18,9 @@ import { setCanvasCallbacks } from './viz-canvas.js';
 import {
   loadSessions, resetEvents, setFeedResetHook,
 } from './viz-network.js';
+import {
+  composeNarrator, setRenderFn, resumeTick,
+} from './viz-narrator.js';
 
 // ─── Feed panel ───────────────────────────────────────────────────────────
 let _feedRenderedCount = 0;
@@ -232,6 +235,27 @@ function labelForModel(id) {
   return id;
 }
 
+// ─── Narrator (live caption under topbar) ─────────────────────────────────
+// renderNarrator pulls the composed string from viz-narrator and updates the
+// DOM. Registered as the narrator's render callback at module init — the
+// narrator module then drives updates via markNarratorDirty() (event-driven)
+// and a 1 Hz tick (resumeTick) for "Xs ago" clocks.
+const _narrEl = document.getElementById('narrator');
+
+export function renderNarrator() {
+  if (!_narrEl) return;
+  const result = composeNarrator(state, vis, Date.now());
+  if (!result) {
+    _narrEl.hidden = true;
+    _narrEl.textContent = '';
+    _narrEl.removeAttribute('data-tone');
+    return;
+  }
+  _narrEl.hidden = false;
+  _narrEl.textContent = result.text;
+  _narrEl.dataset.tone = result.tone;
+}
+
 // ─── Stats ────────────────────────────────────────────────────────────────
 export function updateStats() {
   let running = 0, agents = 0, errors = 0;
@@ -375,3 +399,7 @@ setFeedResetHook(() => {
   _feedRenderedCount = 0;
   _feedNeedsFullRebuild = true;
 });
+
+// Narrator: register render callback and start the 1 Hz tick.
+setRenderFn(renderNarrator);
+resumeTick();

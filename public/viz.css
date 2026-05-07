@@ -35,7 +35,24 @@ body {
 }
 
 /* ─── Main layout ─── */
-#app { display: grid; grid-template-rows: 48px 1fr; height: 100vh; }
+#app { display: grid; grid-template-rows: 48px auto 1fr; height: 100vh; }
+
+/* ─── Narrator (live caption under topbar) ─── */
+#narrator {
+  background: rgba(102, 204, 255, 0.04);
+  border-bottom: 1px solid rgba(102, 204, 255, 0.10);
+  color: var(--holo-bright);
+  font-size: 11px;
+  padding: 6px 20px;
+  letter-spacing: 0.2px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#narrator[data-tone="idle"]  { color: var(--text-muted); }
+#narrator[data-tone="error"] { color: var(--notification); }
+#narrator[data-tone="done"]  { color: var(--complete); }
 
 /* ─── Top bar ─── */
 #topbar {

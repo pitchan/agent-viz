@@ -8,6 +8,7 @@ import {
   COLORS, SPAWN_DIST, TIMELINE_CAP, NODE_GC_MAX_AGE_MS,
   state, vis, markDirty, parseMcpName,
 } from './viz-state.js';
+import { markNarratorDirty } from './viz-narrator.js';
 
 // ─── Feed-cursor adjust hook ──────────────────────────────────────────────
 // When the timeline ring-buffer shifts, viz-ui's _feedRenderedCount must be
@@ -330,6 +331,7 @@ export function processEvent(evt) {
   layoutDirtyRoots.add(`s:${sid}`);
   const handler = EVENT_HANDLERS[evt.hook_event_name];
   if (handler) handler(evt, sid, ts);
+  markNarratorDirty();
 }
 
 export function calcDuration(start, end) {

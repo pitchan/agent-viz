@@ -10,6 +10,9 @@ import { processEvent, layout, resetLayout } from './viz-layout.js';
 import {
   renderFeed, updateStats, updateBudget, fitView, startDurationsTicker, stopDurationsTicker,
 } from './viz-ui.js';
+import {
+  pauseTick, resumeTick, markNarratorDirty,
+} from './viz-narrator.js';
 
 // Render a small pill badge identifying the source agent. Returns HTML safe to
 // inline (label is fixed, no user input).
@@ -240,6 +243,7 @@ export function clearState() {
   vis.drawMcpNodes.length = 0;
   vis.runningNodes.clear();
   renderFeed(); updateStats();
+  markNarratorDirty();
 }
 
 // UI registers a reset hook for its feed-render cursor on clearState.
@@ -264,6 +268,7 @@ function pauseApp() {
   if (sseSource) { sseSource.close(); sseSource = null; sseConnected = false; }
   stopPollFallback();
   stopDurationsTicker();
+  pauseTick();
   if (vis.rafHandle != null) { cancelAnimationFrame(vis.rafHandle); vis.rafHandle = null; }
   if (vis.pulseTimer != null) { clearTimeout(vis.pulseTimer); vis.pulseTimer = null; }
 }
@@ -272,6 +277,7 @@ function resumeApp() {
   _paused = false;
   connectSSE();
   poll(true);
+  resumeTick();
   markDirty();
 }
 document.addEventListener('visibilitychange', () => {
