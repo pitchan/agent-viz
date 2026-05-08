@@ -160,3 +160,34 @@ test('two messages on the same agent accumulate cost and overwrite lastModel', (
   // Cost summed across both rates: 1000*1e-6 (haiku) + 1000*3e-6 (sonnet) = 0.001 + 0.003 = 0.004
   assert.ok(Math.abs(bucket.costUsd - 0.004) < 1e-9, `got ${bucket.costUsd}`);
 });
+
+test('parseTranscriptEvent dispatches via rec.agentSource — copilot is no-op', () => {
+  // Claude-shaped line with usage on a Copilot-tagged session must NOT
+  // accumulate, because the Copilot adapter is the no-op. This proves the
+  // dispatcher actually consults agentSource instead of always running Claude.
+  const rec = freshRec();
+  rec.agentSource = 'copilot';
+  const line = JSON.stringify({
+    type: 'assistant',
+    isSidechain: false,
+    message: {
+      model: 'claude-sonnet-4-5',
+      usage: { input_tokens: 9999, output_tokens: 9999 },
+    },
+  });
+  assert.equal(parseTranscriptEvent(line, rec), false);
+  assert.equal(rec.tokens.main.in, 0);
+  assert.equal(rec.tokens.main.costUsd, 0);
+});
+
+test('parseTranscriptEvent with agentSource=undefined still parses as Claude', () => {
+  // Pre-0.2.0 sessions: agentSource missing. Must keep working.
+  const rec = freshRec();
+  // rec.agentSource stays undefined
+  const line = JSON.stringify({
+    type: 'assistant', isSidechain: false,
+    message: { model: 'claude-sonnet-4-5', usage: { input_tokens: 100, output_tokens: 50 } },
+  });
+  assert.equal(parseTranscriptEvent(line, rec), true);
+  assert.equal(rec.tokens.main.in, 100);
+});
