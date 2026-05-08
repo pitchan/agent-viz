@@ -108,6 +108,9 @@ export function connectSSE() {
               state.tokens.perAgent.set(aid, bucket);
             }
           }
+          // Server sends true for Claude, false for Copilot, omits for legacy events.
+          // Treat anything other than literal `false` as supported (don't break Claude).
+          state.tokens.tokensSupported = (data.tokensSupported !== false);
           updateBudget();
           markDirty();
         }
@@ -230,7 +233,9 @@ export function clearState() {
   state.selected = null; state.toolsCompleted = 0;
   state.timelineEntries = []; state.startTimes.clear();
   state._lastServerId = null;
-  state.tokens.main = null; state.tokens.perAgent.clear();
+  state.tokens.main = null;
+  state.tokens.perAgent.clear();
+  state.tokens.tokensSupported = null;
   updateBudget();
   state.forkedAgentParents.clear();
   vis.nodes.clear(); vis.particles = [];

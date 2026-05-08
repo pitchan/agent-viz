@@ -106,7 +106,7 @@ export function drawSessionNode(ctx, n, vn) {
   }
 
   const sessionCtx = sessionContextSize();
-  if (sessionCtx > 0) {
+  if (sessionCtx > 0 && state.tokens.tokensSupported !== false) {
     ctx.fillStyle = hexAlpha(n.color, 0.55);
     ctx.font = '9px -apple-system, system-ui, sans-serif';
     ctx.fillText(`${formatTokens(sessionCtx)} ctx`, vn.x, vn.y + r + (n.duration ? 26 : 14));
@@ -210,7 +210,7 @@ export function drawAgentNode(ctx, n, vn) {
   const aid = agentIdFromNode(n.id);
   const agentBucket = aid ? state.tokens.perAgent.get(aid) : null;
   const agentCtx = tokenContext(agentBucket);
-  if (agentCtx > 0) {
+  if (agentCtx > 0 && state.tokens.tokensSupported !== false) {
     ctx.fillStyle = hexAlpha(n.color, 0.55);
     ctx.font = '9px -apple-system, system-ui, sans-serif';
     ctx.textAlign = 'center';

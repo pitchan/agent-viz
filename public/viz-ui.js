@@ -133,6 +133,15 @@ export function showDetail(n) {
 // subagent should show a cost that, summed with the main thread's, equals
 // the topbar pill — useful when a session looks suspiciously expensive.
 function tokenCardsHTML(n) {
+  if (state.tokens.tokensSupported === false) {
+    return `
+      <div class="meta-card meta-card-wide">
+        <div class="meta-label">Tokens</div>
+        <div class="meta-value">N/A</div>
+        <div class="meta-sub">Not exposed by this provider</div>
+      </div>
+    `;
+  }
   let bucket = null;
   let contextSize = 0;
   let totalCost = 0;
@@ -203,6 +212,18 @@ function _budgetDOM() {
 export function updateBudget() {
   const els = _budgetDOM();
   if (!els.pill) return;
+
+  // Adapter explicitly declared tokens unavailable for this provider.
+  if (state.tokens.tokensSupported === false) {
+    els.model.textContent = '';
+    els.ctx.textContent = 'Tokens N/A';
+    els.cost.textContent = '';
+    els.ctx.classList.remove('is-warn', 'is-crit');
+    els.pill.title = 'Token usage is not exposed by this provider (e.g. Copilot Chat).';
+    els.pill.hidden = false;
+    return;
+  }
+
   const main = state.tokens.main;
   // Hide while we have no model info yet — the pill flickering empty is worse
   // than not appearing until the first assistant message lands.

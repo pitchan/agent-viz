@@ -48,7 +48,9 @@ export const state = {
   //     lastIn, lastCacheCreate, lastCacheRead,
   //     lastModel, contextMax, costUsd } | null
   // (cumulative + last-message + pricing-derived; see lib/server/tokens.js)
-  tokens: { main: null, perAgent: new Map() },
+  // tokensSupported: false ⇒ adapter declares tokens N/A (UI shows badge).
+  // null ⇒ no SSE snapshot received yet (don't show anything).
+  tokens: { main: null, perAgent: new Map(), tokensSupported: null },
   // Map<forkedChildAgentId, parentAgentId>. Filled by PostToolUse(Skill) events
   // with tool_response.status === 'forked'. Used to attach forked sub-agents
   // under their launching agent instead of the session root — the forked
