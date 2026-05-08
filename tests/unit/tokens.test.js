@@ -97,3 +97,20 @@ test('accumulateUsage with an unknown model leaves pricing fields untouched', ()
   assert.equal(b.lastModel, null);
   assert.equal(b.costUsd, 0);
 });
+
+test('tokensSnapshot exposes tokensSupported flag (default true)', () => {
+  const { ensureTokens, tokensSnapshot } = require('../../lib/server/tokens');
+  const rec = { id: 'r1' };
+  ensureTokens(rec);
+  const snap = tokensSnapshot(rec);
+  assert.equal(snap.tokensSupported, true);
+});
+
+test('tokensSnapshot reports tokensSupported=false when rec.tokens.unsupported is set', () => {
+  const { ensureTokens, tokensSnapshot } = require('../../lib/server/tokens');
+  const rec = { id: 'r2' };
+  ensureTokens(rec);
+  rec.tokens.unsupported = true;
+  const snap = tokensSnapshot(rec);
+  assert.equal(snap.tokensSupported, false);
+});
