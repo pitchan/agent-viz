@@ -1,6 +1,6 @@
 {
   "name": "@vcueto/agent-viz",
-  "version": "0.2.11",
+  "version": "0.2.12",
   "description": "Real-time visualizer for Claude Code and GitHub Copilot CLI sessions: live event stream, token tracking, multi-agent topology with per-source badges.",
   "bin": {
     "agent-viz": "bin/agent-viz.js"
