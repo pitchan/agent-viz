@@ -4,7 +4,7 @@
 //
 // Usage :
 //   agent-viz [start] [--port N] [--foreground] [--no-install-hooks] [--open]
-//   agent-viz stop
+//   agent-viz stop  [--keep-hooks]
 //   agent-viz status
 //   agent-viz install-hooks   [--user|--project|--local]
 //   agent-viz uninstall-hooks [--user|--project|--local]
@@ -41,7 +41,8 @@ Usage:
                                    --foreground       attach to terminal (don't daemonize)
                                    --no-install-hooks don't auto-install hooks
                                    --open             open browser to the URL
-  agent-viz stop                 Stop the running visualizer.
+  agent-viz stop                 Stop the running visualizer (also removes hooks).
+                                   --keep-hooks       keep hooks installed (symmetric to start --no-install-hooks)
   agent-viz status               Show running state + URL.
   agent-viz install-hooks        Install hooks. Default: auto-detect (Claude + Copilot if present).
                                    --target=claude|copilot|both   force a target
@@ -167,15 +168,49 @@ async function cmdStart(argv) {
   }
 }
 
-async function cmdStop() {
+async function cmdStop(argv) {
+  const flags = parseFlags(argv || [], { booleans: ['keep-hooks'] });
   const { stop, status } = require(path.join(PKG_ROOT, 'lib', 'lifecycle.js'));
   const before = await status();
-  if (!before.running) {
+  let res = null;
+  if (before.running) {
+    res = await stop();
+  } else {
     console.log('agent-viz not running.');
-    return;
   }
-  const res = await stop();
-  console.log(`${c.ok('✓')} agent-viz stopped ${c.dim(`(port ${res.port}${res.viaShutdown ? ', graceful' : ', forced'}).`)}`);
+
+  // Mirror of cmdStart's auto-install: stop also removes hooks unless opted out.
+  // We target the SAME scope `start` would have resolved from this cwd
+  // (`resolveScope` returns 'local' if a project root is found, else 'user'),
+  // so unrelated installs in other scopes are preserved. Sweeps both agents —
+  // uninstalling an agent that was never installed is a no-op.
+  const shouldUninstall = flags['keep-hooks'] !== true;
+  if (shouldUninstall) {
+    const { uninstall, resolveScope } = require(path.join(PKG_ROOT, 'lib', 'install-hooks.js'));
+    try {
+      const scoped = resolveScope({ cwd: process.cwd(), packageRoot: PKG_ROOT });
+      const result = uninstall({ scope: scoped.scope, cwd: process.cwd(), packageRoot: PKG_ROOT });
+      let totalRemoved = 0;
+      for (const [agent, x] of Object.entries(result)) {
+        const label = agent === 'claude' ? 'Claude Code' : 'Copilot CLI';
+        for (const r of (x.results || [])) {
+          if (r.removed > 0) {
+            totalRemoved += r.removed;
+            console.log(`${c.ok('✓')} ${label} hooks removed ${c.hint('→')} ${c.dim(r.file)} (${r.scope})`);
+          }
+        }
+      }
+      if (totalRemoved > 0) {
+        console.log(c.dim('  (use `agent-viz stop --keep-hooks` to preserve hooks next time)'));
+      }
+    } catch (e) {
+      console.error(`${c.warn('!')} hook uninstall skipped: ${e.message}`);
+    }
+  }
+
+  if (res) {
+    console.log(`${c.ok('✓')} agent-viz stopped ${c.dim(`(port ${res.port}${res.viaShutdown ? ', graceful' : ', forced'}).`)}`);
+  }
 }
 
 async function cmdStatus() {
@@ -351,7 +386,7 @@ async function main() {
 
   switch (cmd) {
     case 'start':            return cmdStart(rest);
-    case 'stop':             return cmdStop();
+    case 'stop':             return cmdStop(rest);
     case 'status':           return cmdStatus();
     case 'install-hooks':    return cmdInstallHooks(rest);
     case 'uninstall-hooks':  return cmdUninstallHooks(rest);
