@@ -75,6 +75,49 @@ test('subagent agent_progress line populates perAgent bucket with model + cost',
   assert.ok(Math.abs(bucket.costUsd - 0.0025) < 1e-9, `got ${bucket.costUsd}`);
 });
 
+test('subagent transcript-file line (isSidechain + agentId) populates perAgent bucket', () => {
+  // Claude Code ≥ ~2.1.143 writes each sub-agent's transcript to its own file
+  // (<session>/subagents/agent-<id>.jsonl). Those assistant lines carry
+  // isSidechain:true plus a top-level agentId, with the same message.usage
+  // shape as the main thread.
+  const rec = freshRec();
+  const line = JSON.stringify({
+    type: 'assistant',
+    isSidechain: true,
+    agentId: 'a0b3d9c1c934d0613',
+    message: {
+      model: 'claude-haiku-4-5',
+      usage: {
+        input_tokens: 3, output_tokens: 1,
+        cache_creation_input_tokens: 3364, cache_read_input_tokens: 28466,
+      },
+    },
+  });
+  const changed = parseTranscriptEvent(line, rec);
+  assert.equal(changed, true);
+  const bucket = rec.tokens.perAgent.get('a0b3d9c1c934d0613');
+  assert.ok(bucket, 'subagent bucket should be created');
+  assert.equal(bucket.in, 3);
+  assert.equal(bucket.cacheCreate, 3364);
+  assert.equal(bucket.cacheRead, 28466);
+  assert.equal(bucket.lastModel, 'claude-haiku-4-5');
+  assert.ok(bucket.contextMax > 0, 'contextMax must be set from pricing');
+  assert.equal(rec.tokens.main.in, 0, 'main bucket must stay untouched');
+});
+
+test('sidechain assistant line without agentId is ignored (no miscrediting)', () => {
+  // A sidechain line that lacks a top-level agentId can't be attributed to a
+  // sub-agent bucket — it must be skipped rather than land in __main__.
+  const rec = freshRec();
+  const line = JSON.stringify({
+    type: 'assistant', isSidechain: true,
+    message: { model: 'claude-haiku-4-5', usage: { input_tokens: 100, output_tokens: 50 } },
+  });
+  assert.equal(parseTranscriptEvent(line, rec), false);
+  assert.equal(rec.tokens.main.in, 0);
+  assert.equal(rec.tokens.perAgent.size, 0);
+});
+
 test('lines without usage payload return false and do not touch buckets', () => {
   const rec = freshRec();
   const lines = [

@@ -100,20 +100,7 @@ export function connectSSE() {
       }
       if (data.type === 'tokens') {
         const target = currentSessionId || state._lastServerId;
-        if (!target || data.session === target) {
-          state.tokens.main = data.main || null;
-          state.tokens.perAgent.clear();
-          if (data.perAgent) {
-            for (const [aid, bucket] of Object.entries(data.perAgent)) {
-              state.tokens.perAgent.set(aid, bucket);
-            }
-          }
-          // Server sends true for Claude, false for Copilot, omits for legacy events.
-          // Treat anything other than literal `false` as supported (don't break Claude).
-          state.tokens.tokensSupported = (data.tokensSupported !== false);
-          updateBudget();
-          markDirty();
-        }
+        if (!target || data.session === target) applyTokens(data);
         return;
       }
       if (data.type === 'event') {
@@ -131,6 +118,38 @@ export function connectSSE() {
       }
     } catch {}
   };
+}
+
+// ─── Token snapshots ──────────────────────────────────────────────────────
+// Apply a `tokens` snapshot (SSE message or /tokens response) to state and
+// refresh the budget pill. Single application path for both sources.
+function applyTokens(data) {
+  state.tokens.main = data.main || null;
+  state.tokens.perAgent.clear();
+  if (data.perAgent) {
+    for (const [aid, bucket] of Object.entries(data.perAgent)) {
+      state.tokens.perAgent.set(aid, bucket);
+    }
+  }
+  // Server sends true for Claude, false for Copilot, omits for legacy events.
+  // Treat anything other than literal `false` as supported (don't break Claude).
+  state.tokens.tokensSupported = (data.tokensSupported !== false);
+  state.tokens.transcriptMissing = !!data.transcriptMissing;
+  updateBudget();
+  markDirty();
+}
+
+// Fetch a specific session's token snapshot. The SSE stream only pushes
+// `tokens` for the live/active session, so a session picked from the overlay
+// needs this one-shot fetch to populate the budget pill.
+async function fetchTokens(sid) {
+  try {
+    const res = await fetch(`/tokens?session=${encodeURIComponent(sid)}`);
+    const msg = await res.json();
+    // Drop if the user switched sessions while the request was in flight.
+    if (sid !== currentSessionId || !msg) return;
+    applyTokens(msg);
+  } catch {}
 }
 
 // ─── Poll ─────────────────────────────────────────────────────────────────
@@ -224,6 +243,9 @@ document.getElementById('sessions-list').addEventListener('click', e => {
   firstBatch = true;
   poll(true);
   loadSessions();
+  // clearState() blanked the pill; an explicitly-picked session won't get a
+  // live SSE `tokens` push unless it's the active one — fetch its snapshot.
+  if (currentSessionId) fetchTokens(currentSessionId);
   document.getElementById('sessions-overlay').classList.remove('visible');
 });
 
@@ -236,6 +258,7 @@ export function clearState() {
   state.tokens.main = null;
   state.tokens.perAgent.clear();
   state.tokens.tokensSupported = null;
+  state.tokens.transcriptMissing = false;
   updateBudget();
   state.forkedAgentParents.clear();
   vis.nodes.clear(); vis.particles = [];

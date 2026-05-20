@@ -224,6 +224,18 @@ export function updateBudget() {
     return;
   }
 
+  // Token tracking is on (Claude) but the transcript file hasn't been located
+  // yet — surface it explicitly rather than leaving the pill blank.
+  if (state.tokens.transcriptMissing) {
+    els.model.textContent = '';
+    els.ctx.textContent = 'Transcript N/A';
+    els.cost.textContent = '';
+    els.ctx.classList.remove('is-warn', 'is-crit');
+    els.pill.title = 'Transcript file not located yet — token tracking starts as soon as it appears on disk.';
+    els.pill.hidden = false;
+    return;
+  }
+
   const main = state.tokens.main;
   // Hide while we have no model info yet — the pill flickering empty is worse
   // than not appearing until the first assistant message lands.

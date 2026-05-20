@@ -34,3 +34,8 @@ test('state.tokens.tokensSupported defaults to null (unknown until first SSE)', 
   // Booting straight to true would briefly show a fake gauge for Copilot.
   assert.equal(state.tokens.tokensSupported, null);
 });
+
+test('state.tokens.transcriptMissing defaults to false', () => {
+  // No "transcript not located" placeholder until the server actually says so.
+  assert.equal(state.tokens.transcriptMissing, false);
+});

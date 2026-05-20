@@ -50,7 +50,8 @@ export const state = {
   // (cumulative + last-message + pricing-derived; see lib/server/tokens.js)
   // tokensSupported: false ⇒ adapter declares tokens N/A (UI shows badge).
   // null ⇒ no SSE snapshot received yet (don't show anything).
-  tokens: { main: null, perAgent: new Map(), tokensSupported: null },
+  // transcriptMissing: true ⇒ Claude session whose transcript isn't located yet.
+  tokens: { main: null, perAgent: new Map(), tokensSupported: null, transcriptMissing: false },
   // Map<forkedChildAgentId, parentAgentId>. Filled by PostToolUse(Skill) events
   // with tool_response.status === 'forked'. Used to attach forked sub-agents
   // under their launching agent instead of the session root — the forked
