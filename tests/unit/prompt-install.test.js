@@ -128,3 +128,39 @@ test('promptInstallParams: scope down twice + enter → local', async () => {
   const result = await promise;
   assert.equal(result.scope, 'local');
 });
+
+// Regression: on Windows real TTY, raw mode was being toggled between the
+// two ask() calls (off → on → off → on). The off→on transition caused the
+// OS to re-deliver a phantom \r in a later macrotask, which auto-resolved
+// the scope prompt to its default ('user') without user input.
+// The fix is to enable raw mode ONCE for the whole dialog and disable it
+// ONCE at the end. Verifies the call shape rather than simulating the
+// platform-specific phantom event, which can't be reproduced with a
+// PassThrough stream.
+test('promptInstallParams: raw mode is toggled exactly once per dialog (not per ask)', async () => {
+  const calls = [];
+  const io = makeMockIO();
+  // Decorate the mock input with TTY-style methods so the session helper
+  // exercises the real raw-mode code path.
+  io.input.isTTY = true;
+  io.input.isRaw = false;
+  io.input.setRawMode = function (v) { calls.push(['setRawMode', v]); this.isRaw = v; return this; };
+  io.input.unref = function () { calls.push(['unref']); return this; };
+
+  const promise = promptInstallParams({
+    detected: { claude: true, copilot: true },
+    projectRoot: '/some/project',
+    io: { input: io.input, output: io.output },
+  });
+  await tick();
+  press(io.input, 'return'); await tick();    // accept Both
+  press(io.input, 'return');                   // accept user
+  await promise;
+
+  const rawCalls = calls.filter((c) => c[0] === 'setRawMode');
+  assert.deepEqual(
+    rawCalls,
+    [['setRawMode', true], ['setRawMode', false]],
+    'raw mode must be enabled ONCE and disabled ONCE — not toggled between asks'
+  );
+});
