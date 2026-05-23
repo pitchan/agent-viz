@@ -52,6 +52,46 @@ test('computeCost sums input/output/cache contributions', () => {
   assert.ok(Math.abs(cost - 0.021) < 1e-9, `got ${cost}`);
 });
 
+test('computeCost charges the 1h cache tier at 2x input price (Anthropic rate card)', () => {
+  // When the API reports cache_creation.ephemeral_1h_input_tokens the bytes
+  // were written into the 1h cache, billed at 2x input — not 1.25x like the
+  // 5min cache. Without this split, sessions that use the 1h cache (which
+  // Claude Code does by default for system+tools prefix) are under-reported.
+  //
+  // Sonnet 4.5: input=3e-6, cacheCreate(5m)=3.75e-6 → 1h must be 6e-6.
+  const cost = computeCost({
+    input_tokens: 0, output_tokens: 0,
+    cache_creation_input_tokens: 1000, // total = 5m+1h
+    cache_read_input_tokens: 0,
+    cache_creation: { ephemeral_5m_input_tokens: 0, ephemeral_1h_input_tokens: 1000 },
+  }, 'claude-sonnet-4-5');
+  // 1000 * 6e-6 = 0.006 (NOT 1000 * 3.75e-6 = 0.00375)
+  assert.ok(Math.abs(cost - 0.006) < 1e-9, `got ${cost}, expected 0.006 (2x input rate)`);
+});
+
+test('computeCost without a cache_creation breakdown treats it all as 5min (back-compat)', () => {
+  // Pre-1h-cache transcripts and providers that don't expose the split must
+  // keep working — treat the total as 5min, matching legacy behavior.
+  const cost = computeCost({
+    input_tokens: 0, output_tokens: 0,
+    cache_creation_input_tokens: 1000,
+    cache_read_input_tokens: 0,
+  }, 'claude-sonnet-4-5');
+  // 1000 * 3.75e-6 = 0.00375
+  assert.ok(Math.abs(cost - 0.00375) < 1e-9, `got ${cost}`);
+});
+
+test('computeCost splits mixed 5m+1h cache creations correctly', () => {
+  const cost = computeCost({
+    input_tokens: 0, output_tokens: 0,
+    cache_creation_input_tokens: 1500,
+    cache_read_input_tokens: 0,
+    cache_creation: { ephemeral_5m_input_tokens: 500, ephemeral_1h_input_tokens: 1000 },
+  }, 'claude-sonnet-4-5');
+  // 500 * 3.75e-6 + 1000 * 6e-6 = 0.001875 + 0.006 = 0.007875
+  assert.ok(Math.abs(cost - 0.007875) < 1e-9, `got ${cost}`);
+});
+
 test('computeCost returns 0 for unknown model rather than NaN/throw', () => {
   const cost = computeCost(
     { input_tokens: 1000, output_tokens: 500 },

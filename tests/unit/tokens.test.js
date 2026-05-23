@@ -114,3 +114,44 @@ test('tokensSnapshot reports tokensSupported=false when rec.tokens.unsupported i
   const snap = tokensSnapshot(rec);
   assert.equal(snap.tokensSupported, false);
 });
+
+// Claude Code splits one API message into N JSONL lines (one per content
+// block: thinking, text, tool_use) but every line carries the SAME `usage`.
+// Without dedup the bucket sums it N times — causing 2-3× cost over-reporting.
+// The msgId (message.id from the Anthropic API) is the natural dedup key.
+test('accumulateUsage with the same msgId is a no-op (dedup across content blocks)', () => {
+  const b = newBucket();
+  const usage = {
+    input_tokens: 100, output_tokens: 50,
+    cache_creation_input_tokens: 200, cache_read_input_tokens: 1000,
+  };
+  // Three lines for the same API message — thinking + text + tool_use.
+  accumulateUsage(b, usage, 'claude-sonnet-4-5', 'msg_01ABC');
+  accumulateUsage(b, usage, 'claude-sonnet-4-5', 'msg_01ABC');
+  accumulateUsage(b, usage, 'claude-sonnet-4-5', 'msg_01ABC');
+  assert.equal(b.in, 100, 'input must not be triple-counted');
+  assert.equal(b.out, 50);
+  assert.equal(b.cacheCreate, 200);
+  assert.equal(b.cacheRead, 1000);
+  // Cost similarly counted exactly once.
+  // 100*3e-6 + 50*1.5e-5 + 200*3.75e-6 + 1000*3e-7 = 0.0003 + 0.00075 + 0.00075 + 0.0003 = 0.00210
+  assert.ok(Math.abs(b.costUsd - 0.0021) < 1e-9, `got ${b.costUsd}`);
+});
+
+test('accumulateUsage without msgId keeps cumulating (back-compat for callers that have no id)', () => {
+  // Some legacy/hook code paths may not carry a msgId. They must keep working
+  // as before — dedup is opt-in via the 4th argument.
+  const b = newBucket();
+  accumulateUsage(b, { input_tokens: 10, output_tokens: 5 });
+  accumulateUsage(b, { input_tokens: 10, output_tokens: 5 });
+  assert.equal(b.in, 20);
+  assert.equal(b.out, 10);
+});
+
+test('accumulateUsage with different msgIds cumulates normally', () => {
+  const b = newBucket();
+  accumulateUsage(b, { input_tokens: 10, output_tokens: 5 }, 'claude-sonnet-4-5', 'msg_A');
+  accumulateUsage(b, { input_tokens: 20, output_tokens: 10 }, 'claude-sonnet-4-5', 'msg_B');
+  assert.equal(b.in, 30);
+  assert.equal(b.out, 15);
+});
