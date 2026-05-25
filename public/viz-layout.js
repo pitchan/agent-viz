@@ -9,6 +9,7 @@ import {
   state, vis, markDirty, parseMcpName,
 } from './viz-state.js';
 import { markNarratorDirty } from './viz-narrator.js';
+import { feedEvent as feedWatchdog } from './viz-watchdog-client.js';
 
 // ─── Feed-cursor adjust hook ──────────────────────────────────────────────
 // When the timeline ring-buffer shifts, viz-ui's _feedRenderedCount must be
@@ -331,6 +332,7 @@ export function processEvent(evt) {
   layoutDirtyRoots.add(`s:${sid}`);
   const handler = EVENT_HANDLERS[evt.hook_event_name];
   if (handler) handler(evt, sid, ts);
+  feedWatchdog(evt);
   markNarratorDirty();
 }
 

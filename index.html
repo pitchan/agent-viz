@@ -16,6 +16,10 @@
     </div>
     <span class="sep"></span>
     <div id="connection-dot" title="Disconnected"></div>
+    <button type="button" id="watchdog-pill" class="watchdog-pill" title="No active alerts">
+      <span class="watchdog-dot"></span>
+      <span id="watchdog-count" class="watchdog-count" hidden></span>
+    </button>
     <span id="topbar-prompt" style="font-size:12px;color:var(--text-dim);max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title=""></span>
     <span class="sep"></span>
     <div class="stat-group">
@@ -75,6 +79,15 @@
     <div id="sessions-overlay" class="glass-panel">
       <div id="sessions-title">Sessions</div>
       <div id="sessions-list"></div>
+    </div>
+
+    <!-- Watchdog alerts popup -->
+    <div id="alerts-popup" class="glass-panel">
+      <div id="alerts-header">
+        <span id="alerts-title">Active alerts</span>
+        <button id="alerts-close">&times;</button>
+      </div>
+      <div id="alerts-list"></div>
     </div>
   </div>
 </div>

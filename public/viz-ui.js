@@ -21,6 +21,9 @@ import {
 import {
   composeNarrator, setRenderFn, resumeTick,
 } from './viz-narrator.js';
+import {
+  getActiveAlerts, acknowledgeAlert, onNewAlerts,
+} from './viz-watchdog-client.js';
 
 // ─── Feed panel ───────────────────────────────────────────────────────────
 let _feedRenderedCount = 0;
@@ -371,6 +374,7 @@ document.addEventListener('keydown', e => {
     state.selected = null;
     document.getElementById('detail-popup').classList.remove('visible');
     document.getElementById('sessions-overlay').classList.remove('visible');
+    document.getElementById('alerts-popup').classList.remove('visible');
     renderFeed();
     markDirty();
   }
@@ -417,6 +421,99 @@ function updateLiveDurations() {
   }
   markDirty();
 }
+
+// ─── Watchdog pill + alerts popup ─────────────────────────────────────────
+// Reads from viz-watchdog-client (the source of truth for alerts). The pill
+// is always present in the topbar — green = quiet, red+pulse = at least one
+// non-acknowledged alert. Click opens a popup with one row per alert and an
+// Ack button. New alerts also trigger a desktop Notification (permission is
+// requested lazily on the first incoming alert; silent fallback if denied).
+
+const _watchdogEls = { pill: null, count: null, popup: null, list: null };
+function _watchdogDOM() {
+  if (!_watchdogEls.pill) {
+    _watchdogEls.pill = document.getElementById('watchdog-pill');
+    _watchdogEls.count = document.getElementById('watchdog-count');
+    _watchdogEls.popup = document.getElementById('alerts-popup');
+    _watchdogEls.list = document.getElementById('alerts-list');
+  }
+  return _watchdogEls;
+}
+
+function alertItemHTML(a) {
+  return `<div class="alert-item">
+    <div class="alert-info">
+      <div class="alert-type">${esc(a.type)}</div>
+      <div class="alert-msg">${esc(a.message)}</div>
+      <div class="alert-meta">session ${esc(a.sessionId.slice(0, 8))}</div>
+    </div>
+    <button class="alert-ack" data-id="${esc(a.id)}">Ack</button>
+  </div>`;
+}
+
+function renderAlertsPopup() {
+  const els = _watchdogDOM();
+  const active = getActiveAlerts();
+  els.list.innerHTML = active.length
+    ? active.map(alertItemHTML).join('')
+    : '<div class="alerts-empty">No active alerts.</div>';
+}
+
+export function renderWatchdogPill() {
+  const els = _watchdogDOM();
+  const n = getActiveAlerts().length;
+  els.pill.classList.toggle('has-alerts', n > 0);
+  if (n > 0) {
+    els.count.hidden = false;
+    els.count.textContent = String(n);
+    els.pill.title = `${n} active alert${n > 1 ? 's' : ''} — click for details`;
+  } else {
+    els.count.hidden = true;
+    els.pill.title = 'No active alerts';
+  }
+  if (els.popup.classList.contains('visible')) renderAlertsPopup();
+}
+
+document.getElementById('watchdog-pill').addEventListener('click', () => {
+  const popup = document.getElementById('alerts-popup');
+  const opening = !popup.classList.contains('visible');
+  popup.classList.toggle('visible', opening);
+  if (opening) renderAlertsPopup();
+});
+
+document.getElementById('alerts-close').addEventListener('click', () => {
+  document.getElementById('alerts-popup').classList.remove('visible');
+});
+
+document.getElementById('alerts-list').addEventListener('click', (e) => {
+  const btn = e.target.closest('.alert-ack');
+  if (!btn) return;
+  acknowledgeAlert(btn.dataset.id);
+  renderWatchdogPill();
+});
+
+// Lazy permission request — only on the first alert, never at page load.
+// Browsers dedupe by `tag`, so re-emitting a notification with the same id
+// is harmless (the OS toast updates in place).
+let _notifPermAsked = false;
+function notifyDesktop(alert) {
+  if (typeof Notification === 'undefined') return;
+  if (Notification.permission === 'default' && !_notifPermAsked) {
+    _notifPermAsked = true;
+    Notification.requestPermission().catch(() => {});
+  }
+  if (Notification.permission !== 'granted') return;
+  try { new Notification(`agent-viz: ${alert.type}`, { body: alert.message, tag: alert.id }); }
+  catch {}
+}
+
+onNewAlerts((alerts) => {
+  renderWatchdogPill();
+  for (const a of alerts) notifyDesktop(a);
+});
+
+// Initial render so the pill is green from the first paint.
+renderWatchdogPill();
 
 // ─── Wire cross-module hooks ──────────────────────────────────────────────
 // Canvas pointer click → detail + feed highlight.
