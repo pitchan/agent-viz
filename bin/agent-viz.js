@@ -215,6 +215,7 @@ async function cmdStop(argv) {
 
 async function cmdStatus() {
   const { status } = require(path.join(PKG_ROOT, 'lib', 'lifecycle.js'));
+  const { installedScopes } = require(path.join(PKG_ROOT, 'lib', 'install-hooks.js'));
   const s = await status();
   if (s.running) {
     console.log(`${c.ok('running')} ${c.hint('→')} http://localhost:${s.port}`);
@@ -225,6 +226,20 @@ async function cmdStatus() {
     console.log(c.dim('not running.'));
     if (s.stale) console.log(c.dim(`(stale pid file cleared: pid ${s.stale.pid})`));
     console.log(c.dim(`log     : ${s.log}`));
+  }
+
+  const scopes = installedScopes({ cwd: process.cwd(), packageRoot: PKG_ROOT });
+  const lines = [];
+  for (const [agent, list] of Object.entries(scopes)) {
+    if (!list || list.length === 0) continue;
+    const label = agent === 'claude' ? 'Claude Code' : 'Copilot CLI';
+    const names = list.map(x => x.scope).join(', ');
+    const dup = list.length > 1 ? c.warn(`  ! duplicate: each event fires ${list.length}x`) : '';
+    lines.push(`  ${label.padEnd(11)} : ${names}${dup}`);
+  }
+  if (lines.length > 0) {
+    console.log('hooks   :');
+    for (const l of lines) console.log(l);
   }
 }
 
@@ -301,6 +316,14 @@ async function cmdInstallHooks(argv) {
     }
     if (r.gitignore && r.gitignore.changed) {
       console.log(`  + .gitignore : added ${agent === 'claude' ? '.claude/settings.local.json' : '.github/hooks/agent-viz.local.json'}`);
+    }
+    if (r.crossScope && r.crossScope.length > 0) {
+      const others = r.crossScope.map(s => s.scope).join(', ');
+      console.log(`  ${c.warn('!')} hooks also installed in: ${others}`);
+      console.log(c.dim(`    each event will fire ${1 + r.crossScope.length}x (one per scope) — uninstall the extras with`));
+      for (const s of r.crossScope) {
+        console.log(c.dim(`      agent-viz uninstall-hooks --${s.scope} --target=${agent}`));
+      }
     }
   }
   const anyChange = Object.values(result).some(r => r && r.action && r.action !== 'noop');
