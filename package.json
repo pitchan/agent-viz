@@ -52,5 +52,8 @@
   "homepage": "https://github.com/pitchan/agent-viz#readme",
   "publishConfig": {
     "access": "public"
+  },
+  "dependencies": {
+    "@vcueto/agent-viz": "^0.2.16"
   }
 }

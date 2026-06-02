@@ -46,9 +46,9 @@ Usage:
   agent-viz status               Show running state + URL.
   agent-viz install-hooks        Install hooks. Default: auto-detect (Claude + Copilot if present).
                                    --target=claude|copilot|both   force a target
-                                   --user             user-level config (~/.claude or ~/.copilot)
+                                   --user             user-level config (~/.claude or ~/.copilot) — default
                                    --project          repo-committed config
-                                   --local            repo-local gitignored config (default in project)
+                                   --local            repo-local gitignored config
                                    --check            audit instead of installing (exit 1 on stale/missing)
   agent-viz uninstall-hooks      Remove hooks (sweeps all targets unless --target given).
   agent-viz hook                 Internal — read JSON event from stdin.

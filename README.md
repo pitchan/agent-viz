@@ -70,25 +70,26 @@ Detection: an agent is considered installed if its CLI binary is on your `PATH`,
 
 ## Hook management
 
-The first time you run `agent-viz`, it auto-registers hooks for each detected agent. Default paths:
+The first time you run `agent-viz`, it auto-registers hooks for each detected agent. **The default scope is user-level (global)** — the hook then fires from every directory, so a session launched anywhere is captured:
 
-| Agent | Inside a project | Outside a project |
-|---|---|---|
-| Claude Code | `<root>/.claude/settings.local.json` (gitignored) | `~/.claude/settings.json` |
-| Copilot CLI | `<root>/.github/hooks/agent-viz.local.json` (gitignored) | `~/.copilot/hooks/agent-viz.json` |
+| Agent | Default location (user scope) |
+|---|---|
+| Claude Code | `~/.claude/settings.json` |
+| Copilot CLI | `~/.copilot/hooks/agent-viz.json` |
 
-You only need the commands below in three situations:
+Project scopes are opt-in. You only need the commands below in three situations:
 
-**1. You want to share the hook with your team.** The default install is gitignored so each teammate manages their own. To commit it instead:
+**1. You want to scope the hook to one repo (and share it with your team).** Commit it at project scope:
 
 ```bash
 agent-viz install-hooks --project   # writes <root>/.claude/settings.json (committed)
+agent-viz install-hooks --local     # writes the gitignored per-repo variant
 ```
 
-**2. You globally installed agent-viz from inside a project but want the hook user-wide.** Default scope detection picked `--local`; force user scope:
+**2. You're already on user scope and want to confirm it.**
 
 ```bash
-agent-viz install-hooks --user      # writes ~/.claude/settings.json
+agent-viz install-hooks --user      # writes ~/.claude/settings.json (this is the default)
 ```
 
 **3. You want to check or remove the hooks.**

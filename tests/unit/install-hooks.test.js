@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { findProjectRoot, findInstalledScopes, install } = require('../../lib/install-hooks');
+const { findProjectRoot, findInstalledScopes, install, resolveScope } = require('../../lib/install-hooks');
 
 function makeTempDir(prefix) {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -90,6 +90,32 @@ test('install: refreshes existing hook whose timeout drifted (5 → 10)', () => 
     assert.equal(h.timeout, 10, `${ev} timeout should be upgraded to 10, got ${h.timeout}`);
     assert.equal(h.command, command, `${ev} command should be preserved`);
   }
+});
+
+test('resolveScope: no explicit scope defaults to user (global) even inside a project', () => {
+  const projectRoot = makeTempDir('avtest-defscope-');
+  fs.mkdirSync(path.join(projectRoot, '.git'));
+  for (const agent of ['claude', 'copilot']) {
+    const r = resolveScope({ cwd: projectRoot, agent });
+    assert.equal(r.scope, 'user', `${agent}: default scope should be 'user', got '${r.scope}'`);
+    assert.equal(r.projectRoot, null, `${agent}: user scope must not carry a projectRoot`);
+  }
+});
+
+test('resolveScope: explicit --local still resolves to the per-repo file', () => {
+  const projectRoot = makeTempDir('avtest-localscope-');
+  fs.mkdirSync(path.join(projectRoot, '.git'));
+  const r = resolveScope({ scope: 'local', cwd: projectRoot, agent: 'claude' });
+  assert.equal(r.scope, 'local');
+  assert.equal(r.projectRoot, projectRoot);
+});
+
+test('resolveScope: explicit --local with no project still throws', () => {
+  const lonelyHome = makeTempDir('avtest-noproj-');
+  assert.throws(
+    () => resolveScope({ scope: 'local', cwd: lonelyHome, agent: 'claude', packageRoot: lonelyHome }),
+    /--local requested but no/,
+  );
 });
 
 test('install: crossScope flags pre-existing hook in a different scope', () => {
