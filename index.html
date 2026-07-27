@@ -71,6 +71,7 @@
     <div id="toolbar">
       <button id="btn-sessions">Sessions <span class="shortcut">S</span></button>
       <button id="btn-advisor">Conseils <span class="shortcut">A</span></button>
+      <button id="btn-analysis">Sessions analysées <span class="shortcut">N</span></button>
       <button id="btn-fit">Fit <span class="shortcut">F</span></button>
       <button id="btn-clear">Clear <span class="shortcut">C</span></button>
       <button id="btn-autofit">Auto-fit: <span id="autofit-label">ON</span></button>
@@ -91,6 +92,17 @@
       </div>
       <div id="advisor-summary"></div>
       <div id="advisor-list"></div>
+    </div>
+
+    <!-- Analysis overlay -->
+    <div id="analysis-overlay" class="glass-panel">
+      <div id="analysis-header">
+        <span id="analysis-title">Sessions analysées</span>
+        <button type="button" id="analysis-close">&times;</button>
+      </div>
+      <div id="analysis-summary"></div>
+      <div id="analysis-list"></div>
+      <div id="analysis-detail"></div>
     </div>
 
     <!-- Watchdog alerts popup -->
@@ -118,8 +130,10 @@
   import { garbageCollect } from './public/viz-layout.js';
   import { requestRender } from './public/viz-state.js';
   import { initAdvisor } from './public/observatory/advisor-view.js';
+  import { initAnalysis } from './public/observatory/analysis-view.js';
 
   initAdvisor();
+  initAnalysis();
   loadSessions();
   connectSSE();
   poll();
