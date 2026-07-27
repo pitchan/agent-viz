@@ -1,0 +1,120 @@
+// advisor-view.js — "Conseils" page.
+//
+// Rendering only: ranking is done server-side, wording by evidence.js, numbers
+// by format.js, state by store.js. One block per cost basis, each saying it is
+// not comparable with the other — and no total anywhere, because a same
+// session feeds several rules.
+
+import * as api from './api.js';
+import { getState, subscribe, loadAdvisor, changeStatus, applyScanEvent } from './store.js';
+import { formatUsd, formatTokens, confidenceLabel, costLabel, basisTitle } from './format.js';
+import { evidenceLines } from './evidence.js';
+
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+function recommendationCard(rec, { actionable }) {
+  const card = el('div', 'advisor-card');
+  card.dataset.recId = String(rec.id);
+  card.append(
+    el('div', 'advisor-card-title', rec.title),
+    el('div', 'advisor-card-meta', `${confidenceLabel(rec.confidence)} · ${costLabel(rec)}`),
+    el('div', 'advisor-card-action', rec.action),
+  );
+
+  const evidence = el('ul', 'advisor-card-evidence');
+  for (const line of evidenceLines(rec)) evidence.appendChild(el('li', null, line));
+  card.appendChild(evidence);
+
+  if (actionable) {
+    const buttons = el('div', 'advisor-card-buttons');
+    for (const [status, label] of [['accepted', 'J’applique'], ['ignored', 'Ignorer']]) {
+      const btn = el('button', null, label);
+      btn.type = 'button';
+      btn.dataset.status = status;
+      buttons.appendChild(btn);
+    }
+    card.appendChild(buttons);
+  }
+  return card;
+}
+
+function renderSummary(node, summary) {
+  if (!summary) { node.textContent = ''; return; }
+  const partial = summary.costComplete ? '' : ' · coût partiel';
+  node.textContent = `${summary.sessions} sessions · ${formatUsd(summary.costUsd)}`
+    + ` · ${formatTokens(summary.netTokens)} jetons nets`
+    + ` · ${formatTokens(summary.cacheReadTokens)} relus depuis le cache${partial}`
+    + ` · prix : ${summary.priceSource}`;
+}
+
+function renderList(node, { groups, stale }) {
+  node.textContent = '';
+  if (groups.length === 0 && stale.length === 0) {
+    node.appendChild(el('div', 'advisor-empty', 'Aucune recommandation sur la période — rien à corriger.'));
+    return;
+  }
+  for (const group of groups) {
+    node.appendChild(el('div', 'advisor-basis-title', basisTitle(group.basis)));
+    for (const rec of group.priority) node.appendChild(recommendationCard(rec, { actionable: true }));
+    const rest = group.all.filter(r => !group.priority.some(p => p.id === r.id));
+    if (rest.length) {
+      node.appendChild(el('div', 'advisor-rest-title', `Autres observations (${rest.length})`));
+      for (const rec of rest) node.appendChild(recommendationCard(rec, { actionable: true }));
+    }
+  }
+  if (stale.length) {
+    node.appendChild(el('div', 'advisor-rest-title',
+      `Ne se produit plus depuis la dernière analyse (${stale.length})`));
+    for (const rec of stale) node.appendChild(recommendationCard(rec, { actionable: false }));
+  }
+}
+
+function render() {
+  const state = getState();
+  const head = document.getElementById('advisor-summary');
+  const list = document.getElementById('advisor-list');
+  if (state.error) {
+    head.textContent = `Analyse indisponible : ${state.error}`;
+    list.textContent = '';
+    return;
+  }
+  if (state.loading && !state.summary) { head.textContent = 'Analyse en cours…'; return; }
+  renderSummary(head, state.summary);
+  renderList(list, state.recommendations);
+}
+
+export function initAdvisor() {
+  const panel = document.getElementById('advisor-overlay');
+  subscribe(() => { if (panel.classList.contains('visible')) render(); });
+
+  document.getElementById('btn-advisor').addEventListener('click', () => {
+    panel.classList.toggle('visible');
+    if (panel.classList.contains('visible')) loadAdvisor(api);
+  });
+
+  document.getElementById('advisor-close').addEventListener('click', () => {
+    panel.classList.remove('visible');
+  });
+
+  document.getElementById('advisor-rescan').addEventListener('click', () => {
+    api.requestScan().catch(() => { /* progress and errors arrive on the SSE stream */ });
+  });
+
+  document.getElementById('advisor-list').addEventListener('click', e => {
+    const btn = e.target.closest('button[data-status]');
+    if (!btn) return;
+    changeStatus(api, Number(btn.closest('.advisor-card').dataset.recId), btn.dataset.status);
+  });
+
+  // The scan broadcasts its progress on the existing SSE stream; reload when
+  // it finishes so the page never shows advice from before the rescan.
+  window.addEventListener('agentviz:analysisScan', e => {
+    applyScanEvent(e.detail);
+    if (e.detail.phase === 'done' && panel.classList.contains('visible')) loadAdvisor(api);
+  });
+}

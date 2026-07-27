@@ -94,6 +94,12 @@ export function connectSSE() {
   sseSource.onmessage = (msg) => {
     try {
       const data = JSON.parse(msg.data);
+      // Observatory scan progress: re-broadcast as a DOM event so the advisor
+      // panel can follow it without this module importing the observatory.
+      if (data.type === 'analysisScan') {
+        window.dispatchEvent(new CustomEvent('agentviz:analysisScan', { detail: data }));
+        return;
+      }
       if (data.type === 'sessionsChanged') {
         loadSessions();
         return;
