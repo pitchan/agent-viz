@@ -1,0 +1,65 @@
+// Pure parts of the analysis page: the table row and the drill-down lines.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { sessionRow, drillDownLines } from '../../public/observatory/analysis-view.js';
+
+test('a session row carries id, project, model, cost, tokens and duration', () => {
+  assert.deepEqual(sessionRow({
+    id: 'sess-abcdef12', project: 'F--proj', modelMain: 'claude-opus-4-8',
+    costUsd: 1.5, costComplete: true, netTokens: 1200000,
+    startedAt: '2026-07-01T10:00:00.000Z', endedAt: '2026-07-01T10:30:00.000Z',
+  }), ['sess-abc', 'F--proj', 'claude-opus-4-8', '1,50 $', '1.2M', '30 min']);
+});
+
+test('a partially-priced session is marked in its cost cell', () => {
+  assert.equal(sessionRow({
+    id: 's', project: 'p', modelMain: 'm', costUsd: 1, costComplete: false, netTokens: 10,
+    startedAt: null, endedAt: null,
+  })[3], '1,00 $ (partiel)');
+});
+
+test('a session with no known model shows a dash, not an empty cell', () => {
+  assert.equal(sessionRow({
+    id: 's', project: 'p', modelMain: null, costUsd: 0, costComplete: true, netTokens: 0,
+    startedAt: null, endedAt: null,
+  })[2], '—');
+});
+
+const fullReport = {
+  netTokens: 1000, tokens: { total: { cacheRead: 4000 } },
+  context: { cacheChurnTokens: 500, churnCauses: { prefixChange: { tokens: 300 } }, compactions: [{}, {}] },
+  toolResults: { totalResults: 12, totalBytes: 60000 },
+  reads: { cases: { crossAgentDuplicate: { bytes: 2048 } } },
+  subagents: { spawnToolUses: 3, sidecarCount: 2 },
+  parseErrors: 1,
+};
+
+test('the drill-down keeps net tokens and cache reads on separate lines', () => {
+  const lines = drillDownLines(fullReport);
+  assert.ok(lines.some(l => l.includes('1000 jetons nets')));
+  assert.ok(lines.some(l => l.includes('4000 jetons relus depuis le cache')));
+  assert.ok(!lines.some(l => /5000/.test(l)), 'the two must never be added together');
+});
+
+test('the drill-down lists every non-zero figure of the report', () => {
+  const lines = drillDownLines(fullReport);
+  assert.ok(lines.some(l => l.includes('300') && l.includes('préfixe modifié')));
+  assert.ok(lines.some(l => l.includes('2 compactions')));
+  assert.ok(lines.some(l => l.includes('12 sorties d’outils')));
+  assert.ok(lines.some(l => l.includes('relus par un autre agent')));
+  assert.ok(lines.some(l => l.includes('3 sous-agents lancés')));
+  assert.ok(lines.some(l => l.includes('non analysable')));
+});
+
+test('a clean session does not list a line of zeros', () => {
+  const lines = drillDownLines({
+    netTokens: 10, tokens: { total: { cacheRead: 0 } },
+    context: { cacheChurnTokens: 0, churnCauses: { prefixChange: { tokens: 0 } }, compactions: [] },
+    toolResults: { totalResults: 0, totalBytes: 0 },
+    reads: { cases: { crossAgentDuplicate: { bytes: 0 } } },
+    subagents: { spawnToolUses: 0, sidecarCount: 0 },
+    parseErrors: 0,
+  });
+  assert.equal(lines.length, 1, 'only the tokens line remains');
+  assert.ok(!lines.some(l => l.includes('non analysable')));
+});

@@ -54,6 +54,23 @@ Adds `agent-viz` as a dev dependency. The hook command embedded in `settings.jso
 | Open browser automatically | `agent-viz start --open` |
 | Skip auto hook install | `agent-viz start --no-install-hooks` |
 
+## Observatoire (analyse et conseils)
+
+Deux pages s'ajoutent à la vue temps réel, accessibles depuis la barre d'outils.
+
+- **Conseils** — les actions prioritaires, chacune adossée à un chiffre mesuré sur vos propres sessions : quel projet reconstruit son préfixe de cache en cours de route, quel serveur MCP est chargé partout mais jamais appelé, quelle commande imprime beaucoup et souvent, quels fichiers sont relus par plusieurs agents, quelles sessions sont compactées plusieurs fois, quels sous-agents partent sur des tâches trop courtes. Aucune économie n'est projetée : ce sont des coûts constatés sur la période.
+- **Sessions analysées** — le tableau des sessions mesurées (coût, jetons nets, durée, modèle dominant) avec le détail chiffré session par session.
+
+Trois points à savoir :
+
+- **Deux blocs, jamais un classement commun.** Certaines règles chiffrent de vrais jetons, d'autres partent d'octets convertis (≈ 4 octets par jeton). Les deux n'ont pas la même précision : la page les présente séparément et n'affiche **aucun total**, parce qu'une même session alimente plusieurs règles et serait comptée deux fois.
+- **Deux sources de prix coexistent.** La vue temps réel utilise la table de tarifs rafraîchie en ligne, les pages d'analyse celle embarquée dans le moteur. Chaque page nomme la sienne ; aucun chiffre ne mélange les deux. Une session dont le modèle n'a pas de tarif connu est marquée « partiel », jamais arrondie à zéro en silence.
+- **Métadonnées uniquement.** Aucun contenu de prompt, de fichier, de sortie d'outil ni de commande n'est conservé — seulement des compteurs, des tailles et des noms d'outils.
+
+La base `~/.agent-viz/observatory.db` est un **dérivé jetable** : les transcripts restent la source de vérité, et la supprimer ne perd que les statuts « j'applique / ignorer » que vous avez posés sur les recommandations — elle se reconstruit au scan suivant (au démarrage, puis toutes les heures).
+
+L'analyse repose sur le moteur `@vcueto/netgain`, **lié localement** (`npm link @vcueto/netgain`) et volontairement absent de `dependencies` : il n'est pas publié, et le déclarer casserait `npm install` pour les utilisateurs de ce dépôt. Sans lui, les deux pages affichent l'erreur exacte et **la vue temps réel continue de fonctionner normalement**.
+
 ## Multi-agent support
 
 agent-viz captures events from **both Claude Code and GitHub Copilot CLI** simultaneously. On first run, it auto-detects which CLI agents are installed locally and registers the appropriate hooks for each. Sessions are tagged in the dashboard with a colored pill badge (cyan for Claude, violet for Copilot).
