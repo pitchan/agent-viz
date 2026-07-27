@@ -7,10 +7,25 @@
 
 import { formatTokens, formatBytes } from './format.js';
 
+// R1 names the marker the engine journaled and where the prefix broke. The
+// rule decides which one dominates; this file only puts it into French.
+const R1_MARKER_LABEL = {
+  modelSwitch: 'changement de modèle',
+  toolsAppeared: 'chargement d’outils différés',
+  noMarker: 'aucune cause journalisée',
+};
+const R1_DEPTH_LABEL = {
+  facade: 'en façade du contexte (bloc système et outils)',
+  d10to50: 'entre 10 et 50 % de profondeur',
+  d50to90: 'entre 50 et 90 % de profondeur',
+  tail: 'en fin de contexte',
+};
+
 const EVIDENCE_BY_RULE = {
   R1: e => [
     `${formatTokens(e.prefixChangeTokens)} jetons de préfixe reconstruit`,
-    `dont ${formatTokens(e.modelSwitchTokens)} après un changement de modèle`,
+    `cause dominante : ${R1_MARKER_LABEL[e.dominantMarker]} (${formatTokens(e.markerTokens[e.dominantMarker])} jetons)`,
+    `cassure ${R1_DEPTH_LABEL[e.dominantDepth]} (${formatTokens(e.depthTokens[e.dominantDepth])} jetons)`,
     `${Math.round(e.shareOfNetPercent)} % des jetons nets de ces sessions`,
   ],
   R2: e => [

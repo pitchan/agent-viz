@@ -11,8 +11,12 @@ const assert = require('node:assert/strict');
 const r1 = require('../../lib/server/observatory/rules/r1-prefix-change');
 const { evaluateAll, RULES } = require('../../lib/server/observatory/rules/registry');
 
+// The engine guarantees that each breakdown sums exactly to prefixChange, so
+// the default puts every unclaimed token on modelSwitch: tests that say nothing
+// about markers describe the pre-existing "model was switched" case.
 function session(id, { project = 'F--proj', prefixChange = 0, compaction = 0, expiration = 0,
-  modelSwitch = null, netTokens = 100000, costUsd = 10, costComplete = true } = {}) {
+  toolsAppeared = 0, noMarker = 0, depth = null,
+  netTokens = 100000, costUsd = 10, costComplete = true } = {}) {
   return {
     id, project, startedAt: '2026-07-01T10:00:00.000Z', endedAt: '2026-07-01T11:00:00.000Z',
     netTokens, costUsd, costComplete,
@@ -25,11 +29,19 @@ function session(id, { project = 'F--proj', prefixChange = 0, compaction = 0, ex
           prefixChange: { events: 1, tokens: prefixChange },
           unknown: { events: 0, tokens: 0 },
         },
-        prefixBreakdown: { markers: {
-          modelSwitch: { events: 1, tokens: modelSwitch === null ? prefixChange : modelSwitch },
-          toolsAppeared: { events: 0, tokens: 0 },
-          noMarker: { events: 0, tokens: 0 },
-        } },
+        prefixBreakdown: {
+          markers: {
+            modelSwitch: { events: 1, tokens: prefixChange - toolsAppeared - noMarker },
+            toolsAppeared: { events: 0, tokens: toolsAppeared },
+            noMarker: { events: 0, tokens: noMarker },
+          },
+          depth: depth ?? {
+            facade: { events: 0, tokens: 0 },
+            d10to50: { events: 1, tokens: prefixChange },
+            d50to90: { events: 0, tokens: 0 },
+            tail: { events: 0, tokens: 0 },
+          },
+        },
       },
     },
   };
@@ -109,6 +121,68 @@ test('one partially-priced session marks the whole recommendation partial', () =
     session('s2', { prefixChange: 10000, netTokens: 40000, costComplete: false }),
   ]));
   assert.equal(recs[0].evidence.costComplete, false);
+});
+
+// The action must follow the marker the engine actually journaled. On the
+// 90-day history, the biggest project carries 25,26 M prefix-change tokens with
+// modelSwitch at exactly 0: prescribing "start with the right model" there
+// recommends a gesture the measurement refutes.
+test('the action names the model switch only when that marker dominates', () => {
+  const recs = r1.evaluate(ctx([session('s1', { prefixChange: 50000 })]));
+  assert.equal(recs[0].evidence.dominantMarker, 'modelSwitch');
+  assert.match(recs[0].action, /modèle/);
+});
+
+test('when nothing in the journal explains the break, R1 prescribes no gesture', () => {
+  const recs = r1.evaluate(ctx([session('s1', { prefixChange: 50000, noMarker: 50000 })]));
+  const switched = r1.evaluate(ctx([session('s1', { prefixChange: 50000 })]));
+  assert.equal(recs[0].evidence.dominantMarker, 'noMarker');
+  // The text may still name the model — to state it was measured at zero. What
+  // it must not do is prescribe the gesture that belongs to the other marker.
+  assert.notEqual(recs[0].action, switched[0].action);
+  assert.doesNotMatch(recs[0].action, /Démarrer la session/,
+    'a cause measured at zero must never be turned into a remedy');
+  assert.match(recs[0].action, /non journalisée/);
+  assert.match(recs[0].action, /Aucun geste/);
+});
+
+test('when deferred tools were loaded mid-session, the action names that cause', () => {
+  const recs = r1.evaluate(ctx([session('s1', { prefixChange: 50000, toolsAppeared: 50000 })]));
+  assert.equal(recs[0].evidence.dominantMarker, 'toolsAppeared');
+  assert.match(recs[0].action, /outils/);
+});
+
+test('dominance is decided on the aggregate of the sessions that fired', () => {
+  // s1 alone would read as a model switch; across the project noMarker wins.
+  const recs = r1.evaluate(ctx([
+    session('s1', { prefixChange: 30000 }),
+    session('s2', { prefixChange: 50000, noMarker: 50000 }),
+  ]));
+  assert.equal(recs[0].evidence.dominantMarker, 'noMarker');
+});
+
+test('the evidence carries every marker, and they sum to the prefix-change tokens', () => {
+  const recs = r1.evaluate(ctx([session('s1', { prefixChange: 50000, toolsAppeared: 5000, noMarker: 40000 })]));
+  const { markerTokens, prefixChangeTokens } = recs[0].evidence;
+  assert.deepEqual(markerTokens, { modelSwitch: 5000, toolsAppeared: 5000, noMarker: 40000 });
+  const summed = Object.values(markerTokens).reduce((a, b) => a + b, 0);
+  assert.equal(summed, prefixChangeTokens, 'the engine invariant must survive aggregation');
+});
+
+// Where the prefix breaks is the only thing left to say when no marker
+// explains it — a "we do not know" card with no figure is worse than the bug.
+test('the evidence carries where the prefix broke', () => {
+  const recs = r1.evaluate(ctx([session('s1', {
+    prefixChange: 50000, noMarker: 50000,
+    depth: {
+      facade: { events: 1, tokens: 10000 },
+      d10to50: { events: 1, tokens: 35000 },
+      d50to90: { events: 1, tokens: 5000 },
+      tail: { events: 0, tokens: 0 },
+    },
+  })]));
+  assert.equal(recs[0].evidence.dominantDepth, 'd10to50');
+  assert.equal(recs[0].evidence.depthTokens.facade, 10000);
 });
 
 test('the registry exposes R1 and evaluateAll routes through it', () => {
