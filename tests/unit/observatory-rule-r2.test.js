@@ -14,7 +14,12 @@ function session(id, { project = 'F--proj', cwd = 'F:/DEV/proj', byTool = {}, to
     report: {
       cwd,
       toolResults: { byTool },
-      context: { prefixBreakdown: { markers: { toolsAppeared: { events: 1, tokens: toolsAppeared } } } },
+      context: {
+        prefixBreakdown: {
+          markers: { toolsAppeared: { events: 1, tokens: toolsAppeared } },
+          noMarkerDetail: { earlyMcp: { events: 0, tokens: 0 }, other: { events: 0, tokens: 0 } },
+        },
+      },
     },
   };
 }
@@ -37,6 +42,8 @@ test('a user-scope server never called fires, priced on measured tool-block chur
   assert.equal(recs[0].evidence.usedSessions, 0);
   assert.equal(recs[0].evidence.inventorySnapshot, true);
   assert.ok(recs[0].action.includes('à tester'));
+  assert.deepEqual(recs[0].evidence.projects, ['F--proj'],
+    'R2 names the projects its loaded sessions belong to (needed by the P3 pointer)');
 });
 
 test('a server used in more than 10 % of its sessions stays silent', () => {
