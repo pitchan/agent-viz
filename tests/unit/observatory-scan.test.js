@@ -16,6 +16,7 @@ function fakeReport(id, over = {}) {
   return {
     sessionId: id, projectSlug: 'F--proj', cwd: 'F:\\proj',
     startedAt: '2026-07-01T10:00:00.000Z', endedAt: '2026-07-01T10:20:00.000Z',
+    sessionKind: 'interactive',
     tokens: { perModel: { 'claude-opus-4-8': { in: 100, out: 50, cacheCreate: 850, cacheRead: 4000 } },
       costUsd: 0.5, costComplete: true },
     netTokens: 1000, events: 10, parseErrors: 0,

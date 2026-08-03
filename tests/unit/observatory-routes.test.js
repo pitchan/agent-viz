@@ -67,10 +67,31 @@ test('GET /analysis/summary returns the period totals and names its price source
   assert.equal(body.priceSource, 'netgain-table-embarquee');
 });
 
+test('GET /analysis/summary forwards days and includeMachine to the service', async () => {
+  let got;
+  const spy = { ...SERVICE, summary: async opts => { got = opts; return {}; } };
+  await router(spy)('GET', '/analysis/summary?days=7&includeMachine=1');
+  assert.deepEqual(got, { days: 7, includeMachine: true });
+});
+
+test('an absent or non-numeric days parameter reaches the service as undefined', async () => {
+  let got;
+  const spy = { ...SERVICE, summary: async opts => { got = opts; return {}; } };
+  await router(spy)('GET', '/analysis/summary?days=abc');
+  assert.deepEqual(got, { days: undefined, includeMachine: false });
+});
+
 test('GET /analysis/sessions returns the analytic list', async () => {
   const res = await router()('GET', '/analysis/sessions?project=F--proj');
   assert.equal(res.statusCode, 200);
   assert.deepEqual(JSON.parse(res.body).map(s => s.id), ['s1']);
+});
+
+test('GET /analysis/sessions forwards the window and the toggle', async () => {
+  let got;
+  const spy = { ...SERVICE, sessions: async opts => { got = opts; return []; } };
+  await router(spy)('GET', '/analysis/sessions?project=F--p&days=90');
+  assert.deepEqual(got, { project: 'F--p', days: 90, includeMachine: false });
 });
 
 test('GET /analysis/session/:id returns the full report, 404 when unknown', async () => {
@@ -91,6 +112,14 @@ test('POST /analysis/scan answers immediately and does not wait for the scan', a
   assert.equal(res.statusCode, 202);
   assert.equal(JSON.parse(res.body).started, true);
   resolveScan({ discovered: 0, scanned: 0, skipped: 0, failed: 0 });
+});
+
+test('POST /analysis/scan?days=7 passes the window, still answers 202 immediately', async () => {
+  let got;
+  const spy = { ...SERVICE, scan: async opts => { got = opts; } };
+  const res = await router(spy)('POST', '/analysis/scan?days=7');
+  assert.equal(res.statusCode, 202);
+  assert.deepEqual(got, { days: 7 });
 });
 
 test('GET /config/audit returns the inventory and its usage', async () => {

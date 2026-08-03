@@ -22,6 +22,7 @@ const ROW = {
   startedAt: '2026-07-01T10:00:00.000Z', endedAt: '2026-07-01T10:30:00.000Z',
   modelMain: 'claude-opus-4-8', netTokens: 5000, costUsd: 0.42, costComplete: true,
   reportJson: '{"sessionId":"sess-1"}',
+  sessionKind: 'interactive',
 };
 
 test('openStore creates missing parent directories and a usable schema', () => {
@@ -95,6 +96,7 @@ const REC = {
   category: 'outils', confidence: 'fait', estimatedCostUsd: 1.25,
   costBasis: 'octets-approx-4o-par-jeton', evidence: { sessions: ['sess-1'], bytes: 900000 },
   action: 'Cibler la commande',
+  periodFrom: '2026-07-04T00:00:00.000Z', periodTo: '2026-08-03T00:00:00.000Z',
 };
 
 test('upsertRecommendations keeps identity on (ruleId, subject) and preserves status', () => {
@@ -146,5 +148,46 @@ test('scan state round-trips per claude dir', () => {
     h.store.setScanState('C:\\Users\\x\\.claude', '2026-07-01T00:00:00.000Z', '0.11.0');
     assert.deepEqual(h.store.getScanState('C:\\Users\\x\\.claude'),
       { lastScanAt: '2026-07-01T00:00:00.000Z', engineVersion: '0.11.0' });
+  } finally { cleanup(h); }
+});
+
+test('listSessions filters by kinds; NULL kind never passes a kind filter', () => {
+  const h = tmpStore();
+  try {
+    h.store.upsertSession({ ...ROW, id: 'k1', sessionKind: 'interactive' });
+    h.store.upsertSession({ ...ROW, id: 'k2', sessionKind: 'headless' });
+    h.store.upsertSession({ ...ROW, id: 'k3', sessionKind: null });
+    assert.deepEqual(h.store.listSessions({ kinds: ['interactive'] }).map(s => s.id), ['k1']);
+    assert.deepEqual(h.store.listSessions({ kinds: ['interactive', 'headless'] }).map(s => s.id).sort(), ['k1', 'k2']);
+    assert.equal(h.store.listSessions({}).length, 3, 'no filter still returns everything');
+  } finally { cleanup(h); }
+});
+
+test('countByKind groups per kind and counts NULL as unknown', () => {
+  const h = tmpStore();
+  try {
+    h.store.upsertSession({ ...ROW, id: 'c1', sessionKind: 'interactive' });
+    h.store.upsertSession({ ...ROW, id: 'c2', sessionKind: 'headless' });
+    h.store.upsertSession({ ...ROW, id: 'c3', sessionKind: 'headless' });
+    h.store.upsertSession({ ...ROW, id: 'c4', sessionKind: null });
+    assert.deepEqual(h.store.countByKind({}), { interactive: 1, headless: 2, unknown: 1 });
+    assert.deepEqual(h.store.countByKind({ since: '2027-01-01T00:00:00.000Z' }),
+      { interactive: 0, headless: 0, unknown: 0 });
+  } finally { cleanup(h); }
+});
+
+test('recommendations round-trip their period and refresh it on upsert', () => {
+  const h = tmpStore();
+  try {
+    h.store.upsertRecommendations([REC], '2026-08-03T00:00:00.000Z');
+    const [first] = h.store.listRecommendations({});
+    assert.equal(first.periodFrom, REC.periodFrom);
+    assert.equal(first.periodTo, REC.periodTo);
+
+    h.store.upsertRecommendations(
+      [{ ...REC, periodFrom: '2026-07-28T00:00:00.000Z', periodTo: '2026-08-04T00:00:00.000Z' }],
+      '2026-08-04T00:00:00.000Z');
+    const [after] = h.store.listRecommendations({});
+    assert.equal(after.periodFrom, '2026-07-28T00:00:00.000Z', 'the period follows the latest scan');
   } finally { cleanup(h); }
 });

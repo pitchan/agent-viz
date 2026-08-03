@@ -7,10 +7,16 @@
 // do not use the same one.
 
 import * as api from './api.js';
-import { getState, subscribe, loadAnalysis, loadSession } from './store.js';
-import { formatUsd, formatTokens, formatBytes, formatDuration } from './format.js';
+import { getState, subscribe, loadAnalysis, loadSession, setIncludeMachine } from './store.js';
+import { formatUsd, formatTokens, formatBytes, formatDuration, basisLabel, periodHeader } from './format.js';
+import { initPeriodSelector } from './period-selector.js';
 
-const HEADERS = ['Session', 'Projet', 'Modèle', 'Coût', 'Jetons nets', 'Durée'];
+const HEADERS = ['Session', 'Projet', 'Modèle', 'Coût', 'Jetons nets', 'Durée', 'Type'];
+
+// A null kind is a pre-migration row (scanned before sessionKind existed):
+// it is shown as unknown, never as human.
+const KIND_BADGE = { interactive: 'humain', headless: 'machine', unknown: '?' };
+const kindBadgeOf = kind => KIND_BADGE[kind] ?? '?';
 
 export function sessionRow(session) {
   return [
@@ -20,6 +26,7 @@ export function sessionRow(session) {
     session.costComplete ? formatUsd(session.costUsd) : `${formatUsd(session.costUsd)} (partiel)`,
     formatTokens(session.netTokens),
     formatDuration(session.startedAt, session.endedAt),
+    kindBadgeOf(session.sessionKind),
   ];
 }
 
@@ -66,11 +73,15 @@ function buildTable(sessions) {
   for (const session of sessions) {
     const tr = document.createElement('tr');
     tr.dataset.sessionId = session.id;
-    for (const cell of sessionRow(session)) {
+    const cells = sessionRow(session);
+    cells.forEach((cell, i) => {
       const td = document.createElement('td');
       td.textContent = cell;
+      // Last cell is the kind badge — style it from the session, not the
+      // formatted string, since 'humain'/'machine'/'?' alone can't carry it.
+      if (i === cells.length - 1) td.className = `kind-badge kind-${session.sessionKind ?? 'unknown'}`;
       tr.appendChild(td);
-    }
+    });
     table.appendChild(tr);
   }
   return table;
@@ -83,11 +94,16 @@ function render() {
   const detail = document.getElementById('analysis-detail');
 
   if (state.error) { head.textContent = `Analyse indisponible : ${state.error}`; return; }
-  head.textContent = state.sessions.length
-    ? `${state.sessions.length} sessions analysées — cliquer une ligne pour le détail`
+  const { sessions, summary } = state;
+  head.textContent = sessions.length
+    ? [
+        `${sessions.length} sessions affichées — cliquer une ligne pour le détail`,
+        summary?.period ? periodHeader(summary.period) : '',
+        summary?.basis ? basisLabel(summary.basis) : '',
+      ].filter(Boolean).join(' — ')
     : 'Aucune session analysée sur la période.';
   list.textContent = '';
-  if (state.sessions.length) list.appendChild(buildTable(state.sessions));
+  if (sessions.length) list.appendChild(buildTable(sessions));
 
   detail.textContent = '';
   if (state.selectedSession) {
@@ -108,6 +124,13 @@ function render() {
 export function initAnalysis() {
   const panel = document.getElementById('analysis-overlay');
   subscribe(() => { if (panel.classList.contains('visible')) render(); });
+
+  initPeriodSelector(document.getElementById('analysis-period'), () => loadAnalysis(api));
+
+  document.getElementById('analysis-include-machine').addEventListener('change', e => {
+    setIncludeMachine(e.target.checked);
+    loadAnalysis(api);
+  });
 
   document.getElementById('btn-analysis').addEventListener('click', () => {
     panel.classList.toggle('visible');

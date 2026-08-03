@@ -77,6 +77,29 @@ test('several compactions of unknown volume agree in the plural', () => {
   assert.equal(lines.at(-1), '2 compactions dont le volume est inconnu (non comptées)');
 });
 
+test('R1 shows the earlyMcp line only when tokens are there, always with the étude label', () => {
+  const base = {
+    sessions: ['a'], prefixChangeTokens: 1000, dominantMarker: 'noMarker',
+    markerTokens: { modelSwitch: 0, toolsAppeared: 0, noMarker: 800 },
+    depthTokens: { facade: 800, d10to50: 0, d50to90: 0, tail: 0 }, dominantDepth: 'facade',
+    shareOfNetPercent: 12,
+  };
+  const withEarly = evidenceLines({ ruleId: 'R1',
+    evidence: { ...base, noMarkerDetailTokens: { earlyMcp: 600, other: 200 } } });
+  const line = withEarly.find(l => l.includes('début de session à serveurs MCP'));
+  assert.ok(line, 'the position line must appear');
+  assert.ok(line.includes('cause probable (étude'), 'the study label is mandatory');
+  assert.ok(line.includes('×6,3'), 'the correlation figure is named');
+
+  const without = evidenceLines({ ruleId: 'R1',
+    evidence: { ...base, noMarkerDetailTokens: { earlyMcp: 0, other: 800 } } });
+  assert.ok(!without.some(l => l.includes('serveurs MCP')), 'zero earlyMcp: no line');
+
+  const legacy = evidenceLines({ ruleId: 'R1', evidence: base });
+  assert.ok(!legacy.some(l => l.includes('serveurs MCP')),
+    'an M1-era evidence without the field never crashes nor lies');
+});
+
 test('an unknown rule still lists its session count instead of nothing', () => {
   assert.deepEqual(evidenceLines({ ruleId: 'RX', evidence: { sessions: ['a'] } }),
     ['1 session concernée']);

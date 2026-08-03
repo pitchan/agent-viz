@@ -2,8 +2,8 @@
 // so no server and no DOM are involved.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { getState, subscribe, loadAdvisor, loadAnalysis, loadSession, changeStatus, applyScanEvent, resetStore }
-  from '../../public/observatory/store.js';
+import { getState, subscribe, loadAdvisor, loadAnalysis, loadSession, changeStatus, applyScanEvent, resetStore,
+  setPeriodDays, setIncludeMachine } from '../../public/observatory/store.js';
 
 const SUMMARY = { sessions: 3, costUsd: 2, netTokens: 1000, costComplete: true,
   priceSource: 'netgain-table-embarquee' };
@@ -74,6 +74,36 @@ test('changeStatus refreshes the recommendations rather than patching them local
   await loadAdvisor(api);
   await changeStatus(api, 1, 'ignored');
   assert.equal(refreshes, 2, 'the server decides what the list becomes, not the page');
+});
+
+test('loadAdvisor passes the selected window and toggle to the api', async () => {
+  resetStore();
+  const calls = [];
+  const api = {
+    fetchSummary: opts => { calls.push(opts); return Promise.resolve({}); },
+    fetchRecommendations: () => Promise.resolve({ groups: [], stale: [] }),
+  };
+  setPeriodDays(7);
+  setIncludeMachine(true);
+  await loadAdvisor(api);
+  assert.deepEqual(calls[0], { days: 7, includeMachine: true });
+});
+
+test('loadAnalysis passes the same shared state', async () => {
+  resetStore();
+  const api = {
+    fetchSessions: opts => { assert.deepEqual(opts, { days: 90, includeMachine: false }); return Promise.resolve([]); },
+    fetchSummary: () => Promise.resolve({}),
+  };
+  setPeriodDays(90);
+  setIncludeMachine(false);
+  await loadAnalysis(api);
+});
+
+test('the defaults are 30 days, machines excluded', () => {
+  resetStore();
+  assert.equal(getState().periodDays, 30);
+  assert.equal(getState().includeMachine, false);
 });
 
 test('scan events update the progress and only the done phase is a completion', () => {

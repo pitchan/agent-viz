@@ -27,6 +27,12 @@ const EVIDENCE_BY_RULE = {
     `cause dominante : ${R1_MARKER_LABEL[e.dominantMarker]} (${formatTokens(e.markerTokens[e.dominantMarker])} jetons)`,
     `cassure ${R1_DEPTH_LABEL[e.dominantDepth]} (${formatTokens(e.depthTokens[e.dominantDepth])} jetons)`,
     `${Math.round(e.shareOfNetPercent)} % des jetons nets de ces sessions`,
+    // Absent from M1-era evidence: an optional detail, not a required field —
+    // shown only once it carries a real figure, never as a false zero.
+    ...(e.noMarkerDetailTokens && e.noMarkerDetailTokens.earlyMcp > 0 ? [
+      `dont cassures en début de session à serveurs MCP : ${formatTokens(e.noMarkerDetailTokens.earlyMcp)} jetons`
+      + ' — cause probable (étude : corrélation ×6,3 sur 1 700 sessions)',
+    ] : []),
   ],
   R2: e => [
     `chargé dans ${e.loadedSessions} sessions, appelé dans ${e.usedSessions}`,

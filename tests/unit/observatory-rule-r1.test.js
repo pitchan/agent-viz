@@ -35,6 +35,10 @@ function session(id, { project = 'F--proj', prefixChange = 0, compaction = 0, ex
             toolsAppeared: { events: 0, tokens: toolsAppeared },
             noMarker: { events: 0, tokens: noMarker },
           },
+          noMarkerDetail: {
+            earlyMcp: { events: 0, tokens: 0 },
+            other: { events: 0, tokens: 0 },
+          },
           depth: depth ?? {
             facade: { events: 0, tokens: 0 },
             d10to50: { events: 1, tokens: prefixChange },
@@ -183,6 +187,29 @@ test('the evidence carries where the prefix broke', () => {
   })]));
   assert.equal(recs[0].evidence.dominantDepth, 'd10to50');
   assert.equal(recs[0].evidence.depthTokens.facade, 10000);
+});
+
+test('R1 evidence carries the noMarkerDetail ventilation in tokens', () => {
+  const stat = (events, tokens) => ({ events, tokens });
+  // Qualifying session: prefixChange dominant (40000 >= compaction and expiration)
+  // and 40% of net (R1 threshold: 20%). The noMarker bucket splits 30000 / 10000.
+  const session = {
+    id: 'sess-early', project: 'F--dvf', netTokens: 100000, costUsd: 1, costComplete: true,
+    report: { context: {
+      churnCauses: {
+        prefixChange: stat(1, 40000), compaction: stat(0, 0), expiration: stat(0, 0),
+        growth: stat(0, 0), unknown: stat(0, 0),
+      },
+      prefixBreakdown: {
+        markers: { modelSwitch: stat(0, 0), toolsAppeared: stat(0, 0), noMarker: stat(1, 40000) },
+        noMarkerDetail: { earlyMcp: stat(2, 30000), other: stat(1, 10000) },
+        depth: { facade: stat(1, 40000), d10to50: stat(0, 0), d50to90: stat(0, 0), tail: stat(0, 0) },
+      },
+    } },
+  };
+  const recs = r1.evaluate({ sessions: [session], configItems: [] });
+  assert.equal(recs.length, 1);
+  assert.deepEqual(recs[0].evidence.noMarkerDetailTokens, { earlyMcp: 30000, other: 10000 });
 });
 
 test('the registry exposes R1 and evaluateAll routes through it', () => {

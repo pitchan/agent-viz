@@ -61,6 +61,8 @@ Deux pages s'ajoutent à la vue temps réel, accessibles depuis la barre d'outil
 - **Conseils** — les actions prioritaires, chacune adossée à un chiffre mesuré sur vos propres sessions : quel projet reconstruit son préfixe de cache en cours de route, quel serveur MCP est chargé partout mais jamais appelé, quelle commande imprime beaucoup et souvent, quels fichiers sont relus par plusieurs agents, quelles sessions sont compactées plusieurs fois, quels sous-agents partent sur des tâches trop courtes. Aucune économie n'est projetée : ce sont des coûts constatés sur la période.
 - **Sessions analysées** — le tableau des sessions mesurées (coût, jetons nets, durée, modèle dominant) avec le détail chiffré session par session.
 
+La fenêtre d'analyse se choisit dans l'en-tête (7, 30 ou 90 jours, 30 par défaut) et chaque carte affiche la période sur laquelle elle a été constatée. Les sessions machines (`claude -p`, scripts) sont scannées et badgées, mais jamais comptées dans les conseils ni dans les totaux par défaut ; un interrupteur les affiche à la demande, et le résumé annonce toujours l'assiette retenue (sessions humaines, machines exclues, indéterminées exclues). La base se migre seule à l'ouverture : une colonne nouvelle déclenche un re-scan complet au premier lancement, en tâche de fond, sans bloquer la vue temps réel.
+
 Trois points à savoir :
 
 - **Deux blocs, jamais un classement commun.** Certaines règles chiffrent de vrais jetons, d'autres partent d'octets convertis (≈ 4 octets par jeton). Les deux n'ont pas la même précision : la page les présente séparément et n'affiche **aucun total**, parce qu'une même session alimente plusieurs règles et serait comptée deux fois.

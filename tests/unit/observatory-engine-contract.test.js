@@ -43,6 +43,24 @@ test('the SessionReport shape the product consumes is present and typed', async 
   // moves the clock is seen rather than absorbed by R6's duration.
   assert.equal(r.endedAt, '2026-07-01T10:01:30.000Z');
 
+  // M1.1 — session shape. The M1 fixture prompt is a RAW STRING, so the
+  // engine must classify it headless: pinning that value proves the sort.
+  assert.equal(r.sessionKind, 'headless');
+
+  // M1.1 — silent-break ventilation: same shape as every ChurnCauseStat,
+  // and the sub-buckets always sum to the parent bucket (homogeneity rule).
+  const nm = r.context.prefixBreakdown.markers.noMarker;
+  assert.equal(typeof nm.tokens, 'number');
+  assert.equal(typeof nm.events, 'number');
+  for (const key of ['earlyMcp', 'other']) {
+    assert.equal(typeof r.context.prefixBreakdown.noMarkerDetail[key].tokens, 'number', `noMarkerDetail.${key}`);
+    assert.equal(typeof r.context.prefixBreakdown.noMarkerDetail[key].events, 'number');
+  }
+  assert.equal(
+    r.context.prefixBreakdown.noMarkerDetail.earlyMcp.tokens
+      + r.context.prefixBreakdown.noMarkerDetail.other.tokens,
+    nm.tokens);
+
   // Cost and tokens.
   assert.equal(typeof r.netTokens, 'number');
   assert.equal(typeof r.tokens.costUsd, 'number');
@@ -87,4 +105,13 @@ test('the SessionReport shape the product consumes is present and typed', async 
   // Honesty surface.
   assert.equal(typeof r.parseErrors, 'number');
   assert.equal(r.skipped, undefined);
+});
+
+test('a blocks-shaped prompt session is classified interactive', async () => {
+  const { discoverSessions, scanSession } = await loadEngine();
+  const refs = await discoverSessions(FIXTURE_CLAUDE_DIR, {});
+  const ref = refs.find(r => r.sessionId === 'sess-fixture-interactive');
+  assert.ok(ref, 'interactive fixture must be discoverable');
+  const r = await scanSession(ref, 100);
+  assert.equal(r.sessionKind, 'interactive');
 });

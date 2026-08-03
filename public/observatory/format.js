@@ -55,3 +55,31 @@ const BASIS_TITLES = {
 export function basisTitle(basis) {
   return BASIS_TITLES[basis] || basis;
 }
+
+/** JJ/MM local time — the observatory is a single-user local tool. */
+export function formatDayMonth(iso) {
+  const d = new Date(iso);
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/** Every card states its window; a card without one says so, never guesses. */
+export function periodLabel(rec) {
+  if (!rec.periodFrom || !rec.periodTo) return 'période du constat non enregistrée (re-scanner)';
+  return `constaté du ${formatDayMonth(rec.periodFrom)} au ${formatDayMonth(rec.periodTo)}`;
+}
+
+// Shared by both observatory pages (Conseils, Sessions analysées): one
+// wording for the announced basis, not one per view.
+export function basisLabel(basis) {
+  if (!basis) return '';
+  const { counts, includeMachine } = basis;
+  const machines = includeMachine
+    ? `${counts.headless} machines incluses · ${counts.unknown} indéterminées incluses`
+    : `${counts.headless} machines exclues · ${counts.unknown} indéterminées exclues`;
+  return `${counts.interactive} sessions humaines · ${machines}`;
+}
+
+export function periodHeader(period) {
+  if (!period) return '';
+  return `Fenêtre : ${period.days} j — du ${formatDayMonth(period.from)} au ${formatDayMonth(period.to)}`;
+}
