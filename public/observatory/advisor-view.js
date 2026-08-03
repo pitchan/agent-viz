@@ -12,6 +12,7 @@ import {
 } from './format.js';
 import { evidenceLines } from './evidence.js';
 import { initPeriodSelector } from './period-selector.js';
+import { initConfirmButton } from './confirm-button.js';
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -116,6 +117,17 @@ export function initAdvisor() {
     api.requestScan({ days: getState().periodDays }).catch(() => {
       /* progress and errors arrive on the SSE stream */
     });
+  });
+
+  // Purge = the documented file deletion done from inside, behind a two-step
+  // confirmation; the rebuild scan reports its progress on the SSE stream.
+  initConfirmButton(document.getElementById('advisor-purge'), {
+    armedLabel: 'Confirmer la purge ?',
+    onConfirm: () => {
+      api.requestPurge({ days: getState().periodDays }).catch(() => {
+        /* progress and errors arrive on the SSE stream */
+      });
+    },
   });
 
   document.getElementById('advisor-list').addEventListener('click', e => {

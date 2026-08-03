@@ -69,7 +69,7 @@ Trois points à savoir :
 - **Deux sources de prix coexistent.** La vue temps réel utilise la table de tarifs rafraîchie en ligne, les pages d'analyse celle embarquée dans le moteur. Chaque page nomme la sienne ; aucun chiffre ne mélange les deux. Une session dont le modèle n'a pas de tarif connu est marquée « partiel », jamais arrondie à zéro en silence.
 - **Métadonnées uniquement.** Aucun contenu de prompt, de fichier, de sortie d'outil ni de commande n'est conservé — seulement des compteurs, des tailles et des noms d'outils.
 
-La base `~/.agent-viz/observatory.db` est un **dérivé jetable** : les transcripts restent la source de vérité, et la supprimer ne perd que les statuts « j'applique / ignorer » que vous avez posés sur les recommandations — elle se reconstruit au scan suivant (au démarrage, puis toutes les heures).
+La base `~/.agent-viz/observatory.db` est un **dérivé jetable** : les transcripts restent la source de vérité, et la supprimer ne perd que les statuts « j'applique / ignorer » que vous avez posés sur les recommandations — elle se reconstruit au scan suivant (au démarrage, puis toutes les heures). Le bouton « Purger la base » de la page Conseils fait ce geste sans toucher au fichier : il vide la base (après confirmation) puis relance un scan complet.
 
 L'analyse repose sur le moteur `@vcueto/netgain`, **lié localement** (`npm link @vcueto/netgain`) et volontairement absent de `dependencies` : il n'est pas publié, et le déclarer casserait `npm install` pour les utilisateurs de ce dépôt. Sans lui, les deux pages affichent l'erreur exacte et **la vue temps réel continue de fonctionner normalement**.
 
