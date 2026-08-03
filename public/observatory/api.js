@@ -20,18 +20,34 @@ async function postJson(url) {
   return body;
 }
 
-export const fetchSummary = () => getJson('/analysis/summary');
-
-export function fetchSessions({ project, since } = {}) {
+// The 7/30/90 window and the human/machine toggle, shared by every windowed
+// call below — the server clamps and defaults the window on its own.
+const windowParams = ({ days, includeMachine } = {}) => {
   const params = new URLSearchParams();
+  if (days) params.set('days', String(days));
+  if (includeMachine) params.set('includeMachine', '1');
+  return params;
+};
+
+export function fetchSummary(opts = {}) {
+  const q = windowParams(opts).toString();
+  return getJson(`/analysis/summary${q ? `?${q}` : ''}`);
+}
+
+export function fetchSessions({ project, days, includeMachine } = {}) {
+  const params = windowParams({ days, includeMachine });
   if (project) params.set('project', project);
-  if (since) params.set('since', since);
-  const query = params.toString();
-  return getJson(`/analysis/sessions${query ? `?${query}` : ''}`);
+  const q = params.toString();
+  return getJson(`/analysis/sessions${q ? `?${q}` : ''}`);
 }
 
 export const fetchSession = id => getJson(`/analysis/session/${encodeURIComponent(id)}`);
-export const requestScan = () => postJson('/analysis/scan');
+
+export function requestScan(opts = {}) {
+  const q = windowParams(opts).toString();
+  return postJson(`/analysis/scan${q ? `?${q}` : ''}`);
+}
+
 export const fetchConfigAudit = () => getJson('/config/audit');
 export const fetchRecommendations = () => getJson('/recommendations');
 export const setRecommendationStatus = (id, status) =>

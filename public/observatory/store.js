@@ -13,6 +13,8 @@ const EMPTY = () => ({
   scanJustFinished: false,
   loading: false,
   error: null,
+  periodDays: 30,
+  includeMachine: false,
 });
 
 let state = EMPTY();
@@ -53,14 +55,30 @@ async function run(work) {
   }
 }
 
+// The window and the human/machine toggle are shared by both pages — a
+// single logical selector, not one per view (period-selector.js renders it).
+export const setPeriodDays = days => patch({ periodDays: days });
+export const setIncludeMachine = flag => patch({ includeMachine: flag });
+
 export const loadAdvisor = api => run(async () => {
+  const { periodDays, includeMachine } = getState();
   const [summary, recommendations] = await Promise.all([
-    api.fetchSummary(), api.fetchRecommendations(),
+    api.fetchSummary({ days: periodDays, includeMachine }),
+    api.fetchRecommendations(),
   ]);
   return { summary, recommendations, scanJustFinished: false };
 });
 
-export const loadAnalysis = api => run(async () => ({ sessions: await api.fetchSessions() }));
+// The summary rides along so the Sessions page can announce the same basis
+// (human/machine, period) as the Advice page, without a second round trip.
+export const loadAnalysis = api => run(async () => {
+  const { periodDays, includeMachine } = getState();
+  const [sessions, summary] = await Promise.all([
+    api.fetchSessions({ days: periodDays, includeMachine }),
+    api.fetchSummary({ days: periodDays, includeMachine }),
+  ]);
+  return { sessions, summary };
+});
 
 export const loadSession = (api, id) => run(async () => ({ selectedSession: await api.fetchSession(id) }));
 
