@@ -3,12 +3,25 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { sessionRow, drillDownLines } from '../../public/observatory/analysis-view.js';
 
-test('a session row carries id, project, model, cost, tokens and duration', () => {
+test('a session row carries id, project, model, cost, tokens, duration and kind — 7 cells', () => {
   assert.deepEqual(sessionRow({
     id: 'sess-abcdef12', project: 'F--proj', modelMain: 'claude-opus-4-8',
     costUsd: 1.5, costComplete: true, netTokens: 1200000,
     startedAt: '2026-07-01T10:00:00.000Z', endedAt: '2026-07-01T10:30:00.000Z',
-  }), ['sess-abc', 'F--proj', 'claude-opus-4-8', '1,50 $', '1.2M', '30 min']);
+    sessionKind: 'interactive',
+  }), ['sess-abc', 'F--proj', 'claude-opus-4-8', '1,50 $', '1.2M', '30 min', 'humain']);
+});
+
+test('sessionRow shows the kind badge — headless → machine, null/unknown → ?', () => {
+  const base = {
+    id: 's', project: 'p', modelMain: 'm', costUsd: 1, costComplete: true, netTokens: 10,
+    startedAt: null, endedAt: null,
+  };
+  assert.equal(sessionRow({ ...base, sessionKind: 'headless' }).length, 7);
+  assert.equal(sessionRow({ ...base, sessionKind: 'headless' })[6], 'machine');
+  // A null kind is a pre-migration row: never displayed as human.
+  assert.equal(sessionRow({ ...base, sessionKind: null })[6], '?');
+  assert.equal(sessionRow({ ...base, sessionKind: 'unknown' })[6], '?');
 });
 
 test('a partially-priced session is marked in its cost cell', () => {
