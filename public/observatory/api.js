@@ -48,6 +48,11 @@ export function requestScan(opts = {}) {
   return postJson(`/analysis/scan${q ? `?${q}` : ''}`);
 }
 
+export function requestPurge(opts = {}) {
+  const q = windowParams(opts).toString();
+  return postJson(`/analysis/purge${q ? `?${q}` : ''}`);
+}
+
 export const fetchConfigAudit = () => getJson('/config/audit');
 export const fetchRecommendations = () => getJson('/recommendations');
 export const setRecommendationStatus = (id, status) =>

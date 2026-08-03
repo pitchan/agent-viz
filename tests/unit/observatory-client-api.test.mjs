@@ -3,7 +3,7 @@
 // without a real server.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fetchSummary, fetchSessions, requestScan } from '../../public/observatory/api.js';
+import { fetchSummary, fetchSessions, requestScan, requestPurge } from '../../public/observatory/api.js';
 
 function stubFetch(body = {}) {
   const calls = [];
@@ -61,6 +61,17 @@ test('requestScan with no window omits the query string', async () => {
   try {
     await requestScan();
     assert.equal(calls[0].url, '/analysis/scan');
+  } finally {
+    restore();
+  }
+});
+
+test('requestPurge posts to /analysis/purge with only days', async () => {
+  const { calls, restore } = stubFetch({ purged: true, started: true });
+  try {
+    await requestPurge({ days: 30 });
+    assert.equal(calls[0].url, '/analysis/purge?days=30');
+    assert.equal(calls[0].opts.method, 'POST');
   } finally {
     restore();
   }
