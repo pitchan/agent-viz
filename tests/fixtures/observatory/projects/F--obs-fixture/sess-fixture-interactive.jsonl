@@ -1,0 +1,2 @@
+{"type":"user","message":{"role":"user","content":[{"type":"text","text":"analyse le projet"}]},"timestamp":"2026-07-02T09:00:00.000Z","cwd":"F:\\obs-fixture","version":"2.1.201"}
+{"type":"assistant","message":{"role":"assistant","id":"i1","model":"claude-opus-4-8","content":[],"usage":{"input_tokens":100,"output_tokens":30,"cache_creation_input_tokens":2000,"cache_read_input_tokens":0}},"timestamp":"2026-07-02T09:00:05.000Z"}
