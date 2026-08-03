@@ -191,8 +191,8 @@ test('the evidence carries where the prefix broke', () => {
 
 test('R1 evidence carries the noMarkerDetail ventilation in tokens', () => {
   const stat = (events, tokens) => ({ events, tokens });
-  // Session qualifiante : prefixChange dominant (40 000 ≥ compaction et expiration)
-  // et 40 % du net (seuil R1 : 20 %). Le seau noMarker se ventile 30 000 / 10 000.
+  // Qualifying session: prefixChange dominant (40000 >= compaction and expiration)
+  // and 40% of net (R1 threshold: 20%). The noMarker bucket splits 30000 / 10000.
   const session = {
     id: 'sess-early', project: 'F--dvf', netTokens: 100000, costUsd: 1, costComplete: true,
     report: { context: {
