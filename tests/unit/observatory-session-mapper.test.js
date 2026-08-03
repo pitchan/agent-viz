@@ -60,3 +60,16 @@ test('toAnalysedSession is the exact inverse for everything the rules read', () 
       endedAt: '2026-07-01T10:20:00.000Z', netTokens: 1000, costUsd: 0.5, costComplete: true });
   assert.equal(analysed.report.sessionId, 's1');
 });
+
+test('toSessionRow carries the engine sessionKind and toAnalysedSession restores it', () => {
+  const report = {
+    sessionId: 's-kind', projectSlug: 'F--p', startedAt: null, endedAt: null,
+    sessionKind: 'headless', netTokens: 1,
+    tokens: { perModel: {}, costUsd: 0, costComplete: true },
+  };
+  const ref = { mainPath: 'F:\\x.jsonl', mtime: new Date(0), sizeBytes: 1 };
+  const row = toSessionRow(report, ref, 2);
+  assert.equal(row.sessionKind, 'headless');
+  const back = toAnalysedSession({ ...row, reportJson: JSON.stringify(report) });
+  assert.equal(back.sessionKind, 'headless');
+});
