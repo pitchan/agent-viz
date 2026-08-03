@@ -7,8 +7,11 @@
 
 import * as api from './api.js';
 import { getState, subscribe, loadAdvisor, changeStatus, applyScanEvent } from './store.js';
-import { formatUsd, formatTokens, confidenceLabel, costLabel, basisTitle } from './format.js';
+import {
+  formatUsd, formatTokens, confidenceLabel, costLabel, basisTitle, periodLabel, basisLabel, periodHeader,
+} from './format.js';
 import { evidenceLines } from './evidence.js';
+import { initPeriodSelector } from './period-selector.js';
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -23,6 +26,7 @@ function recommendationCard(rec, { actionable }) {
   card.append(
     el('div', 'advisor-card-title', rec.title),
     el('div', 'advisor-card-meta', `${confidenceLabel(rec.confidence)} · ${costLabel(rec)}`),
+    el('div', 'advisor-card-period', periodLabel(rec)),
     el('div', 'advisor-card-action', rec.action),
   );
 
@@ -44,12 +48,17 @@ function recommendationCard(rec, { actionable }) {
 }
 
 function renderSummary(node, summary) {
-  if (!summary) { node.textContent = ''; return; }
+  node.textContent = '';
+  if (!summary) return;
+  node.append(
+    el('div', 'advisor-summary-period', periodHeader(summary.period)),
+    el('div', 'advisor-summary-basis', basisLabel(summary.basis)),
+  );
   const partial = summary.costComplete ? '' : ' · coût partiel';
-  node.textContent = `${summary.sessions} sessions · ${formatUsd(summary.costUsd)}`
+  node.appendChild(el('div', null, `${summary.sessions} sessions · ${formatUsd(summary.costUsd)}`
     + ` · ${formatTokens(summary.netTokens)} jetons nets`
     + ` · ${formatTokens(summary.cacheReadTokens)} relus depuis le cache${partial}`
-    + ` · prix : ${summary.priceSource}`;
+    + ` · prix : ${summary.priceSource}`));
 }
 
 function renderList(node, { groups, stale }) {
@@ -92,6 +101,8 @@ export function initAdvisor() {
   const panel = document.getElementById('advisor-overlay');
   subscribe(() => { if (panel.classList.contains('visible')) render(); });
 
+  initPeriodSelector(document.getElementById('advisor-period'), () => loadAdvisor(api));
+
   document.getElementById('btn-advisor').addEventListener('click', () => {
     panel.classList.toggle('visible');
     if (panel.classList.contains('visible')) loadAdvisor(api);
@@ -102,7 +113,9 @@ export function initAdvisor() {
   });
 
   document.getElementById('advisor-rescan').addEventListener('click', () => {
-    api.requestScan().catch(() => { /* progress and errors arrive on the SSE stream */ });
+    api.requestScan({ days: getState().periodDays }).catch(() => {
+      /* progress and errors arrive on the SSE stream */
+    });
   });
 
   document.getElementById('advisor-list').addEventListener('click', e => {

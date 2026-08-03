@@ -442,3 +442,11 @@ canvas { display: block; width: 100%; height: 100%; }
 #analysis-detail { margin-top: 16px; font-size: 11px; color: var(--text-dim); }
 .analysis-detail-title { font-weight: 600; color: var(--text-primary); margin-bottom: 6px; }
 #analysis-detail ul { margin: 0 0 0 16px; }
+.period-selector { display: flex; gap: 6px; margin: 8px 0; }
+.period-btn {
+  padding: 3px 10px; font-size: 12px; cursor: pointer;
+  background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px; color: var(--text-dim);
+}
+.period-btn.active { color: var(--text-primary); border-color: rgba(255, 255, 255, 0.4); }
+.advisor-card-period { font-size: 11px; color: var(--text-dim); margin-top: 2px; }

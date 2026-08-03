@@ -1,8 +1,10 @@
 // Formatters for the observatory pages. Pure — no DOM, no fetch.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatUsd, formatBytes, formatDuration, confidenceLabel, costBasisLabel, costLabel, basisTitle }
-  from '../../public/observatory/format.js';
+import {
+  formatUsd, formatBytes, formatDuration, confidenceLabel, costBasisLabel, costLabel, basisTitle,
+  formatDayMonth, periodLabel, basisLabel, periodHeader,
+} from '../../public/observatory/format.js';
 
 test('formatUsd uses a French decimal comma and two digits', () => {
   assert.equal(formatUsd(0.4213), '0,42 $');
@@ -53,6 +55,36 @@ test('each basis block has a title that warns against comparing across blocks', 
   assert.match(basisTitle('jetons-mesures'), /jetons mesurés/i);
   assert.match(basisTitle('octets-approx-4o-par-jeton'), /estimé/i);
   assert.notEqual(basisTitle('jetons-mesures'), basisTitle('octets-approx-4o-par-jeton'));
+});
+
+test('formatDayMonth renders JJ/MM', () => {
+  // Midday timestamp: no timezone edge can move the date (anti-flaky).
+  assert.equal(formatDayMonth('2026-08-03T12:00:00.000Z'), '03/08');
+});
+
+test('periodLabel says the window, or says it does not know', () => {
+  assert.equal(
+    periodLabel({ periodFrom: '2026-07-04T12:00:00.000Z', periodTo: '2026-08-03T12:00:00.000Z' }),
+    'constaté du 04/07 au 03/08');
+  assert.equal(periodLabel({ periodFrom: null, periodTo: null }),
+    'période du constat non enregistrée (re-scanner)');
+});
+
+test('basisLabel states the human/machine composition of the announced basis', () => {
+  assert.equal(
+    basisLabel({ counts: { interactive: 12, headless: 640, unknown: 3 }, includeMachine: false }),
+    '12 sessions humaines · 640 machines exclues · 3 indéterminées exclues');
+  assert.equal(
+    basisLabel({ counts: { interactive: 12, headless: 640, unknown: 3 }, includeMachine: true }),
+    '12 sessions humaines · 640 machines incluses · 3 indéterminées incluses');
+  assert.equal(basisLabel(null), '');
+});
+
+test('periodHeader names the window and its bounds', () => {
+  assert.equal(
+    periodHeader({ days: 30, from: '2026-07-04T12:00:00.000Z', to: '2026-08-03T12:00:00.000Z' }),
+    'Fenêtre : 30 j — du 04/07 au 03/08');
+  assert.equal(periodHeader(null), '');
 });
 
 // formatTokens is not redefined by the observatory — it is re-exported from
