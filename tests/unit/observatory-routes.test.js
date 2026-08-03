@@ -1,5 +1,5 @@
 'use strict';
-// The seven analysis endpoints: response shapes, guards, and the missing-engine
+// The eight analysis endpoints: response shapes, guards, and the missing-engine
 // path. The service is injected, so no SQLite file and no engine are needed.
 
 const { test } = require('node:test');
@@ -22,6 +22,7 @@ const SERVICE = {
   sessions: async () => [{ id: 's1', project: 'F--proj', costUsd: 1 }],
   session: async id => (id === 's1' ? { id: 's1', report: { sessionId: 's1' } } : null),
   scan: async () => ({ discovered: 2, scanned: 2, skipped: 0, failed: 0 }),
+  purge: async () => {},
   configAudit: async () => ({ items: [{ kind: 'mcp', name: 'x', scope: 'user', detail: {} }],
     usage: { x: { calls: 0, sessions: 0 } }, sessions: 3 }),
   recommendations: async () => ({ groups: [{ basis: 'jetons-mesures', priority: [{ id: 1 }], all: [{ id: 1 }] }],
@@ -42,20 +43,20 @@ function router(service = SERVICE) {
   };
 }
 
-test('the seven analysis routes are declared with their methods', () => {
+test('the eight analysis routes are declared with their methods', () => {
   const declared = createObservatoryRoutes(() => SERVICE)
     .map(r => `${r.method} ${r.path || r.prefix}`).sort();
   assert.deepEqual(declared, [
     'GET /analysis/session/', 'GET /analysis/sessions', 'GET /analysis/summary',
     'GET /config/audit', 'GET /recommendations',
-    'POST /analysis/scan', 'POST /recommendations/',
+    'POST /analysis/purge', 'POST /analysis/scan', 'POST /recommendations/',
   ]);
 });
 
 test('mutating routes are guarded by sameOrigin', () => {
   const guarded = createObservatoryRoutes(() => SERVICE)
     .filter(r => r.sameOrigin).map(r => r.path || r.prefix).sort();
-  assert.deepEqual(guarded, ['/analysis/scan', '/recommendations/']);
+  assert.deepEqual(guarded, ['/analysis/purge', '/analysis/scan', '/recommendations/']);
 });
 
 test('GET /analysis/summary returns the period totals and names its price source', async () => {
@@ -152,4 +153,31 @@ test('a missing engine answers 503 with the exact error, never an empty page', a
   const res = await router(broken)('GET', '/analysis/summary');
   assert.equal(res.statusCode, 503);
   assert.match(JSON.parse(res.body).error, /@vcueto\/netgain/);
+});
+
+test('POST /analysis/purge wipes first, then starts a rebuild scan with the window', async () => {
+  const events = [];
+  const spy = {
+    ...SERVICE,
+    purge: async () => { events.push('purge'); },
+    scan: async opts => { events.push(['scan', opts]); return {}; },
+  };
+  const res = await router(spy)('POST', '/analysis/purge?days=7');
+  assert.equal(res.statusCode, 202);
+  assert.deepEqual(JSON.parse(res.body), { purged: true, started: true });
+  assert.deepEqual(events, ['purge', ['scan', { days: 7 }]]);
+});
+
+test('POST /analysis/purge answers 503 and never scans when the engine is missing', async () => {
+  let scanned = false;
+  const missing = new Error('netgain introuvable');
+  missing.engineMissing = true;
+  const spy = {
+    ...SERVICE,
+    purge: async () => { throw missing; },
+    scan: async () => { scanned = true; },
+  };
+  const res = await router(spy)('POST', '/analysis/purge');
+  assert.equal(res.statusCode, 503);
+  assert.equal(scanned, false);
 });
