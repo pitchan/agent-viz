@@ -55,3 +55,11 @@ test('the scan date and engine state travel with the totals', () => {
   assert.equal(s.lastScanAt, '2026-07-15T12:00:00.000Z');
   assert.deepEqual(s.engine, { ok: true, error: null });
 });
+
+test('computeSummary carries the announced basis and the period untouched', () => {
+  const basis = { counts: { interactive: 12, headless: 640, unknown: 3 }, includeMachine: false };
+  const period = { from: '2026-07-04T00:00:00.000Z', to: '2026-08-03T00:00:00.000Z', days: 30 };
+  const out = computeSummary([], { lastScanAt: null, engine: null, basis, period });
+  assert.deepEqual(out.basis, basis);
+  assert.deepEqual(out.period, period);
+});
