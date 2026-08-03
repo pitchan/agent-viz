@@ -191,3 +191,27 @@ test('recommendations round-trip their period and refresh it on upsert', () => {
     assert.equal(after.periodFrom, '2026-07-28T00:00:00.000Z', 'the period follows the latest scan');
   } finally { cleanup(h); }
 });
+
+test('purge empties every table and the store stays usable', () => {
+  const h = tmpStore();
+  try {
+    h.store.upsertSession(ROW);
+    h.store.replaceConfigItems('2026-08-04T00:00:00.000Z',
+      [{ kind: 'mcp', name: 'x', scope: 'user', detail: {} }]);
+    h.store.upsertRecommendations([{
+      ruleId: 'r1', subject: 's', title: 't', category: 'c', confidence: 'haute',
+      estimatedCostUsd: 1, costBasis: 'b', periodFrom: 'f', periodTo: 'to',
+      evidence: {}, action: 'a',
+    }], '2026-08-04T00:00:00.000Z');
+    h.store.setScanState('C:\\claude', '2026-08-04T00:00:00.000Z', '0.12.0');
+
+    h.store.purge();
+
+    assert.deepEqual(h.store.listSessions({}), []);
+    assert.deepEqual(h.store.listConfigItems(), []);
+    assert.deepEqual(h.store.listRecommendations({}), []);
+    assert.equal(h.store.getScanState('C:\\claude'), null);
+    h.store.upsertSession(ROW);
+    assert.equal(h.store.listSessions({}).length, 1);
+  } finally { cleanup(h); }
+});
