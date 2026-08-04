@@ -150,3 +150,77 @@ test('_setPricesForTest overrides without mutating the FALLBACK constant', () =>
   // Restore to fallback so later tests in the same process aren't polluted.
   _setPricesForTest({});
 });
+
+test('FALLBACK covers the Claude 5 family and Opus 4.8 (2026 rate card, sticker prices)', () => {
+  // A missing entry made the observatory report ~$24 of 1h-cache rewrite on
+  // Fable 5 as $0.02 — the fallback must price the current family offline.
+  const fable = getPrice('claude-fable-5');
+  assert.ok(fable, 'fable-5 must resolve from the static fallback');
+  assert.equal(fable.input, 1e-5);
+  assert.equal(fable.output, 5e-5);
+  assert.equal(fable.cacheCreate, 1.25e-5);
+  assert.equal(fable.cacheRead, 1e-6);
+  assert.equal(fable.label, 'Fable 5');
+
+  const mythos = getPrice('claude-mythos-5');
+  assert.ok(mythos, 'mythos-5 must resolve (same rates as fable-5)');
+  assert.equal(mythos.input, 1e-5);
+
+  const opus5 = getPrice('claude-opus-5');
+  assert.ok(opus5, 'opus-5 must resolve');
+  assert.equal(opus5.input, 5e-6);
+  assert.equal(opus5.output, 2.5e-5);
+  assert.equal(opus5.label, 'Opus 5');
+
+  // Sonnet 5: sticker price 3/15, NOT the 2/10 intro rate expiring 2026-08-31 —
+  // keeps AVANT/APRÈS scans on one rate card.
+  const sonnet5 = getPrice('claude-sonnet-5');
+  assert.ok(sonnet5, 'sonnet-5 must resolve');
+  assert.equal(sonnet5.input, 3e-6);
+  assert.equal(sonnet5.output, 1.5e-5);
+  assert.equal(sonnet5.label, 'Sonnet 5');
+
+  const opus48 = getPrice('claude-opus-4-8');
+  assert.ok(opus48, 'opus-4-8 must resolve (was missing from the fallback)');
+  assert.equal(opus48.input, 5e-6);
+  assert.equal(opus48.label, 'Opus 4.8');
+});
+
+test('computeCost prices 1.2M tokens of 1h cache on fable-5 at ~$24 (not $0.02)', () => {
+  const cost = computeCost({
+    input_tokens: 0, output_tokens: 0,
+    cache_creation_input_tokens: 1_200_000,
+    cache_read_input_tokens: 0,
+    cache_creation: { ephemeral_5m_input_tokens: 0, ephemeral_1h_input_tokens: 1_200_000 },
+  }, 'claude-fable-5');
+  // 1_200_000 * (1e-5 * 2) = 24.0
+  assert.ok(Math.abs(cost - 24.0) < 1e-9, `got ${cost}`);
+});
+
+test('normalizeId strips the [1m] context-window suffix (netgain mirror)', () => {
+  assert.equal(normalizeId('claude-fable-5[1m]'), 'claude-fable-5');
+  assert.equal(normalizeId('claude-opus-4-8[1m]'), 'claude-opus-4-8');
+});
+
+test('ingestLitellm accepts fable/mythos ids and derives single-digit labels', () => {
+  // The old filter regex only matched claude-(opus|sonnet|haiku)- : a LiteLLM
+  // feed carrying claude-fable-5 was silently discarded even when reachable.
+  // Feed prices that DIFFER from the fallback to prove the entry was ingested.
+  const { _internals } = require('../../lib/server/pricing');
+  const entry = {
+    output_cost_per_token: 6e-5,
+    cache_creation_input_token_cost: 2.5e-5,
+    cache_read_input_token_cost: 2e-6,
+    max_input_tokens: 1_000_000,
+  };
+  _internals.ingestLitellm({
+    'claude-fable-5': { ...entry, input_cost_per_token: 2e-5 },
+    'claude-opus-5': { ...entry, input_cost_per_token: 6e-6 },
+  });
+  assert.equal(getPrice('claude-fable-5').input, 2e-5, 'ingested fable entry must override fallback');
+  assert.equal(getPrice('claude-fable-5').label, 'Fable 5');
+  assert.equal(getPrice('claude-opus-5').input, 6e-6, 'ingested opus-5 entry must override fallback');
+  assert.equal(getPrice('claude-opus-5').label, 'Opus 5');
+  // Restore so later tests aren't polluted.
+  _setPricesForTest({});
+});
