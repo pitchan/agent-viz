@@ -34,6 +34,15 @@ test('accumulateUsage cumulates totals AND tracks the last message values', () =
   assert.equal(b.lastCacheRead, 1500);
 });
 
+test('accumulateUsage prices each message at its own timestamp, not at scan time', () => {
+  // sonnet-5 changes tariff on 2026-09-01 (intro 2 $/M -> sticker 3 $/M input).
+  // A September-dated message must be billed at the sticker rate even when the
+  // accumulation runs during the intro window.
+  const b = newBucket();
+  accumulateUsage(b, { input_tokens: 1000 }, 'claude-sonnet-5', 'm1', '2026-09-15T10:00:00.000Z');
+  assert.ok(Math.abs(b.costUsd - 0.003) < 1e-12, `got ${b.costUsd}, expected 0.003 (sticker)`);
+});
+
 test('newBucket exposes pricing fields zeroed out', () => {
   const b = newBucket();
   assert.equal(b.lastModel, null);

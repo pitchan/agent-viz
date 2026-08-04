@@ -42,6 +42,30 @@ test('main-thread assistant line populates main bucket with model + cost', () =>
   assert.ok(Math.abs(rec.tokens.main.costUsd - 0.0105) < 1e-9, `got ${rec.tokens.main.costUsd}`);
 });
 
+test('main-thread line is billed at the tariff in effect at its timestamp', () => {
+  // The transcript line carries `timestamp`; it must travel down to pricing so
+  // a September sonnet-5 message costs sticker rate (3e-6/token input) even if
+  // the transcript is (re)parsed during the intro-price window.
+  const rec = freshRec();
+  const line = JSON.stringify({
+    type: 'assistant',
+    isSidechain: false,
+    timestamp: '2026-09-15T10:00:00.000Z',
+    message: {
+      model: 'claude-sonnet-5',
+      usage: {
+        input_tokens: 1000, output_tokens: 0,
+        cache_creation_input_tokens: 0, cache_read_input_tokens: 0,
+      },
+    },
+  });
+  assert.equal(parseTranscriptEvent(line, rec), true);
+  assert.ok(
+    Math.abs(rec.tokens.main.costUsd - 0.003) < 1e-12,
+    `got ${rec.tokens.main.costUsd}, expected 0.003 (sticker rate at message date)`,
+  );
+});
+
 test('subagent agent_progress line populates perAgent bucket with model + cost', () => {
   const rec = freshRec();
   const line = JSON.stringify({

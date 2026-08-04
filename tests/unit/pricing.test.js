@@ -151,7 +151,7 @@ test('_setPricesForTest overrides without mutating the FALLBACK constant', () =>
   _setPricesForTest({});
 });
 
-test('FALLBACK covers the Claude 5 family and Opus 4.8 (2026 rate card, sticker prices)', () => {
+test('FALLBACK covers the Claude 5 family and Opus 4.8 (2026 rate card)', () => {
   // A missing entry made the observatory report ~$24 of 1h-cache rewrite on
   // Fable 5 as $0.02 — the fallback must price the current family offline.
   const fable = getPrice('claude-fable-5');
@@ -172,9 +172,9 @@ test('FALLBACK covers the Claude 5 family and Opus 4.8 (2026 rate card, sticker 
   assert.equal(opus5.output, 2.5e-5);
   assert.equal(opus5.label, 'Opus 5');
 
-  // Sonnet 5: sticker price 3/15, NOT the 2/10 intro rate expiring 2026-08-31 —
-  // keeps AVANT/APRÈS scans on one rate card.
-  const sonnet5 = getPrice('claude-sonnet-5');
+  // Sonnet 5 current (sticker) rates — an explicit post-2026-09-01 date pins
+  // the assertion; the intro period is covered by the dated-tariff tests.
+  const sonnet5 = getPrice('claude-sonnet-5', '2026-09-01T00:00:00.000Z');
   assert.ok(sonnet5, 'sonnet-5 must resolve');
   assert.equal(sonnet5.input, 3e-6);
   assert.equal(sonnet5.output, 1.5e-5);
@@ -200,6 +200,42 @@ test('computeCost prices 1.2M tokens of 1h cache on fable-5 at ~$24 (not $0.02)'
 test('normalizeId strips the [1m] context-window suffix (netgain mirror)', () => {
   assert.equal(normalizeId('claude-fable-5[1m]'), 'claude-fable-5');
   assert.equal(normalizeId('claude-opus-4-8[1m]'), 'claude-opus-4-8');
+});
+
+test('getPrice resolves the tariff in effect at the given date (sonnet-5 intro until 2026-08-31)', () => {
+  // Tariffs change over time; the price map keeps a dated history so a message
+  // is billed at the rate in effect when it was produced, not at scan time.
+  const aug = getPrice('claude-sonnet-5', '2026-08-15T00:00:00.000Z');
+  assert.equal(aug.input, 2e-6, 'August = intro rate 2 $/M');
+  assert.equal(aug.output, 1e-5);
+  assert.equal(aug.cacheCreate, 2.5e-6);
+  assert.equal(aug.cacheRead, 2e-7);
+  // Non-rate fields are inherited from the current entry.
+  assert.equal(aug.label, 'Sonnet 5');
+  assert.equal(aug.maxInput, 1_000_000);
+
+  const sept = getPrice('claude-sonnet-5', '2026-09-01T00:00:00.000Z');
+  assert.equal(sept.input, 3e-6, 'from 2026-09-01 = sticker rate 3 $/M');
+  assert.equal(sept.output, 1.5e-5);
+
+  // A model with no tariff change ignores the date entirely.
+  assert.equal(getPrice('claude-fable-5', '2026-08-15T00:00:00.000Z').input, 1e-5);
+  assert.equal(getPrice('claude-fable-5', '2027-01-01T00:00:00.000Z').input, 1e-5);
+});
+
+test('getPrice without a date means "now" (same result as an explicit current timestamp)', () => {
+  assert.equal(
+    getPrice('claude-sonnet-5').input,
+    getPrice('claude-sonnet-5', new Date().toISOString()).input,
+  );
+});
+
+test('computeCost with a model string honors the message date', () => {
+  const usage = { input_tokens: 1000, output_tokens: 0 };
+  const aug = computeCost(usage, 'claude-sonnet-5', '2026-08-15T00:00:00.000Z');
+  const sept = computeCost(usage, 'claude-sonnet-5', '2026-09-15T00:00:00.000Z');
+  assert.ok(Math.abs(aug - 0.002) < 1e-12, `got ${aug} (intro rate expected)`);
+  assert.ok(Math.abs(sept - 0.003) < 1e-12, `got ${sept} (sticker rate expected)`);
 });
 
 test('ingestLitellm accepts fable/mythos ids and derives single-digit labels', () => {
