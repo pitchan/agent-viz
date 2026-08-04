@@ -30,7 +30,7 @@ function recommendationCard(rec, { actionable }) {
     el('div', 'advisor-card-meta', `${confidenceLabel(rec.confidence)} · ${costLabel(rec)}`),
     el('div', 'advisor-card-period', periodLabel(rec)),
     el('div', 'advisor-card-action', rec.action
-      ?? 'Aucun geste recommandé : la cause mesurée n'a pas de remède identifié — carte informative.'),
+      ?? "Aucun geste recommandé : la cause mesurée n'a pas de remède identifié — carte informative."),
   );
 
   const evidence = el('ul', 'advisor-card-evidence');
@@ -38,15 +38,15 @@ function recommendationCard(rec, { actionable }) {
   card.appendChild(evidence);
 
   if (actionable) {
-    // "J’applique" only exists when there is a gesture to apply; an
+    // "J'applique" only exists when there is a gesture to apply; an
     // informative card can still be dismissed.
     const entries = rec.action == null
-      ? [[‘ignored’, ‘Ignorer’]]
-      : [[‘accepted’, ‘J’applique’], [‘ignored’, ‘Ignorer’]];
-    const buttons = el(‘div’, ‘advisor-card-buttons’);
+      ? [['ignored', 'Ignorer']]
+      : [['accepted', "J'applique"], ['ignored', 'Ignorer']];
+    const buttons = el('div', 'advisor-card-buttons');
     for (const [status, label] of entries) {
-      const btn = el(‘button’, null, label);
-      btn.type = ‘button’;
+      const btn = el('button', null, label);
+      btn.type = 'button';
       btn.dataset.status = status;
       buttons.appendChild(btn);
     }
