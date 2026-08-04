@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   formatUsd, formatBytes, formatDuration, confidenceLabel, costBasisLabel, costLabel, basisTitle,
-  formatDayMonth, periodLabel, basisLabel, periodHeader, scanProgressLabel,
+  formatDayMonth, periodLabel, basisLabel, periodHeader, scanProgressLabel, formatTokens,
 } from '../../public/observatory/format.js';
 
 test('formatUsd uses a French decimal comma and two digits', () => {
@@ -103,4 +103,40 @@ test('formatTokens comes from viz-state and keeps its existing rendering', async
   const { formatTokens: original } = await import('../../public/viz-state.js');
   assert.equal(formatTokens, original);
   assert.equal(formatTokens(1234567), '1.2M');
+});
+
+test('costLabel leads with measured tokens when the cost is partial', () => {
+  const rec = {
+    ruleId: 'R1', estimatedCostUsd: 0.02, costBasis: 'jetons-mesures',
+    evidence: { costComplete: false, prefixChangeTokens: 1_200_000 },
+  };
+  const label = costLabel(rec);
+  assert.ok(label.startsWith(`${formatTokens(1_200_000)} jetons mesurés`));
+  assert.ok(label.includes('au moins 0,02 $'));
+});
+
+test('costLabel leads with measured bytes for byte-based rules when partial', () => {
+  const rec = {
+    ruleId: 'R3', estimatedCostUsd: 1.5, costBasis: 'octets-approx-4o-par-jeton',
+    evidence: { costComplete: false, bytes: 2 * 1024 * 1024 },
+  };
+  const label = costLabel(rec);
+  assert.ok(label.startsWith(`${formatBytes(2 * 1024 * 1024)} mesurés`));
+  assert.ok(label.includes('au moins 1,50 $'));
+});
+
+test('costLabel keeps the current partial wording when the rule carries no quantity', () => {
+  const rec = {
+    ruleId: 'R2', estimatedCostUsd: 3, costBasis: 'jetons-mesures',
+    evidence: { costComplete: false },
+  };
+  assert.ok(costLabel(rec).includes('coût partiel'));
+});
+
+test('costLabel is unchanged when the cost is complete', () => {
+  const rec = {
+    ruleId: 'R1', estimatedCostUsd: 48.48, costBasis: 'jetons-mesures',
+    evidence: { costComplete: true, prefixChangeTokens: 9 },
+  };
+  assert.equal(costLabel(rec), '48,48 $ — jetons mesurés');
 });

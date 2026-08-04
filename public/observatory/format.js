@@ -4,7 +4,8 @@
 // formatTokens is NOT redefined here: viz-state.js already owns it and is
 // importable under Node.
 
-export { formatTokens } from '../viz-state.js';
+import { formatTokens } from '../viz-state.js';
+export { formatTokens };
 
 export function formatUsd(n) {
   return `${n.toFixed(2).replace('.', ',')} $`;
@@ -40,10 +41,31 @@ export function costBasisLabel(basis) {
   return BASIS_LABELS[basis] || basis;
 }
 
+// When a card's dollars are partial (an unknown model in its sessions), the
+// measured quantity leads and the dollars demote to a lower bound. One entry
+// per rule, reusing the evidence keys the rules already persist; a rule
+// without a quantity (R2) keeps the plain partial wording. Ranking is NOT
+// affected: ordering tokens against dollars would break the homogeneity rule,
+// so ranking.js keeps scoring the (lower-bound) dollars.
+const LEAD_QUANTITY_BY_RULE = {
+  R1: e => `${formatTokens(e.prefixChangeTokens)} jetons mesurés`,
+  R5: e => `${formatTokens(e.reprocessedTokens)} jetons mesurés`,
+  R6: e => `${formatTokens(e.subagentTokens)} jetons mesurés`,
+  R3: e => `${formatBytes(e.bytes)} mesurés`,
+  R4: e => `${formatBytes(e.duplicateBytes)} mesurés`,
+};
+
 export function costLabel(rec) {
-  const partial = rec.evidence.costComplete === false
-    ? ' (coût partiel : un modèle sans tarif connu)' : '';
-  return `${formatUsd(rec.estimatedCostUsd)} — ${costBasisLabel(rec.costBasis)}${partial}`;
+  if (rec.evidence.costComplete === false) {
+    const lead = LEAD_QUANTITY_BY_RULE[rec.ruleId];
+    if (lead) {
+      return `${lead(rec.evidence)} — dollars incomplets (au moins ${formatUsd(rec.estimatedCostUsd)}`
+        + ' : un modèle sans tarif connu)';
+    }
+    return `${formatUsd(rec.estimatedCostUsd)} — ${costBasisLabel(rec.costBasis)}`
+      + ' (coût partiel : un modèle sans tarif connu)';
+  }
+  return `${formatUsd(rec.estimatedCostUsd)} — ${costBasisLabel(rec.costBasis)}`;
 }
 
 // Heading of a cost-basis block. It exists to tell the reader that the two
