@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   formatUsd, formatBytes, formatDuration, confidenceLabel, costBasisLabel, costLabel, basisTitle,
-  formatDayMonth, periodLabel, basisLabel, periodHeader,
+  formatDayMonth, periodLabel, basisLabel, periodHeader, scanProgressLabel,
 } from '../../public/observatory/format.js';
 
 test('formatUsd uses a French decimal comma and two digits', () => {
@@ -85,6 +85,15 @@ test('periodHeader names the window and its bounds', () => {
     periodHeader({ days: 30, from: '2026-07-04T12:00:00.000Z', to: '2026-08-03T12:00:00.000Z' }),
     'Fenêtre : 30 j — du 04/07 au 03/08');
   assert.equal(periodHeader(null), '');
+});
+
+test('scanProgressLabel counts every handled session, silent when idle or done', () => {
+  assert.equal(scanProgressLabel({ phase: 'start', total: 809, scanned: 0, skipped: 0, failed: 0 }),
+    'Analyse en cours — 0/809 sessions');
+  assert.equal(scanProgressLabel({ phase: 'progress', total: 809, scanned: 500, skipped: 20, failed: 3 }),
+    'Analyse en cours — 523/809 sessions');
+  assert.equal(scanProgressLabel({ phase: 'done', total: 809, scanned: 809, skipped: 0, failed: 0 }), '');
+  assert.equal(scanProgressLabel(null), '');
 });
 
 // formatTokens is not redefined by the observatory — it is re-exported from

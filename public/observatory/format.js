@@ -83,3 +83,11 @@ export function periodHeader(period) {
   if (!period) return '';
   return `Fenêtre : ${period.days} j — du ${formatDayMonth(period.from)} au ${formatDayMonth(period.to)}`;
 }
+
+// Live wording for a running scan (SSE events): the answer to "nothing is
+// moving" during the seconds between a purge/rescan click and its 'done'.
+export function scanProgressLabel(scan) {
+  if (!scan || scan.phase === 'done') return '';
+  const handled = (scan.scanned ?? 0) + (scan.skipped ?? 0) + (scan.failed ?? 0);
+  return `Analyse en cours — ${handled}/${scan.total ?? 0} sessions`;
+}

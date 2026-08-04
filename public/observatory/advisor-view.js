@@ -9,6 +9,7 @@ import * as api from './api.js';
 import { getState, subscribe, loadAdvisor, changeStatus, applyScanEvent } from './store.js';
 import {
   formatUsd, formatTokens, confidenceLabel, costLabel, basisTitle, periodLabel, basisLabel, periodHeader,
+  scanProgressLabel,
 } from './format.js';
 import { evidenceLines } from './evidence.js';
 import { initPeriodSelector } from './period-selector.js';
@@ -95,6 +96,8 @@ function render() {
   }
   if (state.loading && !state.summary) { head.textContent = 'Analyse en cours…'; return; }
   renderSummary(head, state.summary);
+  const progress = scanProgressLabel(state.scan);
+  if (progress) head.appendChild(el('div', 'advisor-scan-progress', progress));
   renderList(list, state.recommendations);
 }
 

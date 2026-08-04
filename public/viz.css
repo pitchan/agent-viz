@@ -400,6 +400,7 @@ canvas { display: block; width: 100%; height: 100%; }
 #advisor-header button:hover, #analysis-header button:hover { background: var(--glass-hover); }
 #advisor-rescan { margin-left: auto; }
 #advisor-purge.confirm-armed { border-color: rgba(231, 76, 60, 0.8); color: #e74c3c; }
+.advisor-scan-progress { color: var(--holo); margin-top: 4px; }
 #advisor-summary, #analysis-summary {
   font-size: 11px; color: var(--text-dim); margin-bottom: 12px;
   font-variant-numeric: tabular-nums;
