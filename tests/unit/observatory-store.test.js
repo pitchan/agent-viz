@@ -215,3 +215,15 @@ test('purge empties every table and the store stays usable', () => {
     assert.equal(h.store.listSessions({}).length, 1);
   } finally { cleanup(h); }
 });
+
+test('a null action survives the store round-trip', () => {
+  const h = tmpStore();
+  try {
+    h.store.upsertRecommendations([{
+      ruleId: 'r1', subject: 's', title: 't', category: 'c', confidence: 'fait',
+      estimatedCostUsd: 1, costBasis: 'b', periodFrom: 'f', periodTo: 'to',
+      evidence: {}, action: null,
+    }], '2026-08-04T00:00:00.000Z');
+    assert.equal(h.store.listRecommendations({})[0].action, null);
+  } finally { cleanup(h); }
+});

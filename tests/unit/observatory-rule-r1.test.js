@@ -137,17 +137,12 @@ test('the action names the model switch only when that marker dominates', () => 
   assert.match(recs[0].action, /modèle/);
 });
 
-test('when nothing in the journal explains the break, R1 prescribes no gesture', () => {
+test('when nothing in the journal explains the break, R1 emits no action at all', () => {
   const recs = r1.evaluate(ctx([session('s1', { prefixChange: 50000, noMarker: 50000 })]));
-  const switched = r1.evaluate(ctx([session('s1', { prefixChange: 50000 })]));
   assert.equal(recs[0].evidence.dominantMarker, 'noMarker');
-  // The text may still name the model — to state it was measured at zero. What
-  // it must not do is prescribe the gesture that belongs to the other marker.
-  assert.notEqual(recs[0].action, switched[0].action);
-  assert.doesNotMatch(recs[0].action, /Démarrer la session/,
-    'a cause measured at zero must never be turned into a remedy');
-  assert.match(recs[0].action, /non journalisée/);
-  assert.match(recs[0].action, /Aucun geste/);
+  // No text stands in for a gesture the measurement cannot support: a null
+  // action is an informative card, not a disguised recommendation.
+  assert.equal(recs[0].action, null);
 });
 
 test('when deferred tools were loaded mid-session, the action names that cause', () => {
