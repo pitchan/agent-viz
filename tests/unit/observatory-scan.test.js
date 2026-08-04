@@ -101,11 +101,13 @@ test('a report flagged skipped by the engine is counted, not stored as a free se
   } finally { cleanup(h); }
 });
 
-test('progress is broadcast as start, per-session progress, then done', async () => {
+test("progress is broadcast as start then per-session progress — 'done' belongs to the service", async () => {
+  // 'done' is the client's reload signal and must wait for the advice write,
+  // so runIncrementalScan never emits it (see observatory-scan-done-order).
   const h = harness([fakeRef('s1'), fakeRef('s2')], async ref => fakeReport(ref.sessionId));
   try {
     await runIncrementalScan(h.deps, OPTS);
-    assert.deepEqual(h.messages.map(m => m.phase), ['start', 'progress', 'progress', 'done']);
+    assert.deepEqual(h.messages.map(m => m.phase), ['start', 'progress', 'progress']);
     assert.ok(h.messages.every(m => m.type === 'analysisScan'));
     assert.equal(h.messages[0].total, 2);
     assert.equal(h.messages.at(-1).scanned, 2);
