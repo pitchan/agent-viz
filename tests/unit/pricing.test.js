@@ -260,3 +260,16 @@ test('ingestLitellm accepts fable/mythos ids and derives single-digit labels', (
   // Restore so later tests aren't polluted.
   _setPricesForTest({});
 });
+
+test('deliberate zero-cost models cost 0 without the unknown-model warning', t => {
+  const spy = t.mock.method(console, 'error');
+  assert.equal(computeCost({ input_tokens: 1000, output_tokens: 50 }, '<synthetic>'), 0);
+  assert.equal(computeCost({ input_tokens: 1000, output_tokens: 50 }, 'ministral-3:latest'), 0);
+  assert.equal(spy.mock.callCount(), 0);
+});
+
+test('a model outside the zero-cost list still warns once and reports 0', t => {
+  const spy = t.mock.method(console, 'error');
+  assert.equal(computeCost({ input_tokens: 10 }, 'mystery-model-9'), 0);
+  assert.equal(spy.mock.callCount(), 1);
+});
