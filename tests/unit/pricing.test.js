@@ -109,10 +109,7 @@ test('computeCost accepts a resolved price object directly (avoids double lookup
   assert.ok(Math.abs(cost - 0.0105) < 1e-9, `got ${cost}`);
 });
 
-test('ingestLitellm rejects __proto__ / constructor / prototype keys', () => {
-  // Defence in depth — even if a malicious mirror sneaks past the regex
-  // filter, the FORBIDDEN_KEYS gate must not let prototype-mutating keys
-  // through into the price map.
+test('litellmDrift rejects __proto__ / constructor / prototype keys and never pollutes', () => {
   const { _internals } = require('../../lib/server/pricing');
   const Object_proto_before = Object.prototype.toString;
   const malicious = {
@@ -121,16 +118,13 @@ test('ingestLitellm rejects __proto__ / constructor / prototype keys', () => {
       cache_creation_input_token_cost: 6.25e-6, cache_read_input_token_cost: 5e-7,
       max_input_tokens: 1_000_000,
     },
-    // Crafted to slip past the regex filter via the (\.|/) alternation if
-    // we relaxed the canonical-id check. Even if it gets in, we must reject.
     'claude-opus-4-7.__proto__': { input_cost_per_token: 1, output_cost_per_token: 1 },
   };
-  _internals.ingestLitellm(malicious);
-  // Assert no prototype mutation occurred.
+  const drifts = _internals.litellmDrift(malicious, '2026-08-15T00:00:00.000Z');
   assert.strictEqual(Object.prototype.toString, Object_proto_before);
   assert.equal({}.polluted, undefined);
-  // Sanity: the legit entry is still loaded.
-  assert.ok(getPrice('claude-opus-4-7'));
+  // The legit, identical entry produces no drift; the malicious key is skipped.
+  assert.deepEqual(drifts, []);
 });
 
 test('FORBIDDEN_KEYS contains the dangerous property names', () => {
@@ -238,27 +232,22 @@ test('computeCost with a model string honors the message date', () => {
   assert.ok(Math.abs(sept - 0.003) < 1e-12, `got ${sept} (sticker rate expected)`);
 });
 
-test('ingestLitellm accepts fable/mythos ids and derives single-digit labels', () => {
-  // The old filter regex only matched claude-(opus|sonnet|haiku)- : a LiteLLM
-  // feed carrying claude-fable-5 was silently discarded even when reachable.
-  // Feed prices that DIFFER from the fallback to prove the entry was ingested.
+test('a changed upstream tariff is REPORTED as drift, never applied to the map', () => {
   const { _internals } = require('../../lib/server/pricing');
   const entry = {
-    output_cost_per_token: 6e-5,
-    cache_creation_input_token_cost: 2.5e-5,
-    cache_read_input_token_cost: 2e-6,
-    max_input_tokens: 1_000_000,
+    output_cost_per_token: 6e-5, cache_creation_input_token_cost: 2.5e-5,
+    cache_read_input_token_cost: 2e-6, max_input_tokens: 1_000_000,
   };
-  _internals.ingestLitellm({
+  const drifts = _internals.litellmDrift({
     'claude-fable-5': { ...entry, input_cost_per_token: 2e-5 },
-    'claude-opus-5': { ...entry, input_cost_per_token: 6e-6 },
-  });
-  assert.equal(getPrice('claude-fable-5').input, 2e-5, 'ingested fable entry must override fallback');
-  assert.equal(getPrice('claude-fable-5').label, 'Fable 5');
-  assert.equal(getPrice('claude-opus-5').input, 6e-6, 'ingested opus-5 entry must override fallback');
-  assert.equal(getPrice('claude-opus-5').label, 'Opus 5');
-  // Restore so later tests aren't polluted.
-  _setPricesForTest({});
+  }, '2026-08-15T00:00:00.000Z');
+  assert.equal(drifts.length, 1);
+  assert.equal(drifts[0].model, 'claude-fable-5');
+  assert.equal(drifts[0].kind, 'tarif-different');
+  assert.equal(drifts[0].litellm.input, 2e-5);
+  assert.equal(drifts[0].embedded.input, 1e-5);
+  // The price map is untouched: the embedded table still bills fable at 1e-5.
+  assert.equal(getPrice('claude-fable-5').input, 1e-5);
 });
 
 test('deliberate zero-cost models cost 0 without the unknown-model warning', t => {
@@ -272,4 +261,72 @@ test('a model outside the zero-cost list still warns once and reports 0', t => {
   const spy = t.mock.method(console, 'error');
   assert.equal(computeCost({ input_tokens: 10 }, 'mystery-model-9'), 0);
   assert.equal(spy.mock.callCount(), 1);
+});
+
+test('an identical LiteLLM feed produces zero drift', () => {
+  const { _internals } = require('../../lib/server/pricing');
+  const feed = {
+    'claude-opus-4-8': {
+      input_cost_per_token: 5e-6, output_cost_per_token: 2.5e-5,
+      cache_creation_input_token_cost: 6.25e-6, cache_read_input_token_cost: 5e-7,
+      max_input_tokens: 1_000_000,
+    },
+  };
+  assert.deepEqual(_internals.litellmDrift(feed, '2026-08-15T00:00:00.000Z'), []);
+});
+
+test('a new canonical Claude model absent from the embedded table is reported', () => {
+  const { _internals } = require('../../lib/server/pricing');
+  const feed = {
+    'claude-opus-6': {
+      input_cost_per_token: 7e-6, output_cost_per_token: 3.5e-5,
+      cache_creation_input_token_cost: 8.75e-6, cache_read_input_token_cost: 7e-7,
+      max_input_tokens: 1_000_000,
+    },
+  };
+  const drifts = _internals.litellmDrift(feed, '2026-08-15T00:00:00.000Z');
+  assert.equal(drifts.length, 1);
+  assert.equal(drifts[0].model, 'claude-opus-6');
+  assert.equal(drifts[0].kind, 'modele-nouveau');
+  assert.equal(drifts[0].embedded, null);
+});
+
+test('sonnet-5 at the intro rate is NOT a drift during the launch window, IS one after', () => {
+  // The 2026-08-05 measurement: LiteLLM stores the intro rate as "current" —
+  // same billing today, a representation difference. After 2026-09-01 the
+  // embedded table switches to the sticker rate; a stale feed becomes a drift.
+  const { _internals } = require('../../lib/server/pricing');
+  const feed = {
+    'claude-sonnet-5': {
+      input_cost_per_token: 2e-6, output_cost_per_token: 1e-5,
+      cache_creation_input_token_cost: 2.5e-6, cache_read_input_token_cost: 2e-7,
+      max_input_tokens: 1_000_000,
+    },
+  };
+  assert.deepEqual(_internals.litellmDrift(feed, '2026-08-15T00:00:00.000Z'), []);
+  const after = _internals.litellmDrift(feed, '2026-09-02T00:00:00.000Z');
+  assert.equal(after.length, 1);
+  assert.equal(after[0].kind, 'tarif-different');
+});
+
+test('a vigil pass never touches the price map: the dated period survives', () => {
+  // Anti-regression lock for the T11 Critical: no code path may write the
+  // price map from LiteLLM anymore. Feed the CATALOG (sticker) rate for
+  // sonnet-5 — during the launch window the embedded table's CURRENT tariff
+  // is the intro rate, so the sticker feed is a drift by construction — and
+  // confirm the dated period (intro rate, valid until 2026-09-01) is still
+  // exactly what getPrice returns afterwards.
+  const { _internals } = require('../../lib/server/pricing');
+  const feed = {
+    'claude-sonnet-5': {
+      input_cost_per_token: 3e-6, output_cost_per_token: 1.5e-5,
+      cache_creation_input_token_cost: 3.75e-6, cache_read_input_token_cost: 3e-7,
+      max_input_tokens: 1_000_000,
+    },
+  };
+  const drifts = _internals.litellmDrift(feed, '2026-08-15T00:00:00.000Z');
+  assert.equal(getPrice('claude-sonnet-5', '2026-08-15T00:00:00.000Z').input, 2e-6);
+  assert.equal(drifts.length, 1);
+  assert.equal(drifts[0].model, 'claude-sonnet-5');
+  assert.equal(drifts[0].kind, 'tarif-different');
 });
