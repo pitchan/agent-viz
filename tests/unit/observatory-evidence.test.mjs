@@ -4,16 +4,30 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { evidenceLines } from '../../public/observatory/evidence.js';
 
-test('R1 states the sessions, the rebuilt-prefix tokens and the journaled cause', () => {
+test('R1 states the sessions, the rebuilt-prefix tokens and the journaled marker', () => {
   assert.deepEqual(
     evidenceLines({ ruleId: 'R1', evidence: { sessions: ['a', 'b'], prefixChangeTokens: 50000,
       markerTokens: { modelSwitch: 40000, toolsAppeared: 0, noMarker: 10000 }, dominantMarker: 'modelSwitch',
       depthTokens: { facade: 5000, d10to50: 40000, d50to90: 5000, tail: 0 }, dominantDepth: 'd10to50',
       shareOfNetPercent: 12 } }),
     ['2 sessions concernées', '50k jetons de préfixe reconstruit',
-      'cause dominante : changement de modèle (40k jetons)',
+      'marqueur dominant : changement de modèle — mécanisme certain, un cache par modèle (40k jetons)',
       'cassure entre 10 et 50 % de profondeur (40k jetons)',
       '12 % des jetons nets de ces sessions']);
+});
+
+// Corrected 2026-08-05: "cause dominante" asserted causality the measurement
+// does not carry. Only modelSwitch has a proven mechanism; toolsAppeared is a
+// temporal coincidence (official docs: deferred tool loading preserves the
+// cache), so the wording must not read as a cause.
+test('R1 presents toolsAppeared as an observed coincidence, never as a cause', () => {
+  const lines = evidenceLines({ ruleId: 'R1', evidence: { sessions: ['a'], prefixChangeTokens: 50000,
+    markerTokens: { modelSwitch: 0, toolsAppeared: 50000, noMarker: 0 }, dominantMarker: 'toolsAppeared',
+    depthTokens: { facade: 50000, d10to50: 0, d50to90: 0, tail: 0 }, dominantDepth: 'facade',
+    shareOfNetPercent: 30 } });
+  assert.equal(lines[2],
+    'marqueur dominant : chargement d’outils différés — coïncidence observée, sans mécanisme établi (50k jetons)');
+  assert.ok(!lines.some(l => l.includes('cause dominante')));
 });
 
 // The case that made the fix necessary: no journaled cause must read as such,
@@ -25,7 +39,7 @@ test('R1 says so plainly when no marker explains the break', () => {
       depthTokens: { facade: 5754305, d10to50: 16971946, d50to90: 2469673, tail: 96572 },
       dominantDepth: 'd10to50', shareOfNetPercent: 54 } }),
     ['1 session concernée', '25.3M jetons de préfixe reconstruit',
-      'cause dominante : aucune cause journalisée (25.3M jetons)',
+      'marqueur dominant : aucun marqueur journalisé (25.3M jetons)',
       'cassure entre 10 et 50 % de profondeur (17.0M jetons)',
       '54 % des jetons nets de ces sessions']);
 });

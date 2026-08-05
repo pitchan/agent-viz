@@ -145,10 +145,16 @@ test('when nothing in the journal explains the break, R1 emits no action at all'
   assert.equal(recs[0].action, null);
 });
 
-test('when deferred tools were loaded mid-session, the action names that cause', () => {
+test('when deferred tools were loaded mid-session, R1 emits no action either', () => {
   const recs = r1.evaluate(ctx([session('s1', { prefixChange: 50000, toolsAppeared: 50000 })]));
   assert.equal(recs[0].evidence.dominantMarker, 'toolsAppeared');
-  assert.match(recs[0].action, /outils/);
+  // Official Anthropic docs: loading a deferred tool through tool search
+  // APPENDS the definition to the conversation history — the prefix is
+  // untouched, the cache is preserved. Our own controlled test agreed
+  // (+265 tk, full cache re-read — doc/10, condition C). The marker is a
+  // temporal coincidence, not a mechanism: prescribing "load tools up front"
+  // is false information, so the card must be informative (null action).
+  assert.equal(recs[0].action, null);
 });
 
 test('dominance is decided on the aggregate of the sessions that fired', () => {
