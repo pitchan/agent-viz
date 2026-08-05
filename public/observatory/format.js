@@ -113,3 +113,33 @@ export function scanProgressLabel(scan) {
   const handled = (scan.scanned ?? 0) + (scan.skipped ?? 0) + (scan.failed ?? 0);
   return `Analyse en cours — ${handled}/${scan.total ?? 0} sessions`;
 }
+
+// ─── « Jetons & tarifs » panel formatters ─────────────────────────────────
+
+// USD per token → per-MTok wording, the unit rate cards are published in.
+export function formatUsdPerMTok(perToken) {
+  return `${(perToken * 1e6).toFixed(2).replace('.', ',')} $ le million`;
+}
+
+export function formatShare(ratio) {
+  return `${(ratio * 100).toFixed(1).replace('.', ',')} %`;
+}
+
+// The pricing panel forbids the false zero: a non-zero amount that would
+// display as "0,00 $" shows as "< 0,01 $" instead. formatUsd itself is NOT
+// changed — its consumers are part of the frozen instrument display.
+export function formatUsdExact(n) {
+  const s = formatUsd(n);
+  return n > 0 && s === '0,00 $' ? '< 0,01 $' : s;
+}
+
+// Human label derived from the canonical id — same rule as viz-ui.js
+// labelForModel, extended to single-digit Claude 5 families ("Opus 5",
+// "Fable 5"). No external data; callers keep the raw id in `title`.
+export function modelLabel(id) {
+  if (!id) return '';
+  const m = id.match(/^claude-(opus|sonnet|haiku|fable|mythos)-(\d+)(?:-(\d+))?$/);
+  if (!m) return id;
+  const family = `${m[1][0].toUpperCase()}${m[1].slice(1)}`;
+  return m[3] !== undefined ? `${family} ${m[2]}.${m[3]}` : `${family} ${m[2]}`;
+}

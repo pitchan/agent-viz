@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   formatUsd, formatBytes, formatDuration, confidenceLabel, costBasisLabel, costLabel, basisTitle,
   formatDayMonth, periodLabel, basisLabel, periodHeader, scanProgressLabel, formatTokens,
+  formatUsdPerMTok, formatShare, formatUsdExact, modelLabel,
 } from '../../public/observatory/format.js';
 
 test('formatUsd uses a French decimal comma and two digits', () => {
@@ -139,4 +140,34 @@ test('costLabel is unchanged when the cost is complete', () => {
     evidence: { costComplete: true, prefixChangeTokens: 9 },
   };
   assert.equal(costLabel(rec), '48,48 $ — jetons mesurés');
+});
+
+test('formatUsdPerMTok speaks per million tokens with a French decimal comma', () => {
+  assert.equal(formatUsdPerMTok(3e-6), '3,00 $ le million');
+  assert.equal(formatUsdPerMTok(1.25e-5), '12,50 $ le million');
+  assert.equal(formatUsdPerMTok(5e-7), '0,50 $ le million');
+});
+
+test('formatShare renders a percentage with one decimal, French comma', () => {
+  assert.equal(formatShare(0.1234), '12,3 %');
+  assert.equal(formatShare(1), '100,0 %');
+  assert.equal(formatShare(0), '0,0 %');
+});
+
+test('formatUsdExact forbids the false zero: sub-cent non-zero shows as < 0,01 $', () => {
+  assert.equal(formatUsdExact(0.004), '< 0,01 $');
+  assert.equal(formatUsdExact(0), '0,00 $');
+  assert.equal(formatUsdExact(12.97), '12,97 $');
+  assert.equal(formatUsdExact(0.01), '0,01 $');
+});
+
+test('modelLabel derives readable labels, Claude 5 single-digit families included', () => {
+  assert.equal(modelLabel('claude-opus-5'), 'Opus 5');
+  assert.equal(modelLabel('claude-fable-5'), 'Fable 5');
+  assert.equal(modelLabel('claude-opus-4-7'), 'Opus 4.7');
+  assert.equal(modelLabel('claude-haiku-4-5'), 'Haiku 4.5');
+  // Anything the rule does not cover keeps its raw id — never invented.
+  assert.equal(modelLabel('<synthetic>'), '<synthetic>');
+  assert.equal(modelLabel('ministral-3:latest'), 'ministral-3:latest');
+  assert.equal(modelLabel(''), '');
 });
