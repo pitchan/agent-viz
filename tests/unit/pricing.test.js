@@ -380,3 +380,61 @@ test('a version above the family max alerts as modele-nouveau', () => {
   assert.equal(drifts[0].model, 'claude-haiku-5');
   assert.equal(drifts[0].kind, 'modele-nouveau');
 });
+
+test('regional premium endpoints are different SKUs, not tariff drift', () => {
+  // Measured on the real feed 2026-08-05: us./eu./au.anthropic.* carry a
+  // uniform +10% premium over the base (direct-API) tariff the embedded
+  // table represents. That premium is a legitimate different SKU, not a
+  // drift of the canonical model — the bare key is the only one compared.
+  const { _internals } = require('../../lib/server/pricing');
+  const base = {
+    input_cost_per_token: 5e-6, output_cost_per_token: 2.5e-5,
+    cache_creation_input_token_cost: 6.25e-6, cache_read_input_token_cost: 5e-7,
+    max_input_tokens: 1_000_000,
+  };
+  const premium = {
+    input_cost_per_token: 5.5e-6, output_cost_per_token: 2.75e-5,
+    cache_creation_input_token_cost: 6.875e-6, cache_read_input_token_cost: 5.5e-7,
+    max_input_tokens: 1_000_000,
+  };
+  const feed = {
+    'claude-opus-4-7': base,
+    'us.anthropic.claude-opus-4-7': premium,
+    'eu.anthropic.claude-opus-4-7': premium,
+    'au.anthropic.claude-opus-4-7': premium,
+  };
+  assert.deepEqual(_internals.litellmDrift(feed, '2026-08-15T00:00:00.000Z'), []);
+});
+
+test('a base-rate change on the bare key still reports drift', () => {
+  const { _internals } = require('../../lib/server/pricing');
+  const feed = {
+    'claude-opus-4-7': {
+      input_cost_per_token: 9e-6, output_cost_per_token: 2.5e-5,
+      cache_creation_input_token_cost: 6.25e-6, cache_read_input_token_cost: 5e-7,
+      max_input_tokens: 1_000_000,
+    },
+  };
+  const drifts = _internals.litellmDrift(feed, '2026-08-15T00:00:00.000Z');
+  assert.equal(drifts.length, 1);
+  assert.equal(drifts[0].model, 'claude-opus-4-7');
+  assert.equal(drifts[0].kind, 'tarif-different');
+});
+
+test('a new model under several regional variants alerts exactly once', () => {
+  const { _internals } = require('../../lib/server/pricing');
+  const entry = {
+    input_cost_per_token: 1e-6, output_cost_per_token: 5e-6,
+    cache_creation_input_token_cost: 1.25e-6, cache_read_input_token_cost: 1e-7,
+    max_input_tokens: 1_000_000,
+  };
+  const feed = {
+    'claude-haiku-5': entry,
+    'us.anthropic.claude-haiku-5': entry,
+    'eu.anthropic.claude-haiku-5': entry,
+  };
+  const drifts = _internals.litellmDrift(feed, '2026-08-15T00:00:00.000Z');
+  assert.equal(drifts.length, 1);
+  assert.equal(drifts[0].model, 'claude-haiku-5');
+  assert.equal(drifts[0].kind, 'modele-nouveau');
+});
