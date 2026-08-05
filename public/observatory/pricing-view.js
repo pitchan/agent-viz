@@ -68,7 +68,7 @@ function buildCostTable(models) {
 function periodsCell(history) {
   if (!history.length) return '—';
   return history
-    .map(p => `jusqu'au ${p.until} : ${formatUsdPerMTok(p.prices.input)} entrée / ${formatUsdPerMTok(p.prices.output)} sortie`)
+    .map(p => `jusqu’au ${p.until} : ${formatUsdPerMTok(p.prices.input)} entrée / ${formatUsdPerMTok(p.prices.output)} sortie`)
     .join(' ; ');
 }
 
