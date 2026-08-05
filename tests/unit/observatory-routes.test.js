@@ -1,5 +1,5 @@
 'use strict';
-// The eight analysis endpoints: response shapes, guards, and the missing-engine
+// The ten analysis endpoints: response shapes, guards, and the missing-engine
 // path. The service is injected, so no SQLite file and no engine are needed.
 
 const { test } = require('node:test');
@@ -28,6 +28,16 @@ const SERVICE = {
   recommendations: async () => ({ groups: [{ basis: 'jetons-mesures', priority: [{ id: 1 }], all: [{ id: 1 }] }],
     stale: [] }),
   setRecommendationStatus: async (id, status) => id === 1 && status === 'ignored',
+  modelCosts: async () => ({
+    models: [{ model: 'claude-opus-4-8', costUsd: 1, pricing: 'tarife' }],
+    totals: { netTokens: 10, costUsd: 1, costComplete: true, cacheReadTokens: 0 },
+    unknownModels: [], excludedPendingRescan: 0, basis: null, period: null,
+  }),
+  pricing: async () => ({
+    priceTable: { source: 'netgain-table-embarquee', unit: 'usd-par-jeton', entries: [], zeroCost: [] },
+    provenance: { scanVersion: 6, engineVersion: '0.13.0', priceSource: 'netgain-table-embarquee', sections: [] },
+    engineVersion: '0.13.0', scanVersion: 6,
+  }),
 };
 
 function router(service = SERVICE) {
@@ -43,12 +53,12 @@ function router(service = SERVICE) {
   };
 }
 
-test('the eight analysis routes are declared with their methods', () => {
+test('the ten analysis routes are declared with their methods', () => {
   const declared = createObservatoryRoutes(() => SERVICE)
     .map(r => `${r.method} ${r.path || r.prefix}`).sort();
   assert.deepEqual(declared, [
-    'GET /analysis/session/', 'GET /analysis/sessions', 'GET /analysis/summary',
-    'GET /config/audit', 'GET /recommendations',
+    'GET /analysis/models', 'GET /analysis/session/', 'GET /analysis/sessions',
+    'GET /analysis/summary', 'GET /config/audit', 'GET /pricing', 'GET /recommendations',
     'POST /analysis/purge', 'POST /analysis/scan', 'POST /recommendations/',
   ]);
 });
@@ -180,4 +190,31 @@ test('POST /analysis/purge answers 503 and never scans when the engine is missin
   const res = await router(spy)('POST', '/analysis/purge');
   assert.equal(res.statusCode, 503);
   assert.equal(scanned, false);
+});
+
+test('GET /analysis/models returns the breakdown and names its price source', async () => {
+  const res = await router()('GET', '/analysis/models');
+  assert.equal(res.statusCode, 200);
+  const body = JSON.parse(res.body);
+  assert.equal(body.models[0].model, 'claude-opus-4-8');
+  assert.equal(body.totals.costUsd, 1);
+  assert.equal(body.priceSource, 'netgain-table-embarquee');
+});
+
+test('GET /analysis/models forwards days and includeMachine to the service', async () => {
+  let got;
+  const spy = { ...SERVICE, modelCosts: async opts => { got = opts; return {}; } };
+  await router(spy)('GET', '/analysis/models?days=7&includeMachine=1');
+  assert.deepEqual(got, { days: 7, includeMachine: true });
+});
+
+test('GET /pricing returns the tariff sheet, the provenance and the versions', async () => {
+  const res = await router()('GET', '/pricing');
+  assert.equal(res.statusCode, 200);
+  const body = JSON.parse(res.body);
+  assert.equal(body.priceTable.source, 'netgain-table-embarquee');
+  assert.ok(body.provenance);
+  assert.equal(body.engineVersion, '0.13.0');
+  assert.equal(body.scanVersion, 6);
+  assert.equal(body.priceSource, 'netgain-table-embarquee');
 });

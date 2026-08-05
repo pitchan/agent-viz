@@ -142,3 +142,9 @@ test('the SessionReport carries per-model dollars (costByModel)', async () => {
     assert.ok(['tarife', 'zero-voulu', 'inconnu'].includes(mc.pricing));
   }
 });
+
+test('the announced price source IS the engine table source — one voice', async () => {
+  const { PRICE_SOURCE } = require('../../lib/server/observatory/routes');
+  const engine = await loadEngine();
+  assert.equal(engine.priceTable().source, PRICE_SOURCE);
+});
