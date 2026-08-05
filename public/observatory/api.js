@@ -57,3 +57,10 @@ export const fetchConfigAudit = () => getJson('/config/audit');
 export const fetchRecommendations = () => getJson('/recommendations');
 export const setRecommendationStatus = (id, status) =>
   postJson(`/recommendations/${encodeURIComponent(id)}?status=${encodeURIComponent(status)}`);
+
+export function fetchModelCosts(opts = {}) {
+  const q = windowParams(opts).toString();
+  return getJson(`/analysis/models${q ? `?${q}` : ''}`);
+}
+
+export const fetchPricing = () => getJson('/pricing');

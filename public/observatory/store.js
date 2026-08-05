@@ -15,6 +15,8 @@ const EMPTY = () => ({
   error: null,
   periodDays: 30,
   includeMachine: false,
+  modelCosts: null,
+  pricing: null,
 });
 
 let state = EMPTY();
@@ -81,6 +83,17 @@ export const loadAnalysis = api => run(async () => {
 });
 
 export const loadSession = (api, id) => run(async () => ({ selectedSession: await api.fetchSession(id) }));
+
+// The pricing panel loads its two halves together: the windowed per-model
+// breakdown, and the window-independent tariff sheet + provenance.
+export const loadPricing = api => run(async () => {
+  const { periodDays, includeMachine } = getState();
+  const [modelCosts, pricing] = await Promise.all([
+    api.fetchModelCosts({ days: periodDays, includeMachine }),
+    api.fetchPricing(),
+  ]);
+  return { modelCosts, pricing };
+});
 
 // After a status change the server decides what the list becomes — the page
 // never patches a recommendation locally, or the +50 % and freshness rules

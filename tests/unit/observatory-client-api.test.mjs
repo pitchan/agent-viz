@@ -3,7 +3,7 @@
 // without a real server.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fetchSummary, fetchSessions, requestScan, requestPurge } from '../../public/observatory/api.js';
+import { fetchSummary, fetchSessions, requestScan, requestPurge, fetchModelCosts, fetchPricing } from '../../public/observatory/api.js';
 
 function stubFetch(body = {}) {
   const calls = [];
@@ -72,6 +72,28 @@ test('requestPurge posts to /analysis/purge with only days', async () => {
     await requestPurge({ days: 30 });
     assert.equal(calls[0].url, '/analysis/purge?days=30');
     assert.equal(calls[0].opts.method, 'POST');
+  } finally {
+    restore();
+  }
+});
+
+test('fetchModelCosts forwards the window; no window means no query string', async () => {
+  const { calls, restore } = stubFetch({ models: [] });
+  try {
+    await fetchModelCosts({ days: 30, includeMachine: true });
+    await fetchModelCosts();
+    assert.equal(calls[0].url, '/analysis/models?days=30&includeMachine=1');
+    assert.equal(calls[1].url, '/analysis/models');
+  } finally {
+    restore();
+  }
+});
+
+test('fetchPricing is window-independent', async () => {
+  const { calls, restore } = stubFetch({ priceTable: { entries: [] } });
+  try {
+    await fetchPricing();
+    assert.equal(calls[0].url, '/pricing');
   } finally {
     restore();
   }

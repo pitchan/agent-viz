@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { getState, subscribe, loadAdvisor, loadAnalysis, loadSession, changeStatus, applyScanEvent, resetStore,
-  setPeriodDays, setIncludeMachine } from '../../public/observatory/store.js';
+  setPeriodDays, setIncludeMachine, loadPricing } from '../../public/observatory/store.js';
 
 const SUMMARY = { sessions: 3, costUsd: 2, netTokens: 1000, costComplete: true,
   priceSource: 'netgain-table-embarquee' };
@@ -113,4 +113,19 @@ test('scan events update the progress and only the done phase is a completion', 
   assert.equal(getState().scanJustFinished, false);
   applyScanEvent({ type: 'analysisScan', phase: 'done', total: 10, scanned: 9, skipped: 1, failed: 0 });
   assert.equal(getState().scanJustFinished, true);
+});
+
+test('loadPricing loads the windowed breakdown and the tariff sheet together', async () => {
+  resetStore();
+  const calls = [];
+  const api = {
+    fetchModelCosts: async opts => { calls.push(['models', opts]); return { models: [], totals: {} }; },
+    fetchPricing: async () => { calls.push(['pricing']); return { priceTable: { entries: [] } }; },
+  };
+  await loadPricing(api);
+  const s = getState();
+  assert.deepEqual(s.modelCosts, { models: [], totals: {} });
+  assert.deepEqual(s.pricing, { priceTable: { entries: [] } });
+  assert.equal(s.loading, false);
+  assert.deepEqual(calls[0], ['models', { days: 30, includeMachine: false }]);
 });
