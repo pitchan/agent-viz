@@ -14,6 +14,11 @@ const watchdog = createWatchdog();
 const listeners = new Set();
 let tickTimer = null;
 
+// External alerts — server-side detections (e.g. the pricing drift vigil).
+// Same shape and same dedup/ack contract as watchdog alerts, kept in their
+// own registry because they do not come from the hook event stream.
+const externalAlerts = new Map();
+
 function notify(newAlerts) {
   if (!newAlerts.length) return;
   for (const fn of listeners) fn(newAlerts);
@@ -35,12 +40,23 @@ export function feedEvent(evt) {
   notify(watchdog.processEvent(evt).newAlerts);
 }
 
+export function raiseExternalAlert(alert) {
+  const existing = externalAlerts.get(alert.id);
+  if (existing && !existing.acknowledged) return;
+  const fresh = { ...alert, acknowledged: false };
+  externalAlerts.set(alert.id, fresh);
+  notify([fresh]);
+}
+
 export function getActiveAlerts() {
-  return watchdog.getActiveAlerts();
+  const external = [...externalAlerts.values()].filter(a => !a.acknowledged);
+  return [...watchdog.getActiveAlerts(), ...external];
 }
 
 export function acknowledgeAlert(id) {
   watchdog.acknowledge(id);
+  const external = externalAlerts.get(id);
+  if (external) external.acknowledged = true;
 }
 
 // Subscribe to new-alert notifications. Returns the unsubscribe function.

@@ -445,7 +445,7 @@ function alertItemHTML(a) {
     <div class="alert-info">
       <div class="alert-type">${esc(a.type)}</div>
       <div class="alert-msg">${esc(a.message)}</div>
-      <div class="alert-meta">session ${esc(a.sessionId.slice(0, 8))}</div>
+      <div class="alert-meta">${a.sessionId ? `session ${esc(a.sessionId.slice(0, 8))}` : esc(a.toolName || '')}</div>
     </div>
     <button class="alert-ack" data-id="${esc(a.id)}">Ack</button>
   </div>`;

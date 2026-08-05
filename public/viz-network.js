@@ -13,6 +13,7 @@ import {
 import {
   pauseTick, resumeTick, markNarratorDirty,
 } from './viz-narrator.js';
+import { raiseExternalAlert } from './viz-watchdog-client.js';
 
 // Render a small pill badge identifying the source agent. Returns HTML safe to
 // inline (label is fixed, no user input).
@@ -94,10 +95,26 @@ export function connectSSE() {
   sseSource.onmessage = (msg) => {
     try {
       const data = JSON.parse(msg.data);
+      // One alert per drifted model, stable id — the client-side dedup contract
+      // (same id active → no refire) matches the watchdog's.
+      function pricingDriftAlert(d) {
+        return {
+          id: `pricingDrift:${d.model}`,
+          type: 'pricingDrift', sessionId: '', toolName: d.model, count: 1,
+          createdAt: Date.now(),
+          message: d.kind === 'modele-nouveau'
+            ? `Vigie tarifaire : ${d.model} existe chez LiteLLM mais pas dans la table embarquée`
+            : `Vigie tarifaire : le tarif de ${d.model} diffère entre LiteLLM et la table embarquée`,
+        };
+      }
       // Observatory scan progress: re-broadcast as a DOM event so the advisor
       // panel can follow it without this module importing the observatory.
       if (data.type === 'analysisScan') {
         window.dispatchEvent(new CustomEvent('agentviz:analysisScan', { detail: data }));
+        return;
+      }
+      if (data.type === 'pricingDrift') {
+        for (const d of data.drifts) raiseExternalAlert(pricingDriftAlert(d));
         return;
       }
       if (data.type === 'sessionsChanged') {
