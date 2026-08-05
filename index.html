@@ -72,6 +72,7 @@
       <button id="btn-sessions">Sessions <span class="shortcut">S</span></button>
       <button id="btn-advisor">Conseils <span class="shortcut">A</span></button>
       <button id="btn-analysis">Sessions analysées <span class="shortcut">N</span></button>
+      <button id="btn-pricing">Jetons &amp; tarifs</button>
       <button id="btn-fit">Fit <span class="shortcut">F</span></button>
       <button id="btn-clear">Clear <span class="shortcut">C</span></button>
       <button id="btn-autofit">Auto-fit: <span id="autofit-label">ON</span></button>
@@ -112,6 +113,17 @@
       <div id="analysis-detail"></div>
     </div>
 
+    <!-- Pricing overlay -->
+    <div id="pricing-overlay" class="glass-panel">
+      <div id="pricing-header">
+        <span id="pricing-title">Jetons &amp; tarifs</span>
+        <button type="button" id="pricing-close">&times;</button>
+      </div>
+      <div id="pricing-period" class="period-selector"></div>
+      <div id="pricing-summary"></div>
+      <div id="pricing-body"></div>
+    </div>
+
     <!-- Watchdog alerts popup -->
     <div id="alerts-popup" class="glass-panel">
       <div id="alerts-header">
@@ -138,9 +150,11 @@
   import { requestRender } from './public/viz-state.js';
   import { initAdvisor } from './public/observatory/advisor-view.js';
   import { initAnalysis } from './public/observatory/analysis-view.js';
+  import { initPricing } from './public/observatory/pricing-view.js';
 
   initAdvisor();
   initAnalysis();
+  initPricing();
   loadSessions();
   connectSSE();
   poll();
