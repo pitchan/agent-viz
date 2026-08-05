@@ -115,3 +115,30 @@ test('a blocks-shaped prompt session is classified interactive', async () => {
   const r = await scanSession(ref, 100);
   assert.equal(r.sessionKind, 'interactive');
 });
+
+test('the engine exposes the embedded price table and its version (v0.5.0 surface)', async () => {
+  const engine = await loadEngine();
+  const table = engine.priceTable();
+  assert.equal(table.source, 'netgain-table-embarquee');
+  assert.equal(table.unit, 'usd-par-jeton');
+  assert.ok(table.entries.length >= 11);
+  assert.ok(table.entries.every(e => e.label && e.maxInput > 0 && typeof e.current.input === 'number'));
+  assert.ok(Array.isArray(table.zeroCost) && table.zeroCost.length >= 2);
+  assert.match(engine.version, /^\d+\.\d+\.\d+$/);
+});
+
+test('the SessionReport carries per-model dollars (costByModel)', async () => {
+  const { discoverSessions, scanSession } = await loadEngine();
+  const refs = await discoverSessions(FIXTURE_CLAUDE_DIR, {});
+  const ref = refs.find(r => r.sessionId === 'sess-fixture');
+  const r = await scanSession(ref, 100);
+  const cbm = r.tokens.costByModel;
+  assert.ok(cbm && typeof cbm === 'object');
+  assert.deepEqual(Object.keys(cbm).sort(), Object.keys(r.tokens.perModel).sort());
+  const sum = Object.values(cbm).reduce((a, m) => a + (m.usd ?? 0), 0);
+  assert.ok(Math.abs(sum - r.tokens.costUsd) < 1e-9, 'sum of per-model dollars = session cost');
+  for (const mc of Object.values(cbm)) {
+    assert.ok(mc.usd === null || typeof mc.usd === 'number');
+    assert.ok(['tarife', 'zero-voulu', 'inconnu'].includes(mc.pricing));
+  }
+});
