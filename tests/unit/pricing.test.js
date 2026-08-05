@@ -20,6 +20,15 @@ test('normalizeId strips provider prefixes and date/version suffixes', () => {
   assert.equal(normalizeId(''), null);
 });
 
+test('normalizeId strips regional routing prefixes and single-digit version suffixes', () => {
+  // Root cause of most of the 109 false "modele-nouveau" alerts: LiteLLM
+  // carries per-region routing ids (global./us./eu./au.anthropic.) that
+  // never normalized down to the canonical id.
+  assert.equal(normalizeId('us.anthropic.claude-opus-4-7'), 'claude-opus-4-7');
+  assert.equal(normalizeId('global.anthropic.claude-fable-5'), 'claude-fable-5');
+  assert.equal(normalizeId('claude-opus-4-6-v1'), 'claude-opus-4-6');
+});
+
 test('getPrice resolves direct ids and provider-prefixed ids from the fallback map', () => {
   const direct = getPrice('claude-sonnet-4-5');
   assert.ok(direct, 'direct lookup should hit fallback');
@@ -329,4 +338,45 @@ test('a vigil pass never touches the price map: the dated period survives', () =
   assert.equal(drifts.length, 1);
   assert.equal(drifts[0].model, 'claude-sonnet-5');
   assert.equal(drifts[0].kind, 'tarif-different');
+});
+
+test('historical models and regional variants never alert', () => {
+  // Decision Vincent 2026-08-05: "absent from the table" alone is not "new" —
+  // historical ids (claude-opus-4-1) and un-normalized regional routing
+  // variants (us./global.anthropic.) are also absent, but are not news.
+  const { _internals } = require('../../lib/server/pricing');
+  const at = '2026-08-15T00:00:00.000Z';
+  const feed = {
+    'us.anthropic.claude-opus-4-7': {
+      input_cost_per_token: 5e-6, output_cost_per_token: 2.5e-5,
+      cache_creation_input_token_cost: 6.25e-6, cache_read_input_token_cost: 5e-7,
+      max_input_tokens: 1_000_000,
+    },
+    'claude-opus-4-1': {
+      input_cost_per_token: 4e-6, output_cost_per_token: 2e-5,
+      cache_creation_input_token_cost: 5e-6, cache_read_input_token_cost: 4e-7,
+      max_input_tokens: 200_000,
+    },
+    'global.anthropic.claude-fable-5': {
+      input_cost_per_token: 1e-5, output_cost_per_token: 5e-5,
+      cache_creation_input_token_cost: 1.25e-5, cache_read_input_token_cost: 1e-6,
+      max_input_tokens: 1_000_000,
+    },
+  };
+  assert.deepEqual(_internals.litellmDrift(feed, at), []);
+});
+
+test('a version above the family max alerts as modele-nouveau', () => {
+  const { _internals } = require('../../lib/server/pricing');
+  const feed = {
+    'claude-haiku-5': {
+      input_cost_per_token: 1e-6, output_cost_per_token: 5e-6,
+      cache_creation_input_token_cost: 1.25e-6, cache_read_input_token_cost: 1e-7,
+      max_input_tokens: 1_000_000,
+    },
+  };
+  const drifts = _internals.litellmDrift(feed, '2026-08-15T00:00:00.000Z');
+  assert.equal(drifts.length, 1);
+  assert.equal(drifts[0].model, 'claude-haiku-5');
+  assert.equal(drifts[0].kind, 'modele-nouveau');
 });
