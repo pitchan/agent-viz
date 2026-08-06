@@ -66,12 +66,12 @@ La fenêtre d'analyse se choisit dans l'en-tête (7, 30 ou 90 jours, 30 par déf
 Trois points à savoir :
 
 - **Deux blocs, jamais un classement commun.** Certaines règles chiffrent de vrais jetons, d'autres partent d'octets convertis (≈ 4 octets par jeton). Les deux n'ont pas la même précision : la page les présente séparément et n'affiche **aucun total**, parce qu'une même session alimente plusieurs règles et serait comptée deux fois.
-- **Deux sources de prix coexistent.** La vue temps réel utilise la table de tarifs rafraîchie en ligne, les pages d'analyse celle embarquée dans le moteur. Chaque page nomme la sienne ; aucun chiffre ne mélange les deux. Une session dont le modèle n'a pas de tarif connu est marquée « partiel », jamais arrondie à zéro en silence.
+- **Une seule source de prix.** La table de tarifs embarquée dans le moteur tarife tout le produit — vue temps réel comprise — et chaque page nomme sa provenance. Elle porte les tarifs datés : un message est facturé au prix en vigueur le jour où il a été envoyé. Une table publique en ligne sert uniquement de vigie : elle est comparée chaque jour à la table embarquée et signale une dérive, sans jamais fixer un prix. Une session dont le modèle n'a pas de tarif connu est marquée « partiel », jamais arrondie à zéro en silence.
 - **Métadonnées uniquement.** Aucun contenu de prompt, de fichier, de sortie d'outil ni de commande n'est conservé — seulement des compteurs, des tailles et des noms d'outils.
 
 La base `~/.agent-viz/observatory.db` est un **dérivé jetable** : les transcripts restent la source de vérité, et la supprimer ne perd que les statuts « j'applique / ignorer » que vous avez posés sur les recommandations — elle se reconstruit au scan suivant (au démarrage, puis toutes les heures). Le bouton « Purger la base » de la page Conseils fait ce geste sans toucher au fichier : il vide la base (après confirmation) puis relance un scan complet.
 
-L'analyse repose sur le moteur `@vcueto/netgain`, **lié localement** (`npm link @vcueto/netgain`) et volontairement absent de `dependencies` : il n'est pas publié, et le déclarer casserait `npm install` pour les utilisateurs de ce dépôt. Sans lui, les deux pages affichent l'erreur exacte et **la vue temps réel continue de fonctionner normalement**.
+L'analyse repose sur le moteur `@vcueto/netgain`, déclaré en **dépendance** et installé avec agent-viz : il n'y a rien à brancher. Son code source vit dans ce dépôt (dossier `netgain/`), publié comme paquet distinct. Si le moteur venait à manquer — installation abîmée —, les deux pages affichent l'erreur exacte et **la vue temps réel continue de fonctionner normalement**.
 
 ## Multi-agent support
 
@@ -191,8 +191,25 @@ The server purges old sessions on boot and every hour.
 
 ## Requirements
 
-- Node.js ≥ 18
+- Node.js ≥ 24
 - Claude Code installed and configured
+
+## Development
+
+This repository holds two packages: `@vcueto/agent-viz` (root) and the analysis engine
+`@vcueto/netgain` (`netgain/`), wired together as an npm workspace.
+
+```bash
+git clone https://github.com/pitchan/agent-viz.git
+cd agent-viz
+npm install                  # links the engine workspace — no npm link needed
+npm run build -w netgain     # the engine is TypeScript; dist/ is not committed
+npm start                    # dashboard on http://localhost:3333
+```
+
+Tests: `npm test` (product, node --test) and `npm test -w netgain` (engine, vitest).
+After changing engine source, rebuild it (`npm run build -w netgain`) — the product loads the
+compiled `dist/`.
 
 ## License
 
