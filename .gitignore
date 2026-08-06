@@ -3,6 +3,7 @@
 .superpowers/
 docs/superpowers/
 node_modules/
+netgain/dist/
 *.tgz
 .github/hooks/agent-viz.local.json
 # Stray Playwright artifacts that escape .playwright-mcp/ when a tool call

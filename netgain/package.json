@@ -1,0 +1,38 @@
+{
+  "name": "@vcueto/netgain",
+  "version": "0.13.0",
+  "private": true,
+  "description": "Mesurer net, jamais brut â€” distribution factuelle des tokens des sessions d'agents (Claude Code). Local-only, lecture seule, zÃ©ro compteur Â« saved Â».",
+  "type": "module",
+  "engines": {
+    "node": ">=20.12"
+  },
+  "bin": {
+    "netgain": "./dist/cli.js",
+    "netgain-map": "./dist/mcp/main.js"
+  },
+  "exports": {
+    ".": "./dist/doctor/index.js",
+    "./doctor": "./dist/doctor/index.js",
+    "./core": "./dist/core/index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx src/cli.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "typescript": "5.9.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.0",
+    "tsx": "^4.20.0",
+    "vitest": "^3.2.0"
+  }
+}
