@@ -63,7 +63,7 @@ test('install: refreshes existing hook whose timeout drifted (5 → 10)', () => 
   fs.mkdirSync(path.join(projectRoot, '.git'));
   // Pre-existing hook with the exact desired command BUT obsolete timeout=5.
   // Without the upgrade path, this would noop and the timeout would stay 5.
-  const command = 'npx --yes agent-viz@9.9.9-test hook --source=claude';
+  const command = 'npx --yes @vcueto/agent-viz@9.9.9-test hook --source=claude';
   const settingsFile = path.join(projectRoot, '.claude', 'settings.json');
   fs.mkdirSync(path.dirname(settingsFile), { recursive: true });
   fs.writeFileSync(settingsFile, JSON.stringify({

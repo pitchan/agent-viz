@@ -7,7 +7,7 @@ Real-time visualizer for [Claude Code](https://docs.claude.com/en/docs/claude-co
 Two commands and you're done:
 
 ```bash
-npm install -g agent-viz
+npm install -g @vcueto/agent-viz
 agent-viz
 ```
 
@@ -28,7 +28,7 @@ agent-viz stop
 ### Try it once without installing
 
 ```bash
-npx agent-viz
+npx @vcueto/agent-viz
 ```
 
 Same behavior as the global install, **but slower in practice**: each Claude Code hook firing pays an npx cold-start cost (~300–800 ms) because the binary is resolved from a temp cache. For daily use, prefer the global install above (~40–80 ms per hook firing).
@@ -36,7 +36,7 @@ Same behavior as the global install, **but slower in practice**: each Claude Cod
 ### Per-project install
 
 ```bash
-npm install --save-dev agent-viz
+npm install --save-dev @vcueto/agent-viz
 npx agent-viz
 ```
 
@@ -157,14 +157,14 @@ Two steps, **in order** — npm 7+ no longer runs lifecycle scripts on uninstall
 
 ```bash
 agent-viz uninstall-hooks    # remove agent-viz hooks from all scopes
-npm uninstall -g agent-viz   # then remove the package
+npm uninstall -g @vcueto/agent-viz   # then remove the package
 ```
 
 If you skipped step 1 (or uninstalled an older version), Claude Code will start logging `Cannot find module` errors at every hook firing. Recover with:
 
 ```bash
 # Easiest — npx fetches a fresh agent-viz just to run the cleanup:
-npx --yes agent-viz@latest uninstall-hooks
+npx --yes @vcueto/agent-viz@latest uninstall-hooks
 
 # Or hand-edit ~/.claude/settings.json and remove every hook entry whose
 # `command` mentions "agent-viz".
