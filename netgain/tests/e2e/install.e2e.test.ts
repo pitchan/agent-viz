@@ -1,12 +1,17 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { canonicalProjectKey, missingDistFiles } from '../../src/install/paths.js';
 
 const netgainRoot = path.resolve(import.meta.dirname, '..', '..');
-const tsxCli = path.join(netgainRoot, 'node_modules', 'tsx', 'dist', 'cli.mjs');
+// Résolu par NOM et non par chemin figé : un espace de travail npm hisse les
+// dépendances vers la racine du dépôt, où ce test doit les retrouver aussi.
+// `tsx` n'exporte pas dist/cli.mjs, d'où le détour par son package.json.
+const requireFromHere = createRequire(import.meta.url);
+const tsxCli = path.join(path.dirname(requireFromHere.resolve('tsx/package.json')), 'dist', 'cli.mjs');
 
 const home = mkdtempSync(path.join(tmpdir(), 'netgain-install-home-'));
 const repo = mkdtempSync(path.join(tmpdir(), 'netgain-install-repo-'));
@@ -18,7 +23,7 @@ afterAll(() => {
 beforeAll(() => {
   // `on` exige dist présent (l'entrée MCP pointe dist/) — build si absent
   if (missingDistFiles(netgainRoot).length > 0) {
-    execFileSync(process.execPath, [path.join(netgainRoot, 'node_modules', 'typescript', 'bin', 'tsc'), '-p', 'tsconfig.build.json'], {
+    execFileSync(process.execPath, [requireFromHere.resolve('typescript/bin/tsc'), '-p', 'tsconfig.build.json'], {
       cwd: netgainRoot,
     });
   }

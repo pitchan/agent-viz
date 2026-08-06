@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, describe, expect, test } from 'vitest';
@@ -172,7 +173,11 @@ describe('conseil « préfixe modifié » dans le rendu terminal', () => {
 describe('CLI bout-en-bout', () => {
   test('netgain doctor --json écrit un rapport JSON valide sur stdout, exit 0', () => {
     const netgainRoot = path.resolve(import.meta.dirname, '..', '..');
-    const tsxCli = path.join(netgainRoot, 'node_modules', 'tsx', 'dist', 'cli.mjs');
+    // Résolu par NOM et non par chemin figé : un espace de travail npm hisse les
+    // dépendances vers la racine du dépôt, où ce test doit les retrouver aussi.
+    // `tsx` n'exporte pas dist/cli.mjs, d'où le détour par son package.json.
+    const requireFromHere = createRequire(import.meta.url);
+    const tsxCli = path.join(path.dirname(requireFromHere.resolve('tsx/package.json')), 'dist', 'cli.mjs');
     const out = execFileSync(
       process.execPath,
       [tsxCli, path.join(netgainRoot, 'src', 'cli.ts'), 'doctor', '--json', '--claude-dir', claudeDir],
