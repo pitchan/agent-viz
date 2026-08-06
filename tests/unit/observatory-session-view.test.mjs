@@ -12,6 +12,18 @@ test('a session row carries id, project, model, cost, tokens, duration and kind 
   }), ['sess-abc', 'F--proj', 'claude-opus-4-8', '1,50 $', '1.2M', '30 min', 'humain']);
 });
 
+// The "Projet" cell shows the real working directory the service resolved. The
+// slug stays the fallback — the test above, which passes no projectPath at all,
+// pins that fallback and must keep passing untouched.
+test('the project cell shows the real path when the service resolved one', () => {
+  assert.equal(sessionRow({
+    id: 'sess-abcdef12', project: 'F--DEV-Demo-IA-OPTIM-SKILLS-TOKEN-SAVERS',
+    projectPath: 'F:\\DEV\\Demo IA OPTIM\\SKILLS TOKEN SAVERS',
+    modelMain: 'claude-opus-5', costUsd: 1, costComplete: true, netTokens: 10,
+    startedAt: null, endedAt: null, sessionKind: 'interactive',
+  })[1], 'F:\\DEV\\Demo IA OPTIM\\SKILLS TOKEN SAVERS');
+});
+
 test('sessionRow shows the kind badge — headless → machine, null/unknown → ?', () => {
   const base = {
     id: 's', project: 'p', modelMain: 'm', costUsd: 1, costComplete: true, netTokens: 10,

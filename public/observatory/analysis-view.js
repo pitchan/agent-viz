@@ -21,7 +21,9 @@ const kindBadgeOf = kind => KIND_BADGE[kind] ?? '?';
 export function sessionRow(session) {
   return [
     session.id.slice(0, 8),
-    session.project,
+    // Le vrai chemin de travail quand le service a su le lire ; le slug encodé
+    // par Claude Code sinon — jamais une cellule vide.
+    session.projectPath || session.project,
     session.modelMain || '—',
     session.costComplete ? formatUsd(session.costUsd) : `${formatUsd(session.costUsd)} (partiel)`,
     formatTokens(session.netTokens),

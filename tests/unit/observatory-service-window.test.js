@@ -120,3 +120,34 @@ test('scan persists 90 days but evaluates advice on the requested window, human 
     assert.equal(rec.periodTo, NOW.toISOString());
   }
 });
+
+// The project label is put on here and nowhere else: the rules only carry the
+// slug as an identity. The service is therefore the seam that must be pinned.
+test('scan names the project with the real working directory, keeping the slug as identity', async () => {
+  const row = { ...HUMAN_ROW, reportJson: JSON.stringify({ ...R1_REPORT, cwd: 'd:\\dvf-postgis-pipeline' }) };
+  const deps = fakeDeps({ rows: [row] });
+  await serviceOf(deps).scan({ days: 7 });
+  const rec = deps.calls.upserted.find(r => r.ruleId === 'R1');
+  assert.equal(rec.title, 'Préfixe de cache reconstruit en cours de session — projet D:\\dvf-postgis-pipeline');
+  assert.equal(rec.subject, 'F--dvf', 'the persisted identity stays the slug');
+});
+
+// A transcript that never declared a cwd is a real case, not an anomaly: the
+// card names the slug rather than going anonymous.
+test('a report without a cwd falls back to the slug in the title', async () => {
+  const deps = fakeDeps({ rows: [HUMAN_ROW] });
+  await serviceOf(deps).scan({ days: 7 });
+  const rec = deps.calls.upserted.find(r => r.ruleId === 'R1');
+  assert.equal(rec.title, 'Préfixe de cache reconstruit en cours de session — projet F--dvf');
+});
+
+test('sessions() exposes projectPath — the real path, or the slug when unknown', async () => {
+  const withCwd = { ...HUMAN_ROW, reportJson: JSON.stringify({ ...R1_REPORT, cwd: 'f:\\DEV\\x' }) };
+  const [named] = await serviceOf(fakeDeps({ rows: [withCwd] })).sessions();
+  assert.equal(named.projectPath, 'F:\\DEV\\x');
+  assert.equal(named.project, 'F--dvf');
+  assert.equal(named.reportJson, undefined, 'the full report never travels to the table view');
+
+  const [unnamed] = await serviceOf(fakeDeps({ rows: [HUMAN_ROW] })).sessions();
+  assert.equal(unnamed.projectPath, 'F--dvf');
+});
