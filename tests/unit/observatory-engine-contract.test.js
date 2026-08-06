@@ -125,6 +125,8 @@ test('the engine exposes the embedded price table and its version (v0.5.0 surfac
   assert.ok(table.entries.every(e => e.label && e.maxInput > 0 && typeof e.current.input === 'number'));
   assert.ok(Array.isArray(table.zeroCost) && table.zeroCost.length >= 2);
   assert.match(engine.version, /^\d+\.\d+\.\d+$/);
+  // Un seul outil, une seule version : le moteur ne peut plus dériver du produit.
+  assert.equal(engine.version, require('../../package.json').version);
 });
 
 test('the SessionReport carries per-model dollars (costByModel)', async () => {

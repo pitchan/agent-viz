@@ -71,7 +71,7 @@ Trois points à savoir :
 
 La base `~/.agent-viz/observatory.db` est un **dérivé jetable** : les transcripts restent la source de vérité, et la supprimer ne perd que les statuts « j'applique / ignorer » que vous avez posés sur les recommandations — elle se reconstruit au scan suivant (au démarrage, puis toutes les heures). Le bouton « Purger la base » de la page Conseils fait ce geste sans toucher au fichier : il vide la base (après confirmation) puis relance un scan complet.
 
-L'analyse repose sur le moteur `@vcueto/netgain`, déclaré en **dépendance** et installé avec agent-viz : il n'y a rien à brancher. Son code source vit dans ce dépôt (dossier `netgain/`), publié comme paquet distinct. Si le moteur venait à manquer — installation abîmée —, les deux pages affichent l'erreur exacte et **la vue temps réel continue de fonctionner normalement**.
+L'analyse repose sur le moteur netgain, qui **fait partie d'agent-viz** : même dépôt (dossier `netgain/`), même paquet, même version, même installation. Il n'y a rien à brancher ni à installer à côté. Si le moteur venait à manquer — installation abîmée —, les deux pages affichent l'erreur exacte et **la vue temps réel continue de fonctionner normalement**.
 
 ## Multi-agent support
 
@@ -196,20 +196,22 @@ The server purges old sessions on boot and every hour.
 
 ## Development
 
-This repository holds two packages: `@vcueto/agent-viz` (root) and the analysis engine
-`@vcueto/netgain` (`netgain/`), wired together as an npm workspace.
+One repository, **one package**: `@vcueto/agent-viz`. The analysis engine is not a separate
+package — its TypeScript source lives in `netgain/` and its compiled `dist/` ships inside the
+published tarball. `netgain/package.json` exists only to mark that subtree as ESM
+(`{"type":"module"}`) inside a CommonJS package; it must stay.
 
 ```bash
 git clone https://github.com/pitchan/agent-viz.git
 cd agent-viz
-npm install                  # links the engine workspace — no npm link needed
-npm run build -w netgain     # the engine is TypeScript; dist/ is not committed
+npm install
+npm run build                # the engine is TypeScript; dist/ is not committed
 npm start                    # dashboard on http://localhost:3333
 ```
 
-Tests: `npm test` (product, node --test) and `npm test -w netgain` (engine, vitest).
-After changing engine source, rebuild it (`npm run build -w netgain`) — the product loads the
-compiled `dist/`.
+Tests: `npm test` (product, node --test) and `npm run test:engine` (engine, vitest).
+After changing engine source, rebuild it (`npm run build`) — the product loads the compiled
+`dist/`. Publishing runs both suites and the build first (`prepublishOnly`).
 
 ## License
 

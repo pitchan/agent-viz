@@ -49,7 +49,9 @@ describe('serveur MCP map — protocole', () => {
     expect(res.result.protocolVersion).toBe('2025-06-18');
     expect(res.result.capabilities.tools).toBeDefined();
     expect(res.result.serverInfo.name).toBe('netgain-map');
-    const pkg = JSON.parse(readFileSync(path.resolve(import.meta.dirname, '..', '..', 'package.json'), 'utf8')) as { version: string };
+    // Un seul outil, une seule version : celle du package.json du produit, à la
+    // racine du dépôt (le moteur n'est plus un paquet distinct).
+    const pkg = JSON.parse(readFileSync(path.resolve(import.meta.dirname, '..', '..', '..', 'package.json'), 'utf8')) as { version: string };
     expect(res.result.serverInfo.version).toBe(pkg.version);
   });
 

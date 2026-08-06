@@ -52,9 +52,9 @@ test('an unsubscribed listener stops being called', async () => {
 test('a failing call records the exact error and clears loading', async () => {
   resetStore();
   await loadAdvisor(fakeApi({
-    fetchSummary: async () => { throw new Error("Cannot find package '@vcueto/netgain'"); },
+    fetchSummary: async () => { throw new Error("Cannot find module '/app/netgain/dist/core/index.js'"); },
   }));
-  assert.match(getState().error, /@vcueto\/netgain/);
+  assert.match(getState().error, /netgain[\\/]dist/);
   assert.equal(getState().loading, false);
   assert.equal(getState().summary, null);
 });

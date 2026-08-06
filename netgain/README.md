@@ -3,10 +3,10 @@
 > Mesurer **net**, jamais brut. Distribution factuelle des jetons de vos sessions d'agents —
 > local, lecture seule, zéro compteur « économisé ».
 
-Moteur d'analyse de l'Observatoire d'[agent-viz](https://github.com/pitchan/agent-viz),
-utilisable seul en ligne de commande. Il lit les transcripts Claude Code de votre poste
-(`~/.claude/projects/**.jsonl`) et répond à une seule question, avec des faits : **où partent
-vos jetons ?**
+Moteur d'analyse de l'Observatoire d'[agent-viz](https://github.com/pitchan/agent-viz).
+**Ce n'est pas un paquet séparé** : c'est un dossier d'agent-viz, livré et versionné avec lui.
+Il lit les transcripts Claude Code de votre poste (`~/.claude/projects/**.jsonl`) et répond à
+une seule question, avec des faits : **où partent vos jetons ?**
 
 Il fournit aussi `netgain-map`, un serveur MCP qui sert la carte exacte d'un dépôt (routes,
 variables d'environnement, graphe d'imports) pour éviter de la redécouvrir à la main.
@@ -14,11 +14,11 @@ variables d'environnement, graphe d'imports) pour éviter de la redécouvrir à 
 ## Installation
 
 ```bash
-npm install -g @vcueto/netgain
+npm install -g @vcueto/agent-viz
 ```
 
-Installé automatiquement comme dépendance d'`agent-viz` : si vous utilisez l'Observatoire,
-vous l'avez déjà.
+Il n'y a rien d'autre à installer : les commandes `netgain` et `netgain-map` ci-dessous sont
+posées par agent-viz, en même temps que l'interface web.
 
 ## Usage
 
@@ -106,14 +106,17 @@ fichier n'est jamais touché**. `netgain off` retire exactement ces deux entrée
 ## Développement
 
 Le moteur vit dans le dépôt [agent-viz](https://github.com/pitchan/agent-viz), dossier
-`netgain/`, comme espace de travail npm.
+`netgain/`. Son outillage (TypeScript, vitest) est déclaré à la racine : il n'y a qu'un seul
+`npm install` et qu'un seul `package.json` de plein droit. Celui de `netgain/` ne porte que
+`{"type":"module"}`, pour que Node lise ce sous-dossier comme des modules ES alors que le
+produit est en CommonJS.
 
 ```bash
 git clone https://github.com/pitchan/agent-viz.git
 cd agent-viz
 npm install
-npm run build -w netgain     # tsc → netgain/dist/
-npm test -w netgain          # suite du moteur
+npm run build            # tsc → netgain/dist/
+npm run test:engine      # suite du moteur (vitest)
 ```
 
 ## Limites connues

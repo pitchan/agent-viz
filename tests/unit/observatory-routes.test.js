@@ -158,11 +158,12 @@ test('POST /recommendations/:id accepts a known status, rejects anything else', 
 test('a missing engine answers 503 with the exact error, never an empty page', async () => {
   const broken = {
     ...SERVICE,
-    summary: async () => { const e = new Error("Cannot find package '@vcueto/netgain'"); e.engineMissing = true; throw e; },
+    // Message tel que Node le produit quand le moteur embarque n'a pas ete construit.
+    summary: async () => { const e = new Error("Cannot find module '/app/netgain/dist/core/index.js'"); e.engineMissing = true; throw e; },
   };
   const res = await router(broken)('GET', '/analysis/summary');
   assert.equal(res.statusCode, 503);
-  assert.match(JSON.parse(res.body).error, /@vcueto\/netgain/);
+  assert.match(JSON.parse(res.body).error, /netgain[\\/]dist/);
 });
 
 test('POST /analysis/purge wipes first, then starts a rebuild scan with the window', async () => {

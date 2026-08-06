@@ -112,7 +112,8 @@ function buildProvenanceBlock(provenance) {
   }
   const meta = document.createElement('p');
   meta.className = 'pricing-notice-meta';
-  meta.textContent = `Moteur netgain v${provenance.engineVersion} — analyse SCAN_VERSION ${provenance.scanVersion} — source des prix : ${provenance.priceSource}`;
+  // Le moteur n'a plus de version propre : il est livré dans agent-viz, à sa version.
+  meta.textContent = `Moteur netgain (agent-viz v${provenance.engineVersion}) — analyse SCAN_VERSION ${provenance.scanVersion} — source des prix : ${provenance.priceSource}`;
   wrap.appendChild(meta);
   return wrap;
 }
