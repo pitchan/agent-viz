@@ -2,7 +2,7 @@
   "name": "@vcueto/netgain",
   "version": "0.14.0",
   "license": "MIT",
-  "description": "Mesurer net, jamais brut â€” distribution factuelle des tokens des sessions d'agents (Claude Code). Local-only, lecture seule, zÃ©ro compteur Â« saved Â».",
+  "description": "Mesurer net, jamais brut — distribution factuelle des tokens des sessions d'agents (Claude Code). Local-only, lecture seule, zéro compteur « saved ».",
   "type": "module",
   "engines": {
     "node": ">=20.12"
