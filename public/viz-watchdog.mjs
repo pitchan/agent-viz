@@ -50,10 +50,11 @@ function hashInput(toolInput) {
 // needs — partitioned by concern, so detectors don't step on each other.
 function emptyBuffer() {
   return {
-    recent: [],          // [{ ts, sig }] — last N PreToolUse signatures
+    recent: [],          // [{ ts, sig, toolUseId, failed }] — last N PreToolUse
     failures: new Map(), // toolName → consecutive failure count
     running: new Map(),  // tool_use_id → in-flight tool record
     lastEventAt: null,   // event time of the last event seen for the session
+    cwd: '',             // where the session runs — the panel groups by it
   };
 }
 
@@ -79,12 +80,13 @@ function actor(evt) {
 function makeAlert({
   type, sessionId, toolName = '', count, createdAt, message,
   agentId = '', agentType = '', subject = '', occurrences = [], tools = [],
+  cwd = '',
 }) {
   const scope = agentId ? `${sessionId}:${agentId}` : sessionId;
   return {
     id: toolName ? `${type}:${scope}:${toolName}` : `${type}:${scope}`,
     type, sessionId, toolName, count, createdAt, message,
-    agentId, agentType, subject, occurrences, tools,
+    agentId, agentType, subject, occurrences, tools, cwd,
     acknowledged: false,
   };
 }
@@ -102,29 +104,61 @@ function makeAlert({
 // Every window a detector measures is measured in the event stream's own time,
 // so a burst that arrives as one replayed batch keeps the shape it really had.
 
+// What we can honestly say about a set of outcomes. A call still in flight
+// carries `failed: null` — unknown is not success, and "all failing" about a
+// set that contains an unknown would be a claim we cannot back. So the phrase
+// is built from what came back, and stays silent when nothing did.
+function failureSuffix(occurrences) {
+  const known = occurrences.filter(o => o.failed !== null);
+  const failed = known.filter(o => o.failed);
+  if (failed.length === 0) return '';
+  return failed.length === known.length ? ' — all failing' : ` — ${failed.length} failing`;
+}
+
 const DETECTORS = {
   loop: {
     onEvent(ctx, evt, ts) {
-      if (evt.hook_event_name !== 'PreToolUse') return null;
       const sid = evt.session_id;
       if (!sid || !evt.tool_name) return null;
       const buf = getSessionBuffer(ctx.state, sid);
+      const name = evt.hook_event_name;
+      // How a call ended is only known when it comes back. Write the outcome
+      // onto the occurrence already recorded, so an alert raised later can say
+      // whether what repeated was a repetition of failures.
+      if (name === 'PostToolUse' || name === 'PostToolUseFailure') {
+        // A human pressing Escape ends the call without telling us anything
+        // about the command: the outcome stays unknown rather than becoming
+        // "failed". Counting someone taking back control as a fault is the
+        // exact kind of false alarm this watchdog exists to not make.
+        if (evt.tool_use_id && !evt.is_interrupt) {
+          for (const e of buf.recent) {
+            if (e.toolUseId === evt.tool_use_id) { e.failed = name === 'PostToolUseFailure'; break; }
+          }
+        }
+        return null;
+      }
+      if (name !== 'PreToolUse') return null;
       const who = actor(evt);
       // The agent is part of the signature: two subagents each calling the
       // same command twice is four calls and no loop.
       const sig = `${who.agentId}:${evt.tool_name}:${hashInput(evt.tool_input)}`;
-      buf.recent.push({ ts, sig });
+      buf.recent.push({ ts, sig, toolUseId: evt.tool_use_id || '', failed: null });
       if (buf.recent.length > ctx.thresholds.loop.bufferSize) buf.recent.shift();
       const windowStart = ts - ctx.thresholds.loop.windowMs;
       const occurrences = [];
-      for (const e of buf.recent) if (e.sig === sig && e.ts >= windowStart) occurrences.push(e.ts);
+      for (const e of buf.recent) {
+        if (e.sig === sig && e.ts >= windowStart) {
+          occurrences.push({ ts: e.ts, toolUseId: e.toolUseId, failed: e.failed });
+        }
+      }
       if (occurrences.length >= ctx.thresholds.loop.count) {
-        const spanSecs = Math.round((ts - occurrences[0]) / 1000);
+        const spanSecs = Math.round((ts - occurrences[0].ts) / 1000);
         return makeAlert({
           type: 'loop', sessionId: sid, toolName: evt.tool_name,
           count: occurrences.length, createdAt: ts, ...who,
-          subject: toolSubject(evt), occurrences,
-          message: `${evt.tool_name} called ${occurrences.length}× with the same input in ${spanSecs}s`,
+          subject: toolSubject(evt), occurrences, cwd: evt.cwd || '',
+          message: `${evt.tool_name} called ${occurrences.length}× with the same input in ${spanSecs}s`
+                 + failureSuffix(occurrences),
         });
       }
       return null;
@@ -143,6 +177,7 @@ const DETECTORS = {
           return makeAlert({
             type: 'retryStorm', sessionId: sid, toolName: evt.tool_name,
             count: cur, createdAt: ts, ...actor(evt), subject: toolSubject(evt),
+            cwd: evt.cwd || '',
             message: `${cur} consecutive failures on ${evt.tool_name}`,
           });
         }
@@ -163,6 +198,9 @@ const DETECTORS = {
       if (!sid) return null;
       const buf = getSessionBuffer(ctx.state, sid);
       buf.lastEventAt = ts;
+      // onTick has no event to read: the session's project has to be kept
+      // here, where events go past, or a stuck alert could not name it.
+      if (evt.cwd) buf.cwd = evt.cwd;
       const name = evt.hook_event_name;
       if (name === 'PreToolUse' && evt.tool_use_id) {
         // Record enough to answer "what is it stuck on?" without going back to
@@ -200,7 +238,7 @@ const DETECTORS = {
         if (silence >= ctx.thresholds.stuck.abandonedMs) continue;
         alerts.push(makeAlert({
           type: 'stuck', sessionId: sid, count: buf.running.size, createdAt: tickNow,
-          tools: [...buf.running.values()],
+          tools: [...buf.running.values()], cwd: buf.cwd,
           // An absolute time, never a duration. This message is written once
           // and re-read for as long as the alert lives; "for 180s" is true for
           // one second and false for every second after.

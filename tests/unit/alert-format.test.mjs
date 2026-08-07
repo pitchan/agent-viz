@@ -18,7 +18,8 @@ function loopAlert(over = {}) {
     type: 'loop', sessionId: 'sid-abcdef12', toolName: 'Bash', count: 4,
     createdAt: at(14, 3, 24), message: 'Bash called 4× with the same input in 15s',
     agentId: '', agentType: '', subject: 'npm test',
-    occurrences: [at(14, 3, 9), at(14, 3, 14), at(14, 3, 19), at(14, 3, 24)],
+    occurrences: [at(14, 3, 9), at(14, 3, 14), at(14, 3, 19), at(14, 3, 24)]
+      .map((ts, i) => ({ ts, toolUseId: `t${i}`, failed: null })),
     tools: [], acknowledged: false, id: 'loop:sid-abcdef12:Bash', ...over,
   };
 }

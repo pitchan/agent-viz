@@ -37,7 +37,7 @@ export function alertActor({ agentId, agentType }) {
 
 const DETAIL_LINES = {
   loop: a => (a.occurrences.length
-    ? [`Repeats at ${a.occurrences.map(clockTime).join(', ')}`]
+    ? [`Repeats at ${a.occurrences.map(o => clockTime(o.ts)).join(', ')}`]
     : []),
   stuck: (a) => {
     // Clock first: the list is read by scanning its left edge. The actor is

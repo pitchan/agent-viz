@@ -43,7 +43,11 @@ test('loop alert carries one real timestamp per repeat', () => {
   const times = [T - 15_000, T - 10_000, T - 5_000, T];
   let last = [];
   times.forEach((at, i) => { last = wd.processEvent(pre({ at, id: `t${i}` })).newAlerts; });
-  assert.deepEqual(last[0].occurrences, times, 'the panel must be able to print the four real clock times');
+  assert.deepEqual(
+    last[0].occurrences,
+    times.map((ts, i) => ({ ts, toolUseId: `t${i}`, failed: null })),
+    'the panel must be able to print the four real clock times',
+  );
 });
 
 test('loop alert names the agent that ran the calls', () => {
