@@ -104,15 +104,18 @@ function makeAlert({
 // Every window a detector measures is measured in the event stream's own time,
 // so a burst that arrives as one replayed batch keeps the shape it really had.
 
-// What we can honestly say about a set of outcomes. A call still in flight
-// carries `failed: null` — unknown is not success, and "all failing" about a
-// set that contains an unknown would be a claim we cannot back. So the phrase
-// is built from what came back, and stays silent when nothing did.
+// What we can honestly say about a set of outcomes.
+//
+// A count, never a quantifier. The alert is raised ON the repeating call, so
+// that call's outcome has not come back yet and — the alert being a snapshot —
+// never will. "All failing" would therefore be a claim about something we have
+// not seen and cannot see, in the one tool whose job is to not over-claim. A
+// count with a visible denominator says exactly as much as we know: three of
+// the four came back failing, and the reader can see that four were counted.
 function failureSuffix(occurrences) {
-  const known = occurrences.filter(o => o.failed !== null);
-  const failed = known.filter(o => o.failed);
+  const failed = occurrences.filter(o => o.failed === true);
   if (failed.length === 0) return '';
-  return failed.length === known.length ? ' — all failing' : ` — ${failed.length} failing`;
+  return ` — ${failed.length} of ${occurrences.length} failing`;
 }
 
 const DETECTORS = {

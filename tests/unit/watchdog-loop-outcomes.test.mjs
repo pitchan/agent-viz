@@ -48,9 +48,15 @@ test('loop: chaque occurrence porte son identifiant et son issue', () => {
     'le dernier appel est encore en vol : son issue est inconnue, pas fausse');
 });
 
-test('loop: le libelle dit "all failing" quand tout ce qui est connu a echoue', () => {
+test('loop: le libelle COMPTE les echecs, il ne quantifie jamais', () => {
   const wd = createWatchdog({ now: () => T + 10_000 });
-  assert.match(runFailingLoop(wd).message, /all failing$/);
+  // 4 appels, 3 revenus en echec, le 4e encore en vol. Dire « all failing »
+  // affirmerait sur un appel dont l'issue n'est pas connue — et qui ne le sera
+  // jamais, l'alerte etant une photographie.
+  const alert = runFailingLoop(wd);
+  assert.ok(alert, 'la boucle doit lever une alerte');
+  assert.match(alert.message, / — 3 of 4 failing$/);
+  assert.doesNotMatch(alert.message, /\ball\b/);
 });
 
 test('loop: une repetition qui reussit ne parle pas d echec', () => {
@@ -61,6 +67,7 @@ test('loop: une repetition qui reussit ne parle pas d echec', () => {
     if (r.newAlerts.length) last = r.newAlerts[0];
     if (i < 4) wd.processEvent(post(i, T + i * 1000 + 500, false));
   }
+  assert.ok(last, 'la boucle doit lever une alerte');
   assert.doesNotMatch(last.message, /failing/);
 });
 
@@ -72,7 +79,8 @@ test('loop: une repetition en partie en echec compte, elle ne generalise pas', (
     if (r.newAlerts.length) last = r.newAlerts[0];
     if (i < 4) wd.processEvent(post(i, T + i * 1000 + 500, i === 1));
   }
-  assert.match(last.message, /1 failing$/);
+  assert.ok(last, 'la boucle doit lever une alerte');
+  assert.match(last.message, / — 1 of 4 failing$/);
 });
 
 test('une interruption humaine n est pas un echec de la commande', () => {
@@ -84,6 +92,7 @@ test('une interruption humaine n est pas un echec de la commande', () => {
     // Echap humain : l appel s arrete, mais on n apprend RIEN sur la commande.
     if (i < 4) wd.processEvent({ ...post(i, T + i * 1000 + 500, true), is_interrupt: true });
   }
+  assert.ok(last, 'la boucle doit lever une alerte');
   assert.deepEqual(last.occurrences.map(o => o.failed), [null, null, null, null],
     'inconnu, pas echoue : compter une reprise en main comme une panne serait une fausse alerte');
   assert.doesNotMatch(last.message, /failing/);
@@ -92,6 +101,18 @@ test('une interruption humaine n est pas un echec de la commande', () => {
 test('toute alerte porte le projet ou elle s est produite', () => {
   const wd = createWatchdog({ now: () => T + 10_000 });
   assert.equal(runFailingLoop(wd).cwd, 'f:\\DEV\\projet');
+});
+
+test('retryStorm porte lui aussi le projet', () => {
+  const wd = createWatchdog({ now: () => T + 10_000 });
+  let last = null;
+  for (let i = 1; i <= 3; i++) {
+    const r = wd.processEvent(post(i, T + i * 1000, true));
+    if (r.newAlerts.length) last = r.newAlerts[0];
+  }
+  assert.ok(last, 'trois echecs consecutifs doivent lever une alerte');
+  assert.equal(last.type, 'retryStorm');
+  assert.equal(last.cwd, 'f:\\DEV\\projet');
 });
 
 test('stuck porte aussi le projet, sans avoir d evenement sous la main', () => {
@@ -136,4 +157,19 @@ test('un releve reel de PostToolUseFailure marque bien son occurrence en echec',
   assert.equal(last.occurrences[0].toolUseId, failureEvent.tool_use_id);
   assert.deepEqual(last.occurrences.map(o => o.failed), [true, null, null, null]);
   assert.equal(last.cwd, failureEvent.cwd);
+  assert.match(last.message, / — 1 of 4 failing$/,
+    'un seul echec connu sur quatre se dit comme tel, jamais « all »');
+});
+
+// `error` et `duration_ms` ne sont consommes par aucun detecteur aujourd hui,
+// et c est exactement pourquoi ils ont besoin d une assertion : sans elle, les
+// retirer du releve laisserait la suite verte et ce que la sonde de la tache 1
+// avait etabli serait perdu en silence. On epingle la FORME, pas un libelle.
+test('le releve garde la forme que la sonde a etablie', () => {
+  assert.equal(typeof failureEvent.error, 'string',
+    'error est une chaine plate, pas l objet structure qu annonçait une source secondaire');
+  assert.match(failureEvent.error, /^Exit code \d+\n[\s\S]+$/,
+    'code de sortie puis stderr, colles par un \\n');
+  assert.ok(Number.isFinite(failureEvent.duration_ms),
+    'duration_ms est une duree en millisecondes');
 });

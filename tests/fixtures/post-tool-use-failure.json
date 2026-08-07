@@ -1,8 +1,8 @@
 {
-  "session_id": "cc556e59-9a05-40d3-97fb-1d7a5e088ab3",
-  "transcript_path": "C:\\Users\\Vincent\\.claude\\projects\\F--DEV-agent-viz\\cc556e59-9a05-40d3-97fb-1d7a5e088ab3.jsonl",
-  "cwd": "F:\\DEV\\agent-viz",
-  "prompt_id": "15c27d4b-31e2-407f-bdef-0a5a271f56fe",
+  "session_id": "00000000-0000-4000-8000-000000000001",
+  "transcript_path": "C:\\Users\\dev\\.claude\\projects\\C--dev-demo-projet\\00000000-0000-4000-8000-000000000001.jsonl",
+  "cwd": "C:\\dev\\demo-projet",
+  "prompt_id": "00000000-0000-4000-8000-000000000002",
   "permission_mode": "default",
   "effort": {
     "level": "xhigh"
@@ -13,7 +13,7 @@
     "command": "bash -c \"echo sonde-echec >&2; exit 3\"",
     "description": "Run probe command that writes to stderr and exits 3"
   },
-  "tool_use_id": "toolu_01MdgZwksEYbX8Ldz4RPTxk9",
+  "tool_use_id": "toolu_01AAAAAAAAAAAAAAAAAAAAAA",
   "error": "Exit code 3\nsonde-echec",
   "is_interrupt": false,
   "duration_ms": 1098,
