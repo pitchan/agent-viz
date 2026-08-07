@@ -10,6 +10,7 @@ import {
 } from './viz-state.js';
 import { markNarratorDirty } from './viz-narrator.js';
 import { feedEvent as feedWatchdog } from './viz-watchdog-client.js';
+import { toolSubject } from './viz-tool-subject.mjs';
 
 // ─── Feed-cursor adjust hook ──────────────────────────────────────────────
 // When the timeline ring-buffer shifts, viz-ui's _feedRenderedCount must be
@@ -344,18 +345,11 @@ export function calcDuration(start, end) {
   return `${(ms / 60000).toFixed(1)}m`;
 }
 
+// Feed label: the shared subject rule, cut to the width the feed column can
+// show. The rule itself lives in viz-tool-subject.mjs — the watchdog needs the
+// same answer at a different length.
 export function formatToolSub(evt) {
-  if (!evt.tool_input) return '';
-  const ti = evt.tool_input;
-  if (evt.tool_name === 'Bash') return (ti.command || '').slice(0, 45);
-  if (evt.tool_name === 'Read') return (ti.file_path || '').split(/[/\\]/).pop();
-  if (evt.tool_name === 'Write') return (ti.file_path || '').split(/[/\\]/).pop();
-  if (evt.tool_name === 'Edit') return (ti.file_path || '').split(/[/\\]/).pop();
-  if (evt.tool_name === 'Grep') return (ti.pattern || '').slice(0, 45);
-  if (evt.tool_name === 'Glob') return (ti.pattern || '').slice(0, 45);
-  if (evt.tool_name === 'Agent') return (ti.description || '').slice(0, 45);
-  if (evt.tool_name === 'Skill') return (ti.skill || '').slice(0, 45);
-  return '';
+  return toolSubject(evt).slice(0, 45);
 }
 
 // ─── Layout (incremental orbital) ─────────────────────────────────────────

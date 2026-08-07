@@ -156,12 +156,24 @@ body {
 #alerts-close:hover { background: var(--glass-hover); color: var(--text-primary); }
 #alerts-list { flex: 1; overflow-y: auto; padding: 8px; }
 .alert-item {
-  display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center;
+  display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: start;
   padding: 10px 12px; border-radius: 8px; margin-bottom: 4px;
   background: rgba(255, 85, 102, 0.05);
   border: 1px solid rgba(255, 85, 102, 0.18);
 }
 .alert-info { overflow: hidden; min-width: 0; }
+/* A command is arbitrary text in a fixed-width panel: wrap it, including
+   mid-token, so a long one-word path grows the row downward and never pushes
+   the popup sideways. */
+.alert-subject {
+  font-family: var(--font-mono, ui-monospace, monospace); font-size: 11px;
+  color: var(--text-secondary, var(--text-dim)); margin-bottom: 2px;
+  overflow-wrap: anywhere; white-space: pre-wrap;
+}
+.alert-detail {
+  font-size: 10px; color: var(--text-dim); margin-bottom: 2px;
+  overflow-wrap: anywhere; font-variant-numeric: tabular-nums;
+}
 .alert-type { font-size: 9px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--error); font-weight: 700; margin-bottom: 2px; }
 .alert-msg { font-size: 12px; color: var(--text-primary); margin-bottom: 2px; }
 .alert-meta { font-size: 10px; color: var(--text-muted); font-variant-numeric: tabular-nums; }

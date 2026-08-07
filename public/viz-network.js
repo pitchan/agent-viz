@@ -13,7 +13,15 @@ import {
 import {
   pauseTick, resumeTick, markNarratorDirty,
 } from './viz-narrator.js';
-import { raiseExternalAlert } from './viz-watchdog-client.js';
+import { raiseExternalAlert, setObserving } from './viz-watchdog-client.js';
+
+// ─── Transport health ─────────────────────────────────────────────────────
+// The watchdog's stuck detector concludes from an absence of events, so it
+// has to be told when an absence means nothing: the stream is down, or the
+// tab is hidden and we closed it ourselves. Healthy = the stream is up, or
+// the poll fallback is still answering.
+let _lastPollOk = true;
+function refreshObserving() { setObserving(sseConnected || _lastPollOk); }
 
 // Render a small pill badge identifying the source agent. Returns HTML safe to
 // inline (label is fixed, no user input).
@@ -84,12 +92,14 @@ export function connectSSE() {
     sseConnected = true;
     connDot.classList.add('connected');
     connDot.title = 'Connected';
+    refreshObserving();
     stopPollFallback();
   };
   sseSource.onerror = () => {
     sseConnected = false;
     connDot.classList.remove('connected');
     connDot.title = 'Disconnected';
+    refreshObserving();
     startPollFallback();
   };
   sseSource.onmessage = (msg) => {
@@ -196,7 +206,12 @@ export async function poll(force) {
     }
     if (firstBatch && state.nodes.size) { firstBatch = false; _pendingFitView = true; }
     scheduleRender();
-  } catch {}
+    _lastPollOk = true;
+    refreshObserving();
+  } catch {
+    _lastPollOk = false;
+    refreshObserving();
+  }
 }
 
 // ─── Sessions list ────────────────────────────────────────────────────────
@@ -318,6 +333,9 @@ function pauseApp() {
   _paused = true;
   if (sseSource) { sseSource.close(); sseSource = null; sseConnected = false; }
   stopPollFallback();
+  // We are about to stop listening on purpose. Nothing that follows is the
+  // agent going quiet.
+  setObserving(false);
   stopDurationsTicker();
   pauseTick();
   if (vis.rafHandle != null) { cancelAnimationFrame(vis.rafHandle); vis.rafHandle = null; }
@@ -327,7 +345,7 @@ function resumeApp() {
   if (!_paused) return;
   _paused = false;
   connectSSE();
-  poll(true);
+  poll(true);   // re-poll first: the file, not the gap, says what happened
   resumeTick();
   markDirty();
 }

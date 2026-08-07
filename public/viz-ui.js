@@ -22,8 +22,11 @@ import {
   composeNarrator, setRenderFn, resumeTick,
 } from './viz-narrator.js';
 import {
-  getActiveAlerts, acknowledgeAlert, onNewAlerts,
+  getActiveAlerts, acknowledgeAlert, onAlertsChanged,
 } from './viz-watchdog-client.js';
+import {
+  alertActor, alertDetailLines, notificationPayload, truncate,
+} from './viz-alert-format.mjs';
 
 // ─── Feed panel ───────────────────────────────────────────────────────────
 let _feedRenderedCount = 0;
@@ -440,12 +443,24 @@ function _watchdogDOM() {
   return _watchdogEls;
 }
 
+// The wording comes from viz-alert-format (shared with the OS notification);
+// this function only decides which element each line lands in.
 function alertItemHTML(a) {
+  const subject = a.subject
+    ? `<div class="alert-subject">${esc(truncate(a.subject))}</div>` : '';
+  const details = alertDetailLines(a)
+    .map(line => `<div class="alert-detail">${esc(line)}</div>`).join('');
+  const meta = [
+    a.sessionId ? `session ${a.sessionId.slice(0, 8)}` : a.toolName || '',
+    a.type === 'stuck' ? '' : alertActor(a),
+  ].filter(Boolean).join(' · ');
   return `<div class="alert-item">
     <div class="alert-info">
       <div class="alert-type">${esc(a.type)}</div>
       <div class="alert-msg">${esc(a.message)}</div>
-      <div class="alert-meta">${a.sessionId ? `session ${esc(a.sessionId.slice(0, 8))}` : esc(a.toolName || '')}</div>
+      ${subject}
+      ${details}
+      <div class="alert-meta">${esc(meta)}</div>
     </div>
     <button class="alert-ack" data-id="${esc(a.id)}">Ack</button>
   </div>`;
@@ -503,11 +518,12 @@ function notifyDesktop(alert) {
     Notification.requestPermission().catch(() => {});
   }
   if (Notification.permission !== 'granted') return;
-  try { new Notification(`agent-viz: ${alert.type}`, { body: alert.message, tag: alert.id }); }
+  const { title, body } = notificationPayload(alert);
+  try { new Notification(title, { body, tag: alert.id }); }
   catch {}
 }
 
-onNewAlerts((alerts) => {
+onAlertsChanged((alerts) => {
   renderWatchdogPill();
   for (const a of alerts) notifyDesktop(a);
 });

@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  raiseExternalAlert, getActiveAlerts, acknowledgeAlert, onNewAlerts,
+  raiseExternalAlert, getActiveAlerts, acknowledgeAlert, onAlertsChanged,
 } from '../../public/viz-watchdog-client.js';
 
 const drift = id => ({
@@ -14,7 +14,7 @@ const drift = id => ({
 
 test('a raised external alert becomes active and notifies listeners', () => {
   const seen = [];
-  const off = onNewAlerts(a => seen.push(...a));
+  const off = onAlertsChanged(a => seen.push(...a));
   raiseExternalAlert(drift('pricingDrift:a'));
   off();
   assert.equal(seen.length, 1);
@@ -24,7 +24,7 @@ test('a raised external alert becomes active and notifies listeners', () => {
 test('the same id does not fire twice while active', () => {
   raiseExternalAlert(drift('pricingDrift:b'));
   const seen = [];
-  const off = onNewAlerts(a => seen.push(...a));
+  const off = onAlertsChanged(a => seen.push(...a));
   raiseExternalAlert(drift('pricingDrift:b'));
   off();
   assert.equal(seen.length, 0);
