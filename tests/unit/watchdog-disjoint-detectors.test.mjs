@@ -1,16 +1,21 @@
-// Once failures are visible, the documented worst case — an agent re-running
-// the same failing command — satisfies BOTH detectors: loop (same input, four
-// times) and retryStorm (three failures in a row). Two badges for one incident
-// is exactly the alert fatigue this product exists to avoid.
+// Une fois les échecs visibles, le pire cas documenté — un agent qui relance
+// la même commande qui plante — satisfait les DEUX détecteurs : loop (même
+// entrée, quatre fois) et retryStorm (trois échecs d'affilée). Deux pastilles
+// pour une seule panne, c'est très exactement la fatigue d'alerte que ce
+// produit existe pour éviter.
 //
-// The fix is not precedence, it is disjointness. Repeating the SAME failing
-// call is loop's subject, and loop says it better: it names the command and
-// counts the repeats. So retryStorm stops counting a failure that repeats the
-// previous one, and keeps only what loop cannot see — a run of DIFFERENT calls
-// all failing.
+// La correction n'est pas une préséance, c'est une disjonction. Répéter le
+// MÊME appel qui échoue est le sujet de loop, et loop le dit mieux : il nomme
+// la commande et compte les répétitions. retryStorm cesse donc de compter un
+// échec qui répète le précédent, et ne garde que ce que loop ne peut pas voir
+// — une série d'appels DIFFÉRENTS qui échouent tous.
 //
-// Precedence could not have worked: retryStorm's threshold is reached first,
-// so by the time loop fires there is nothing left to suppress.
+// Une préséance n'aurait pas pu marcher : le seuil de retryStorm est atteint
+// en premier, donc au moment où loop sort il n'y a plus rien à supprimer.
+//
+// Mais la délégation est CONDITIONNELLE. loop ne voit qu'une répétition qui
+// tient dans sa fenêtre ; se taire pour une répétition qu'il n'atteindra
+// jamais, ce serait ne prévenir personne.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -53,7 +58,7 @@ test('des commandes DIFFERENTES qui echouent d affilee restent le domaine de ret
 test('deux echecs identiques encadrant un troisieme different comptent pour deux', () => {
   const wd = createWatchdog({ now: () => T + 60_000 });
   const raised = [];
-  const cmds = ['a', 'a', 'b', 'a'];   // a, a(repetition ignoree), b, a
+  const cmds = ['a', 'a', 'b', 'a'];   // a, a(répétition ignorée), b, a
   cmds.forEach((c, i) => {
     wd.processEvent(pre(i, T + i * 1000, c));
     raised.push(...wd.processEvent(fail(i, T + i * 1000 + 500)).newAlerts);
@@ -65,15 +70,15 @@ test('deux echecs identiques encadrant un troisieme different comptent pour deux
 test('une signature inconnue n est jamais tenue pour une repetition', () => {
   const wd = createWatchdog({ now: () => T + 60_000 });
   const raised = [];
-  // Aucun PreToolUse : le detecteur ne peut pas savoir ce que ces appels
-  // etaient. Il ne doit pas en conclure qu'ils se repetent.
+  // Aucun PreToolUse et aucun tool_input : le détecteur ne peut pas savoir ce
+  // que ces appels étaient. Il ne doit pas en conclure qu'ils se répètent.
   for (let i = 10; i <= 12; i++) {
     raised.push(...wd.processEvent(fail(i, T + i * 1000, 'Read', `r${i}`)).newAlerts);
   }
   assert.deepEqual(raised.map(a => a.type), ['retryStorm']);
 });
 
-test('trois interruptions humaines ne sont pas un orage d echecs', () => {
+test('quatre interruptions humaines ne sont pas un orage d echecs', () => {
   const wd = createWatchdog({ now: () => T + 60_000 });
   const raised = [];
   for (let i = 1; i <= 4; i++) {
@@ -82,6 +87,69 @@ test('trois interruptions humaines ne sont pas un orage d echecs', () => {
   }
   assert.deepEqual(raised, [],
     'reprendre la main quatre fois n est pas quatre pannes');
+});
+
+test('une boucle d echecs TROP LENTE pour loop reste vue par retryStorm', () => {
+  // 45 s par tentative : loop ne verra jamais 4 appels dans sa fenêtre de
+  // 60 s. Se taire ici, ce serait ne prévenir personne — et c'est le cas le
+  // plus courant en vrai (un build qui échoue met plus de 20 s).
+  const wd = createWatchdog({ now: () => T + 200_000 });
+  const raised = [];
+  for (let i = 1; i <= 3; i++) {
+    const at = T + i * 45_000;
+    wd.processEvent(pre(i, at, 'npm run build'));
+    raised.push(...wd.processEvent(fail(i, at + 1000)).newAlerts);
+  }
+  assert.deepEqual(raised.map(a => a.type), ['retryStorm'],
+    'hors de portee de loop, retryStorm reprend son role');
+});
+
+test('la meme boucle ASSEZ RAPIDE pour loop laisse loop parler seul', () => {
+  // Même scénario, cadence 10 s : 10 × 3 = 30 ≤ 60, loop y arrivera.
+  //
+  // L'horloge se pose juste après le dernier événement, et pas plus loin : au
+  // delà de freshnessMs (120 s) la barrière de fraîcheur retiendrait l'alerte
+  // de loop, et le test rendrait [] — un vert impossible qui ne dirait rien de
+  // la cadence. Une boucle rapide est de toute façon une boucle récente.
+  const wd = createWatchdog({ now: () => T + 60_000 });
+  const raised = [];
+  for (let i = 1; i <= 4; i++) {
+    const at = T + i * 10_000;
+    raised.push(...wd.processEvent(pre(i, at, 'npm run build')).newAlerts);
+    raised.push(...wd.processEvent(fail(i, at + 1000)).newAlerts);
+  }
+  assert.deepEqual(raised.map(a => a.type), ['loop']);
+});
+
+test('la signature se lit sur l evenement d echec, pas seulement dans le tampon de loop', () => {
+  // Aucun PreToolUse : l'ancienne lecture indirecte aurait rendu null et
+  // compté trois fois. L'échec porte tool_input, la signature est connue.
+  const wd = createWatchdog({ now: () => T + 60_000 });
+  const raised = [];
+  for (let i = 1; i <= 3; i++) {
+    raised.push(...wd.processEvent({
+      ...fail(i, T + i * 1000), tool_input: { command: 'npm run build' },
+    }).newAlerts);
+  }
+  assert.deepEqual(raised, [],
+    'trois fois le meme echec est une repetition, meme sans PreToolUse');
+});
+
+test('apres un succes, le premier echec identique compte a nouveau', () => {
+  // Le seul test qui couvre `lastFailureSig.delete`. Sans lui, le premier
+  // « a » d'après le succès passerait pour une répétition du « a » d'avant.
+  const wd = createWatchdog({ now: () => T + 60_000 });
+  const raised = [];
+  const step = (i, cmd) => {
+    wd.processEvent(pre(i, T + i * 1000, cmd));
+    raised.push(...wd.processEvent(fail(i, T + i * 1000 + 500)).newAlerts);
+  };
+  step(1, 'a');
+  wd.processEvent({ hook_event_name: 'PostToolUse', session_id: SID, tool_name: 'Bash',
+    tool_use_id: 'ok', cwd: 'f:\\p', _ts: new Date(T + 2000).toISOString() });
+  step(2, 'a'); step(3, 'b'); step(4, 'a');
+  assert.deepEqual(raised.map(a => a.type), ['retryStorm'],
+    'le succes efface la memoire : a, b, a = trois echecs distincts');
 });
 
 test('un succes remet le compteur ET la memoire du dernier echec a zero', () => {

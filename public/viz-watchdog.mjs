@@ -46,13 +46,16 @@ function hashInput(toolInput) {
   return JSON.stringify(toolInput);
 }
 
-// Per-session bookkeeping. One bucket holds the state every detector
-// needs — partitioned by concern, so detectors don't step on each other.
+// Per-session bookkeeping. One bucket holds the state every detector needs,
+// partitioned by concern — with one deliberate exception: `recent` is written
+// by `loop` and read by `retryStorm`, which needs to know what a failure was
+// about when the failure event itself doesn't say. That read is a fallback and
+// stays read-only; every other field has exactly one writer.
 function emptyBuffer() {
   return {
     recent: [],              // [{ ts, sig, toolUseId, failed }] — last N PreToolUse
     failures: new Map(),     // toolName → consecutive distinct failure count
-    lastFailureSig: new Map(), // toolName → signature of the last counted failure
+    lastFailureSig: new Map(), // toolName → { sig, ts } of the last failure seen
     running: new Map(),      // tool_use_id → in-flight tool record
     lastEventAt: null,       // event time of the last event seen for the session
     cwd: '',                 // where the session runs — the panel groups by it
@@ -119,12 +122,19 @@ function failureSuffix(occurrences) {
   return ` — ${failed.length} of ${occurrences.length} failing`;
 }
 
-// Which call a failure was about. The failure event is not documented to carry
-// tool_input, so the signature is read from the PreToolUse that opened the
-// call — `loop` already records exactly that, keyed by tool_use_id. Returns
-// null when we cannot tell, and null is never treated as a repeat: not knowing
-// what a call was is no reason to claim it repeated the last one.
+// Which call a failure was about. The failure event carries `tool_input` — the
+// probe's frozen sample proves it, and `toolSubject(evt)` a few lines below
+// already relies on it — so the signature is computed the same way `loop`
+// computes its own. `buf.recent` is only a fallback for an event that arrived
+// without it: reading the buffer first would tie this detector to `loop`'s
+// bufferSize, and the whole rule would stop applying, non-deterministically,
+// as soon as ten other calls interleaved between a call and its failure.
+// Returns null when we cannot tell, and null is never treated as a repeat: not
+// knowing what a call was is no reason to claim it repeated the last one.
 function failureSignature(buf, evt) {
+  if (evt.tool_input !== undefined) {
+    return `${evt.agent_id || ''}:${evt.tool_name}:${hashInput(evt.tool_input)}`;
+  }
   if (!evt.tool_use_id) return null;
   for (const e of buf.recent) if (e.toolUseId === evt.tool_use_id) return e.sig;
   return null;
@@ -190,14 +200,24 @@ const DETECTORS = {
         // back control. Three interruptions in a row would otherwise raise a
         // storm alert about the user's own decisions.
         if (evt.is_interrupt) return null;
+        const sig = failureSignature(buf, evt);
+        const previous = buf.lastFailureSig.get(evt.tool_name);
+        // Record first, decide after: the cadence must be the gap between two
+        // consecutive failures, whether or not the earlier one was counted.
+        buf.lastFailureSig.set(evt.tool_name, { sig, ts });
         // Re-running the SAME failing call is a loop, and `loop` says it
         // better — it names the command and counts the repeats. Counting it
-        // here as well would put two badges on one incident. What this
-        // detector is for is the case `loop` cannot see: a run of DIFFERENT
-        // calls all failing.
-        const sig = failureSignature(buf, evt);
-        if (sig !== null && sig === buf.lastFailureSig.get(evt.tool_name)) return null;
-        buf.lastFailureSig.set(evt.tool_name, sig);
+        // here too would put two badges on one incident.
+        //
+        // But `loop` only sees a repetition that FITS IN ITS WINDOW: four
+        // calls within sixty seconds. Deferring to it for a repetition it will
+        // never reach means nobody is told at all — and a build that fails
+        // after forty-five seconds and is retried forever is exactly the case
+        // this product exists to catch. So the deference is conditional: stay
+        // quiet only when the measured cadence proves `loop` will get there.
+        const reachableByLoop = (ts - (previous?.ts ?? 0)) * (ctx.thresholds.loop.count - 1)
+          <= ctx.thresholds.loop.windowMs;
+        if (sig !== null && previous && sig === previous.sig && reachableByLoop) return null;
         const cur = (buf.failures.get(evt.tool_name) || 0) + 1;
         buf.failures.set(evt.tool_name, cur);
         if (cur >= ctx.thresholds.retryStorm.count) {

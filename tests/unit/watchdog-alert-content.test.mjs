@@ -129,15 +129,20 @@ test('stuck alert names the agent holding the in-flight tool', () => {
 
 // ─── Retry storm ───────────────────────────────────────────────────────────
 
+// Three DIFFERENT commands, deliberately. Re-running one failing command is
+// `loop`'s subject now, not this detector's, so a storm is what `loop` cannot
+// see: a run of distinct calls that all fail. The alert is raised ON the third,
+// so the subject it must carry is the third command.
 test('retryStorm alert carries the subject of the failing call', () => {
   const wd = createWatchdog({ now: clockAt().now });
+  const commands = ['npm ci', 'npm run build', 'npm test'];
   let last = [];
-  for (let i = 0; i < 3; i++) {
+  commands.forEach((command, i) => {
     last = wd.processEvent({
       session_id: 'sid1', hook_event_name: 'PostToolUseFailure',
-      tool_name: 'Bash', tool_input: { command: 'npm ci' }, tool_use_id: `f${i}`,
+      tool_name: 'Bash', tool_input: { command }, tool_use_id: `f${i}`,
       _ts: iso(T - 3_000 + i * 1_000),
     }).newAlerts;
-  }
-  assert.equal(last[0].subject, 'npm ci');
+  });
+  assert.equal(last[0].subject, 'npm test');
 });
