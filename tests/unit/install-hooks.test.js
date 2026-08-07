@@ -93,6 +93,10 @@ test('install: refreshes existing hook whose timeout drifted (5 → 10)', () => 
     assert.equal(h.timeout, 10, `${ev} timeout should be upgraded to 10, got ${h.timeout}`);
     assert.equal(h.command, command, `${ev} command should be preserved`);
   }
+  // Le 6e echappe a la boucle ci-dessus (elle compare a l'ANCIENNE commande) :
+  // il faut sa propre assertion, sinon rien ne prouve qu'il a atteint le disque.
+  const ajoute = persisted.hooks.PostToolUseFailure[0].hooks[0];
+  assert.equal(ajoute.timeout, 10, `PostToolUseFailure timeout should be 10, got ${ajoute.timeout}`);
 });
 
 test('resolveScope: no explicit scope defaults to user (global) even inside a project', () => {
@@ -145,6 +149,31 @@ test('install: crossScope flags pre-existing hook in a different scope', () => {
 test('EVENTS: l abonnement aux echecs d outil est declare', () => {
   assert.ok(EVENTS.includes('PostToolUseFailure'),
     'sans cet evenement, retryStorm ne peut se declencher sur aucune machine');
+});
+
+// Les cinq evenements que les deux agents partageaient avant PostToolUseFailure.
+const EVENTS_COPILOT_ATTENDUS = ['UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop', 'SessionStart'];
+
+test('EVENTS: la liste de Claude porte l echec, celle de Copilot ne l invente pas', () => {
+  assert.ok(_internals.eventsFor('claude').includes('PostToolUseFailure'),
+    'PostToolUseFailure est un evenement Claude Code : il doit rester declare cote Claude');
+  assert.deepEqual(_internals.eventsFor('copilot'), EVENTS_COPILOT_ATTENDUS,
+    'rien ne prouve que Copilot connaisse PostToolUseFailure : ne pas ecrire ce nom chez lui');
+});
+
+test('installCopilot: le fichier ecrit ne declare que les evenements connus de Copilot', () => {
+  const projectRoot = makeTempDir('avtest-copilot-events-');
+  fs.mkdirSync(path.join(projectRoot, '.git'));
+  const result = install({
+    target: 'copilot',
+    scope: 'project',
+    cwd: projectRoot,
+    packageRoot: makeTempDir('avtest-pkg-copilot-'),
+    version: '9.9.9-test',
+  });
+  const written = JSON.parse(fs.readFileSync(result.copilot.target.file, 'utf8'));
+  assert.deepEqual(Object.keys(written.hooks), EVENTS_COPILOT_ATTENDUS,
+    'agent-viz ne doit ecrire aucun nom d evenement non mesure dans la config d un tiers');
 });
 
 test('install: une configuration aux 5 anciens evenements ne gagne que le nouveau', () => {
