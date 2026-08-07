@@ -50,11 +50,12 @@ function hashInput(toolInput) {
 // needs — partitioned by concern, so detectors don't step on each other.
 function emptyBuffer() {
   return {
-    recent: [],          // [{ ts, sig, toolUseId, failed }] — last N PreToolUse
-    failures: new Map(), // toolName → consecutive failure count
-    running: new Map(),  // tool_use_id → in-flight tool record
-    lastEventAt: null,   // event time of the last event seen for the session
-    cwd: '',             // where the session runs — the panel groups by it
+    recent: [],              // [{ ts, sig, toolUseId, failed }] — last N PreToolUse
+    failures: new Map(),     // toolName → consecutive distinct failure count
+    lastFailureSig: new Map(), // toolName → signature of the last counted failure
+    running: new Map(),      // tool_use_id → in-flight tool record
+    lastEventAt: null,       // event time of the last event seen for the session
+    cwd: '',                 // where the session runs — the panel groups by it
   };
 }
 
@@ -118,6 +119,17 @@ function failureSuffix(occurrences) {
   return ` — ${failed.length} of ${occurrences.length} failing`;
 }
 
+// Which call a failure was about. The failure event is not documented to carry
+// tool_input, so the signature is read from the PreToolUse that opened the
+// call — `loop` already records exactly that, keyed by tool_use_id. Returns
+// null when we cannot tell, and null is never treated as a repeat: not knowing
+// what a call was is no reason to claim it repeated the last one.
+function failureSignature(buf, evt) {
+  if (!evt.tool_use_id) return null;
+  for (const e of buf.recent) if (e.toolUseId === evt.tool_use_id) return e.sig;
+  return null;
+}
+
 const DETECTORS = {
   loop: {
     onEvent(ctx, evt, ts) {
@@ -174,6 +186,18 @@ const DETECTORS = {
       if (!sid || !evt.tool_name) return null;
       const buf = getSessionBuffer(ctx.state, sid);
       if (evt.hook_event_name === 'PostToolUseFailure') {
+        // A human pressing Escape is not a failure — it is someone taking
+        // back control. Three interruptions in a row would otherwise raise a
+        // storm alert about the user's own decisions.
+        if (evt.is_interrupt) return null;
+        // Re-running the SAME failing call is a loop, and `loop` says it
+        // better — it names the command and counts the repeats. Counting it
+        // here as well would put two badges on one incident. What this
+        // detector is for is the case `loop` cannot see: a run of DIFFERENT
+        // calls all failing.
+        const sig = failureSignature(buf, evt);
+        if (sig !== null && sig === buf.lastFailureSig.get(evt.tool_name)) return null;
+        buf.lastFailureSig.set(evt.tool_name, sig);
         const cur = (buf.failures.get(evt.tool_name) || 0) + 1;
         buf.failures.set(evt.tool_name, cur);
         if (cur >= ctx.thresholds.retryStorm.count) {
@@ -186,6 +210,9 @@ const DETECTORS = {
         }
       } else if (evt.hook_event_name === 'PostToolUse') {
         buf.failures.set(evt.tool_name, 0);
+        // The memory of the last failure goes with the counter: after a
+        // success, the next failure starts a new series whatever it repeats.
+        buf.lastFailureSig.delete(evt.tool_name);
       }
       return null;
     },
