@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { findProjectRoot, findInstalledScopes, install, resolveScope } = require('../../lib/install-hooks');
+const { findProjectRoot, findInstalledScopes, install, resolveScope, EVENTS, _internals } = require('../../lib/install-hooks');
 
 function makeTempDir(prefix) {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -81,8 +81,11 @@ test('install: refreshes existing hook whose timeout drifted (5 → 10)', () => 
     version: '9.9.9-test',
   });
   const r = result.claude;
-  assert.equal(r.action, 'updated', `expected action='updated', got '${r.action}'`);
+  // Une config d'avant PostToolUseFailure : les 5 anciens sont rafraîchis ET le
+  // 6e est posé au passage — d'où 'installed+updated' et non 'updated'.
+  assert.equal(r.action, 'installed+updated', `expected action='installed+updated', got '${r.action}'`);
   assert.equal(r.updated.length, 5, `expected all 5 events refreshed, got ${r.updated.length}`);
+  assert.deepEqual(r.missing, ['PostToolUseFailure'], 'seul le nouvel evenement doit manquer');
 
   const persisted = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
   for (const ev of ['UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop', 'SessionStart']) {
@@ -137,4 +140,22 @@ test('install: crossScope flags pre-existing hook in a different scope', () => {
   const otherScopes = r.crossScope.map(s => s.scope);
   assert.ok(otherScopes.includes('local'), `expected 'local' in crossScope ${otherScopes.join(',')}`);
   assert.ok(!otherScopes.includes('project'), `current scope 'project' must not appear in crossScope`);
+});
+
+test('EVENTS: l abonnement aux echecs d outil est declare', () => {
+  assert.ok(EVENTS.includes('PostToolUseFailure'),
+    'sans cet evenement, retryStorm ne peut se declencher sur aucune machine');
+});
+
+test('install: une configuration aux 5 anciens evenements ne gagne que le nouveau', () => {
+  const cmd = 'node "C:/x/agent-viz/bin/agent-viz.js" hook';
+  const settings = { hooks: {} };
+  for (const ev of ['UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop', 'SessionStart']) {
+    _internals.addHook(settings, ev, cmd);
+  }
+  const missing = _internals.auditSettings(settings, cmd)
+    .filter(a => !a.installed)
+    .map(a => a.event);
+  assert.deepEqual(missing, ['PostToolUseFailure'],
+    'la migration doit ajouter le nouvel evenement sans doublonner les autres');
 });
