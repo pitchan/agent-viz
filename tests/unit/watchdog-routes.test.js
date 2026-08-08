@@ -177,12 +177,19 @@ test('traduction seulement : la route ne peut atteindre aucun autre module', () 
   // un journal en ajout seul (mesure de la revue de la tache 7, voir le PIEGE
   // en bas de lib/server/watchdog/index.js).
   //
+  // Les DEUX formes, et la seconde n est pas theorique : les gestionnaires sont
+  // deja `async`, donc `await import('../watchdog')` y est licite et atteint
+  // exactement le meme module. Une garde posee sur la seule forme `require` est
+  // une garde posee d un seul cote — le defaut le plus frequent de ce chantier.
+  //
   // Le prix assume, et il faut le dire : cette assertion regarde le TEXTE,
   // commentaires compris. Le jour ou ce module aura une vraie raison de
   // dependre de quelque chose, elle rougira — et ce sera une decision a
   // prendre, pas un accident.
   assert.doesNotMatch(source, /\brequire\s*\(/,
     'la surface HTTP du chien de garde ne depend de rien, c est ce qui la borne');
+  assert.doesNotMatch(source, /\bimport\s*\(/,
+    'ni par require, ni par import() — les gestionnaires sont async');
 });
 
 // ── GET /alerts ──────────────────────────────────────────────────────────────
