@@ -250,15 +250,62 @@ test('catch-up: une ligne illisible est sautee, celles d apres passent', async (
   assert.equal(s.list({ sinceDays: 90 }).length, 1);
 });
 
-test('catch-up: une entree illisible n arrete pas les fichiers suivants', async () => {
+test('catch-up: une entree illisible se plaint, et n arrete pas les fichiers suivants', async () => {
   const dir = tmpDir();
   // Un DOSSIER nomme comme un flux : `readFile` echoue (EISDIR). Il passe
   // avant l autre dans l ordre alphabetique de readdir.
   fs.mkdirSync(path.join(dir, 'aaa.jsonl'));
   fs.writeFileSync(path.join(dir, `${SID}.jsonl`), flot());
   const s = await svc(tmpFile());
-  assert.equal(await catchUpFromDisk(s, dir), 10, 'le fichier d apres a bien ete lu');
+  const { valeur, dits } = await enEcoutant(() => catchUpFromDisk(s, dir));
+  assert.equal(valeur, 10, 'le fichier d apres a bien ete lu');
   assert.equal(s.list({ sinceDays: 90 }).length, 1);
+  // Un flux qu on n a pas su lire, c est des pannes qui ne seront pas
+  // consignees. Le sauter en silence est le meme trou muet que pour le
+  // dossier, dix lignes plus haut dans le meme fichier.
+  assert.match(dits.join('\n'), /flux d evenements illisible, aaa\.jsonl/);
+});
+
+test('catch-up: un fichier disparu entre le listage et la lecture ne se plaint pas', async () => {
+  const dir = tmpDir();
+  fs.writeFileSync(path.join(dir, `${SID}.jsonl`), flot());
+  const s = await svc(tmpFile());
+  // Le menage purge les sessions pendant que le serveur tourne : ENOENT ici
+  // veut dire « elle vient d etre supprimee », pas « on n a pas su lire ».
+  //
+  // Et ce test porte une seconde charge, qu il faut connaitre avant de le
+  // toucher : en supprimant le fichier AU MOMENT ou la limite est demandee, il
+  // rend observable l ORDRE des deux operations. La limite doit etre prise
+  // AVANT la lecture — prise apres, le chemin vif aurait pu avancer pendant
+  // celle-ci et l on rendrait des octets qu il a deja livres. C est le seul
+  // test qui voie cet ordre : ici, si la limite etait demandee apres, le
+  // fichier serait encore la et dix evenements seraient relus.
+  const limiteQuiSupprime = (p) => { fs.rmSync(p); return null; };
+  const { valeur, dits } = await enEcoutant(() => catchUpFromDisk(s, dir, limiteQuiSupprime));
+  assert.equal(valeur, 0);
+  assert.equal(dits.join('\n'), '', 'une session purgee n est pas une anomalie');
+});
+
+test('catch-up: la limite vive borne la lecture, son absence lit tout', async () => {
+  const dir = tmpDir();
+  const contenu = flot();                       // 10 lignes
+  fs.writeFileSync(path.join(dir, `${SID}.jsonl`), contenu);
+  // L octet ou s arretent les trois premieres lignes — la frontiere que le
+  // lecteur d evenements expose quand son watcher a pris la main la.
+  const troisLignes = Buffer.byteLength(contenu.split('\n').slice(0, 3).join('\n') + '\n');
+
+  // Bornee : le chemin vif possede tout ce qui suit, le relire le compterait
+  // deux fois — et le detecteur compte, meme quand le journal dedoublonne.
+  assert.equal(await catchUpFromDisk(await svc(tmpFile()), dir, () => troisLignes), 3);
+  // Aucun watcher sur ce fichier : personne d autre ne le lit, on prend tout.
+  assert.equal(await catchUpFromDisk(await svc(tmpFile()), dir, () => null), 10);
+  // Appelant qui ne fournit rien : on prend tout aussi. Relire de trop ne perd
+  // jamais un fait ; c est le repli le plus sur.
+  assert.equal(await catchUpFromDisk(await svc(tmpFile()), dir), 10);
+  // Et zero est une VRAIE reponse — un watcher arme sur un fichier vide possede
+  // tout le fichier. Le confondre avec « pas de limite » rouvrirait le
+  // recouvrement en entier.
+  assert.equal(await catchUpFromDisk(await svc(tmpFile()), dir, () => 0), 0);
 });
 
 test('catch-up: un dossier absent n est pas une erreur', async () => {

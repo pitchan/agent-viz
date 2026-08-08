@@ -34,10 +34,12 @@ process.env.USERPROFILE = BAC;
 process.env.HOME = BAC;
 
 const { createJournal, DEFAULT_PATH } = require('../../lib/server/watchdog/journal');
-const { createWatchdogService } = require('../../lib/server/watchdog/service');
+const { createWatchdogService, WATCHDOG_MODULE } = require('../../lib/server/watchdog/service');
 const { sseClients } = require('../../lib/server/sse');
 const { DIR, sessionIndex } = require('../../lib/server/session-index');
-const { readAndBroadcast } = require('../../lib/server/event-reader');
+const {
+  readAndBroadcast, resetFileOffset, liveHandoffOffset,
+} = require('../../lib/server/event-reader');
 
 // La redirection est verifiee, pas supposee : si elle ne prenait pas, tout ce
 // fichier travaillerait sur les vraies donnees de l'utilisateur en silence.
@@ -50,6 +52,7 @@ const T = 1_700_000_000_000;
 const SID = 'sess-1';
 const HORLOGE = () => T + 3_600_000;
 const lignes = fp => fs.readFileSync(fp, 'utf8').split('\n').filter(l => l.trim()).length;
+const echapper = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const aNettoyer = [BAC];
 const neufDossier = (prefixe) => {
@@ -155,6 +158,26 @@ function fichierDeSession(nom, contenu) {
   return fp;
 }
 
+// Le vrai module de detection, mais qui leve sur un evenement porteur du
+// marqueur `_boum`. C'est la seule facon d'eprouver le chemin d'echec sans
+// priver de detecteur tous les autres tests, qui partagent la meme instance —
+// celle qu `event-reader` a chargee et qu'aucun vidage de cache n'atteint.
+const moduleQuiLeveSurMarqueur = async () => {
+  const vrai = await import(WATCHDOG_MODULE);
+  return {
+    createWatchdog(opts) {
+      const wd = vrai.createWatchdog(opts);
+      return {
+        ...wd,
+        processEvent(evt) {
+          if (evt && evt._boum) throw new Error('detecteur casse');
+          return wd.processEvent(evt);
+        },
+      };
+    },
+  };
+};
+
 // ─── L'ordre, au niveau du service ────────────────────────────────────────────
 
 test('cablage: ce qui est diffuse est deja consigne', async () => {
@@ -196,17 +219,21 @@ test('event-reader: sans chien de garde, le flux d evenements passe quand meme',
   assert.equal(recus.filter(m => m.type === 'alert').length, 0);
 });
 
+// Le journal de l'instance partagee — celle qu `event-reader` tient. Il est
+// pose ici parce que plusieurs tests d'`event-reader` doivent le relire.
+const journalPartage = tmpFile();
+
 test('event-reader: ce que le chien de garde voit part sur le flux, apres l evenement', async () => {
   const idx = require('../../lib/server/watchdog');
-  const journalPath = tmpFile();
-  await idx.initWatchdog({ journalPath, now: HORLOGE });
+  const journalPath = journalPartage;
+  await idx.initWatchdog({ journalPath, now: HORLOGE, loadModule: moduleQuiLeveSurMarqueur });
 
   // Au moment ou l'alerte part sur le flux, sa ligne doit deja etre sur le
   // disque : la meme regle qu'au niveau du service, mesuree cette fois au bout
   // de toute la chaine.
   const surMessage = (m) => {
     if (m.type !== 'alert') return;
-    assert.match(fs.readFileSync(journalPath, 'utf8'), new RegExp(m.alert.id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    assert.match(fs.readFileSync(journalPath, 'utf8'), new RegExp(echapper(m.alert.id)));
   };
   const recus = ecouterSSE(surMessage);
   await readAndBroadcast(fichierDeSession('avec-garde', flotJusquAuDeclencheur()));
@@ -239,6 +266,61 @@ test('event-reader: relire le meme fichier ne rediffuse pas l alerte', async () 
   assert.equal(recus.filter(m => m.type === 'alert').length, 0, 'un fait deja consigne n est pas un fait nouveau');
 });
 
+test('cablage: le rattrapage s arrete la ou le chemin vif prend la main', async () => {
+  const idx = require('../../lib/server/watchdog');
+  const SP = 'sess-partage';   // une session a part : les compteurs du detecteur
+                               // sont par session, et les autres tests ont deja
+                               // fait boucler `sess-1`.
+  // UN appel deja sur le disque, DEUX de plus apres la prise en main : trois au
+  // total, sous le seuil de `loop` (4 appels identiques en 60 s). Si les deux
+  // chemins se recouvraient, le detecteur en compterait cinq — le journal
+  // dedoublonne l'alerte, pas les compteurs qui la produisent — et le produit
+  // annoncerait une boucle que l'utilisateur n'a jamais faite.
+  const fp = fichierDeSession('partage', JSON.stringify(pre(1, T + 1000, SP)) + '\n');
+  const priseEnMain = fs.statSync(fp).size;
+  resetFileOffset(fp, priseEnMain);
+  assert.equal(liveHandoffOffset(fp), priseEnMain, 'le lecteur d evenements expose sa frontiere');
+  // Un fichier que personne ne suit : le balayage en est seul responsable.
+  assert.equal(liveHandoffOffset(path.join(path.dirname(fp), 'jamais-suivi.jsonl')), null);
+  // Et zero est une REPONSE, pas une absence de reponse : un watcher arme sur
+  // un fichier vide possede tout ce qui y sera ecrit. Un test de veracite
+  // (`get(fp) || null`) le retournerait en « lis tout » et rouvrirait le
+  // recouvrement sur exactement les sessions qui viennent de naitre.
+  const vide = path.join(path.dirname(fp), 'vide.jsonl');
+  fs.writeFileSync(vide, '');
+  resetFileOffset(vide, 0);
+  assert.equal(liveHandoffOffset(vide), 0);
+  fs.appendFileSync(fp, JSON.stringify(pre(2, T + 2000, SP)) + '\n'
+                      + JSON.stringify(pre(3, T + 3000, SP)) + '\n');
+
+  const recus = ecouterSSE();
+  const { valeur } = await enEcoutant(() => idx.runCatchUp(path.dirname(fp), liveHandoffOffset));
+  assert.equal(valeur, 1, 'le passe s arrete a l octet ou le vif commence');
+  await readAndBroadcast(fp);   // le chemin vif livre exactement le reste
+  recus.fermer();
+  assert.equal(recus.filter(m => m.type === 'event').length, 2);
+  assert.equal(recus.filter(m => m.type === 'alert').length, 0,
+    'trois appels comptes trois fois, pas cinq');
+});
+
+test('event-reader: un detecteur qui leve se dit une fois, et le canevas continue', async () => {
+  const idx = require('../../lib/server/watchdog');
+  assert.ok(idx.getWatchdogService(), 'precondition : le service est en place');
+  // Sans garde, l enveloppe `catch {}` de la boucle (elle est la pour
+  // JSON.parse) avalerait l exception : le chien de garde cesserait de produire
+  // des alertes POUR TOUJOURS et rien ne le dirait — le trou muet exact que le
+  // solde 4 ferme dix lignes plus loin.
+  const boum = { ...pre(9, T + 9000, 'sess-boum'), _boum: true };
+  const contenu = JSON.stringify(boum) + '\n' + JSON.stringify(boum) + '\n';
+  const recus = ecouterSSE();
+  const { dits } = await enEcoutant(() => readAndBroadcast(fichierDeSession('boum', contenu)));
+  recus.fermer();
+  assert.equal(recus.filter(m => m.type === 'event').length, 2, 'le canevas est servi quand meme');
+  const plaintes = dits.split('\n').filter(l => /detection failed/.test(l));
+  assert.equal(plaintes.length, 1, 'dite une fois — pas zero, pas a chaque evenement');
+  assert.match(plaintes[0], /detecteur casse/);
+});
+
 // ─── Le demarrage ────────────────────────────────────────────────────────────
 
 function neufIndex() {
@@ -260,6 +342,19 @@ const moduleCasse = async () => ({
   },
 });
 
+// Et un qui casse au BATTEMENT : le rattrapage se passe bien, c'est le minuteur
+// qui leve — la ou personne n'attrape.
+const moduleQuiCasseAuBattement = async () => ({
+  createWatchdog() {
+    return {
+      processEvent() { return { newAlerts: [] }; },
+      tick() { throw new Error('battement casse'); },
+      acknowledge() {},
+      getActiveAlerts() { return []; },
+    };
+  },
+});
+
 test('demarrage: l instance d abord, le rattrapage ensuite', async () => {
   const idx = neufIndex();
   const dir = tmpDir();
@@ -269,8 +364,8 @@ test('demarrage: l instance d abord, le rattrapage ensuite', async () => {
   // Sans l'attente sur l'instance, le rattrapage tomberait sur un service qui
   // n'existe pas encore et rendrait 0 — le passe ne serait jamais relu, et
   // rien ne le dirait.
-  const { valeur, dits } = await enEcoutant(() => idx.demarrerChienDeGarde({
-    dir, diffuser: () => {}, cadenceMs: 60_000,
+  const { valeur, dits } = await enEcoutant(() => idx.startWatchdog({
+    dir, broadcastAlert: () => {}, cadenceMs: 60_000,
     init: { journalPath, now: HORLOGE },
   }));
   clearInterval(valeur);
@@ -283,11 +378,11 @@ test('demarrage: le rattrapage ne diffuse rien', async () => {
   const dir = tmpDir();
   fs.writeFileSync(path.join(dir, `${SID}.jsonl`), flot());
   const recus = [];
-  const battement = await idx.demarrerChienDeGarde({
-    dir, diffuser: m => recus.push(m), cadenceMs: 60_000,
+  const { valeur } = await enEcoutant(() => idx.startWatchdog({
+    dir, broadcastAlert: a => recus.push(a), cadenceMs: 60_000,
     init: { journalPath: tmpFile(), now: HORLOGE },
-  });
-  clearInterval(battement);
+  }));
+  clearInterval(valeur);
   // Les curseurs d'evenements sont poses a la FIN des fichiers, deliberement :
   // rouvrir le serveur ne doit pas rejouer l'activite passee sur le canevas.
   assert.deepEqual(recus, [], 'le rattrapage nourrit le chien de garde, il ne parle pas au canevas');
@@ -297,8 +392,8 @@ test('demarrage: la ligne rapporte le nombre relu et n en conclut rien', async (
   const idx = neufIndex();
   const dir = tmpDir();
   fs.writeFileSync(path.join(dir, `${SID}.jsonl`), flot());
-  const { valeur, dits } = await enEcoutant(() => idx.demarrerChienDeGarde({
-    dir, diffuser: () => {}, cadenceMs: 60_000,
+  const { valeur, dits } = await enEcoutant(() => idx.startWatchdog({
+    dir, broadcastAlert: () => {}, cadenceMs: 60_000,
     init: { journalPath: tmpFile(), now: HORLOGE },
   }));
   clearInterval(valeur);
@@ -318,27 +413,33 @@ test('demarrage: le battement bat, et ce qu il leve part sur le flux', async () 
   fs.writeFileSync(path.join(dir, `${SID}.jsonl`), JSON.stringify(pre(1, T)) + '\n');
   const journalPath = tmpFile();
   const recus = [];
-  const battement = await idx.demarrerChienDeGarde({
-    dir, diffuser: m => recus.push(m), cadenceMs: 5,
+  // L'anteriorite se mesure AU MOMENT de la diffusion, pas apres coup : un
+  // controle final ne prouverait que la coexistence des deux, jamais l'ordre.
+  const broadcastAlert = (alert) => {
+    assert.match(fs.readFileSync(journalPath, 'utf8'), new RegExp(echapper(alert.id)),
+      'consignee avant d etre dite');
+    recus.push(alert);
+  };
+  const { valeur } = await enEcoutant(() => idx.startWatchdog({
+    dir, broadcastAlert, cadenceMs: 5,
     init: { journalPath, now: () => T + 4 * 60_000 },
-  });
+  }));
   try {
     await jusqua(() => recus.length > 0, 'une alerte levee par le battement');
-  } finally { clearInterval(battement); }
-  assert.equal(recus[0].type, 'alert');
-  assert.equal(recus[0].alert.type, 'stuck');
-  assert.equal(lignes(journalPath), 1, 'et consignee avant d etre dite');
+  } finally { clearInterval(valeur); }
+  assert.equal(recus[0].type, 'stuck', 'le battement rend une ALERTE, l enveloppe est l affaire du serveur');
+  assert.equal(lignes(journalPath), 1);
 });
 
 test('demarrage: le minuteur ne retient jamais le processus', async () => {
   const idx = neufIndex();
-  const battement = await idx.demarrerChienDeGarde({
-    dir: tmpDir(), diffuser: () => {}, cadenceMs: 60_000,
+  const { valeur } = await enEcoutant(() => idx.startWatchdog({
+    dir: tmpDir(), broadcastAlert: () => {}, cadenceMs: 60_000,
     init: { journalPath: tmpFile(), now: HORLOGE },
-  });
+  }));
   try {
-    assert.equal(battement.hasRef(), false, 'sans unref, `agent-viz start` ne rendrait jamais la main');
-  } finally { clearInterval(battement); }
+    assert.equal(valeur.hasRef(), false, 'sans unref, `agent-viz start` ne rendrait jamais la main');
+  } finally { clearInterval(valeur); }
 });
 
 test('demarrage: un rattrapage qui casse n empeche pas le serveur de demarrer', async () => {
@@ -347,8 +448,8 @@ test('demarrage: un rattrapage qui casse n empeche pas le serveur de demarrer', 
   fs.writeFileSync(path.join(dir, `${SID}.jsonl`), flot());
   // `runCatchUp` propage l'exception du detecteur, deliberement : c'est a
   // l'appelant de decider. Ici on decide de demarrer sans le passe.
-  const { valeur, dits } = await enEcoutant(() => idx.demarrerChienDeGarde({
-    dir, diffuser: () => {}, cadenceMs: 60_000,
+  const { valeur, dits } = await enEcoutant(() => idx.startWatchdog({
+    dir, broadcastAlert: () => {}, cadenceMs: 60_000,
     init: { journalPath: tmpFile(), now: HORLOGE, loadModule: moduleCasse },
   }));
   try {
@@ -359,8 +460,8 @@ test('demarrage: un rattrapage qui casse n empeche pas le serveur de demarrer', 
 
 test('demarrage: sans service, le battement ne tue pas le processus', async () => {
   const idx = neufIndex();
-  const { valeur } = await enEcoutant(() => idx.demarrerChienDeGarde({
-    dir: tmpDir(), diffuser: () => {}, cadenceMs: 5,
+  const { valeur } = await enEcoutant(() => idx.startWatchdog({
+    dir: tmpDir(), broadcastAlert: () => {}, cadenceMs: 5,
     // Module de detection introuvable : `initWatchdog` degrade et rend null.
     init: { journalPath: tmpFile(), now: HORLOGE, loadModule: async () => { throw new Error('introuvable'); } },
   }));
@@ -370,6 +471,35 @@ test('demarrage: sans service, le battement ne tue pas le processus', async () =
     await new Promise(r => setTimeout(r, 60));
     assert.equal(idx.getWatchdogService(), null);
   } finally { clearInterval(valeur); }
+});
+
+test('demarrage: un battement qui leve ne tue pas le demon, et se dit une fois', async () => {
+  const idx = neufIndex();
+  const vraiErr = console.error;
+  const vraiLog = console.log;
+  const dits = [];
+  console.error = (...a) => dits.push(a.map(String).join(' '));
+  console.log = (...a) => dits.push(a.map(String).join(' '));
+  let battement;
+  try {
+    // Le battement bat toutes les 5 ms ; sans garde, la premiere exception
+    // partirait d'un rappel de minuteur — non attrapee, elle tue le demon, et
+    // avec lui tout le produit. Avec garde, on le dit UNE fois : se plaindre a
+    // chaque battement noierait la sortie sans rien apprendre de plus.
+    battement = await idx.startWatchdog({
+      dir: tmpDir(), broadcastAlert: () => {}, cadenceMs: 5,
+      init: { journalPath: tmpFile(), now: HORLOGE, loadModule: moduleQuiCasseAuBattement },
+    });
+    await new Promise(r => setTimeout(r, 80));   // de quoi battre une dizaine de fois
+  } finally {
+    clearInterval(battement);
+    console.error = vraiErr;
+    console.log = vraiLog;
+  }
+  const plaintes = dits.filter(l => /battement en echec/.test(l));
+  assert.equal(plaintes.length, 1, 'dite une fois — pas zero, pas a chaque battement');
+  assert.match(plaintes[0], /battement casse/);
+  assert.ok(idx.getWatchdogService(), 'et le service est toujours la, le processus aussi');
 });
 
 test('index: initWatchdog(null) ne fabrique pas une promesse rejetee', async () => {
