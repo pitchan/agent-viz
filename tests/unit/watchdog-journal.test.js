@@ -160,9 +160,54 @@ test('un acquittement sans cle est refuse, pas ecrit en silence', (t) => {
   const j = createJournal({ filePath, now: () => T });
   j.append(alertAt(T));
   j.appendAck('loop:s1:Bash', 'pas une date', T + 5000);
+  // `Number('')` et `Number(null)` valent 0, un 0 que Number.isFinite accepte :
+  // une conversion naive les prendrait pour un horodatage a l'epoque Unix et
+  // ecrirait un acquittement orphelin. C'est pour ces deux-la que la conversion
+  // est restreinte aux chaines non vides.
+  j.appendAck('loop:s1:Bash', '', T + 5000);
+  j.appendAck('loop:s1:Bash', null, T + 5000);
   assert.equal(lignes(filePath).length, 1, 'aucune ligne que la relecture rejetterait');
   assert.equal(j.readAll({ now: T })[0].acknowledged, false, 'ni acquittement en memoire');
-  assert.equal(plaintes(spy, 'acquittement'), 1, 'et le defaut est dit, pas avale');
+  assert.equal(plaintes(spy, 'acquittement sans (id'), 3, 'et chaque defaut est dit, pas avale');
+});
+
+test('un acquittement sans horodatage utilisable retombe sur l horloge du serveur', (t) => {
+  // `at` ne fait pas partie de la cle : il ne dit pas QUELLE alerte est
+  // acquittee, seulement QUAND. Refuser perdrait une action reelle de
+  // l'utilisateur — le panneau resterait allume sur une alerte qu'il vient
+  // d'eteindre, il recliquerait, une ligne de plus, sans fin. La tache 8
+  // acquitte par une route HTTP : un parametre absent arrive `undefined`.
+  const filePath = tmp(t);
+  const spy = t.mock.method(console, 'error', () => {});
+  const j = createJournal({ filePath, now: () => T + 9000 });
+  j.append(alertAt(T));
+  j.appendAck('loop:s1:Bash', T, undefined);
+  const [vif] = j.readAll({ now: T });
+  assert.equal(vif.acknowledged, true, 'l acquittement de l utilisateur n est pas perdu');
+  assert.equal(vif.ackAt, T + 9000, 'l heure retenue est celle du serveur, pas une invention');
+  const [relu] = createJournal({ filePath, now: () => T }).readAll({ now: T });
+  assert.equal(relu.acknowledged, true, 'et il survit au redemarrage');
+  assert.equal(relu.ackAt, T + 9000);
+  assert.equal(plaintes(spy, 'horodatage'), 1, 'l appelant casse ne reste pas invisible');
+
+  // Une chaine qui n'est pas un horodatage suit le meme chemin.
+  j.append(alertAt(T + 1000, 'loop:s1:Autre'));
+  j.appendAck('loop:s1:Autre', T + 1000, 'demain');
+  const autre = j.readAll({ now: T + 1000 }).find(a => a.id === 'loop:s1:Autre');
+  assert.equal(autre.ackAt, T + 9000);
+  assert.equal(plaintes(spy, 'horodatage'), 2);
+});
+
+test('un acquittement horodate en chaine garde son heure', (t) => {
+  // Meme frontiere HTTP que `createdAt`, meme normalisation : ce qui est relu
+  // doit etre un nombre, pas la chaine qu'on a recue.
+  const filePath = tmp(t);
+  const j = createJournal({ filePath, now: () => T });
+  j.append(alertAt(T));
+  j.appendAck('loop:s1:Bash', String(T), String(T + 5000));
+  const [relu] = createJournal({ filePath, now: () => T }).readAll({ now: T });
+  assert.equal(relu.acknowledged, true);
+  assert.equal(relu.ackAt, T + 5000, 'un nombre, pas une chaine');
 });
 
 test('l acquittement vaut aussitot, sans attendre une relecture', (t) => {
