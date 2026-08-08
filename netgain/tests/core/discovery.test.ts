@@ -25,6 +25,12 @@ touch('projects/F--DEV-proj-a/sess-new.jsonl', '{"type":"user"}\n', T3);
 touch('projects/F--DEV-proj-a/sess-new/subagents/agent-abc.jsonl', '{"type":"assistant"}\n', T3);
 touch('projects/F--DEV-proj-a/sess-new/subagents/agent-abc.meta.json', '{"agentType":"Explore"}', T3);
 touch('projects/F--DEV-proj-a/sess-new/subagents/agent-def.jsonl', '{"type":"assistant"}\n', T3);
+// Troisième palier : les sous-agents lancés par un workflow, plus deux leurres
+// que le filtre de nom doit écarter (journal de workflow, script de workflow).
+touch('projects/F--DEV-proj-a/sess-new/subagents/workflows/wf_123/agent-ghi.jsonl', '{"type":"assistant"}\n', T3);
+touch('projects/F--DEV-proj-a/sess-new/subagents/workflows/wf_123/agent-ghi.meta.json', '{"agentType":"Plan"}', T3);
+touch('projects/F--DEV-proj-a/sess-new/subagents/workflows/wf_123/journal.jsonl', '{"type":"other"}\n', T3);
+touch('projects/F--DEV-proj-a/sess-new/subagents/workflows/wf_123.json', '{"meta":true}', T3);
 touch('projects/F--DEV-proj-a/notes.txt', 'pas un transcript', T3);
 touch('projects/D--other-proj/sess-mid.jsonl', '{"type":"user"}\n', T2);
 
@@ -39,13 +45,31 @@ describe('discoverSessions', () => {
   test('attache les sous-agents avec meta.json quand présent, null sinon', async () => {
     const sessions = await discoverSessions(claudeDir, {});
     const withAgents = sessions.find((s) => s.sessionId === 'sess-new');
-    expect(withAgents?.subagents.map((a) => a.agentId).sort()).toEqual(['abc', 'def']);
+    expect(withAgents?.subagents.map((a) => a.agentId).sort()).toEqual(['abc', 'def', 'ghi']);
     const abc = withAgents?.subagents.find((a) => a.agentId === 'abc');
     const def = withAgents?.subagents.find((a) => a.agentId === 'def');
     expect(abc?.metaPath?.endsWith('agent-abc.meta.json')).toBe(true);
     expect(def?.metaPath).toBeNull();
     const without = sessions.find((s) => s.sessionId === 'sess-old');
     expect(without?.subagents).toEqual([]);
+  });
+
+  test('descend sous subagents/workflows/ sans y ramasser autre chose que des agent-*.jsonl', async () => {
+    const sessions = await discoverSessions(claudeDir, {});
+    const withAgents = sessions.find((s) => s.sessionId === 'sess-new');
+    const ghi = withAgents?.subagents.find((a) => a.agentId === 'ghi');
+
+    // Le transcript profond est découvert, et son meta.json est celui de SON dossier.
+    expect(ghi?.jsonlPath.includes(path.join('workflows', 'wf_123'))).toBe(true);
+    expect(ghi?.metaPath?.endsWith(path.join('wf_123', 'agent-ghi.meta.json'))).toBe(true);
+
+    // Les non-transcripts du même dossier restent dehors.
+    const paths = withAgents?.subagents.map((a) => a.jsonlPath) ?? [];
+    expect(paths.some((p) => p.endsWith('journal.jsonl'))).toBe(false);
+    expect(paths.some((p) => p.endsWith('wf_123.json'))).toBe(false);
+
+    // L'ordre est déterministe (readdir récursif ne le garantit pas).
+    expect([...paths].sort()).toEqual(paths);
   });
 
   test('filtre --project par sous-chaîne de slug', async () => {

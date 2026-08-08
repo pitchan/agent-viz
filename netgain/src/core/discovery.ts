@@ -24,7 +24,9 @@ export interface DiscoveryFilters {
 
 /**
  * Énumère les sessions sous <claudeDir>/projects/<slug>/<sessionId>.jsonl
- * et leurs sous-agents <slug>/<sessionId>/subagents/agent-*.jsonl.
+ * et leurs sous-agents, à TOUTE profondeur sous <slug>/<sessionId>/subagents/ :
+ * les agents de workflow vivent sous subagents/workflows/wf_<id>/ et étaient
+ * invisibles à un balayage à plat — 3,4 % des jetons nets, sans erreur levée.
  * Lecture seule ; tout dossier illisible est ignoré sans throw.
  */
 export async function discoverSessions(claudeDir: string, filters: DiscoveryFilters): Promise<SessionRef[]> {
@@ -77,22 +79,29 @@ export async function discoverSessions(claudeDir: string, filters: DiscoveryFilt
 async function discoverSubagents(dir: string): Promise<SubagentRef[]> {
   let entries;
   try {
-    entries = await readdir(dir, { withFileTypes: true });
+    entries = await readdir(dir, { recursive: true, withFileTypes: true });
   } catch {
     return [];
   }
-  const metaNames = new Set(entries.filter((e) => e.isFile() && e.name.endsWith('.meta.json')).map((e) => e.name));
+  // Clé sur le CHEMIN complet, pas sur le nom : en récursif, deux dossiers de
+  // workflow peuvent porter le même nom de meta, et le nom seul les confondrait.
+  const metaPaths = new Set(
+    entries.filter((e) => e.isFile() && e.name.endsWith('.meta.json')).map((e) => path.join(e.parentPath, e.name)),
+  );
   const refs: SubagentRef[] = [];
   for (const e of entries) {
     if (!e.isFile() || !e.name.startsWith('agent-') || !e.name.endsWith('.jsonl')) continue;
     const agentId = e.name.slice('agent-'.length, -'.jsonl'.length);
-    const metaName = `agent-${agentId}.meta.json`;
+    const metaPath = path.join(e.parentPath, `agent-${agentId}.meta.json`);
     refs.push({
       agentId,
-      jsonlPath: path.join(dir, e.name),
-      metaPath: metaNames.has(metaName) ? path.join(dir, metaName) : null,
+      jsonlPath: path.join(e.parentPath, e.name),
+      metaPath: metaPaths.has(metaPath) ? metaPath : null,
     });
   }
+  // L'ordre d'un readdir récursif n'est pas garanti d'une plateforme à l'autre :
+  // sans ce tri, les rapports et les tests deviennent dépendants du système de fichiers.
+  refs.sort((a, b) => (a.jsonlPath < b.jsonlPath ? -1 : a.jsonlPath > b.jsonlPath ? 1 : 0));
   return refs;
 }
 
