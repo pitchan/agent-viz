@@ -626,19 +626,43 @@ test('demarrage: ce que le serveur oublie de fournir se dit a voix haute', async
 const SOURCE_SERVEUR = fs.readFileSync(
   path.join(__dirname, '..', '..', 'lib', 'server.js'), 'utf8');
 
+// L'appel, et RIEN que l'appel. Un `[\s\S]*?` parti de `startWatchdog({`
+// balaierait jusqu'a la fin du fichier : n'importe quel `dir: DIR` ecrit PLUS
+// BAS satisferait l'assertion pendant que l'appel, lui, passerait un faux
+// dossier. Injoignable tant que le fichier s'arrete juste apres l'appel —
+// c'est-a-dire jusqu'a ce que la tache 8 y ajoute une ligne. On borne par
+// comptage d'accolades, donc l'ordre du fichier n'entre plus en jeu.
+function appelDe(source, nom) {
+  const debut = source.indexOf(`${nom}({`);
+  assert.notEqual(debut, -1, `appel a ${nom} introuvable dans lib/server.js`);
+  let profondeur = 0;
+  for (let i = source.indexOf('{', debut); i < source.length; i++) {
+    if (source[i] === '{') profondeur += 1;
+    else if (source[i] === '}' && (profondeur -= 1) === 0) return source.slice(debut, i + 1);
+  }
+  return assert.fail(`appel a ${nom} non ferme dans lib/server.js`);
+}
+const APPEL = appelDe(SOURCE_SERVEUR, 'startWatchdog');
+
 test('serveur: le chien de garde recoit le vrai dossier et la vraie frontiere', () => {
   // `DIR` : la seule definition faisant autorite du dossier d evenements.
-  assert.match(SOURCE_SERVEUR, /startWatchdog\(\{[\s\S]*?\bdir:\s*DIR\b/);
+  assert.match(APPEL, /\bdir:\s*DIR\b/);
   // `liveFrom` : sans lui, les deux chemins relisent les memes octets et le
   // produit annonce des boucles qui n ont pas eu lieu. `startWatchdog` s en
   // plaint au demarrage, mais mieux vaut que la suite le dise d abord.
-  assert.match(SOURCE_SERVEUR, /startWatchdog\(\{[\s\S]*?\bliveFrom:\s*liveHandoffOffset\b/);
+  assert.match(APPEL, /\bliveFrom:\s*liveHandoffOffset\b/);
 });
 
 test('serveur: l enveloppe SSE est composee ici, et le canal n est pas broadcastSSE nu', () => {
+  // Le renvoi arriere `\1` est la charge utile de ce controle, pas un ornement :
+  // il exige que la valeur mise dans le champ `alert` soit LE PARAMETRE de la
+  // lambda. Sans lui, `a => broadcastSSE({ type: 'alert', alert })` passe —
+  // `alert` n y est lie a rien, chaque alerte leve un ReferenceError, et les
+  // `try/catch` de `feedWatchdog` et du battement l avalent. Exactement la
+  // classe muette que ces deux tests existent pour fermer.
   assert.match(
-    SOURCE_SERVEUR,
-    /broadcastAlert:\s*(\w+)\s*=>\s*broadcastSSE\(\{\s*type:\s*'alert',\s*alert\s*\}\)/,
+    APPEL,
+    /broadcastAlert:\s*(\w+)\s*=>\s*broadcastSSE\(\{\s*type:\s*'alert',\s*(?:\1|alert:\s*\1)\s*\}\)/,
     'le chien de garde rend une alerte nue ; c est ICI que le protocole du serveur l habille',
   );
 });
