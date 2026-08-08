@@ -161,6 +161,21 @@ test('service: un acquittement que le journal refuse n eteint pas l alerte', asy
   assert.equal(lignes(filePath), 1, 'seule l alerte est au journal');
 });
 
+test('service: ack rapporte ce que le journal a retenu', async () => {
+  const filePath = tmpFile();
+  let maintenant = T + 4 * 60_000;
+  const s = await svc(filePath, { now: () => maintenant });
+  s.onEvent(pre(1, T));                       // outil encore en vol
+  const [a] = s.tick();
+  // Le service SAIT si l acquittement a ete retenu — le journal le lui dit —
+  // et jeter cette information ferait repondre 200 a la route sur un
+  // acquittement que le journal vient de refuser. L utilisateur verrait son
+  // geste pris en compte, et l alerte reviendrait NON acquittee au redemarrage.
+  assert.equal(s.ack(a.id, a.createdAt), true, 'retenu');
+  const { valeur } = await enEcoutant(() => s.ack(a.id, 'pas une date'));
+  assert.equal(valeur, false, 'refuse — et l appelant doit pouvoir le savoir');
+});
+
 test('service: acquitter ecrit une ligne et le relit', async () => {
   const filePath = tmpFile();
   const s = await svc(filePath);
@@ -249,6 +264,25 @@ test('catch-up: une entree illisible n arrete pas les fichiers suivants', async 
 test('catch-up: un dossier absent n est pas une erreur', async () => {
   const s = await svc(tmpFile());
   assert.equal(await catchUpFromDisk(s, path.join(os.tmpdir(), 'avtest-nexiste-pas-xyz')), 0);
+});
+
+test('catch-up: un dossier illisible se plaint, un dossier absent se tait', async () => {
+  const s = await svc(tmpFile());
+  // Absent : le silence est legitime, c est un premier demarrage.
+  const absent = await enEcoutant(() => catchUpFromDisk(s, path.join(os.tmpdir(), 'avtest-nexiste-pas-xyz')));
+  assert.equal(absent.valeur, 0);
+  assert.equal(absent.dits.join('\n'), '', 'un premier demarrage n a rien a dire');
+  // Illisible : un FICHIER la ou un dossier est attendu. Meme forme d echec
+  // qu un EACCES ou qu un verrou d antivirus sous Windows — et la, le
+  // rattrapage NE FAIT PAS son travail. Rendre 0 sans un mot le rendrait
+  // indiscernable d un dossier legitimement vide : c est la promesse du
+  // produit qui tomberait sans symptome. Meme partage qu a la lecture du
+  // journal (journal.js:load).
+  const fichier = path.join(neufDossier('avtest-pasundossier-'), 'x.jsonl');
+  fs.writeFileSync(fichier, flot());
+  const casse = await enEcoutant(() => catchUpFromDisk(s, fichier));
+  assert.equal(casse.valeur, 0);
+  assert.match(casse.dits.join('\n'), /dossier d evenements illisible/);
 });
 
 // ─── Le cablage (index.js) ────────────────────────────────────────────────
