@@ -378,8 +378,72 @@ test('retryStorm: tant que ca echoue, c est le meme orage', () => {
   const raised = [];
   for (let i = 0; i < 6; i++) {
     raised.push(...wd.processEvent(fail({ at: T + i * 1_000, id: `x${i}` })).newAlerts);
+    // The client beats every five seconds whether or not anything happened,
+    // and a beat must not touch this alert. Judging the dedup lock here made
+    // the storm vanish one beat after it was reported and announce itself
+    // again on every later failure.
+    clock.advance(5_000);
+    wd.tick();
   }
   assert.equal(raised.length, 1, 'six failures with nothing succeeding in between are one storm');
+  assert.equal(wd.getActiveAlerts().length, 1, 'and it is still there to be acknowledged');
+});
+
+test('loop: l alerte reste affichable et acquittable au-dela de sa fenetre', () => {
+  const clock = clockAt();
+  const wd = createWatchdog({ now: clock.now });
+  let last = [];
+  for (let i = 0; i < 4; i++) last = wd.processEvent(pre({ at: T + i * 1_000, id: `a${i}` })).newAlerts;
+  const alert = last[0];
+
+  clock.advance(90_000);   // past loop's 60s window, inside the 120s display cut
+  wd.tick();
+  assert.equal(wd.getActiveAlerts().length, 1,
+    'the window bounds an episode, not how long its report is worth reading');
+  assert.equal(isFresh(alert, alert.createdAt + 90_000), true,
+    'and freshness, not the window, is what governs the display');
+  wd.acknowledge(alert.id);
+  assert.deepEqual(wd.getActiveAlerts(), [], 'acknowledging it still does something');
+});
+
+test('retryStorm: deux sous-agents sur le meme outil ont deux compteurs', () => {
+  const clock = clockAt();
+  const wd = createWatchdog({ now: clock.now });
+  const byAgent = (at, id, agent) => ({ ...fail({ at, id }), agent_id: agent, agent_type: 'Explore' });
+  const raised = [];
+  for (const [at, id, who] of [[T, 'a1', 'A'], [T + 1_000, 'a2', 'A'],
+                               [T + 2_000, 'b1', 'B'], [T + 3_000, 'b2', 'B']]) {
+    raised.push(...wd.processEvent(byAgent(at, id, who)).newAlerts);
+  }
+  assert.deepEqual(raised, [],
+    'two failures each is nobody at three — one shared counter would have fired');
+
+  const rA = wd.processEvent(byAgent(T + 4_000, 'a3', 'A')).newAlerts;
+  assert.equal(rA.length, 1, 'A reaches three on its own');
+  assert.equal(rA[0].agentId, 'A');
+  assert.equal(rA[0].count, 3, 'and it counted A s failures only');
+});
+
+test('retryStorm: le succes d un sous-agent ne relance pas l orage de l autre', () => {
+  const clock = clockAt();
+  const wd = createWatchdog({ now: clock.now });
+  const byAgent = (at, id, agent) => ({ ...fail({ at, id }), agent_id: agent });
+  const raised = [];
+  for (let i = 0; i < 3; i++) raised.push(...wd.processEvent(byAgent(T + i * 1_000, `a${i}`, 'A')).newAlerts);
+  assert.equal(raised.length, 1, 'A is in a storm');
+
+  // B succeeds on the same tool. On a shared counter this would zero A's
+  // series, hand back A's dedup lock, and let A's next three failures report
+  // the very same storm a second time.
+  wd.processEvent({
+    session_id: 'sid1', hook_event_name: 'PostToolUse', tool_name: 'Bash',
+    tool_use_id: 'b1', agent_id: 'B', _ts: iso(T + 4_000),
+  });
+  const after = [];
+  for (let i = 0; i < 3; i++) {
+    after.push(...wd.processEvent(byAgent(T + 5_000 + i * 1_000, `a${3 + i}`, 'A')).newAlerts);
+  }
+  assert.deepEqual(after, [], 'B s success says nothing about A s series');
 });
 
 test('retryStorm: un succes clot l orage, la serie suivante sonne de nouveau', () => {

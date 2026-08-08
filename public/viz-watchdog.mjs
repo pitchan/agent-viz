@@ -36,6 +36,14 @@ function eventTime(evt, now) {
   return Number.isFinite(parsed) ? parsed : now();
 }
 
+// The failure counter is scoped to the agent as well as the tool, because the
+// alert's identity is. Two subagents failing on the same tool are two storms,
+// and one of them succeeding must not close the other's series — which matters
+// twice over now that the counter also decides when the dedup lock is released.
+function failureKey(agentId, toolName) {
+  return `${agentId || ''}:${toolName}`;
+}
+
 function hashInput(toolInput) {
   if (toolInput === undefined || toolInput === null) return '';
   return JSON.stringify(toolInput);
@@ -55,7 +63,7 @@ function emptyBuffer() {
     // signature removes the thing being predicted.
     calls: new Map(),          // sig → [{ ts, toolUseId, failed }]
     sigOfCall: new Map(),      // tool_use_id → sig, for a failure with no tool_input
-    failures: new Map(),       // toolName → consecutive failures, repeats excluded
+    failures: new Map(),       // agent:tool → consecutive failures, repeats excluded
     lastFailureSig: new Map(), // toolName → { sig, ts } of the last failure seen
     running: new Map(),        // tool_use_id → in-flight tool record
     lastEventAt: null,         // event time of the last event seen for the session
@@ -119,6 +127,12 @@ function makeAlert({
 // Contract:
 //   onEvent(ctx, evt, ts) → Alert | null   — ts = when the event happened
 //   onTick(ctx, now)      → Alert[]
+//   isStale(ctx, alert, now)      → bool   — optional: has the condition
+//       CEASED? tick() retires the alert, taking it off the screen.
+//   isPastEpisode(ctx, alert, ts) → bool   — optional: has a NEW episode
+//       begun? emitIfNew releases the dedup lock so the next one can speak.
+// Two questions, never one: an episode ending is not a reason to withdraw a
+// report nobody has read. A detector may declare either, both, or neither.
 // ctx = { state, thresholds, now: () => epochMs }
 //
 // Detectors are pure functions on (state, evt|now) — all mutation is
@@ -159,15 +173,20 @@ function failureSignature(buf, evt) {
 
 const DETECTORS = {
   loop: {
-    // "Is this still the same loop?" The window IS the definition of an
-    // episode: once it has closed, four fresh repeats are a new loop and
-    // deserve to be told, not swallowed as a duplicate of the old one.
+    // "Has a new loop begun?" The window IS the definition of an episode: once
+    // it has closed, four fresh repeats are a new loop and deserve to be told,
+    // not swallowed as a duplicate of the old one.
     //
     // Something has to answer this, or the alert keeps the dedup lock for
     // ever — and since the identity is `loop:<session>:<tool>`, one alert
     // nobody acknowledged would silence that tool for the rest of the session.
-    isStale(ctx, alert, now) {
-      return (now - alert.createdAt) > ctx.thresholds.loop.windowMs;
+    //
+    // Note what this is NOT: it is not a reason to take the alert off the
+    // screen. The window bounds an episode, not how long its report is worth
+    // reading. Retiring on it would make a loop unacknowledgeable after sixty
+    // seconds — see `isStale` on stuck for the hook that does withdraw.
+    isPastEpisode(ctx, alert, ts) {
+      return (ts - alert.createdAt) > ctx.thresholds.loop.windowMs;
     },
     onEvent(ctx, evt, ts) {
       const sid = evt.session_id;
@@ -230,9 +249,8 @@ const DETECTORS = {
     // "The counter is back to zero" states the rule but cannot be used to test
     // it. Nothing looks at the counter while it is zero: the reset happens on a
     // success, and the next question comes three failures later, by which time
-    // it has climbed back to the threshold. On the tick path a beat might catch
-    // the zero; on the event path — and in a server catch-up, which has no
-    // beats at all — it never would.
+    // it has climbed back to the threshold. On the event path — and in a server
+    // catch-up, which has no beats at all — the zero is never seen.
     //
     // What is true at every instant is that the counter only ever climbs within
     // a series. So a counter that has not passed what this alert already
@@ -240,14 +258,20 @@ const DETECTORS = {
     // rebuilt, or there is nothing left to continue. Zero always satisfies it,
     // so the rule above is the special case, not something else.
     //
-    // A tool with no counter reads as lapsed — unreachable while the alert
-    // exists (raising it is what set the counter, and only a success ever
+    // This is asked only where the counter has already climbed — on emission,
+    // never on a beat. Asked on a beat it would be true the instant the alert
+    // was raised (`failures` is written to `cur` just before makeAlert reads it
+    // as `count`), and the storm would be retired five seconds after being
+    // reported, unacknowledgeable, re-announcing itself on every later failure.
+    //
+    // A tool with no counter reads as a new episode — unreachable while the
+    // alert exists (raising it is what set the counter, and only a success ever
     // rewrites it, to zero), and the safe direction anyway: an unknown state
     // must never hold a lock.
-    isStale(ctx, alert) {
+    isPastEpisode(ctx, alert) {
       const buf = ctx.state.sessions.get(alert.sessionId);
       if (!buf) return true;
-      return (buf.failures.get(alert.toolName) || 0) <= alert.count;
+      return (buf.failures.get(failureKey(alert.agentId, alert.toolName)) || 0) <= alert.count;
     },
     onEvent(ctx, evt, ts) {
       const sid = evt.session_id;
@@ -300,8 +324,9 @@ const DETECTORS = {
             && buf.calls.has(sig)) {
           return null;
         }
-        const cur = (buf.failures.get(evt.tool_name) || 0) + 1;
-        buf.failures.set(evt.tool_name, cur);
+        const key = failureKey(evt.agent_id, evt.tool_name);
+        const cur = (buf.failures.get(key) || 0) + 1;
+        buf.failures.set(key, cur);
         if (cur >= ctx.thresholds.retryStorm.count) {
           return makeAlert({
             type: 'retryStorm', sessionId: sid, toolName: evt.tool_name,
@@ -311,7 +336,7 @@ const DETECTORS = {
           });
         }
       } else if (evt.hook_event_name === 'PostToolUse') {
-        buf.failures.set(evt.tool_name, 0);
+        buf.failures.set(failureKey(evt.agent_id, evt.tool_name), 0);
         // The memory of the last failure goes with the counter: after a
         // success, the next failure starts a new series whatever it repeats.
         buf.lastFailureSig.delete(evt.tool_name);
@@ -401,18 +426,28 @@ const DETECTORS = {
   },
 };
 
-// Has the incident this alert describes ended? Asked of the alert already in
-// the registry, never of the new one. A detector that does not answer never
-// lapses, so adding a fourth one changes nothing until it opts in.
+// Does the alert already in the registry still own its identity, or has a new
+// episode begun? Asked of the stored alert, never of the new one, and only
+// where an alert is being emitted: this releases the dedup lock, it withdraws
+// nothing from the screen.
 //
-// This is NOT the freshness rule and must not be confused with it. Freshness
-// asks "is this worth shouting about?" and lives at the display; this asks "is
-// this still the same incident?" and belongs to detection — a server with no
-// display at all still needs it, or a loop at 10am keeps the loop at 2pm out
-// of the journal.
-function hasLapsed(ctx, alert, at) {
+// Deliberately NOT the same hook as `isStale`, and the distance between them is
+// the whole point. `isStale` answers "has the condition ceased?" and belongs to
+// tick(), which retires. Wiring both to one predicate retired every retryStorm
+// alert one beat after it was raised — its counter equals `alert.count` the
+// instant it is created — leaving it unacknowledgeable and re-announcing the
+// same storm on every later failure.
+//
+// Nor is either of them the freshness rule: that one asks "is this worth
+// shouting about?" and lives at the display. A server with no display at all
+// still needs this one, or a loop at 10am keeps the loop at 2pm out of the
+// journal.
+//
+// A detector that declares neither hook keeps its alert until it is
+// acknowledged — the safe default, and what loop and retryStorm did before.
+function startsNewEpisode(ctx, alert, at) {
   const det = DETECTORS[alert.type];
-  return !!(det && typeof det.isStale === 'function' && det.isStale(ctx, alert, at));
+  return !!(det && typeof det.isPastEpisode === 'function' && det.isPastEpisode(ctx, alert, at));
 }
 
 // ─── Factory ──────────────────────────────────────────────────────────────
@@ -421,8 +456,8 @@ function hasLapsed(ctx, alert, at) {
 // only way to drive the watchdog is through these four methods.
 //
 // emitIfNew implements the dedup rule: same signature already active
-// (non-acknowledged) and still describing a live incident → skip. Acknowledged
-// or lapsed → replace, and the next trigger fires.
+// (non-acknowledged) and still holding its identity → skip. Acknowledged, or
+// superseded by a new episode → replace, and the next trigger fires.
 
 // canObserve answers "would an event have reached us just now?". It is the
 // caller's business — the browser knows about its stream and its tab, this
@@ -436,13 +471,13 @@ export function createWatchdog({ now = () => Date.now(), thresholds = {}, canObs
   const ctx = { state, thresholds: mergeThresholds(thresholds), now, canObserve };
 
   // `at` is the reference time for judging whether the alert already in the
-  // registry has lapsed — event time on the event path, wall clock on the tick
-  // path. Never the moment we happen to be running: replaying a file must give
-  // the same result as living through it.
+  // registry still owns its identity — event time on the event path, wall clock
+  // on the tick path. Never the moment we happen to be running: replaying a
+  // file must give the same result as living through it.
   function emitIfNew(alert, at) {
     if (!alert) return null;
     const existing = state.activeAlerts.get(alert.id);
-    if (existing && !existing.acknowledged && !hasLapsed(ctx, existing, at)) return null;
+    if (existing && !existing.acknowledged && !startsNewEpisode(ctx, existing, at)) return null;
     state.activeAlerts.set(alert.id, alert);
     return alert;
   }
@@ -473,8 +508,15 @@ export function createWatchdog({ now = () => Date.now(), thresholds = {}, canObs
     tick() {
       const newAlerts = [];
       const tickNow = now();
+      // Only what a detector says has CEASED leaves the screen. The dedup
+      // lock is not consulted here: an episode being over is a reason to let
+      // the next one speak, never a reason to take the report away from
+      // someone who has not read it yet.
       for (const [id, alert] of state.activeAlerts) {
-        if (hasLapsed(ctx, alert, tickNow)) state.activeAlerts.delete(id);
+        const det = DETECTORS[alert.type];
+        if (det && typeof det.isStale === 'function' && det.isStale(ctx, alert, tickNow)) {
+          state.activeAlerts.delete(id);
+        }
       }
       for (const det of Object.values(DETECTORS)) {
         if (typeof det.onTick !== 'function') continue;
