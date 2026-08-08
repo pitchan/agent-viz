@@ -81,15 +81,20 @@
 //      ones.
 //
 //   4. THE WORKSTATION SETTING. `workstationSetting` marks the subset that
-//      alone deserves an alert — Bash quoting, PowerShell cmdlets, Windows
-//      paths, command separators: 41 occurrences over 90 days. Everything
-//      else is recognised TO BE EXCLUDED, not to be said. The tool-protocol
-//      patterns (`inv-write-before-read`, `inv-read-without-pagination`,
-//      `inv-search-bad-pattern`) are the most frequent of all, but their
-//      instruction is already written in the tool descriptions the agent
-//      re-reads every turn: the survey does not prove an instruction is
-//      missing, it proves an existing instruction does not hold. Two
-//      different diagnoses, and only the second is demonstrated.
+//      alone deserves an alert — Windows paths, Bash quoting, PowerShell
+//      cmdlets, command separators. Everything else is recognised TO BE
+//      EXCLUDED, not to be said.
+//
+//      A pattern earns that flag by ONE test, and the doc states it by its
+//      criterion rather than by a symptom: is this something the user can fix
+//      ONCE and never see again? Two different things fail that test. The
+//      tool-protocol patterns (`inv-write-before-read`,
+//      `inv-read-without-pagination`, `inv-search-bad-pattern`) fail it
+//      because their instruction is ALREADY WRITTEN in the tool descriptions
+//      the agent re-reads every turn. `inv-bash-unbalanced-quote` failed it
+//      for the opposite reason and only until 2026-08-08: it merged two
+//      causes, so it could name no remedy at all. Splitting it (doc/30) gave
+//      both causes back their flag, and left the merged pattern as a net.
 //
 // ── A limit that is written down rather than hidden ───────────────────────
 // `bash` messages are not localised on this machine, so the `inv-bash-*`
@@ -187,7 +192,38 @@ export const PATTERNS = Object.freeze([
     re: /line \d+: cd: [A-Za-z]:[^\s/\\][^\s:]*: No such file or directory/ },
   { id: 'inv-bash-cd-too-many-args', class: 'invocation', workstationSetting: true,
     re: /line \d+: cd: too many arguments/ },
-  { id: 'inv-bash-unbalanced-quote', class: 'invocation', workstationSetting: true,
+  // Two disjoint causes under one message. The 2026-08-08 survey (doc/30)
+  // went back from the message TO THE COMMAND — which the original
+  // calibration never did, having only ever read the failure text — and
+  // found no typo among the 19: two workstation settings, 11 and 8.
+  //
+  // A. A DIRECTORY path ending in a backslash, the way Windows displays one:
+  // `ls "D:\folder\"`. Under a POSIX shell `\` escapes, so `\"` stops being a
+  // closing quote and the string never closes. Same root as
+  // `inv-bash-windows-path-unquoted`. Verified live: backslashes break
+  // nothing by themselves inside double quotes — `"F:\DEV\public"` runs —
+  // ONLY the trailing one does.
+  { id: 'inv-bash-trailing-backslash-in-path', class: 'invocation', workstationSetting: true,
+    re: /eval: line \d+: unexpected EOF while looking for matching `"/ },
+  // B. A `cat >> f <<'EOF'` carrying 8 to 15 KB. The command is
+  // SYNTACTICALLY VALID — `bash -n` green all 8 times — it simply does not
+  // reach the shell whole. Measured over the entire history: 9 heredoc
+  // commands of 8 KB or more, 9 failures, zero exceptions. The transport
+  // mechanism is NOT explained: truncation of the command text and a naive
+  // `eval '<cmd>'` envelope were both tested and refuted. This pattern names
+  // a reproducible fact, not an explanation, and must not be read as one.
+  { id: 'inv-bash-heredoc-too-large', class: 'invocation', workstationSetting: true,
+    re: /-c: line \d+: unexpected EOF while looking for matching `'/ },
+  // The net, and that is all it is now. It matches both forms above, so it
+  // must stay BEHIND them. It no longer rings: it merged two causes, and its
+  // French sentence — « un guillemet ouvert et jamais refermé » — described
+  // the symptom without being able to name any remedy. That sentence was the
+  // tell, and the flag's own definition is what it failed.
+  //
+  // It survives because the two new anchors describe how the HARNESS invokes
+  // the shell, not bash itself. If that changes, the case is still classified
+  // and counted instead of vanishing — visible degradation, never silent.
+  { id: 'inv-bash-unbalanced-quote', class: 'invocation', workstationSetting: false,
     re: /line \d+: unexpected EOF while looking for matching/ },
   { id: 'inv-bash-syntax-error', class: 'invocation', workstationSetting: true,
     re: /line \d+: syntax error near unexpected token/ },

@@ -135,8 +135,20 @@ const SAMPLES = [
    'Exit code 1 /usr/bin/bash: line 1: cd: D:dvf-postgis-pipelinefrontend: No such file or directory'],
   ['inv-bash-cd-too-many-args',
    'Exit code 1 /usr/bin/bash: line 1: cd: too many arguments'],
-  ['inv-bash-unbalanced-quote',
+  // Deux causes disjointes, mesurees le 2026-08-08 (doc/30) : 11 antislash
+  // final avant le guillemet fermant, 8 heredoc au-dela de 8 Ko. Elles se
+  // separent sur le message SEUL — 19/19 — et sur deux ancres a la fois : la
+  // voie d'appel (`eval:` / `-c:`) ET le caractere cherche (`"` / `'`).
+  ['inv-bash-trailing-backslash-in-path',
    'Exit code 2 /usr/bin/bash: eval: line 1: unexpected EOF while looking for matching `"\''],
+  ['inv-bash-heredoc-too-large',
+   "Exit code 2 /usr/bin/bash: -c: line 149: unexpected EOF while looking for matching `''"],
+  // Le filet. Ni `eval:` ni `-c:` : aucune des deux ancres neuves ne le prend,
+  // et il est donc classe et compte SANS alerter. C'est exactement le scenario
+  // « le harnais a change sa facon d'appeler le shell » : degradation visible,
+  // jamais silencieuse.
+  ['inv-bash-unbalanced-quote',
+   'Exit code 2 /usr/bin/bash: line 42: unexpected EOF while looking for matching `"\''],
   ['inv-bash-syntax-error',
    "Exit code 2 /usr/bin/bash: -c: line 1: syntax error near unexpected token `newline'"],
   ['inv-cross-shell-cmdlet-in-posix',
@@ -181,14 +193,18 @@ const SAMPLES = [
 ];
 
 // Le sous-ensemble « réglage du poste » : le seul qui donnera lieu à une
-// alerte. 41 occurrences au relevé, exactement ces neuf motifs.
-// `inv-cross-shell-cmdlet-in-posix` n en fait plus partie : 1 occurrence, 1
-// projet, 1 acteur en 90 jours, et il ne distinguait un cmdlet PowerShell d un
-// binaire absent que par la CASSE du nom.
+// alerte. Exactement ces dix motifs.
+// `inv-cross-shell-cmdlet-in-posix` n en fait pas partie : 1 occurrence en 90
+// jours, et il ne distinguait un cmdlet PowerShell d un binaire absent que par
+// la CASSE du nom.
+// `inv-bash-unbalanced-quote` n en fait plus partie depuis doc/30 : il
+// fusionnait deux causes et ne pouvait donc nommer aucun remede. Il reste dans
+// la table comme FILET, classe et compte, jamais dit.
 const WORKSTATION_IDS = [
   'inv-bash-windows-path-unquoted',
   'inv-bash-cd-too-many-args',
-  'inv-bash-unbalanced-quote',
+  'inv-bash-trailing-backslash-in-path',
+  'inv-bash-heredoc-too-large',
   'inv-bash-syntax-error',
   'inv-ps-command-not-found',
   'inv-ps-parameter-not-found',
@@ -243,11 +259,11 @@ test('classify est idempotent : deux appels sur le meme texte donnent le meme ve
   }
 });
 
-test('la table compte 37 motifs, dont 22 d invocation', () => {
+test('la table compte 39 motifs, dont 24 d invocation', () => {
   const byClass = {};
   for (const p of PATTERNS) byClass[p.class] = (byClass[p.class] || 0) + 1;
-  assert.deepEqual(byClass, { harness: 4, invocation: 22, environment: 5, verdict: 6 });
-  assert.equal(PATTERNS.length, 37);
+  assert.deepEqual(byClass, { harness: 4, invocation: 24, environment: 5, verdict: 6 });
+  assert.equal(PATTERNS.length, 39);
 });
 
 // ─── Couverture : un echantillon reel par motif ────────────────────────────
@@ -477,7 +493,7 @@ test('un tres gros texte qui contient un motif est quand meme classe', () => {
 
 // ─── Le reglage du poste : le seul sous-ensemble qui alertera ──────────────
 
-test('exactement neuf motifs relevent du reglage du poste', () => {
+test('exactement dix motifs relevent du reglage du poste', () => {
   const flagges = PATTERNS.filter(p => p.workstationSetting).map(p => p.id);
   assert.deepEqual([...flagges].sort(), [...WORKSTATION_IDS].sort());
 });
@@ -503,6 +519,22 @@ test('aucun motif hors invocation n est marque reglage du poste', () => {
   for (const p of PATTERNS.filter(x => x.class !== 'invocation')) {
     assert.equal(p.workstationSetting, false, `${p.id} : classe ${p.class} et marque reglage du poste`);
   }
+});
+
+test('le filet generique reste classe mais ne sonne plus', () => {
+  // Il fusionnait deux causes et ne pouvait donc nommer aucun remede (doc/30).
+  // Il survit pour que rien ne disparaisse en silence si les ancres neuves
+  // vieillissent — le pire mode de panne de ce produit.
+  const p = PATTERNS.find(x => x.id === 'inv-bash-unbalanced-quote');
+  assert.equal(p.class, 'invocation', 'le filet reste une invocation');
+  assert.equal(p.workstationSetting, false, 'le filet ne doit plus alerter');
+});
+
+test('chaque ancre refuse l echantillon de l autre cause', () => {
+  const antislash = 'Exit code 2 /usr/bin/bash: eval: line 1: unexpected EOF while looking for matching `"\'';
+  const heredoc = "Exit code 2 /usr/bin/bash: -c: line 149: unexpected EOF while looking for matching `''";
+  assert.equal(classify(antislash).id, 'inv-bash-trailing-backslash-in-path');
+  assert.equal(classify(heredoc).id, 'inv-bash-heredoc-too-large');
 });
 
 // ═══ 5. CITER n est pas EMETTRE ════════════════════════════════════════════
@@ -626,6 +658,14 @@ test('vrd-exit-code-bare reste le dernier filet, derriere tout ce qui alerte', (
   const dernierAlertant = Math.max(...PATTERNS.filter(p => p.workstationSetting).map(p => idx(p.id)));
   assert.ok(idx('vrd-exit-code-bare') > dernierAlertant);
   assert.equal(PATTERNS.at(-1).id, 'vrd-exit-code-bare');
+});
+
+test('les deux motifs neufs precedent le filet qui les avalerait', () => {
+  // Le filet matche `line \d+: unexpected EOF ...`, donc les deux formes
+  // specifiques aussi. Place devant elles, il prendrait tout et le detecteur
+  // redeviendrait muet sur les deux causes a la fois.
+  assert.ok(idx('inv-bash-trailing-backslash-in-path') < idx('inv-bash-unbalanced-quote'));
+  assert.ok(idx('inv-bash-heredoc-too-large') < idx('inv-bash-unbalanced-quote'));
 });
 
 test('un binaire absent ne sonne pas, quelle que soit la casse de son nom', () => {
@@ -785,6 +825,27 @@ const RELEVE = new Map([
   ['vrd-exit-code-bare', String.raw`^\s*Exit code \d+`, ''],
 ].map(([id, source, flags]) => [id, { source, flags }]));
 
+// Le SECOND releve (doc/30-design-scission-guillemet.md, 2026-08-08) : deux
+// motifs de plus, nes de la scission de `inv-bash-unbalanced-quote`, qui
+// fusionnait deux causes. Ils ne vont PAS dans RELEVE — celui-ci est le temoin
+// de doc/27, et les y glisser mentirait sur leur provenance, c est-a-dire sur
+// la seule chose que cette section existe pour tenir. Meme role, meme
+// discipline, autre source.
+//
+// `String.raw` ne convient pas ici et c est la seule raison du changement de
+// style : un backtick ne peut pas figurer nu dans un litteral de gabarit, et
+// l echapper ajouterait un antislash a la source comparee.
+const RELEVE_30 = new Map([
+  ['inv-bash-trailing-backslash-in-path',
+   'eval: line \\d+: unexpected EOF while looking for matching `"', ''],
+  ['inv-bash-heredoc-too-large',
+   "-c: line \\d+: unexpected EOF while looking for matching `'", ''],
+].map(([id, source, flags]) => [id, { source, flags }]));
+
+// Ce que la table doit reproduire : l union des deux releves. Les ECARTS se
+// declarent contre cette union, jamais contre l un des deux seulement.
+const TEMOIN = new Map([...RELEVE, ...RELEVE_30]);
+
 // Les seuls ecarts admis au releve, chacun avec sa raison et sa nature.
 //   `equivalent: true`  — le motif reconnait EXACTEMENT le meme ensemble de
 //                         textes ; l ecart ne sert qu a rendre le motif
@@ -817,7 +878,7 @@ const ECARTS = new Map([
   ['inv-bash-unbalanced-quote', {
     source: String.raw`line \d+: unexpected EOF while looking for matching`,
     flags: '', equivalent: false,
-    pourquoi: 'meme ancre. C est le motif alertant le plus volumineux du releve (16 occurrences) et donc celui qu il faut le plus durcir.',
+    pourquoi: 'meme ancre. Il fut le motif alertant le plus volumineux du releve (16 occurrences) ; doc/30 a montre qu il fusionnait deux causes et l a scinde. Il n alerte plus, mais l ancre reste : un motif qui compte sans rien dire doit compter juste.',
   }],
   ['inv-bash-syntax-error', {
     source: String.raw`line \d+: syntax error near unexpected token`,
@@ -831,15 +892,15 @@ const ECARTS = new Map([
   }],
 ]);
 
-test('les 37 expressions sont celles du releve, ecart par ecart declare', () => {
-  assert.deepEqual([...PATTERNS.map(p => p.id)].sort(), [...RELEVE.keys()].sort(),
-    'la table et le releve ne portent pas les memes identifiants');
+test('les 39 expressions sont celles des deux releves, ecart par ecart declare', () => {
+  assert.deepEqual([...PATTERNS.map(p => p.id)].sort(), [...TEMOIN.keys()].sort(),
+    'la table et les releves ne portent pas les memes identifiants');
   for (const p of PATTERNS) {
-    const attendu = ECARTS.get(p.id) || RELEVE.get(p.id);
+    const attendu = ECARTS.get(p.id) || TEMOIN.get(p.id);
     assert.equal(p.re.source, attendu.source, `${p.id} : expression non conforme`);
     assert.equal(p.re.flags, attendu.flags, `${p.id} : drapeaux non conformes`);
     if (ECARTS.has(p.id)) {
-      assert.notEqual(p.re.source, RELEVE.get(p.id).source,
+      assert.notEqual(p.re.source, TEMOIN.get(p.id).source,
         `${p.id} est declare en ecart alors qu il est conforme au releve`);
       assert.ok(ECARTS.get(p.id).pourquoi.length > 40, `${p.id} : ecart sans raison ecrite`);
     }
@@ -872,7 +933,7 @@ const CORPUS = [
 test('un ecart declare ne fait que RESTREINDRE le motif du releve, jamais l elargir', () => {
   for (const [id, ecart] of ECARTS) {
     const p = PATTERNS.find(x => x.id === id);
-    const duReleve = new RegExp(RELEVE.get(id).source, RELEVE.get(id).flags);
+    const duReleve = new RegExp(TEMOIN.get(id).source, TEMOIN.get(id).flags);
     for (const text of CORPUS) {
       if (p.re.test(text)) {
         assert.ok(duReleve.test(text),
