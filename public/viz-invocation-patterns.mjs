@@ -312,12 +312,14 @@ export const PATTERNS = Object.freeze([
 
   // ── LAYER 6 — the generic invocation entry, and why it sits here. "This
   // file does not exist" is exploration: no instruction makes anyone guess a
-  // directory tree. So it is classified to be counted, never to be advised —
-  // hence workstationSetting false, which keeps it off the alerting path —
-  // and it is the LAST invocation pattern because it is the only one that
-  // leaks into verdicts (4 measured false positives, 2 node stack traces and
-  // 2 python tracebacks). Moving it up re-opens all four. `introuvable dans`
-  // is the second of the table's two French anchors.
+  // directory tree. So it is classified in order to be EXCLUDED, never to be
+  // advised — hence workstationSetting false, which keeps it off the alerting
+  // path. (It is not counted either: the detector's filter returns before its
+  // counter. Nothing in this table is "counted but unsaid" — see the net's
+  // entry above.) And it is the LAST invocation pattern because it is the only
+  // one that leaks into verdicts (4 measured false positives, 2 node stack
+  // traces and 2 python tracebacks). Moving it up re-opens all four.
+  // `introuvable dans` is the second of the table's two French anchors.
   { id: 'inv-path-not-found', class: 'invocation', workstationSetting: false,
     re: /(?:Path|File) does not exist|No such file or directory|introuvable dans/ },
 

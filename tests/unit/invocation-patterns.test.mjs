@@ -144,9 +144,11 @@ const SAMPLES = [
   ['inv-bash-heredoc-too-large',
    "Exit code 2 /usr/bin/bash: -c: line 149: unexpected EOF while looking for matching `''"],
   // Le filet. Ni `eval:` ni `-c:` : aucune des deux ancres neuves ne le prend,
-  // et il est donc classe et compte SANS alerter. C'est exactement le scenario
-  // « le harnais a change sa facon d'appeler le shell » : degradation visible,
-  // jamais silencieuse.
+  // et il ALERTE, sous sa phrase vague. C'est exactement le scenario « le
+  // harnais a change sa facon d'appeler le shell » : la forme n'est plus
+  // reconnue par les ancres, mais elle sonne quand meme. Un motif muet ne
+  // compterait pas non plus — le filtre du detecteur rend null avant le
+  // compteur.
   ['inv-bash-unbalanced-quote',
    'Exit code 2 /usr/bin/bash: line 42: unexpected EOF while looking for matching `"\''],
   ['inv-bash-syntax-error',
@@ -920,7 +922,7 @@ const ECARTS = new Map([
   ['inv-bash-unbalanced-quote', {
     source: String.raw`line \d+: unexpected EOF while looking for matching`,
     flags: '', equivalent: false,
-    pourquoi: 'meme ancre. Il fut le motif alertant le plus volumineux du releve (16 occurrences) ; doc/30 a montre qu il fusionnait deux causes et l a scinde. Il n alerte plus, mais l ancre reste : un motif qui compte sans rien dire doit compter juste.',
+    pourquoi: 'meme ancre. Il fut le motif alertant le plus volumineux du releve (16 occurrences) ; doc/30 a montre qu il fusionnait deux causes et l a scinde en deux motifs plus specifiques. Il reste alertant, en dernier des trois : il ne se declenche que sur les formes qu aucune ancre ne reconnait, et l estampille reste ce qui distingue l emis du cite.',
   }],
   ['inv-bash-syntax-error', {
     source: String.raw`line \d+: syntax error near unexpected token`,

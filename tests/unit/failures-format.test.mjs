@@ -120,7 +120,7 @@ test('chaque cause du releve dit ce qui a ete mal ecrit, pas ce que l outil a re
     'Bash · appel mal formé : un guillemet simple non fermé — typiquement un heredoc trop gros pour la ligne de commande');
 });
 
-test('la phrase du filet survit, meme si plus aucune alerte ne la porte', () => {
+test('la phrase du filet est celle qui sert quand la cause n est pas caracterisee', () => {
   // Elle est de nouveau VIVANTE depuis le 2026-08-08 : le filet alerte, donc
   // une alerte la porte. Elle reste malgre tout la seule phrase du bloc a
   // decrire un symptome sans nommer de remede, et c est juste — le filet ne se
