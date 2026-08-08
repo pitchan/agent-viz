@@ -6,6 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { failureLine, projectLabel, failuresSummary } from '../../public/observatory/failures-format.js';
+import { _DETECTOR_TYPES } from '../../public/viz-watchdog.mjs';
 
 const base = {
   type: 'loop', toolName: 'Bash', count: 4, subject: 'npm run build',
@@ -63,6 +64,81 @@ test('une session bloquee sur un seul outil parle au singulier', () => {
 
 test('un type inconnu se rend lisible plutot que vide', () => {
   assert.equal(failureLine({ ...base, type: 'pricingDrift' }).headline, 'pricingDrift');
+});
+
+// ── Appel mal formé ────────────────────────────────────────────────────────
+//
+// L'alerte porte un IDENTIFIANT de motif — `inv-bash-windows-path-unquoted` —
+// et rien d'autre : ni la commande, ni le message d'erreur. C'est ce bloc qui
+// en fait une phrase. Traduire le `message` anglais serait la seule facon de
+// le voir diverger de ce que le detecteur a mesure, et ce `message` sert la
+// notification bureau, qui suit la langue du chrome.
+
+const invocation = {
+  ...base, type: 'badInvocation', toolName: 'Bash', count: 1, subject: '',
+  occurrences: [], patternId: 'inv-bash-windows-path-unquoted',
+};
+
+test('un appel mal forme dit LEQUEL, en francais, depuis le seul identifiant', () => {
+  const l = failureLine(invocation);
+  assert.equal(l.headline,
+    'Bash · appel mal formé : un chemin Windows non protégé sous un shell POSIX');
+  assert.equal(l.subject, '', 'aucun texte de commande n a ete consigne, rien a montrer');
+});
+
+test('un appel mal forme repete dit combien de fois', () => {
+  assert.equal(failureLine({ ...invocation, count: 3 }).headline,
+    'Bash · appel mal formé : un chemin Windows non protégé sous un shell POSIX, 3 fois dans la session');
+});
+
+// Le detecteur compte TOUJOURS, des la premiere occurrence. « 1 fois dans la
+// session » se lit comme du bruit sur une ligne de tableau de bord.
+// Mutation attrapee : afficher le compte sans condition.
+test('une premiere occurrence ne parle pas de repetition', () => {
+  assert.doesNotMatch(failureLine(invocation).headline, /fois dans la session/);
+});
+
+// La table des motifs (public/viz-invocation-patterns.mjs) grandit a chaque cas
+// rencontre, et elle n'a pas a attendre ce fichier-ci pour le faire. Un motif
+// qu'il ne connait pas encore doit donc dire ce qu'on sait vraiment — que
+// quelque chose se regle sur le poste — plutot que de laisser un trou.
+//
+// Mutation attrapee : retirer le repli et composer directement avec la table.
+test('un motif que le bloc ne connait pas encore retombe sur une formulation generique', () => {
+  const l = failureLine({ ...invocation, patternId: 'inv-motif-de-demain' });
+  assert.equal(l.headline, 'Bash · appel mal formé : un réglage du poste de travail');
+  assert.doesNotMatch(l.headline, /inv-motif-de-demain/,
+    'un identifiant technique n est pas une phrase francaise');
+});
+
+test('une alerte d invocation amputee de son motif se rend quand meme', () => {
+  // Le journal ne regarde pas ce qu il relit : une ligne abimee mais encore
+  // analysable arrive jusqu ici. Un jet ferait afficher le bloc ENTIER vide.
+  const { patternId, ...ampute } = invocation;
+  assert.equal(failureLine(ampute).headline,
+    'Bash · appel mal formé : un réglage du poste de travail');
+});
+
+// ── Le filet : aucun detecteur ne peut arriver muet ────────────────────────
+//
+// Ce bloc est le SEUL endroit du produit ou une panne survit a la session
+// pendant laquelle elle s'est produite. Un detecteur ajoute sans sa formulation
+// francaise y afficherait son nom de type — `badInvocation` — ce qui se lit
+// comme un bug de l'outil, pas comme une panne de la session. Le contrat se
+// pose donc des DEUX cotes : la table des detecteurs et la table des phrases
+// doivent nommer les memes choses.
+//
+// Les alertes externes (la vigie tarifaire) ne passent pas par ici : elles ne
+// viennent pas du flux de hooks, ne sont jamais consignees au journal, et
+// vivent dans leur propre registre cote navigateur. D'ou le filet pose sur les
+// types de DETECTEURS et pas sur « tout ce qui porte un type ».
+test('tout type d alerte du detecteur a sa formulation francaise', () => {
+  assert.ok(_DETECTOR_TYPES.length >= 4, 'la liste des detecteurs doit etre reelle');
+  for (const type of _DETECTOR_TYPES) {
+    const headline = failureLine({ ...invocation, type }).headline;
+    assert.notEqual(headline, type,
+      `${type} n a pas de formulation francaise : le bloc afficherait son nom de type`);
+  }
 });
 
 // Le journal ne regarde pas ce qu'il relit : de la forme d'une alerte il ne

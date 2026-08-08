@@ -45,10 +45,54 @@ function failureNote(occurrences) {
   return `, ${failed.length} sur ${occurrences.length} en échec`;
 }
 
+// Ce que dit un identifiant de motif d'invocation, en clair.
+//
+// C'est ici, et nulle part ailleurs, que `inv-bash-windows-path-unquoted`
+// redevient une phrase. L'alerte ne porte QUE cet identifiant — ni la commande,
+// ni le message d'erreur, ni un extrait — donc le bloc n'a rien d'autre a
+// composer avec, et c'est exactement ce qui rend la promesse du produit
+// tenable : la donnee consignee ne nomme rien de la machine de l'utilisateur.
+//
+// Chaque phrase dit ce qui a ete mal ecrit, pas ce que l'outil a repondu : ce
+// que le lecteur cherche ici, c'est le reglage a poser une fois.
+const MOTIFS = {
+  'inv-bash-windows-path-unquoted': 'un chemin Windows non protégé sous un shell POSIX',
+  'inv-bash-cd-too-many-args': 'un changement de dossier vers un chemin non protégé',
+  'inv-bash-unbalanced-quote': 'un guillemet ouvert et jamais refermé',
+  'inv-bash-syntax-error': 'une syntaxe que le shell POSIX ne sait pas lire',
+  // Phrase INERTE aujourd'hui, et gardée sciemment : le motif est passé hors
+  // du sous-ensemble qui alerte (il ne distinguait un cmdlet d'un binaire
+  // absent que par la casse du nom), donc aucune alerte ne le porte plus. Elle
+  // reste parce qu'elle est juste, et qu'un motif re-calibré la retrouverait —
+  // pas parce qu'on a oublié de la retirer.
+  'inv-cross-shell-cmdlet-in-posix': 'une commande PowerShell lancée sous un shell POSIX',
+  'inv-ps-command-not-found': 'une commande que PowerShell ne connaît pas',
+  'inv-ps-parameter-not-found': 'un paramètre que cette commande PowerShell n’a pas',
+  'inv-ps-argument-type': 'un argument PowerShell du mauvais type',
+  'inv-ps-syntax': 'une syntaxe que PowerShell ne sait pas lire',
+  'inv-ps-argument-exception': 'un argument que la commande PowerShell a refusé',
+};
+
+// La table des motifs (public/viz-invocation-patterns.mjs) grandit a chaque cas
+// rencontre, et elle n'a aucune raison d'attendre ce fichier-ci pour le faire.
+// Un motif encore inconnu doit donc dire ce qu'on sait vraiment — qu'il y a un
+// reglage a poser — plutot que de laisser un trou dans la phrase. Meme parti
+// que le repli sur le type d'alerte plus bas : une ligne muette dans un tableau
+// de bord se lit comme un bug de l'outil.
+const REGLAGE_INCONNU = 'un réglage du poste de travail';
+
+// Le detecteur compte des la premiere occurrence — c'est son role. Mais « 1
+// fois dans la session » n'apprend rien et occupe la ligne : le compte ne se
+// dit qu'a partir du moment ou il distingue quelque chose.
+const repetitionNote = count => (count > 1 ? `, ${count} fois dans la session` : '');
+
 const HEADLINES = {
   loop: a => `${a.toolName} · même commande ${a.count}×${failureNote(listeDe(a.occurrences))}`,
   retryStorm: a => `${a.toolName} · ${a.count} échecs consécutifs`,
   stuck: a => `Aucun événement · ${a.count} outil${a.count > 1 ? 's' : ''} encore en vol`,
+  badInvocation: a =>
+    `${a.toolName} · appel mal formé : ${MOTIFS[a.patternId] || REGLAGE_INCONNU}`
+    + repetitionNote(a.count),
 };
 
 function subjectOf(alert) {

@@ -69,6 +69,37 @@ test('l alerte est relue telle qu elle est venue, champ pour champ', (t) => {
   assert.deepEqual(restitue, original);
 });
 
+test('un champ ajoute par un nouveau detecteur survit au disque et au redemarrage', (t) => {
+  // Il n'existe AUCUNE liste blanche de champs, ni ici ni sur la route qui sert
+  // ces alertes : le journal ecrit l'objet entier et le relit entier. C'est ce
+  // que ce test fige, sur le champ qui l'exige le plus — `patternId` est la
+  // SEULE chose que porte une alerte d'appel mal forme, puisqu'elle ne consigne
+  // ni la commande ni le message d'erreur. Le perdre a la relecture ne
+  // laisserait pas une ligne incomplete : il laisserait une ligne qui ne dit
+  // plus rien, et le bloc Pannes retomberait sur sa formulation generique sans
+  // qu'aucun test ne bouge.
+  const filePath = tmp(t);
+  const invocation = {
+    ...alertAt(T, 'badInvocation:s1:inv-bash-windows-path-unquoted'),
+    type: 'badInvocation', count: 2, subject: '', occurrences: [],
+    message: 'Bash failed on how it was called — inv-bash-windows-path-unquoted (2x this session)',
+    patternId: 'inv-bash-windows-path-unquoted',
+  };
+  createJournal({ filePath, now: () => T }).append(invocation);
+
+  const relu = createJournal({ filePath, now: () => T });
+  const [row] = relu.readAll({ now: T });
+  assert.equal(row.patternId, 'inv-bash-windows-path-unquoted',
+    'le motif est tout ce que cette alerte sait dire');
+  const { ackAt, ...restitue } = row;
+  assert.deepEqual(restitue, invocation, 'et le reste avec lui, champ pour champ');
+
+  // Et l'acquittement vise bien cette alerte-la : son id porte le motif, pas
+  // l'outil, et il traverse le disque tel quel.
+  relu.appendAck('badInvocation:s1:inv-bash-windows-path-unquoted', T, T + 5000);
+  assert.equal(createJournal({ filePath, now: () => T }).readAll({ now: T })[0].acknowledged, true);
+});
+
 test('rejouer le meme fait n ecrit rien de plus', (t) => {
   const filePath = tmp(t);
   const j = createJournal({ filePath, now: () => T });

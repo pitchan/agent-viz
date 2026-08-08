@@ -1,8 +1,8 @@
 // viz-watchdog.mjs — toxic-pattern detection on the live event stream.
 //
-// Pure module: no DOM, no SSE, no fs. Clock is injected. Three detectors
-// in a declarative table (loop / retryStorm / stuck) — adding a fourth
-// (token burn, prompt injection, …) is one entry in DETECTORS.
+// Pure module: no DOM, no SSE, no fs. Clock is injected. Four detectors
+// in a declarative table (loop / retryStorm / stuck / badInvocation) — adding
+// a fifth (token burn, prompt injection, …) is one entry in DETECTORS.
 //
 // Consumers call processEvent(evt) on every incoming event and tick()
 // periodically (for time-based conditions like stuck). Each call returns
@@ -12,6 +12,21 @@
 
 import { toolSubject } from './viz-tool-subject.mjs';
 import { clockTime } from './viz-alert-format.mjs';
+import { classify, PATTERNS } from './viz-invocation-patterns.mjs';
+
+// The one filter `badInvocation` applies, derived from the table instead of
+// restated here. `classify` answers WHAT a message is; only the table knows
+// which of those answers points at something the user can set once and never
+// meet again. Every other pattern is recognised in order to be EXCLUDED — the
+// survey behind that table measured that the most frequent ones already have
+// their instruction written in the tool descriptions, so repeating it would be
+// advice about something nobody forgot to say.
+//
+// Read once, at load: the table is data and does not change under us, and a
+// Set states the question this detector actually asks — membership, not order.
+const WORKSTATION_SETTINGS = new Set(
+  PATTERNS.filter(p => p.workstationSetting).map(p => p.id),
+);
 
 const DEFAULTS = {
   loop:       { windowMs: 60_000,      count: 4 },
@@ -65,6 +80,11 @@ function emptyBuffer() {
     sigOfCall: new Map(),      // tool_use_id → sig, for a failure with no tool_input
     failures: new Map(),       // agent:tool → consecutive failures, repeats excluded
     lastFailureSig: new Map(), // toolName → { sig, ts } of the last failure seen
+    // How often this session has met a given workstation-setting pattern,
+    // per actor — written and read by `badInvocation` alone. Deliberately NOT
+    // reset by an acknowledgement: the detector knows nothing about acks, and
+    // "the fifth time today" stays true whether or not anyone read the first.
+    badInvocations: new Map(), // agent:pattern → occurrences in this session
     running: new Map(),        // tool_use_id → in-flight tool record
     lastEventAt: null,         // event time of the last event seen for the session
     cwd: '',                   // where the session runs — the panel groups by it
@@ -107,18 +127,31 @@ function actor(evt) {
 // detector that raises the alert is the only thing that can answer it, so it
 // answers it here rather than leaving every consumer to guess from the type.
 //
+// `patternId` is part of it too, and empty for every detector that recognises
+// no pattern. It carries the identifier of the invocation pattern and NEVER a
+// fragment of the text that was matched — which is what lets the product's
+// promise about retained content stand.
+//
 // The id scopes to the agent as well as the session, so two subagents looping
 // at once are two alerts rather than one that names whichever fired first.
+//
+// `discriminator` is what tells two alerts of the same type in the same scope
+// apart. It defaults to the tool name because that is what it is for the three
+// detectors that watch ONE tool — but it is not universal, and conflating the
+// payload field with the identity part is what would force a fourth detector
+// to lie about `toolName` to get the id it needs. `badInvocation` watches a
+// workstation setting: the same setting met through two different tools is one
+// setting to fix, so its discriminator is the pattern, not the tool.
 function makeAlert({
   type, sessionId, toolName = '', count, createdAt, message,
   agentId = '', agentType = '', subject = '', occurrences = [], tools = [],
-  cwd = '', standing = false,
+  cwd = '', standing = false, patternId = '', discriminator = toolName,
 }) {
   const scope = agentId ? `${sessionId}:${agentId}` : sessionId;
   return {
-    id: toolName ? `${type}:${scope}:${toolName}` : `${type}:${scope}`,
+    id: discriminator ? `${type}:${scope}:${discriminator}` : `${type}:${scope}`,
     type, sessionId, toolName, count, createdAt, message,
-    agentId, agentType, subject, occurrences, tools, cwd, standing,
+    agentId, agentType, subject, occurrences, tools, cwd, standing, patternId,
     acknowledged: false,
   };
 }
@@ -424,6 +457,68 @@ const DETECTORS = {
           || silence >= ctx.thresholds.stuck.abandonedMs;
     },
   },
+
+  // The only detector that reads the TEXT of a failure. The other three watch
+  // the SHAPE of the stream — the same input four times, three failures in a
+  // row, nothing at all for three minutes — and none of them can tell a build
+  // that legitimately says no from a command the agent did not know how to
+  // write. This one asks that second question, and only that one: did this
+  // call fail because of HOW it was made?
+  //
+  // It is worth asking because the answer has an action attached. A Windows
+  // path eaten by a POSIX shell, a cmdlet run under bash: the user sets that
+  // once and never meets it again. Which is also why the filter below is the
+  // ONLY one — a pattern outside `workstationSetting` is recognised so that it
+  // can be left unsaid, not so that it can be reported.
+  //
+  // It declares neither `isStale` nor `isPastEpisode` — the safe default
+  // documented at `startsNewEpisode`, and here it is the honest one twice
+  // over. A failure that has happened cannot un-happen, so no clock has
+  // grounds to withdraw the report; and a missing setting is one thing to fix,
+  // so it deserves one alert until somebody has read it.
+  badInvocation: {
+    onEvent(ctx, evt, ts) {
+      if (evt.hook_event_name !== 'PostToolUseFailure') return null;
+      // BEFORE anything else, counter included. A human pressing Escape ends
+      // the call before it could say anything about the way it was written, so
+      // there is nothing here to classify and nothing to count. Same invariant
+      // as `loop` and `retryStorm`: someone taking back control is not a
+      // fault, and calling it one is the exact false alarm this watchdog
+      // exists to not raise.
+      if (evt.is_interrupt) return null;
+      const sid = evt.session_id;
+      if (!sid || !evt.tool_name) return null;
+      // `evt.error` comes from the hook, not from us: absent, empty or not a
+      // string at all are all real inputs, and `classify` is contracted to
+      // answer null for each of them rather than throw into the event loop.
+      const pattern = classify(evt.error);
+      if (!pattern || !WORKSTATION_SETTINGS.has(pattern.id)) return null;
+      const buf = getSessionBuffer(ctx.state, sid);
+      // Per actor as well as per pattern, because the alert's identity is.
+      // Two subagents tripping on the same setting are two facts — that is
+      // what the survey actually measured: three subagents of one session,
+      // minutes apart, on one shell trap.
+      const key = `${evt.agent_id || ''}:${pattern.id}`;
+      const count = (buf.badInvocations.get(key) || 0) + 1;
+      buf.badInvocations.set(key, count);
+      return makeAlert({
+        type: 'badInvocation', sessionId: sid, toolName: evt.tool_name,
+        count, createdAt: ts, ...actor(evt), cwd: evt.cwd || '',
+        patternId: pattern.id, discriminator: pattern.id,
+        // No `subject`, and its absence is the decision, not an omission. The
+        // other detectors put the command there; this one may not. What it
+        // reports was recognised by reading an error message, and the promise
+        // that goes with reading one is that neither it nor the command that
+        // produced it is kept — the pattern identifier says everything the
+        // user needs and names nothing of their machine.
+        //
+        // The count only appears once it means something: "1× this session"
+        // is noise on the one line a desktop notification gets to show.
+        message: `${evt.tool_name} failed on how it was called — ${pattern.id}`
+               + (count > 1 ? ` (${count}× this session)` : ''),
+      });
+    },
+  },
 };
 
 // Does the alert already in the registry still own its identity, or has a new
@@ -540,3 +635,15 @@ export function createWatchdog({ now = () => Date.now(), thresholds = {}, canObs
 }
 
 export { DEFAULTS as _DEFAULTS };
+
+// The kinds of alert a DETECTOR can raise — not "every type that exists": the
+// pricing vigil builds its own alerts client-side, never goes through the
+// journal, and is deliberately absent from this list.
+//
+// It is exported so a contract can be checked on BOTH sides rather than on one.
+// The Pannes panel words each of these in French from their structured fields;
+// a detector added without its wording would print its type name there, which
+// reads as a broken tool rather than as a failed session. A test that reads
+// this list is what makes that impossible to do silently — see
+// tests/unit/failures-format.test.mjs.
+export const _DETECTOR_TYPES = Object.keys(DETECTORS);
