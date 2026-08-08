@@ -2,11 +2,15 @@
 // Le journal est la seule chose qui distingue une alarme d'un enregistreur de
 // vol. Ce fichier fige les proprietes qui font qu'on peut lui faire
 // confiance : il n'ecrit jamais deux fois le meme fait, il ne reecrit jamais
-// une ligne deja ecrite, il rend l'alerte telle qu'elle est venue, et il ne
-// fait pas tomber le serveur quand le disque refuse.
+// une ligne deja ecrite, il rend l'alerte telle qu'elle est venue, il ne fait
+// pas tomber le serveur quand le disque refuse, et il ne grandit pas sans fin.
 //
 // Aucun test ne touche le vrai `~` : tous passent un `filePath` sous
-// os.tmpdir(). La machine porte un instrument de mesure, pas un bac a sable.
+// os.tmpdir(), et le dossier est efface a la fin du test. La machine porte un
+// instrument de mesure, pas un bac a sable.
+//
+// Aucun test ne depend de l'horloge murale non plus : `now` est injecte
+// partout, y compris a la construction — la retention se mesure au chargement.
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -17,83 +21,125 @@ const { createJournal, keyOf } = require('../../lib/server/watchdog/journal');
 
 const T = 1_700_000_000_000;
 const DAY = 86_400_000;
-const tmp = () => path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'avtest-journal-')), 'alerts.jsonl');
+
+const dossier = (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'avtest-journal-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  return dir;
+};
+const tmp = t => path.join(dossier(t), 'alerts.jsonl');
+const lignes = fp => fs.readFileSync(fp, 'utf8').trim().split('\n').filter(Boolean);
+const plaintes = (spy, motif) =>
+  spy.mock.calls.filter(c => String(c.arguments[0]).includes(motif)).length;
+
+// La forme reelle que produit makeAlert (public/viz-watchdog.mjs), tous champs
+// compris. `acknowledged: false` en fait partie, et c'est un piege a signaler :
+// une fois sur le disque ce champ est FIGE — la ligne n'est jamais reecrite,
+// donc il dira false meme apres un acquittement. C'est `readAll` qui recalcule
+// depuis les lignes `ack` et qui fait autorite ; la tache 8 ne doit jamais lire
+// `acknowledged` depuis le fichier.
 const alertAt = (createdAt, id = 'loop:s1:Bash') => ({
-  id, type: 'loop', sessionId: 's1', toolName: 'Bash', cwd: 'f:\\p',
-  createdAt, message: 'x', standing: false,
-  occurrences: [{ ts: createdAt, toolUseId: 't1', failed: true }], tools: [],
+  id, type: 'loop', sessionId: 's1', toolName: 'Bash', count: 4, createdAt,
+  message: 'Bash called 4x with the same input in 12s',
+  agentId: '', agentType: '', subject: 'npm run build',
+  occurrences: [{ ts: createdAt, toolUseId: 't1', failed: true }],
+  tools: [], cwd: 'f:\\p', standing: false, acknowledged: false,
 });
 
-test('une alerte ecrite se relit', () => {
-  const filePath = tmp();
-  const j = createJournal({ filePath });
+test('une alerte ecrite se relit', (t) => {
+  const filePath = tmp(t);
+  const j = createJournal({ filePath, now: () => T });
   assert.equal(j.append(alertAt(T)), true);
-  const rows = createJournal({ filePath }).readAll({ now: T });
+  const rows = createJournal({ filePath, now: () => T }).readAll({ now: T });
   assert.equal(rows.length, 1);
   assert.equal(rows[0].createdAt, T);
   assert.equal(rows[0].acknowledged, false);
   assert.equal(rows[0].ackAt, null);
 });
 
-test('l alerte est relue telle qu elle est venue, champ pour champ', () => {
+test('l alerte est relue telle qu elle est venue, champ pour champ', (t) => {
   // Le journal ne connait ni detecteur ni forme d'alerte au-dela de (id,
-  // createdAt) : ce que les tachess suivantes liront doit etre l'original, pas
-  // une projection appauvrie.
-  const filePath = tmp();
+  // createdAt) : ce que les taches suivantes liront doit etre l'original, pas
+  // une projection appauvrie. Seul `ackAt` est ajoute.
+  const filePath = tmp(t);
   const original = alertAt(T);
-  createJournal({ filePath }).append(original);
-  const [row] = createJournal({ filePath }).readAll({ now: T });
-  const { acknowledged, ackAt, ...restitue } = row;
+  createJournal({ filePath, now: () => T }).append(original);
+  const [row] = createJournal({ filePath, now: () => T }).readAll({ now: T });
+  const { ackAt, ...restitue } = row;
   assert.deepEqual(restitue, original);
 });
 
-test('rejouer le meme fait n ecrit rien de plus', () => {
-  const filePath = tmp();
-  const j = createJournal({ filePath });
+test('rejouer le meme fait n ecrit rien de plus', (t) => {
+  const filePath = tmp(t);
+  const j = createJournal({ filePath, now: () => T });
   j.append(alertAt(T));
   assert.equal(j.append(alertAt(T)), false, 'meme (id, createdAt) = meme fait');
   // Et au redemarrage, la cle est relue depuis le fichier, pas perdue.
-  const j2 = createJournal({ filePath });
+  const j2 = createJournal({ filePath, now: () => T });
   assert.equal(j2.append(alertAt(T)), false);
-  assert.equal(fs.readFileSync(filePath, 'utf8').trim().split('\n').length, 1);
+  assert.equal(lignes(filePath).length, 1);
 });
 
-test('la meme alerte a un autre moment est un autre fait', () => {
-  const j = createJournal({ filePath: tmp() });
+test('la meme alerte a un autre moment est un autre fait', (t) => {
+  const j = createJournal({ filePath: tmp(t), now: () => T });
   j.append(alertAt(T));
   assert.equal(j.append(alertAt(T + 60_000)), true);
 });
 
-test('deux alertes distinctes au meme instant sont deux faits', () => {
+test('deux alertes distinctes au meme instant sont deux faits', (t) => {
   // Cas reel : `stuck` et `loop` concluent sur le meme battement d'horloge.
   // Une cle qui oublierait l'id en avalerait une des deux.
-  const filePath = tmp();
-  const j = createJournal({ filePath });
+  const filePath = tmp(t);
+  const j = createJournal({ filePath, now: () => T });
   assert.equal(j.append(alertAt(T, 'loop:s1:Bash')), true);
   assert.equal(j.append(alertAt(T, 'stuck:s1')), true);
-  assert.equal(createJournal({ filePath }).readAll({ now: T }).length, 2);
+  assert.equal(createJournal({ filePath, now: () => T }).readAll({ now: T }).length, 2);
 });
 
-test('acquitter ajoute une ligne, ne reecrit rien', () => {
-  const filePath = tmp();
-  const j = createJournal({ filePath });
+test('une alerte sans cle est refusee, pas ecrite en silence', (t) => {
+  // Sans (id, createdAt) le fait n'est ni deduplicable ni relisible :
+  // l'ecrire le rendrait invisible a readAll (undefined >= plancher est faux)
+  // tout en le faisant rediffuser a chaque rattrapage, pour toujours.
+  const filePath = tmp(t);
+  const spy = t.mock.method(console, 'error', () => {});
+  const j = createJournal({ filePath, now: () => T });
+  const { createdAt, ...sansHeure } = alertAt(T);
+  assert.equal(j.append(sansHeure), false, 'un fait sans heure n est pas un fait');
+  assert.equal(fs.existsSync(filePath), false, 'rien d irrecuperable n a ete ecrit');
+  assert.equal(spy.mock.callCount(), 1, 'et le defaut est dit, pas avale');
+});
+
+test('acquitter ajoute une ligne, ne reecrit rien', (t) => {
+  const filePath = tmp(t);
+  const j = createJournal({ filePath, now: () => T });
   j.append(alertAt(T));
   j.appendAck('loop:s1:Bash', T, T + 5000);
-  const lines = fs.readFileSync(filePath, 'utf8').trim().split('\n');
-  assert.equal(lines.length, 2);
-  assert.equal(JSON.parse(lines[0]).kind, 'alert');
-  assert.equal(JSON.parse(lines[1]).kind, 'ack');
-  const rows = createJournal({ filePath }).readAll({ now: T });
+  const l = lignes(filePath);
+  assert.equal(l.length, 2);
+  assert.equal(JSON.parse(l[0]).kind, 'alert');
+  assert.equal(JSON.parse(l[1]).kind, 'ack');
+  const rows = createJournal({ filePath, now: () => T }).readAll({ now: T });
   assert.equal(rows[0].acknowledged, true);
   assert.equal(rows[0].ackAt, T + 5000);
 });
 
-test('l acquittement vaut aussitot, sans attendre une relecture', () => {
+test('l acquittement recalcule bat le champ fige du fichier', (t) => {
+  const filePath = tmp(t);
+  const j = createJournal({ filePath, now: () => T });
+  j.append(alertAt(T));
+  j.appendAck('loop:s1:Bash', T, T + 5000);
+  assert.equal(JSON.parse(lignes(filePath)[0]).alert.acknowledged, false,
+    'la ligne du disque dit false pour toujours : elle n est jamais reecrite');
+  const [row] = createJournal({ filePath, now: () => T }).readAll({ now: T });
+  assert.equal(row.acknowledged, true, 'c est readAll qui fait autorite');
+});
+
+test('l acquittement vaut aussitot, sans attendre une relecture', (t) => {
   // Le serveur ne redemarre pas entre l'acquittement et le rafraichissement
   // du panneau : c'est la meme instance qui repond. Un test qui ne verifie
   // l'ack qu'apres relecture laisse passer un journal qui ne l'inscrit qu'au
   // fichier.
-  const j = createJournal({ filePath: tmp() });
+  const j = createJournal({ filePath: tmp(t), now: () => T });
   j.append(alertAt(T));
   j.appendAck('loop:s1:Bash', T, T + 5000);
   const [row] = j.readAll({ now: T });
@@ -101,21 +147,21 @@ test('l acquittement vaut aussitot, sans attendre une relecture', () => {
   assert.equal(row.ackAt, T + 5000);
 });
 
-test('un acquittement ne vaut que pour le fait qu il nomme', () => {
+test('un acquittement ne vaut que pour le fait qu il nomme', (t) => {
   // L'ack porte (id, createdAt) : acquitter la panne d'hier ne doit pas
   // eteindre celle de ce matin, qui porte le meme id.
-  const filePath = tmp();
-  const j = createJournal({ filePath });
+  const filePath = tmp(t);
+  const j = createJournal({ filePath, now: () => T });
   j.append(alertAt(T));
   j.append(alertAt(T + 60_000));
   j.appendAck('loop:s1:Bash', T, T + 5000);
-  const rows = createJournal({ filePath }).readAll({ now: T + 60_000 });
+  const rows = createJournal({ filePath, now: () => T }).readAll({ now: T + 60_000 });
   assert.deepEqual(rows.map(r => [r.createdAt, r.acknowledged]),
     [[T + 60_000, false], [T, true]]);
 });
 
-test('la fenetre coupe sur l heure de l evenement, plus recent d abord', () => {
-  const j = createJournal({ filePath: tmp() });
+test('la fenetre coupe sur l heure de l evenement, plus recent d abord', (t) => {
+  const j = createJournal({ filePath: tmp(t), now: () => T });
   // Ordre d'ecriture volontairement different de l'ordre attendu : sans le
   // tri, la reponse serait [Moyen, Recent].
   j.append(alertAt(T - 40 * DAY, 'loop:s1:Vieux'));
@@ -125,53 +171,161 @@ test('la fenetre coupe sur l heure de l evenement, plus recent d abord', () => {
   assert.deepEqual(ids, ['loop:s1:Recent', 'loop:s1:Moyen']);
 });
 
-test('une alerte a l horloge en avance est gardee, et vient en tete', () => {
+test('une alerte a l horloge en avance est gardee, et vient en tete', (t) => {
   // Horloge de machine decalee : `createdAt` vient de l'evenement, pas du
-  // serveur. Une memoire ne jette pas un fait parce qu'il la surprend.
-  const j = createJournal({ filePath: tmp() });
+  // serveur. Une memoire ne jette pas un fait parce qu'il la surprend. Le
+  // prix de ce choix est ecrit dans journal.js : une horloge fausse d'un an
+  // produit une alerte epinglee en tete a vie.
+  const j = createJournal({ filePath: tmp(t), now: () => T });
   j.append(alertAt(T - 3600_000, 'loop:s1:Passe'));
   j.append(alertAt(T + 3600_000, 'loop:s1:Futur'));
   const ids = j.readAll({ sinceDays: 30, now: T }).map(a => a.id);
   assert.deepEqual(ids, ['loop:s1:Futur', 'loop:s1:Passe']);
 });
 
-test('une ligne illisible est sautee, jamais fatale', () => {
-  const filePath = tmp();
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+test('une ligne illisible est sautee, jamais fatale', (t) => {
+  const filePath = tmp(t);
   fs.writeFileSync(filePath,
     JSON.stringify({ kind: 'alert', alert: alertAt(T) }) + '\n'
     + '{ceci n est pas du json\n'
     + JSON.stringify({ kind: 'alert', alert: alertAt(T + 1000, 'loop:s1:Autre') }) + '\n');
-  const rows = createJournal({ filePath }).readAll({ now: T + 1000 });
+  const rows = createJournal({ filePath, now: () => T + 1000 }).readAll({ now: T + 1000 });
   assert.equal(rows.length, 2, 'un arret brutal ne doit pas empecher le demarrage');
+  assert.equal(lignes(filePath).length, 3,
+    'une ligne illisible ne declenche pas a elle seule une reecriture');
+});
+
+test('un premier demarrage ne se plaint pas', (t) => {
+  const spy = t.mock.method(console, 'error', () => {});
+  createJournal({ filePath: tmp(t), now: () => T });
+  assert.equal(spy.mock.callCount(), 0, 'un fichier absent est un debut, pas un incident');
+});
+
+test('un journal illisible se plaint, il ne repart pas vide en silence', (t) => {
+  // Le cas Windows : antivirus ou sauvegarde qui tient le fichier (EBUSY),
+  // droits perdus (EACCES). Traiter ca comme un premier demarrage repartirait
+  // avec `seen` vide, et le rattrapage de la tache 6 rendrait alors `true` sur
+  // tout l'historique : tout rediffuse, un doublon par alerte dans le fichier.
+  const filePath = tmp(t);
+  fs.mkdirSync(filePath);                       // EISDIR a la lecture
+  const spy = t.mock.method(console, 'error', () => {});
+  createJournal({ filePath, now: () => T });
+  assert.equal(plaintes(spy, 'illisible'), 1);
 });
 
 test('un disque qui refuse ne fait pas tomber le service', (t) => {
   // Un dossier la ou le fichier devrait etre : toute ecriture echouera.
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'avtest-journal-ro-'));
-  const filePath = path.join(dir, 'alerts.jsonl');
+  const filePath = tmp(t);
   fs.mkdirSync(filePath);
-  // Implementation muette : la plainte est attendue, la sortie de la suite
-  // n'a pas a la porter.
-  const plainte = t.mock.method(console, 'error', () => {});
-  const j = createJournal({ filePath });
+  // Implementation muette : les plaintes sont attendues, la sortie de la
+  // suite n'a pas a les porter.
+  const spy = t.mock.method(console, 'error', () => {});
+  const j = createJournal({ filePath, now: () => T });
   assert.doesNotThrow(() => j.append(alertAt(T)));
-  assert.doesNotThrow(() => j.appendAck('loop:s1:Bash', T, T));
+  // Assez d'ecritures pour couvrir le delai de reprise et provoquer une
+  // seconde tentative reelle : sans ca, « une seule plainte » ne prouverait
+  // rien qu'une absence de tentative.
+  for (let i = 0; i < 30; i++) assert.doesNotThrow(() => j.appendAck('loop:s1:Bash', T, T + i));
   // Le fait est en memoire : l'appelant doit pouvoir diffuser l'alerte meme
   // quand le disque l'a refusee. Perdre la memoire n'est pas perdre l'alerte.
   assert.equal(j.readAll({ now: T }).length, 1);
-  // ... et on se plaint une fois, pas a chaque ecriture.
-  assert.equal(plainte.mock.callCount(), 1);
+  assert.equal(plaintes(spy, 'indisponible'), 1, 'on le dit une fois par panne, pas par ecriture');
 });
 
 test('une ecriture refusee reste un fait inedit pour l appelant', (t) => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'avtest-journal-ro2-'));
-  const filePath = path.join(dir, 'alerts.jsonl');
+  const filePath = tmp(t);
   fs.mkdirSync(filePath);
   t.mock.method(console, 'error', () => {});
-  const j = createJournal({ filePath });
+  const j = createJournal({ filePath, now: () => T });
   assert.equal(j.append(alertAt(T)), true, 'l alerte doit etre diffusee malgre le disque');
   assert.equal(j.append(alertAt(T)), false, 'mais elle ne redevient pas inedite');
+});
+
+test('un disque qui redevient disponible est reessaye, et la panne suivante se dit', (t) => {
+  // Un echec transitoire ne doit pas eteindre la memoire jusqu'au prochain
+  // redemarrage : sinon plus aucun acquittement n'est ecrit, et toutes les
+  // alertes que l'utilisateur avait acquittees reviennent au demarrage suivant.
+  const filePath = tmp(t);
+  fs.mkdirSync(filePath);
+  const spy = t.mock.method(console, 'error', () => {});
+  const j = createJournal({ filePath, now: () => T });
+  j.append(alertAt(T));
+  assert.equal(plaintes(spy, 'indisponible'), 1);
+
+  fs.rmdirSync(filePath);                       // le disque repond de nouveau
+  for (let i = 0; i < 30; i++) j.appendAck('loop:s1:Bash', T, T + i);
+  assert.ok(fs.statSync(filePath).isFile(), 'le journal a repris tout seul');
+  assert.equal(plaintes(spy, 'indisponible'), 1, 'la reprise ne re-annonce pas la panne');
+
+  // Et le verrou n'a pas ete cimente : une NOUVELLE panne a droit a sa plainte.
+  t.mock.method(fs, 'appendFileSync', () => { throw new Error('disque plein'); });
+  j.appendAck('loop:s1:Bash', T, T + 999);
+  assert.equal(plaintes(spy, 'indisponible'), 2);
+});
+
+test('au-dela de la retention, la ligne quitte la memoire et le fichier', (t) => {
+  const filePath = tmp(t);
+  const j = createJournal({ filePath, now: () => T });
+  j.append(alertAt(T - 100 * DAY, 'loop:s1:Ancetre'));
+  j.append(alertAt(T - 10 * DAY, 'loop:s1:Recent'));
+  assert.equal(lignes(filePath).length, 2, 'les deux ont bien ete ecrites');
+
+  const relu = createJournal({ filePath, now: () => T });
+  assert.deepEqual(relu.readAll({ sinceDays: 90, now: T }).map(a => a.id), ['loop:s1:Recent']);
+  assert.equal(relu.seenKeys().size, 1, 'la cle perimee ne pese plus en memoire');
+  assert.equal(lignes(filePath).length, 1,
+    'le fichier est compacte, pas seulement filtre a la lecture');
+  assert.deepEqual(fs.readdirSync(path.dirname(filePath)), ['alerts.jsonl'],
+    'aucun fichier temporaire laisse derriere');
+});
+
+test('la compaction garde l acquittement du fait qu elle garde', (t) => {
+  const filePath = tmp(t);
+  const j = createJournal({ filePath, now: () => T });
+  j.append(alertAt(T - 100 * DAY, 'loop:s1:Ancetre'));
+  j.append(alertAt(T - 10 * DAY, 'loop:s1:Recent'));
+  j.appendAck('loop:s1:Recent', T - 10 * DAY, T - 9 * DAY);
+  j.appendAck('loop:s1:Ancetre', T - 100 * DAY, T - 99 * DAY);
+
+  const relu = createJournal({ filePath, now: () => T });
+  assert.deepEqual(relu.readAll({ sinceDays: 90, now: T }).map(a => [a.id, a.acknowledged]),
+    [['loop:s1:Recent', true]]);
+  assert.equal(lignes(filePath).length, 2, 'l alerte gardee et son ack, rien d autre');
+});
+
+test('sans peremption, le journal n est pas reecrit du tout', (t) => {
+  // L'ajout seul reste la regle : on ne reecrit que pour la peremption, jamais
+  // « au cas ou » a chaque demarrage.
+  const filePath = tmp(t);
+  const j = createJournal({ filePath, now: () => T });
+  j.append(alertAt(T - 10 * DAY, 'loop:s1:A'));
+  j.append(alertAt(T - 2 * DAY, 'loop:s1:B'));
+  const avant = fs.readFileSync(filePath, 'utf8');
+  const renommage = t.mock.method(fs, 'renameSync');
+  createJournal({ filePath, now: () => T });
+  assert.equal(renommage.mock.callCount(), 0, 'aucune compaction quand rien n a peri');
+  assert.equal(fs.readFileSync(filePath, 'utf8'), avant);
+});
+
+test('une compaction qui echoue laisse le journal entier', (t) => {
+  // Fichier temporaire puis renommage : si la reecriture casse, l'ancien
+  // journal doit etre encore la. Une reecriture en place laisserait un fichier
+  // tronque — pire que trop long.
+  const filePath = tmp(t);
+  const j = createJournal({ filePath, now: () => T });
+  j.append(alertAt(T - 100 * DAY, 'loop:s1:Ancetre'));
+  j.append(alertAt(T - 10 * DAY, 'loop:s1:Recent'));
+  const avant = fs.readFileSync(filePath, 'utf8');
+
+  const spy = t.mock.method(console, 'error', () => {});
+  t.mock.method(fs, 'renameSync', () => { throw new Error('renommage refuse'); });
+  const relu = createJournal({ filePath, now: () => T });
+  assert.equal(fs.readFileSync(filePath, 'utf8'), avant, 'le journal d origine est intact');
+  assert.deepEqual(fs.readdirSync(path.dirname(filePath)), ['alerts.jsonl'],
+    'le temporaire est nettoye');
+  assert.equal(relu.readAll({ sinceDays: 90, now: T }).length, 1,
+    'la memoire vive est bornee meme quand le fichier ne l est pas');
+  assert.equal(plaintes(spy, 'compaction'), 1);
 });
 
 test('keyOf distingue deux alertes que la concatenation naive confondrait', () => {
@@ -179,9 +333,8 @@ test('keyOf distingue deux alertes que la concatenation naive confondrait', () =
   assert.notEqual(keyOf('a1', 2), keyOf('a', 12));
 });
 
-test('seenKeys rend une copie, pas la memoire du journal', () => {
-  const filePath = tmp();
-  const j = createJournal({ filePath });
+test('seenKeys rend une copie, pas la memoire du journal', (t) => {
+  const j = createJournal({ filePath: tmp(t), now: () => T });
   j.append(alertAt(T));
   const cles = j.seenKeys();
   assert.equal(cles.size, 1);
