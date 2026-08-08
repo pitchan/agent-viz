@@ -70,7 +70,7 @@
 //
 //   3. THE SHELL'S OWN STAMP. Bash prefixes every message it emits with
 //      `line N:` — `/usr/bin/bash: line 1: cd: …`, `bash: eval: line 16: …`.
-//      A text that merely QUOTES the message does not. All five POSIX-shell
+//      A text that merely QUOTES the message does not. All seven POSIX-shell
 //      patterns therefore require that stamp: it is what tells a message the
 //      shell wrote from a message a document, a test report or a container's
 //      multiplexed log carries. Verified on all 28 real POSIX-shell failures
@@ -79,6 +79,24 @@
 //      Residual limit, written rather than hidden: a container running bash
 //      does stamp `line N:`, so its log lines can still be taken for local
 //      ones.
+//      That residual limit got WIDER on 2026-08-08 and is named here rather
+//      than left to be discovered: `-c:` is exactly what a container stamps,
+//      since `CMD`/`RUN` in shell form run `sh -c`. A multiplexed container
+//      log line now reaches the ALERTING subset through
+//      `inv-bash-heredoc-too-large`. A test exercises this deliberately so
+//      the exposure is visible in the suite rather than in production.
+//
+//      A second limit, and the more important one: THE ANCHORS IDENTIFY THE
+//      INVOCATION PATH, NOT THE CAUSE. `eval:` plus a double quote
+//      establishes "unterminated double quote under the eval path" and
+//      nothing else — no backslash, no path, no heredoc appears in the
+//      regex. That the two coincided 19 times out of 19 over 90 days is a
+//      correlation, not a mechanism. `grep "TODO src/` lands on the first
+//      anchor, `git commit -m 'l'agent'` on the second, and each would be
+//      handed the other cause's remedy. This is why the French sentences
+//      state the established fact first and the likely gesture second, and
+//      why the counters these patterns feed are noisier than a reader of the
+//      survey would assume.
 //
 //   4. THE WORKSTATION SETTING. `workstationSetting` marks the subset that
 //      alone deserves an alert — Windows paths, Bash quoting, PowerShell
@@ -92,9 +110,11 @@
 //      `inv-read-without-pagination`, `inv-search-bad-pattern`) fail it
 //      because their instruction is ALREADY WRITTEN in the tool descriptions
 //      the agent re-reads every turn. `inv-bash-unbalanced-quote` failed it
-//      for the opposite reason and only until 2026-08-08: it merged two
-//      causes, so it could name no remedy at all. Splitting it (doc/30) gave
-//      both causes back their flag, and left the merged pattern as a net.
+//      for a third reason and only briefly: it merged two causes, so it could
+//      name no remedy. Splitting it (doc/30) gave both causes their own flag.
+//      The merged pattern stays in the table AND stays alerting — see its
+//      entry for why a non-alerting net would have been silent rather than
+//      safe.
 //
 // ── A limit that is written down rather than hidden ───────────────────────
 // `bash` messages are not localised on this machine, so the `inv-bash-*`
@@ -182,7 +202,7 @@ export const PATTERNS = Object.freeze([
   // separators. The only subset that will ever raise an alert, and the reason
   // everything above it is consulted first.
   //
-  // All five POSIX-shell patterns require bash's own `line N:` stamp — see
+  // All seven POSIX-shell patterns require bash's own `line N:` stamp — see
   // point 3 of the header. It is what a quotation does not have.
   //
   // The SHAPE of a Windows path whose backslashes were eaten by the POSIX
@@ -214,16 +234,24 @@ export const PATTERNS = Object.freeze([
   // a reproducible fact, not an explanation, and must not be read as one.
   { id: 'inv-bash-heredoc-too-large', class: 'invocation', workstationSetting: true,
     re: /-c: line \d+: unexpected EOF while looking for matching `'/ },
-  // The net, and that is all it is now. It matches both forms above, so it
-  // must stay BEHIND them. It no longer rings: it merged two causes, and its
-  // French sentence — « un guillemet ouvert et jamais refermé » — described
-  // the symptom without being able to name any remedy. That sentence was the
-  // tell, and the flag's own definition is what it failed.
+  // The net, and it ALERTS. It matches both forms above, so it must stay
+  // BEHIND them — but it must not be silent, and an earlier version of this
+  // split got that wrong in a way worth writing down.
   //
-  // It survives because the two new anchors describe how the HARNESS invokes
-  // the shell, not bash itself. If that changes, the case is still classified
-  // and counted instead of vanishing — visible degradation, never silent.
-  { id: 'inv-bash-unbalanced-quote', class: 'invocation', workstationSetting: false,
+  // That version marked it `workstationSetting: false`, claiming it was
+  // "classified and counted, never said". It counted nothing: the detector's
+  // filter (`viz-watchdog.mjs:495`) returns BEFORE the counter at :502-503,
+  // so a non-alerting pattern is classified and then thrown away. Counting is
+  // a side effect of alerting, not a channel of its own. And before the split
+  // EVERY stamped `unexpected EOF` rang, so alerting on `eval:` and `-c:`
+  // alone silenced a third shape — `bash script.sh` stamps `script.sh: line
+  // N:` — that used to ring. The split written to prevent silence was
+  // introducing one, justified by a mechanism that did not exist.
+  //
+  // Alerting, it cannot silence anything, and its vague sentence — « un
+  // guillemet ouvert et jamais refermé » — becomes the honest one: it states
+  // the symptom in exactly the case where the cause is not yet characterised.
+  { id: 'inv-bash-unbalanced-quote', class: 'invocation', workstationSetting: true,
     re: /line \d+: unexpected EOF while looking for matching/ },
   { id: 'inv-bash-syntax-error', class: 'invocation', workstationSetting: true,
     re: /line \d+: syntax error near unexpected token/ },

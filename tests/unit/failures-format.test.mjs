@@ -114,16 +114,18 @@ test('un motif que le bloc ne connait pas encore retombe sur une formulation gen
 test('chaque cause du releve dit ce qui a ete mal ecrit, pas ce que l outil a repondu', () => {
   const antislash = failureLine({ ...invocation, patternId: 'inv-bash-trailing-backslash-in-path' });
   assert.equal(antislash.headline,
-    'Bash · appel mal formé : un chemin Windows terminé par un antislash, sous un shell POSIX');
+    'Bash · appel mal formé : un guillemet double non fermé — typiquement un chemin Windows terminé par un antislash');
   const heredoc = failureLine({ ...invocation, patternId: 'inv-bash-heredoc-too-large' });
   assert.equal(heredoc.headline,
-    'Bash · appel mal formé : un document écrit par heredoc, trop gros pour la ligne de commande');
+    'Bash · appel mal formé : un guillemet simple non fermé — typiquement un heredoc trop gros pour la ligne de commande');
 });
 
 test('la phrase du filet survit, meme si plus aucune alerte ne la porte', () => {
-  // Meme parti que `inv-cross-shell-cmdlet-in-posix` : gardee parce qu'elle est
-  // juste, pas parce qu'on a oublie de la retirer. Un motif re-calibre la
-  // retrouverait.
+  // Elle est de nouveau VIVANTE depuis le 2026-08-08 : le filet alerte, donc
+  // une alerte la porte. Elle reste malgre tout la seule phrase du bloc a
+  // decrire un symptome sans nommer de remede, et c est juste — le filet ne se
+  // declenche que lorsque aucune des deux ancres ne reconnait la forme,
+  // c est-a-dire quand la cause n est pas caracterisee.
   const l = failureLine({ ...invocation, patternId: 'inv-bash-unbalanced-quote' });
   assert.match(l.headline, /guillemet ouvert et jamais refermé/);
   assert.doesNotMatch(l.headline, /réglage du poste de travail/);

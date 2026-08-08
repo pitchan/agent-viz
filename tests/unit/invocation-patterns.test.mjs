@@ -193,18 +193,22 @@ const SAMPLES = [
 ];
 
 // Le sous-ensemble « réglage du poste » : le seul qui donnera lieu à une
-// alerte. Exactement ces dix motifs.
+// alerte. Exactement ces onze motifs.
 // `inv-cross-shell-cmdlet-in-posix` n en fait pas partie : 1 occurrence en 90
 // jours, et il ne distinguait un cmdlet PowerShell d un binaire absent que par
 // la CASSE du nom.
-// `inv-bash-unbalanced-quote` n en fait plus partie depuis doc/30 : il
-// fusionnait deux causes et ne pouvait donc nommer aucun remede. Il reste dans
-// la table comme FILET, classe et compte, jamais dit.
+// `inv-bash-unbalanced-quote` en fait de nouveau partie, et c est la
+// correction du 2026-08-08 : une version anterieure de la scission l avait
+// sorti en affirmant qu il « comptait encore sans etre dit ». Il ne comptait
+// rien. Le filtre du detecteur (viz-watchdog.mjs:495) rend null AVANT le
+// compteur des lignes 502-503 : un motif qui n alerte pas ne compte pas non
+// plus, il est classe puis jete.
 const WORKSTATION_IDS = [
   'inv-bash-windows-path-unquoted',
   'inv-bash-cd-too-many-args',
   'inv-bash-trailing-backslash-in-path',
   'inv-bash-heredoc-too-large',
+  'inv-bash-unbalanced-quote',
   'inv-bash-syntax-error',
   'inv-ps-command-not-found',
   'inv-ps-parameter-not-found',
@@ -493,7 +497,7 @@ test('un tres gros texte qui contient un motif est quand meme classe', () => {
 
 // ─── Le reglage du poste : le seul sous-ensemble qui alertera ──────────────
 
-test('exactement dix motifs relevent du reglage du poste', () => {
+test('exactement onze motifs relevent du reglage du poste', () => {
   const flagges = PATTERNS.filter(p => p.workstationSetting).map(p => p.id);
   assert.deepEqual([...flagges].sort(), [...WORKSTATION_IDS].sort());
 });
@@ -521,13 +525,42 @@ test('aucun motif hors invocation n est marque reglage du poste', () => {
   }
 });
 
-test('le filet generique reste classe mais ne sonne plus', () => {
-  // Il fusionnait deux causes et ne pouvait donc nommer aucun remede (doc/30).
-  // Il survit pour que rien ne disparaisse en silence si les ancres neuves
-  // vieillissent — le pire mode de panne de ce produit.
+test('CHAQUE motif inv-bash-* exige l estampille line N: du shell', () => {
+  // L estampille est ce qui distingue un message EMIS par le shell d un
+  // message CITE par un document ou un rapport de test. Enonce comme un
+  // compte en prose — « les cinq motifs POSIX » — l invariant se perime des
+  // qu on ajoute une ligne. Derive de la table, il vieillit avec elle.
+  const bash = PATTERNS.filter(p => p.id.startsWith('inv-bash-'));
+  assert.ok(bash.length >= 5, 'la table doit porter des motifs de shell POSIX');
+  for (const p of bash) {
+    assert.match(p.re.source, /line \\d\+:/,
+      `${p.id} : motif de shell POSIX sans l estampille line N:`);
+  }
+});
+
+test('LIMITE ECRITE : un journal de conteneur atteint le sous-ensemble qui alerte', () => {
+  // `CMD`/`RUN` en forme shell lancent `sh -c`, donc un conteneur estampille
+  // `-c: line N:` exactement comme le harnais le fait. La regle « l estampille
+  // distingue l emis du cite » ne couvre pas ce cas, et la scission a double le
+  // nombre de motifs alertants qui y sont exposes.
+  //
+  // Ce test ne decrit PAS un comportement voulu. Il rend la limite visible
+  // dans la suite plutot qu en production. S il casse, c est qu on l a
+  // corrigee : le remplacer alors, jamais le supprimer.
+  const journalDeConteneur =
+    "svc_1  | bash: -c: line 1: unexpected EOF while looking for matching `''";
+  assert.equal(classify(journalDeConteneur).id, 'inv-bash-heredoc-too-large');
+});
+
+test('le filet generique ALERTE, parce qu un motif muet ne compte pas non plus', () => {
+  // Une version anterieure de la scission l avait mis a false en le disant
+  // « compte sans etre dit ». Le filtre du detecteur (viz-watchdog.mjs:495)
+  // rend null AVANT le compteur : un motif non alertant est classe puis jete.
+  // Et avant la scission, toute forme estampillee unexpected EOF sonnait —
+  // n alerter que sur eval: et -c: rendait muette une troisieme forme.
   const p = PATTERNS.find(x => x.id === 'inv-bash-unbalanced-quote');
-  assert.equal(p.class, 'invocation', 'le filet reste une invocation');
-  assert.equal(p.workstationSetting, false, 'le filet ne doit plus alerter');
+  assert.equal(p.class, 'invocation');
+  assert.equal(p.workstationSetting, true, 'le filet doit alerter, sinon il se tait');
 });
 
 test('chaque ancre refuse l echantillon de l autre cause', () => {
@@ -773,7 +806,7 @@ test('un message PowerShell prive de FullyQualifiedErrorId n est pas classe, Cat
   }
 });
 
-// ═══ 8. Les 37 expressions, verrouillees contre le releve ═══════════════════
+// ═══ 8. Les 39 expressions, verrouillees contre les deux releves ═══════════
 //
 // Sans ce test, tout elargissement passe : la revue a fait survivre cinq
 // mutants sur le chemin d alerte, dont `inv-bash-windows-path-unquoted`
@@ -845,6 +878,15 @@ const RELEVE_30 = new Map([
 // Ce que la table doit reproduire : l union des deux releves. Les ECARTS se
 // declarent contre cette union, jamais contre l un des deux seulement.
 const TEMOIN = new Map([...RELEVE, ...RELEVE_30]);
+
+test('les deux temoins ne revendiquent jamais le meme motif', () => {
+  // `new Map([...RELEVE, ...RELEVE_30])` laisse le second ECRASER le premier
+  // en silence. C est la seule facon dont cette structure peut pourrir : un
+  // troisieme releve re-declarant un motif existant effacerait la provenance
+  // que la scission existe pour proteger, suite au vert.
+  assert.equal(RELEVE.size + RELEVE_30.size, TEMOIN.size,
+    'deux releves revendiquent le meme identifiant de motif');
+});
 
 // Les seuls ecarts admis au releve, chacun avec sa raison et sa nature.
 //   `equivalent: true`  — le motif reconnait EXACTEMENT le meme ensemble de

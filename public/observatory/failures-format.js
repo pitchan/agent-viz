@@ -58,13 +58,15 @@ function failureNote(occurrences) {
 const MOTIFS = {
   'inv-bash-windows-path-unquoted': 'un chemin Windows non protégé sous un shell POSIX',
   'inv-bash-cd-too-many-args': 'un changement de dossier vers un chemin non protégé',
-  'inv-bash-trailing-backslash-in-path': 'un chemin Windows terminé par un antislash, sous un shell POSIX',
-  'inv-bash-heredoc-too-large': 'un document écrit par heredoc, trop gros pour la ligne de commande',
-  // Phrase INERTE depuis doc/30, et gardée sciemment, comme celle de
-  // `inv-cross-shell-cmdlet-in-posix` juste en dessous. Le motif est passé hors
-  // du sous-ensemble qui alerte parce qu'il fusionnait deux causes : il décrit
-  // le symptôme sans pouvoir nommer le remède, et c'est cette phrase-ci qui
-  // l'avait trahi. Elle reste parce qu'elle est juste.
+  'inv-bash-trailing-backslash-in-path': 'un guillemet double non fermé — typiquement un chemin Windows terminé par un antislash',
+  'inv-bash-heredoc-too-large': 'un guillemet simple non fermé — typiquement un heredoc trop gros pour la ligne de commande',
+  // Cette phrase decrit un SYMPTOME sans nommer de remede, et c'est
+  // exactement pourquoi elle est juste ici — et seulement ici. Le motif qui
+  // la porte est le FILET : il ne se declenche que lorsque aucune des deux
+  // ancres ne reconnait la forme, c'est-a-dire quand la cause n'est pas
+  // caracterisee. Dire « un guillemet ouvert et jamais referme » est alors
+  // tout ce qu'on sait honnetement. C'est quand ce motif couvrait DEUX causes
+  // connues que la phrase mentait par omission.
   'inv-bash-unbalanced-quote': 'un guillemet ouvert et jamais refermé',
   'inv-bash-syntax-error': 'une syntaxe que le shell POSIX ne sait pas lire',
   // Phrase INERTE aujourd'hui, et gardée sciemment : le motif est passé hors

@@ -49,8 +49,8 @@ const HEREDOC_TROP_GROS =
   "Exit code 2 /usr/bin/bash: -c: line 149: unexpected EOF while looking for matching `''";
 
 // Le meme message SANS aucune des deux ancres — le scenario « le harnais a
-// change sa facon d'appeler le shell ». Reconnu, compte, mais jamais dit :
-// c'est la raison d'etre du filet.
+// change sa facon d'appeler le shell ». Il doit SONNER : un motif muet ne
+// compte pas non plus, le filtre du detecteur rendant null avant le compteur.
 const QUOTE_SANS_ANCRE =
   'Exit code 2 /usr/bin/bash: line 42: unexpected EOF while looking for matching `"\'';
 
@@ -242,13 +242,14 @@ test('un heredoc trop gros leve une alerte, avec son propre motif', () => {
   assert.equal(a[0].patternId, 'inv-bash-heredoc-too-large');
 });
 
-test('le meme message sans ancre est reconnu mais ne dit rien', () => {
-  // Le filtre est unique et c'est `workstationSetting`, lu sur la table. Le
-  // detecteur n'a rien a decider ici : ce test verifie que le drapeau CIRCULE,
-  // pas qu'il est bien pose — ca, c'est la tache 1 qui le tient.
+test('une forme non caracterisee sonne quand meme, sous le motif du filet', () => {
+  // C est la garantie de non-silence de toute la scission. Avant elle, toute
+  // forme estampillee unexpected EOF sonnait ; si le filet se taisait, la
+  // scission RETRECIRAIT la couverture au lieu de l affiner.
   const wd = createWatchdog({ now: () => T });
-  assert.deepEqual(leve(wd, echec({ id: 'q1', error: QUOTE_SANS_ANCRE })), []);
-  assert.equal(wd.getActiveAlerts().length, 0);
+  const a = leve(wd, echec({ id: 'q1', error: QUOTE_SANS_ANCRE }));
+  assert.equal(a.length, 1, 'une forme non reconnue ne doit jamais se taire');
+  assert.equal(a[0].patternId, 'inv-bash-unbalanced-quote');
 });
 
 test('le meme reglage manquant ne merite qu une alerte tant qu elle n est pas acquittee', () => {
