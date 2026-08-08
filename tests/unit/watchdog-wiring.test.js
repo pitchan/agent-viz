@@ -630,27 +630,48 @@ const SOURCE_SERVEUR = fs.readFileSync(
 // balaierait jusqu'a la fin du fichier : n'importe quel `dir: DIR` ecrit PLUS
 // BAS satisferait l'assertion pendant que l'appel, lui, passerait un faux
 // dossier. Injoignable tant que le fichier s'arrete juste apres l'appel —
-// c'est-a-dire jusqu'a ce que la tache 8 y ajoute une ligne. On borne par
-// comptage d'accolades, donc l'ordre du fichier n'entre plus en jeu.
-function appelDe(source, nom) {
+// c'est-a-dire jusqu'a ce que la tache 8 y ajoute une ligne.
+//
+// La borne est un COMPTAGE D'ACCOLADES, et il faut dire ce qu'elle n'est pas :
+// elle ignore les chaines et les commentaires. Une accolade non appariee
+// ECRITE DANS l'appel — un `// TODO: passer { dir depuis la config` — ferait
+// deborder la tranche et rouvrirait exactement le faux vert qu'elle ferme ; un
+// `}` dans une chaine la tronquerait et ferait rougir du code sain. Il n'y a
+// rien de tel dans `lib/server.js` aujourd'hui, donc elle tient. Ecrire un vrai
+// analyseur pour garder trois lignes serait disproportionne : c'est un
+// compromis, pas une garantie, et le voila dit.
+//
+// Rend null plutot que de lever : voir `appelSurveille`.
+function decouperAppel(source, nom) {
   const debut = source.indexOf(`${nom}({`);
-  assert.notEqual(debut, -1, `appel a ${nom} introuvable dans lib/server.js`);
+  if (debut === -1) return null;
   let profondeur = 0;
   for (let i = source.indexOf('{', debut); i < source.length; i++) {
     if (source[i] === '{') profondeur += 1;
     else if (source[i] === '}' && (profondeur -= 1) === 0) return source.slice(debut, i + 1);
   }
-  return assert.fail(`appel a ${nom} non ferme dans lib/server.js`);
+  return null;
 }
-const APPEL = appelDe(SOURCE_SERVEUR, 'startWatchdog');
+
+// Calcule DANS le test, jamais au chargement du module. Au chargement, un
+// simple reformatage de `lib/server.js` — `startWatchdog(\n  {` — ferait
+// exploser les vingt et un tests de ce fichier au lieu des deux que ce contrat
+// concerne, et aucun message ne dirait pourquoi. Un garde-fou qui brule le
+// fichier entier sur son propre faux positif est un mauvais garde-fou.
+function appelSurveille() {
+  const appel = decouperAppel(SOURCE_SERVEUR, 'startWatchdog');
+  assert.ok(appel, 'appel `startWatchdog({` introuvable dans lib/server.js — reformatage ?');
+  return appel;
+}
 
 test('serveur: le chien de garde recoit le vrai dossier et la vraie frontiere', () => {
+  const appel = appelSurveille();
   // `DIR` : la seule definition faisant autorite du dossier d evenements.
-  assert.match(APPEL, /\bdir:\s*DIR\b/);
+  assert.match(appel, /\bdir:\s*DIR\b/);
   // `liveFrom` : sans lui, les deux chemins relisent les memes octets et le
   // produit annonce des boucles qui n ont pas eu lieu. `startWatchdog` s en
   // plaint au demarrage, mais mieux vaut que la suite le dise d abord.
-  assert.match(APPEL, /\bliveFrom:\s*liveHandoffOffset\b/);
+  assert.match(appel, /\bliveFrom:\s*liveHandoffOffset\b/);
 });
 
 test('serveur: l enveloppe SSE est composee ici, et le canal n est pas broadcastSSE nu', () => {
@@ -658,11 +679,17 @@ test('serveur: l enveloppe SSE est composee ici, et le canal n est pas broadcast
   // il exige que la valeur mise dans le champ `alert` soit LE PARAMETRE de la
   // lambda. Sans lui, `a => broadcastSSE({ type: 'alert', alert })` passe —
   // `alert` n y est lie a rien, chaque alerte leve un ReferenceError, et les
-  // `try/catch` de `feedWatchdog` et du battement l avalent. Exactement la
-  // classe muette que ces deux tests existent pour fermer.
+  // `try/catch` de `feedWatchdog` et du battement l avalent.
+  //
+  // Et le raccourci se verifie DANS LES DEUX SENS, d ou le `(?<=\1)` : le
+  // raccourci `{ …, alert }` n est licite que si le parametre s appelle
+  // `alert`. Sans cette moitie, `a => broadcastSSE({ type: 'alert', a })`
+  // passait aussi — le renvoi arriere etait satisfait, mais l enveloppe emise
+  // etait `{type:'alert', a:{…}}` et le client de la tache 9 y lirait
+  // `msg.alert === undefined`. La meme classe muette, prise par l autre bout.
   assert.match(
-    APPEL,
-    /broadcastAlert:\s*(\w+)\s*=>\s*broadcastSSE\(\{\s*type:\s*'alert',\s*(?:\1|alert:\s*\1)\s*\}\)/,
+    appelSurveille(),
+    /broadcastAlert:\s*(\w+)\s*=>\s*broadcastSSE\(\{\s*type:\s*'alert',\s*(?:alert(?<=\1)|alert:\s*\1)\s*\}\)/,
     'le chien de garde rend une alerte nue ; c est ICI que le protocole du serveur l habille',
   );
 });
