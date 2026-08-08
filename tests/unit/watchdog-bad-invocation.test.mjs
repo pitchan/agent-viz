@@ -57,8 +57,9 @@ const QUOTE_SANS_ANCRE =
 // Invocation reconnue, mais PAS un reglage du poste : une cmdlet PowerShell
 // sous bash ne se distinguait d'un binaire absent que par la CASSE du nom
 // (`Docker-Compose` sonnait, `docker-compose` se taisait — le meme echec). 1
-// occurrence en 90 jours contre 51 pour le binaire absent : classee pour etre
-// comptee, jamais dite.
+// occurrence en 90 jours contre 51 pour le binaire absent : classee POUR ETRE
+// EXCLUE, jamais dite — et pas comptee non plus. Se taire est ici le bon
+// comportement : un binaire absent n a pas de reglage de poste.
 const CMDLET_SOUS_BASH =
   'Exit code 127 /usr/bin/bash: line 1: Select-String: command not found';
 

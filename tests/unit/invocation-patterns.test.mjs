@@ -707,8 +707,11 @@ test('un binaire absent ne sonne pas, quelle que soit la casse de son nom', () =
   // Le defaut D3 : `inv-cross-shell-cmdlet-in-posix` ne distinguait un cmdlet
   // PowerShell d un binaire absent que par la casse du nom, ce qui n est pas
   // un critere. Il pesait 1 occurrence, 1 projet, 1 acteur en 90 jours contre
-  // 51 pour `env-binary-missing`. Il reste classe — pour etre compte — et ne
-  // dit plus rien.
+  // 51 pour `env-binary-missing`. Il reste classe POUR ETRE EXCLU, et n est
+  // pas compte non plus — le filtre du detecteur rend null avant son compteur.
+  // A la difference du filet, rien ne se perd a le taire : `env-binary-missing`,
+  // place au-dessus, classe deja le meme echec, et un binaire absent n a aucun
+  // reglage de poste a offrir.
   const p = PATTERNS.find(x => x.id === 'inv-cross-shell-cmdlet-in-posix');
   assert.equal(p.workstationSetting, false);
   assert.ok(idx('env-binary-missing') < idx('inv-cross-shell-cmdlet-in-posix'),

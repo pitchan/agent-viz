@@ -255,14 +255,25 @@ export const PATTERNS = Object.freeze([
     re: /line \d+: unexpected EOF while looking for matching/ },
   { id: 'inv-bash-syntax-error', class: 'invocation', workstationSetting: true,
     re: /line \d+: syntax error near unexpected token/ },
-  // Recognised to be COUNTED, never to be said, and that is a correction of a
-  // first calibration rather than a nuance. It weighs 1 occurrence, 1 project,
-  // 1 actor over 90 days, and it tells a PowerShell cmdlet from a missing
-  // binary by the CASE of the name alone — which is not a criterion. Left
-  // alerting, `Docker-Compose: command not found` rang while
-  // `docker-compose: command not found` stayed silent: the same failure, and
-  // only the capital deciding. It also now sits after `env-binary-missing`,
-  // the pattern it used to precede 51 occurrences to 1.
+  // Recognised in order to be EXCLUDED, never to be said — and it is NOT
+  // counted either: the detector's filter returns before its counter. This is
+  // a correction of a first calibration rather than a nuance.
+  //
+  // It is silenced for the opposite reason to the net seven lines above, and
+  // the difference is the whole rule. The net was silenced while it still
+  // covered a shape that used to ring, with nothing to catch it: that was a
+  // hole. This one was silenced because it rang WRONGLY — the same failure is
+  // still classified by `env-binary-missing` above, and a missing binary has
+  // no workstation setting to post, so saying nothing is correct. Not
+  // alerting is right when the failure has no gesture to offer; it is wrong
+  // when it merely hides a shape nobody has characterised yet.
+  //
+  // It weighs 1 occurrence, 1 project, 1 actor over 90 days, and it tells a
+  // PowerShell cmdlet from a missing binary by the CASE of the name alone —
+  // which is not a criterion. Left alerting, `Docker-Compose: command not
+  // found` rang while `docker-compose: command not found` stayed silent: the
+  // same failure, and only the capital deciding. It also now sits after
+  // `env-binary-missing`, the pattern it used to precede 51 occurrences to 1.
   { id: 'inv-cross-shell-cmdlet-in-posix', class: 'invocation', workstationSetting: false,
     re: /line \d+: [A-Z][a-z]+-[A-Z][A-Za-z]+: command not found/ },
   // The five PowerShell patterns, all five of them, together. The anchor is
