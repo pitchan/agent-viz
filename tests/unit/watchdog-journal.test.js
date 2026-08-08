@@ -134,6 +134,37 @@ test('l acquittement recalcule bat le champ fige du fichier', (t) => {
   assert.equal(row.acknowledged, true, 'c est readAll qui fait autorite');
 });
 
+test('un acquittement au createdAt en chaine survit au redemarrage', (t) => {
+  // Le point d'acquittement du produit est une route HTTP (tache 8), ou tout
+  // parametre de requete arrive en CHAINE. `keyOf` fabrique une chaine, donc
+  // sans normalisation a la frontiere la cle correspond en memoire vive, la
+  // ligne part bien sur le disque, et c'est `ingest` qui la refuse a la
+  // relecture : l'alerte acquittee revient. La panne ne se voit qu'apres un
+  // redemarrage — la verifier en memoire vive ne prouve rien.
+  const filePath = tmp(t);
+  const j = createJournal({ filePath, now: () => T });
+  j.append(alertAt(T));
+  j.appendAck('loop:s1:Bash', String(T), T + 5000);
+  assert.equal(j.readAll({ now: T })[0].acknowledged, true, 'en memoire vive');
+  assert.equal(lignes(filePath).length, 2, 'la ligne d ack est bien sur le disque');
+  const relu = createJournal({ filePath, now: () => T });
+  assert.equal(relu.readAll({ now: T })[0].acknowledged, true, 'et apres un redemarrage');
+  assert.equal(relu.readAll({ now: T })[0].ackAt, T + 5000);
+});
+
+test('un acquittement sans cle est refuse, pas ecrit en silence', (t) => {
+  // Meme garde qu'`append`, pour la meme raison : ce que le journal ecrit doit
+  // etre ce qu'il saura relire.
+  const filePath = tmp(t);
+  const spy = t.mock.method(console, 'error', () => {});
+  const j = createJournal({ filePath, now: () => T });
+  j.append(alertAt(T));
+  j.appendAck('loop:s1:Bash', 'pas une date', T + 5000);
+  assert.equal(lignes(filePath).length, 1, 'aucune ligne que la relecture rejetterait');
+  assert.equal(j.readAll({ now: T })[0].acknowledged, false, 'ni acquittement en memoire');
+  assert.equal(plaintes(spy, 'acquittement'), 1, 'et le defaut est dit, pas avale');
+});
+
 test('l acquittement vaut aussitot, sans attendre une relecture', (t) => {
   // Le serveur ne redemarre pas entre l'acquittement et le rafraichissement
   // du panneau : c'est la meme instance qui repond. Un test qui ne verifie
@@ -305,6 +336,30 @@ test('sans peremption, le journal n est pas reecrit du tout', (t) => {
   createJournal({ filePath, now: () => T });
   assert.equal(renommage.mock.callCount(), 0, 'aucune compaction quand rien n a peri');
   assert.equal(fs.readFileSync(filePath, 'utf8'), avant);
+});
+
+test('une horloge qui saute ne vide pas le journal', (t) => {
+  // Pile morte, machine virtuelle restauree depuis un instantane, saut NTP au
+  // demarrage. `readAll` refuse deja de jeter une alerte datee du futur parce
+  // que l'horloge peut mentir : `load` ne peut pas se fier a la meme horloge
+  // pour reecrire le fichier de facon irreversible. Un seul demarrage suffirait
+  // sinon a vider la seule chose que le produit ne sait pas reconstruire.
+  const filePath = tmp(t);
+  const j = createJournal({ filePath, now: () => T });
+  j.append(alertAt(T - 2 * DAY, 'loop:s1:A'));
+  j.append(alertAt(T - 1 * DAY, 'loop:s1:B'));
+  j.appendAck('loop:s1:B', T - 1 * DAY, T);
+  const avant = fs.readFileSync(filePath, 'utf8');
+
+  const fou = createJournal({ filePath, now: () => T + 200 * DAY });
+  assert.equal(fs.readFileSync(filePath, 'utf8'), avant, 'rien n a ete detruit');
+  assert.equal(fou.readAll({ sinceDays: 90, now: T + 200 * DAY }).length, 0,
+    'la memoire vive reste bornee, elle, meme quand le fichier ne bouge pas');
+
+  // L'horloge revenue a la raison, tout est encore la — acquittement compris.
+  const relu = createJournal({ filePath, now: () => T });
+  assert.deepEqual(relu.readAll({ sinceDays: 90, now: T }).map(a => [a.id, a.acknowledged]),
+    [['loop:s1:B', true], ['loop:s1:A', false]]);
 });
 
 test('une compaction qui echoue laisse le journal entier', (t) => {
