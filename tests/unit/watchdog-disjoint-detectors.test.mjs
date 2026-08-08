@@ -121,9 +121,85 @@ test('la meme boucle ASSEZ RAPIDE pour loop laisse loop parler seul', () => {
   assert.deepEqual(raised.map(a => a.type), ['loop']);
 });
 
-test('la signature se lit sur l evenement d echec, pas seulement dans le tampon de loop', () => {
-  // Aucun PreToolUse : l'ancienne lecture indirecte aurait rendu null et
-  // compté trois fois. L'échec porte tool_input, la signature est connue.
+// Les échecs de ces trois tests portent `tool_input`, comme ceux de la vraie
+// machine (le relevé gelé de la sonde le prouve). C'est indispensable : sans
+// lui la signature retomberait sur le tampon de loop, où le PreToolUse a
+// justement été évincé, elle vaudrait null — et le scénario ne reproduirait
+// plus du tout la panne qu'il est censé épingler.
+
+test('une boucle rapide noyee par d autres appels reste vue par retryStorm', () => {
+  // La cadence prouve le TEMPS, pas la CAPACITÉ. Le tampon de loop fait dix
+  // entrées, partagées par tous les outils de la session : dix lectures
+  // intercalées évincent les occurrences du build, et loop ne peut plus
+  // atteindre son seuil quelle que soit la cadence.
+  const wd = createWatchdog({ now: () => T + 60_000 });
+  const raised = [];
+  for (let i = 1; i <= 3; i++) {
+    const at = T + i * 15_000;
+    wd.processEvent(pre(i, at, 'npm run build'));
+    for (let j = 0; j < 10; j++) {
+      wd.processEvent({
+        hook_event_name: 'PreToolUse', session_id: SID, tool_name: 'Read',
+        tool_use_id: `r${i}-${j}`, tool_input: { file_path: `f${j}.js` },
+        cwd: 'f:\\p', _ts: new Date(at + j * 100).toISOString(),
+      });
+    }
+    raised.push(...wd.processEvent({
+      ...fail(i, at + 2000), tool_input: { command: 'npm run build' },
+    }).newAlerts);
+  }
+  assert.deepEqual(raised.map(a => a.type), ['retryStorm'],
+    'deferer a un detecteur qui a perdu ses preuves, c est le meme silence');
+});
+
+test('un filet d appels intercales aveugle loop sans vider ses preuves', () => {
+  // Le cas étroit, et le plus retors : trois lectures par cycle ne font pas
+  // perdre TOUTES ses occurrences à loop — il lui en reste deux. Assez pour
+  // croire qu'il « détient » encore la répétition, jamais assez pour atteindre
+  // son seuil de quatre. Exiger deux occurrences aurait laissé ce régime en
+  // silence total ; il en faut count - 1, c'est-à-dire de quoi tirer au
+  // prochain appel.
+  const wd = createWatchdog({ now: () => T + 60_000 });
+  const raised = [];
+  for (let i = 1; i <= 3; i++) {
+    const at = T + i * 5_000;
+    wd.processEvent(pre(i, at, 'npm run build'));
+    for (let j = 0; j < 3; j++) {
+      wd.processEvent({
+        hook_event_name: 'PreToolUse', session_id: SID, tool_name: 'Read',
+        tool_use_id: `r${i}-${j}`, tool_input: { file_path: `f${j}.js` },
+        cwd: 'f:\\p', _ts: new Date(at + j * 100).toISOString(),
+      });
+    }
+    raised.push(...wd.processEvent({
+      ...fail(i, at + 2000), tool_input: { command: 'npm run build' },
+    }).newAlerts);
+  }
+  assert.deepEqual(raised.map(a => a.type), ['retryStorm'],
+    'loop plafonne a deux occurrences et ne tirera jamais : se taire serait un silence');
+});
+
+test('la frontiere de cadence est exactement celle de loop, pas une approximation', () => {
+  const run = (gap) => {
+    const wd = createWatchdog({ now: () => T + 5 * gap });
+    const raised = [];
+    for (let i = 1; i <= 3; i++) {
+      const at = T + i * gap;
+      wd.processEvent(pre(i, at, 'npm run build'));
+      raised.push(...wd.processEvent(fail(i, at + 100)).newAlerts);
+    }
+    return raised.map(a => a.type);
+  };
+  // 20 s × 3 = 60 s : loop y arrive tout juste, retryStorm se tait.
+  assert.deepEqual(run(20_000), []);
+  // Une milliseconde de plus, et loop ne peut plus : retryStorm reprend.
+  assert.deepEqual(run(20_001), ['retryStorm']);
+});
+
+test('trois echecs identiques que loop n a jamais vus ne sont pas un silence', () => {
+  // Aucun PreToolUse : loop n'a aucune preuve de cette répétition, et n'en
+  // aura jamais. Lui déférer ici, ce serait se taire pour toujours — le
+  // défaut même que la condition de capacité existe pour fermer.
   const wd = createWatchdog({ now: () => T + 60_000 });
   const raised = [];
   for (let i = 1; i <= 3; i++) {
@@ -131,8 +207,29 @@ test('la signature se lit sur l evenement d echec, pas seulement dans le tampon 
       ...fail(i, T + i * 1000), tool_input: { command: 'npm run build' },
     }).newAlerts);
   }
-  assert.deepEqual(raised, [],
-    'trois fois le meme echec est une repetition, meme sans PreToolUse');
+  assert.deepEqual(raised.map(a => a.type), ['retryStorm'],
+    'on ne defere pas a un detecteur qui n a rien vu et ne verra rien');
+});
+
+test('la signature se lit sur l evenement d echec, pas seulement dans le tampon de loop', () => {
+  // loop détient bien la répétition — quatre PreToolUse identiques. Mais les
+  // échecs portent un tool_use_id que le tampon ne connaît pas : seule la
+  // lecture directe de `tool_input` peut voir qu'ils se répètent. Sans elle la
+  // signature serait nulle, retryStorm compterait ses trois échecs, et la
+  // double pastille reviendrait.
+  const wd = createWatchdog({ now: () => T + 60_000 });
+  const raised = [];
+  for (let i = 1; i <= 4; i++) {
+    const at = T + i * 10_000;
+    raised.push(...wd.processEvent(pre(i, at, 'npm run build')).newAlerts);
+    raised.push(...wd.processEvent({
+      hook_event_name: 'PostToolUseFailure', session_id: SID, tool_name: 'Bash',
+      tool_use_id: `inconnu-${i}`, tool_input: { command: 'npm run build' },
+      cwd: 'f:\\p', _ts: new Date(at + 1000).toISOString(),
+    }).newAlerts);
+  }
+  assert.deepEqual(raised.map(a => a.type), ['loop'],
+    'sans lecture directe la signature serait inconnue et retryStorm doublonnerait');
 });
 
 test('apres un succes, le premier echec identique compte a nouveau', () => {

@@ -122,6 +122,20 @@ function failureSuffix(occurrences) {
   return ` — ${failed.length} of ${occurrences.length} failing`;
 }
 
+// Does `loop` still hold this repetition — enough of it to fire on the very
+// next call? `loop` alerts when it counts `count` occurrences in its window,
+// so holding `count - 1` right now is exactly what makes the next repeat its
+// alert. Anything less is not evidence that `loop` will speak: `buf.recent` is
+// a fixed-size buffer shared by every tool of the session, so a steady trickle
+// of other calls can hold this signature at two or three occurrences forever —
+// below the threshold, for ever, however fast the failures come.
+function loopStillHolds(ctx, buf, sig, ts) {
+  const windowStart = ts - ctx.thresholds.loop.windowMs;
+  let seen = 0;
+  for (const e of buf.recent) if (e.sig === sig && e.ts >= windowStart) seen++;
+  return seen >= ctx.thresholds.loop.count - 1;
+}
+
 // Which call a failure was about. The failure event carries `tool_input` — the
 // probe's frozen sample proves it, and `toolSubject(evt)` a few lines below
 // already relies on it — so the signature is computed the same way `loop`
@@ -215,9 +229,20 @@ const DETECTORS = {
         // after forty-five seconds and is retried forever is exactly the case
         // this product exists to catch. So the deference is conditional: stay
         // quiet only when the measured cadence proves `loop` will get there.
-        const reachableByLoop = (ts - (previous?.ts ?? 0)) * (ctx.thresholds.loop.count - 1)
-          <= ctx.thresholds.loop.windowMs;
-        if (sig !== null && previous && sig === previous.sig && reachableByLoop) return null;
+        //
+        // And proving the cadence proves the TIMING, not the CAPACITY.
+        // `loop` counts inside `buf.recent`, a fixed-size buffer shared by
+        // every tool and every subagent of the session: interleaved calls
+        // evict the earlier occurrences, and `loop` then never reaches its
+        // threshold however fast the failures come. Deferring to a detector
+        // that has lost its own evidence is the same silence by another door,
+        // so the deference also requires that `loop` still holds enough of the
+        // repetition to fire on the next call.
+        if (sig !== null && previous && sig === previous.sig
+            && (ts - previous.ts) * (ctx.thresholds.loop.count - 1) <= ctx.thresholds.loop.windowMs
+            && loopStillHolds(ctx, buf, sig, ts)) {
+          return null;
+        }
         const cur = (buf.failures.get(evt.tool_name) || 0) + 1;
         buf.failures.set(evt.tool_name, cur);
         if (cur >= ctx.thresholds.retryStorm.count) {
