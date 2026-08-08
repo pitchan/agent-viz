@@ -166,9 +166,64 @@ test('un acquittement sans cle est refuse, pas ecrit en silence', (t) => {
   // est restreinte aux chaines non vides.
   j.appendAck('loop:s1:Bash', '', T + 5000);
   j.appendAck('loop:s1:Bash', null, T + 5000);
+  // Et le blanc, pas seulement le vide : `Number('   ')` vaut 0 lui aussi, et
+  // `?createdAt=%20` sur la route de la tache 8 suffit a l'envoyer.
+  j.appendAck('loop:s1:Bash', '   ', T + 5000);
   assert.equal(lignes(filePath).length, 1, 'aucune ligne que la relecture rejetterait');
   assert.equal(j.readAll({ now: T })[0].acknowledged, false, 'ni acquittement en memoire');
-  assert.equal(plaintes(spy, 'acquittement sans (id'), 3, 'et chaque defaut est dit, pas avale');
+  assert.equal(plaintes(spy, 'acquittement sans (id'), 4, 'et chaque defaut est dit, pas avale');
+});
+
+test('le contrat des horodatages : millisecondes epoch, rien d autre', (t) => {
+  // `createdAt` et `at` sont des millisecondes epoch — nombre ou chaine de
+  // chiffres. Une date ISO 8601 ou un objet Date n'en sont PAS, et c'est
+  // delibere : lire du texte de date obligerait a accepter les formats locaux,
+  // dont l'interpretation depend du moteur. On prefere une perte visible a une
+  // donnee fausse silencieuse.
+  const filePath = tmp(t);
+  const spy = t.mock.method(console, 'error', () => {});
+  const j = createJournal({ filePath, now: () => T + 9000 });
+  j.append(alertAt(T));
+
+  // Au contrat : le nombre et la chaine de chiffres nomment le meme fait.
+  j.appendAck('loop:s1:Bash', T, T + 5000);
+  assert.equal(j.readAll({ now: T })[0].ackAt, T + 5000);
+  j.appendAck('loop:s1:Bash', String(T), String(T + 7000));
+  assert.equal(j.readAll({ now: T })[0].ackAt, T + 7000, 'la chaine de chiffres vise la meme cle');
+
+  // Hors contrat sur la cle : refus, parce que le serveur ne peut pas
+  // l'inventer sans designer un autre fait.
+  j.appendAck('loop:s1:Bash', new Date(T).toISOString(), T + 5000);
+  j.appendAck('loop:s1:Bash', new Date(T), T + 5000);
+  assert.equal(plaintes(spy, 'acquittement sans (id'), 2);
+  assert.equal(plaintes(spy, 'horodatage'), 0, 'le refus de cle ne se deguise pas en repli');
+});
+
+test('la ligne dit quand c est l horloge du serveur qui a parle', (t) => {
+  // `now()` est une observation juste, mais l'ecrire au meme endroit et sous
+  // la meme forme que ce qu'un acquitteur aurait rapporte conflaterait deux
+  // choses differentes. L'absence du champ vaut « fourni par l'appelant ».
+  const filePath = tmp(t);
+  t.mock.method(console, 'error', () => {});
+  const j = createJournal({ filePath, now: () => T + 9000 });
+  j.append(alertAt(T, 'loop:s1:Fourni'));
+  j.append(alertAt(T, 'loop:s1:Repli'));
+
+  j.appendAck('loop:s1:Fourni', T, T + 5000);
+  // Une date REELLE, mais hors contrat : ce que le repli jette doit se voir.
+  j.appendAck('loop:s1:Repli', T, new Date(T + 5000).toISOString());
+
+  const acks = lignes(filePath).map(JSON.parse).filter(r => r.kind === 'ack');
+  const fourni = acks.find(r => r.id === 'loop:s1:Fourni');
+  const repli = acks.find(r => r.id === 'loop:s1:Repli');
+  assert.equal(fourni.at, T + 5000);
+  assert.equal('atFrom' in fourni, false, 'rien a signaler : l appelant l a fourni');
+  assert.equal(repli.at, T + 9000, 'l horloge du serveur');
+  assert.equal(repli.atFrom, 'server', 'et la ligne dit que c est elle');
+
+  // `readAll` l'ignore : c'est la trace sur le disque qui compte.
+  const [row] = createJournal({ filePath, now: () => T }).readAll({ now: T });
+  assert.equal('atFrom' in row, false);
 });
 
 test('un acquittement sans horodatage utilisable retombe sur l horloge du serveur', (t) => {
