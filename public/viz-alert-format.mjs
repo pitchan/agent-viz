@@ -40,8 +40,9 @@ const DETAIL_LINES = {
     // The alert keeps every occurrence — it is the record, and `count` has to
     // stay exact. The cap belongs here, at the display. Nothing else bounds
     // this list: only time bounds it. Repeats keep accumulating while an alert
-    // is already active and deduplicated, so the next one emitted after an
-    // acknowledgement carries every repeat still inside loop's window.
+    // is already active and deduplicated, so the next one emitted — once the
+    // lock breaks, whether by an acknowledgement or by the episode's own
+    // window closing — carries every repeat still inside that window.
     if (a.occurrences.length === 0) return [];
     const shown = a.occurrences.slice(0, LIST_MAX).map(o => clockTime(o.ts)).join(', ');
     // Never drop silently: a list that stops at five without saying so reads

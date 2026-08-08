@@ -46,6 +46,20 @@ test('une boucle de l instant allume la pastille et previent', () => {
   assert.equal(getActiveAlerts().filter(a => a.sessionId === 'sess-live').length, 1);
 });
 
+test('une boucle rendue invisible ne condamne pas son outil', () => {
+  // MEME session et MEME outil que le test precedent, exprès : l'identite d'une
+  // alerte est `loop:<session>:<outil>`, donc isoler une session par test est
+  // precisement ce qui masquait le defaut. Le fantome d'il y a une heure est
+  // encore au registre ; la boucle EN COURS doit passer quand meme.
+  const seen = [];
+  const off = onAlertsChanged(a => seen.push(...a));
+  const base = Date.now() - 3_000;
+  for (let i = 0; i < 4; i++) feedEvent(pre('sess-old', base + i * 500, `L${i}`));
+  off();
+  assert.equal(seen.length, 1, 'un incident clos ne doit pas eteindre l outil pour la session');
+  assert.equal(getActiveAlerts().filter(a => a.sessionId === 'sess-old').length, 1);
+});
+
 test('une alerte externe n est jamais soumise au tamis', () => {
   // La vigie tarifaire ne vient pas du flux d evenements. Selon l appelant
   // elle porte l heure de sa levee ou rien du tout ; dans les deux cas la

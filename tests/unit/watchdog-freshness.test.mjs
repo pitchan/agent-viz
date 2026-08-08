@@ -272,6 +272,7 @@ test('stuck: the detector marks its alert standing, and the display cut spares i
   assert.equal(alert.standing, true, 'the display reads a flag, it cannot guess the type');
 
   clock.advance(10 * 60_000);   // nothing happened, nobody acknowledged
+  wd.tick();                    // and the watchdog has looked again since
   assert.equal(wd.getActiveAlerts().length, 1, 'the watchdog still judges the session stuck');
   assert.equal(isFresh(alert, clock.now()), true, 'so the badge has to keep saying so');
 });
@@ -305,6 +306,97 @@ test('stuck: standing is not immortal — the detector still takes its alert bac
   assert.equal(isFresh(alert, clock.now()), true, 'the clock alone will never drop it');
   assert.deepEqual(wd.getActiveAlerts().filter(a => isFresh(a, clock.now())), [],
     'and still nothing is shown: what stands has to be able to stop standing');
+});
+
+// ─── The dedup registry is not the display ─────────────────────────────────
+// The gate used to sit BETWEEN book-keeping and emission, so it also kept a
+// stale alert out of `activeAlerts`. Without it, an alert the display filters
+// away still holds the dedup lock — and since the identity is
+// `loop:<session>:<tool>` with no entry in it, one ghost silences that tool for
+// the rest of the session, unacknowledgeably (the button only exists for what
+// the display renders).
+//
+// The answer is not to put freshness back into detection: "should we shout?"
+// and "is this still the same incident?" are different questions. The second
+// already has its mechanism — `isStale` — and each detector answers it from
+// its own definition.
+
+test('loop: un episode clos ne verrouille pas le suivant', () => {
+  const clock = clockAt();
+  const wd = createWatchdog({ now: clock.now });
+  let first = [];
+  for (let i = 0; i < 4; i++) {
+    first = wd.processEvent(pre({ at: T - 15_000 + i * 5_000, id: `a${i}` })).newAlerts;
+  }
+  assert.equal(first.length, 1);
+
+  clock.advance(5 * 60_000);
+  wd.tick();
+  const at = clock.now();
+  let second = [];
+  for (let i = 0; i < 4; i++) {
+    second = wd.processEvent(pre({ at: at + i * 5_000, id: `b${i}` })).newAlerts;
+  }
+  assert.equal(second.length, 1, 'the same tool looping again later is a new incident');
+  assert.notEqual(second[0].createdAt, first[0].createdAt);
+});
+
+test('loop: deux episodes du meme rattrapage entrent tous les deux', () => {
+  // The server's start-up sweep replays a whole file with no tick in between.
+  // Retiring on tick alone would not save the afternoon episode: the lock has
+  // to break on the emission path too, or the journal keeps only the first.
+  const wd = createWatchdog({ now: () => T + 5 * 3_600_000 });
+  const morning = T;
+  const afternoon = T + 4 * 3_600_000;
+  const raised = [];
+  for (const base of [morning, afternoon]) {
+    for (let i = 0; i < 4; i++) {
+      raised.push(...wd.processEvent(pre({ at: base + i * 5_000, id: `${base}-${i}` })).newAlerts);
+    }
+  }
+  assert.equal(raised.length, 2, 'four hours apart is two incidents, and no tick came between');
+  assert.deepEqual(raised.map(a => a.createdAt), [morning + 15_000, afternoon + 15_000]);
+});
+
+test('loop: dans la meme fenetre, c est toujours le meme incident', () => {
+  // The negative control — breaking the lock must not turn one runaway into a
+  // new alert every few calls — and the reason the lock is judged in the event
+  // stream's own time. These eight calls really did happen inside half a
+  // minute; replaying them an hour later must not split them into five
+  // incidents because OUR clock has moved on since.
+  const wd = createWatchdog({ now: () => T + 3_600_000 });
+  const raised = [];
+  for (let i = 0; i < 8; i++) {
+    raised.push(...wd.processEvent(pre({ at: T - 30_000 + i * 4_000, id: `t${i}` })).newAlerts);
+  }
+  assert.equal(raised.length, 1, 'eight calls inside half a minute are one loop, not five');
+});
+
+test('retryStorm: tant que ca echoue, c est le meme orage', () => {
+  const clock = clockAt();
+  const wd = createWatchdog({ now: clock.now });
+  const raised = [];
+  for (let i = 0; i < 6; i++) {
+    raised.push(...wd.processEvent(fail({ at: T + i * 1_000, id: `x${i}` })).newAlerts);
+  }
+  assert.equal(raised.length, 1, 'six failures with nothing succeeding in between are one storm');
+});
+
+test('retryStorm: un succes clot l orage, la serie suivante sonne de nouveau', () => {
+  const clock = clockAt();
+  const wd = createWatchdog({ now: clock.now });
+  const raised = [];
+  for (let i = 0; i < 3; i++) raised.push(...wd.processEvent(fail({ at: T + i * 1_000, id: `x${i}` })).newAlerts);
+  assert.equal(raised.length, 1, 'three consecutive failures are a storm');
+
+  wd.processEvent({
+    session_id: 'sid1', hook_event_name: 'PostToolUse',
+    tool_name: 'Bash', tool_use_id: 'ok', _ts: iso(T + 4_000),
+  });
+  for (let i = 0; i < 3; i++) {
+    raised.push(...wd.processEvent(fail({ at: T + 10_000 + i * 1_000, id: `y${i}` })).newAlerts);
+  }
+  assert.equal(raised.length, 2, 'a series that starts after a success is a new storm');
 });
 
 // ─── Thresholds ────────────────────────────────────────────────────────────

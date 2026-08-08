@@ -112,6 +112,11 @@ export function connectSSE() {
           id: `pricingDrift:${d.model}`,
           type: 'pricingDrift', sessionId: '', toolName: d.model, count: 1,
           createdAt: Date.now(),
+          // Une dérive tarifaire est un état, pas un moment : elle reste vraie
+          // tant que la table embarquée n'a pas bougé. Les deux tableaux vides
+          // complètent la forme uniforme, pour qu'un consommateur puisse lire
+          // n'importe quel champ sans savoir d'où l'alerte vient.
+          standing: true, occurrences: [], tools: [],
           message: d.kind === 'modele-nouveau'
             ? `Vigie tarifaire : ${d.model} existe chez LiteLLM mais pas dans la table embarquée`
             : `Vigie tarifaire : le tarif de ${d.model} diffère entre LiteLLM et la table embarquée`,

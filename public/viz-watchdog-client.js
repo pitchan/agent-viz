@@ -44,6 +44,12 @@ function ensureTicker() {
     // that came back, or one that went past the point of being worth
     // reporting. Notifying only on new alerts would leave a retracted alert
     // on the badge for as long as the tab stays open.
+    //
+    // No freshness filter on this path, unlike feedEvent. A tick-raised alert
+    // is stamped with the tick's own clock, so it is fresh by construction —
+    // and `stuck`, the only detector with an onTick today, is `standing`
+    // anyway. A fourth detector raising a dated alert on tick would break that
+    // silently, and would have to filter here too.
     const before = activeCount();
     const { newAlerts } = watchdog.tick();
     if (newAlerts.length || activeCount() !== before) notify(newAlerts);

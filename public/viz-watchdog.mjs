@@ -159,6 +159,16 @@ function failureSignature(buf, evt) {
 
 const DETECTORS = {
   loop: {
+    // "Is this still the same loop?" The window IS the definition of an
+    // episode: once it has closed, four fresh repeats are a new loop and
+    // deserve to be told, not swallowed as a duplicate of the old one.
+    //
+    // Something has to answer this, or the alert keeps the dedup lock for
+    // ever — and since the identity is `loop:<session>:<tool>`, one alert
+    // nobody acknowledged would silence that tool for the rest of the session.
+    isStale(ctx, alert, now) {
+      return (now - alert.createdAt) > ctx.thresholds.loop.windowMs;
+    },
     onEvent(ctx, evt, ts) {
       const sid = evt.session_id;
       if (!sid || !evt.tool_name) return null;
@@ -212,6 +222,33 @@ const DETECTORS = {
   },
 
   retryStorm: {
+    // A storm lasts exactly as long as its series, and the series is what
+    // `failures` counts — a success resets it to zero. So the criterion is not
+    // a duration: while the tool keeps failing it is the same storm and must
+    // not be announced twice, however long it runs.
+    //
+    // "The counter is back to zero" states the rule but cannot be used to test
+    // it. Nothing looks at the counter while it is zero: the reset happens on a
+    // success, and the next question comes three failures later, by which time
+    // it has climbed back to the threshold. On the tick path a beat might catch
+    // the zero; on the event path — and in a server catch-up, which has no
+    // beats at all — it never would.
+    //
+    // What is true at every instant is that the counter only ever climbs within
+    // a series. So a counter that has not passed what this alert already
+    // reported cannot be that same series still running: it was reset and
+    // rebuilt, or there is nothing left to continue. Zero always satisfies it,
+    // so the rule above is the special case, not something else.
+    //
+    // A tool with no counter reads as lapsed — unreachable while the alert
+    // exists (raising it is what set the counter, and only a success ever
+    // rewrites it, to zero), and the safe direction anyway: an unknown state
+    // must never hold a lock.
+    isStale(ctx, alert) {
+      const buf = ctx.state.sessions.get(alert.sessionId);
+      if (!buf) return true;
+      return (buf.failures.get(alert.toolName) || 0) <= alert.count;
+    },
     onEvent(ctx, evt, ts) {
       const sid = evt.session_id;
       if (!sid || !evt.tool_name) return null;
@@ -364,13 +401,28 @@ const DETECTORS = {
   },
 };
 
+// Has the incident this alert describes ended? Asked of the alert already in
+// the registry, never of the new one. A detector that does not answer never
+// lapses, so adding a fourth one changes nothing until it opts in.
+//
+// This is NOT the freshness rule and must not be confused with it. Freshness
+// asks "is this worth shouting about?" and lives at the display; this asks "is
+// this still the same incident?" and belongs to detection — a server with no
+// display at all still needs it, or a loop at 10am keeps the loop at 2pm out
+// of the journal.
+function hasLapsed(ctx, alert, at) {
+  const det = DETECTORS[alert.type];
+  return !!(det && typeof det.isStale === 'function' && det.isStale(ctx, alert, at));
+}
+
 // ─── Factory ──────────────────────────────────────────────────────────────
 // createWatchdog returns an object whose contract is the public API of the
 // module. Callers should never reach into the closed-over `state`; the
 // only way to drive the watchdog is through these four methods.
 //
 // emitIfNew implements the dedup rule: same signature already active
-// (non-acknowledged) → skip. Acknowledged → replace (next trigger fires).
+// (non-acknowledged) and still describing a live incident → skip. Acknowledged
+// or lapsed → replace, and the next trigger fires.
 
 // canObserve answers "would an event have reached us just now?". It is the
 // caller's business — the browser knows about its stream and its tab, this
@@ -383,10 +435,14 @@ export function createWatchdog({ now = () => Date.now(), thresholds = {}, canObs
   };
   const ctx = { state, thresholds: mergeThresholds(thresholds), now, canObserve };
 
-  function emitIfNew(alert) {
+  // `at` is the reference time for judging whether the alert already in the
+  // registry has lapsed — event time on the event path, wall clock on the tick
+  // path. Never the moment we happen to be running: replaying a file must give
+  // the same result as living through it.
+  function emitIfNew(alert, at) {
     if (!alert) return null;
     const existing = state.activeAlerts.get(alert.id);
-    if (existing && !existing.acknowledged) return null;
+    if (existing && !existing.acknowledged && !hasLapsed(ctx, existing, at)) return null;
     state.activeAlerts.set(alert.id, alert);
     return alert;
   }
@@ -397,12 +453,16 @@ export function createWatchdog({ now = () => Date.now(), thresholds = {}, canObs
     // that happened while the server was down must still be recorded, with
     // the time it really happened. Deciding what is recent enough to SHOUT
     // about belongs to the display — viz-alert-freshness.mjs.
+    //
+    // The dedup lock is judged in the event's own time, not ours. A start-up
+    // sweep replays a whole file without a single tick in between, so this is
+    // the only place that can tell an episode from the one before it.
     processEvent(evt) {
       const ts = eventTime(evt, now);
       const newAlerts = [];
       for (const det of Object.values(DETECTORS)) {
         if (typeof det.onEvent !== 'function') continue;
-        const a = emitIfNew(det.onEvent(ctx, evt, ts));
+        const a = emitIfNew(det.onEvent(ctx, evt, ts), ts);
         if (a) newAlerts.push(a);
       }
       return { newAlerts };
@@ -414,15 +474,12 @@ export function createWatchdog({ now = () => Date.now(), thresholds = {}, canObs
       const newAlerts = [];
       const tickNow = now();
       for (const [id, alert] of state.activeAlerts) {
-        const det = DETECTORS[alert.type];
-        if (det && typeof det.isStale === 'function' && det.isStale(ctx, alert, tickNow)) {
-          state.activeAlerts.delete(id);
-        }
+        if (hasLapsed(ctx, alert, tickNow)) state.activeAlerts.delete(id);
       }
       for (const det of Object.values(DETECTORS)) {
         if (typeof det.onTick !== 'function') continue;
         for (const a of det.onTick(ctx, tickNow)) {
-          const emitted = emitIfNew(a);
+          const emitted = emitIfNew(a, tickNow);
           if (emitted) newAlerts.push(emitted);
         }
       }

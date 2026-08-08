@@ -63,8 +63,9 @@ test('a loop lists the real clock time of every repeat', () => {
 // Nothing bounds `occurrences` by count any more — only loop's window does.
 // It used to be capped at ten by the loop buffer's fixed size; counting per
 // signature removed that buffer, and repeats keep piling up while an alert is
-// active and deduplicated, so the next one emitted carries a whole window —
-// 240 of them at four calls a second, the very runaway this detector catches.
+// active and deduplicated, so the next one emitted once the lock breaks carries
+// a whole window — 240 of them at four calls a second, the very runaway this
+// detector exists to catch.
 test('a loop caps how many repeat times it prints and says what it dropped', () => {
   const many = Array.from({ length: 240 }, (_, i) => ({
     ts: at(14, 3, 0) + i * 250, toolUseId: `t${i}`, failed: null,
