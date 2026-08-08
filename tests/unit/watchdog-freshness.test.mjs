@@ -22,6 +22,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createWatchdog } from '../../public/viz-watchdog.mjs';
+import { isFresh } from '../../public/viz-alert-freshness.mjs';
 
 const T = 1_700_000_000_000; // fixed "now" for every test
 
@@ -250,6 +251,60 @@ test('loop still fires while blind — it judges events, never their absence', (
   let last = [];
   for (let i = 0; i < 4; i++) last = wd.processEvent(pre({ at: T - 15_000 + i * 5_000, id: `t${i}` })).newAlerts;
   assert.equal(last.length, 1, 'an event in hand is proof regardless of the channel');
+});
+
+// ─── standing: a state does not go out of date ─────────────────────────────
+// Moving freshness to the display gave the badge a two-minute expiry it never
+// had. For an event-driven alert that is right — it reports something that is
+// over. For stuck it would be a lie: createdAt is frozen by the dedup rule, so
+// at minute five of a session that is still frozen the watchdog says stuck and
+// the badge says nothing. The alert declares which kind it is; the display
+// reads the flag and never the type.
+//
+// These go through a REAL detector on purpose. Exercising the flag against
+// isFresh alone would pin the rule and leave the detector free to never set it.
+
+test('stuck: the detector marks its alert standing, and the display cut spares it', () => {
+  const clock = clockAt();
+  const wd = createWatchdog({ now: clock.now });
+  wd.processEvent(pre({ at: T - 4 * 60_000, id: 't1' }));
+  const alert = wd.tick().newAlerts[0];
+  assert.equal(alert.standing, true, 'the display reads a flag, it cannot guess the type');
+
+  clock.advance(10 * 60_000);   // nothing happened, nobody acknowledged
+  assert.equal(wd.getActiveAlerts().length, 1, 'the watchdog still judges the session stuck');
+  assert.equal(isFresh(alert, clock.now()), true, 'so the badge has to keep saying so');
+});
+
+test('loop: an event-driven alert is not standing, and does go out of date', () => {
+  const clock = clockAt();
+  const wd = createWatchdog({ now: clock.now });
+  let last = [];
+  for (let i = 0; i < 4; i++) {
+    last = wd.processEvent(pre({ at: T - 15_000 + i * 5_000, id: `t${i}` })).newAlerts;
+  }
+  const alert = last[0];
+  assert.equal(alert.standing, false, 'something that is over is not a standing condition');
+  assert.equal(isFresh(alert, alert.createdAt), true, 'news while it is news');
+  assert.equal(isFresh(alert, alert.createdAt + 2 * 60_000 + 1), false, 'history two minutes later');
+});
+
+test('stuck: standing is not immortal — the detector still takes its alert back', () => {
+  const clock = clockAt();
+  const wd = createWatchdog({ now: clock.now });
+  wd.processEvent(pre({ at: T - 4 * 60_000, id: 't1' }));
+  const alert = wd.tick().newAlerts[0];
+  // The tool comes back, so the condition is over. Freshness would hold on to
+  // this alert for ever — the withdrawal can only come from the detector.
+  wd.processEvent({
+    session_id: 'sid1', hook_event_name: 'PostToolUse',
+    tool_name: 'Bash', tool_use_id: 't1', _ts: iso(T),
+  });
+  wd.tick();
+  clock.advance(10 * 60_000);
+  assert.equal(isFresh(alert, clock.now()), true, 'the clock alone will never drop it');
+  assert.deepEqual(wd.getActiveAlerts().filter(a => isFresh(a, clock.now())), [],
+    'and still nothing is shown: what stands has to be able to stop standing');
 });
 
 // ─── Thresholds ────────────────────────────────────────────────────────────

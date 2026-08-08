@@ -93,18 +93,24 @@ function actor(evt) {
 // `tools` are always arrays, empty when the detector has nothing to put in
 // them. A consumer can read any field of any alert without type-sniffing.
 //
+// `standing` is part of that contract. It says whether the alert reports a
+// moment that has passed or a condition that still holds, which is what a
+// display needs to know before deciding an alert has gone out of date. The
+// detector that raises the alert is the only thing that can answer it, so it
+// answers it here rather than leaving every consumer to guess from the type.
+//
 // The id scopes to the agent as well as the session, so two subagents looping
 // at once are two alerts rather than one that names whichever fired first.
 function makeAlert({
   type, sessionId, toolName = '', count, createdAt, message,
   agentId = '', agentType = '', subject = '', occurrences = [], tools = [],
-  cwd = '',
+  cwd = '', standing = false,
 }) {
   const scope = agentId ? `${sessionId}:${agentId}` : sessionId;
   return {
     id: toolName ? `${type}:${scope}:${toolName}` : `${type}:${scope}`,
     type, sessionId, toolName, count, createdAt, message,
-    agentId, agentType, subject, occurrences, tools, cwd,
+    agentId, agentType, subject, occurrences, tools, cwd, standing,
     acknowledged: false,
   };
 }
@@ -328,6 +334,9 @@ const DETECTORS = {
         alerts.push(makeAlert({
           type: 'stuck', sessionId: sid, count: buf.running.size, createdAt: tickNow,
           tools: [...buf.running.values()], cwd: buf.cwd,
+          // The one condition that is still true while nothing happens, so the
+          // one alert a clock must not retire. `isStale` below is what ends it.
+          standing: true,
           // An absolute time, never a duration. This message is written once
           // and re-read for as long as the alert lives; "for 180s" is true for
           // one second and false for every second after.

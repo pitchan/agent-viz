@@ -13,5 +13,16 @@
 export const FRESHNESS_MS = 2 * 60_000;
 
 export function isFresh(alert, now, freshnessMs = FRESHNESS_MS) {
+  // A standing alert describes a STATE, not a moment. `stuck` says "nothing
+  // has happened since 16:22" — that stays true, and stays worth showing,
+  // however long ago it started; ageing it out would hide a session that is
+  // still frozen. Its lifecycle is already handled where it belongs: the
+  // watchdog withdraws it through `isStale` the moment the session speaks
+  // again, or once it has gone past being worth reporting. Event-driven
+  // alerts are the opposite — they describe something that happened once,
+  // and an hour later they are history, not news.
+  //
+  // The alert declares which it is. Nothing here sniffs its type.
+  if (alert.standing) return true;
   return (now - alert.createdAt) <= freshnessMs;
 }

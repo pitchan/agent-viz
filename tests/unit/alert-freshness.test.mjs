@@ -27,3 +27,13 @@ test('la fenetre est reglable, la valeur par defaut ne fuit pas', () => {
   assert.equal(isFresh({ createdAt: T - 10_000 }, T, 5_000), false);
   assert.equal(isFresh({ createdAt: T - 10_000 }, T, 60_000), true);
 });
+
+// A standing alert describes a state, not a moment: it is worth showing for as
+// long as the state holds, and what ends it is the detector withdrawing it —
+// never the clock. Same createdAt, same now: only the flag separates them.
+test('une alerte d etat n a pas de date de peremption', () => {
+  const old = T - 3_600_000;
+  assert.equal(isFresh({ createdAt: old, standing: true }, T), true);
+  assert.equal(isFresh({ createdAt: old, standing: false }, T), false,
+    'controle negatif : c est bien le drapeau qui fait la difference, pas l heure');
+});
