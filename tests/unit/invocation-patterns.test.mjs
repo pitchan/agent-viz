@@ -527,14 +527,20 @@ test('aucun motif hors invocation n est marque reglage du poste', () => {
   }
 });
 
-test('CHAQUE motif inv-bash-* exige l estampille line N: du shell', () => {
+test('CHAQUE motif de shell POSIX exige l estampille line N: du shell', () => {
   // L estampille est ce qui distingue un message EMIS par le shell d un
   // message CITE par un document ou un rapport de test. Enonce comme un
   // compte en prose — « les cinq motifs POSIX » — l invariant se perime des
-  // qu on ajoute une ligne. Derive de la table, il vieillit avec elle.
-  const bash = PATTERNS.filter(p => p.id.startsWith('inv-bash-'));
-  assert.ok(bash.length >= 5, 'la table doit porter des motifs de shell POSIX');
-  for (const p of bash) {
+  // qu on ajoute une ligne.
+  //
+  // La famille POSIX porte DEUX prefixes, et l oublier est ce qui vient
+  // d arriver : `inv-cross-shell-cmdlet-in-posix` ne commence pas par
+  // `inv-bash-`. Le compte est verrouille comme celui des motifs PowerShell
+  // plus bas — un huitieme motif de shell fera echouer ce test, ce qui est le
+  // seul moyen de forcer quelqu un a verifier qu il porte bien l estampille.
+  const posix = PATTERNS.filter(p => /^inv-(?:bash|cross-shell)-/.test(p.id));
+  assert.equal(posix.length, 7, 'la table doit porter sept motifs de shell POSIX');
+  for (const p of posix) {
     assert.match(p.re.source, /line \\d\+:/,
       `${p.id} : motif de shell POSIX sans l estampille line N:`);
   }
