@@ -58,6 +58,13 @@ function failureNote(occurrences) {
 const MOTIFS = {
   'inv-bash-windows-path-unquoted': 'un chemin Windows non protégé sous un shell POSIX',
   'inv-bash-cd-too-many-args': 'un changement de dossier vers un chemin non protégé',
+  'inv-bash-trailing-backslash-in-path': 'un chemin Windows terminé par un antislash, sous un shell POSIX',
+  'inv-bash-heredoc-too-large': 'un document écrit par heredoc, trop gros pour la ligne de commande',
+  // Phrase INERTE depuis doc/30, et gardée sciemment, comme celle de
+  // `inv-cross-shell-cmdlet-in-posix` juste en dessous. Le motif est passé hors
+  // du sous-ensemble qui alerte parce qu'il fusionnait deux causes : il décrit
+  // le symptôme sans pouvoir nommer le remède, et c'est cette phrase-ci qui
+  // l'avait trahi. Elle reste parce qu'elle est juste.
   'inv-bash-unbalanced-quote': 'un guillemet ouvert et jamais refermé',
   'inv-bash-syntax-error': 'une syntaxe que le shell POSIX ne sait pas lire',
   // Phrase INERTE aujourd'hui, et gardée sciemment : le motif est passé hors
