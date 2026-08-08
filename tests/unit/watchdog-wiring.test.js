@@ -607,6 +607,42 @@ test('demarrage: ce que le serveur oublie de fournir se dit a voix haute', async
   assert.doesNotMatch(complet.dits, /sans frontiere|sans canal/);
 });
 
+// ─── Le dernier maillon : ce que `lib/server.js` passe reellement ────────────
+//
+// Ces deux tests lisent `lib/server.js` comme du TEXTE, et c'est delibere. Ne
+// pas les « ameliorer » en `require` : ce fichier est un point d'entree, le
+// charger lie le port 3333 et tue le serveur agent-viz de la machine — sur
+// celle-ci, l'instrument de mesure du projet. L'objection « aucun test ne peut
+// charger server.js » est vraie du CHARGEMENT, pas de la lecture.
+//
+// Et il faut bien quelque chose ici, parce que le guet de type de
+// `startWatchdog` ne couvre que l'OUBLI. Le REMPLACEMENT lui echappe :
+// `broadcastAlert: broadcastSSE` est bien une fonction, elle passe la garde, et
+// les alertes partiraient sur le flux sous la forme `{type:'stuck', …}` au lieu
+// de `{type:'alert', alert}` — que le client de la tache 9 ignorerait en
+// silence. C'est la moitie dangereuse : muette jusqu'a la tache 9.
+//
+// Le prix assume : reformater ces lignes fait rougir ces tests. C'est le but.
+const SOURCE_SERVEUR = fs.readFileSync(
+  path.join(__dirname, '..', '..', 'lib', 'server.js'), 'utf8');
+
+test('serveur: le chien de garde recoit le vrai dossier et la vraie frontiere', () => {
+  // `DIR` : la seule definition faisant autorite du dossier d evenements.
+  assert.match(SOURCE_SERVEUR, /startWatchdog\(\{[\s\S]*?\bdir:\s*DIR\b/);
+  // `liveFrom` : sans lui, les deux chemins relisent les memes octets et le
+  // produit annonce des boucles qui n ont pas eu lieu. `startWatchdog` s en
+  // plaint au demarrage, mais mieux vaut que la suite le dise d abord.
+  assert.match(SOURCE_SERVEUR, /startWatchdog\(\{[\s\S]*?\bliveFrom:\s*liveHandoffOffset\b/);
+});
+
+test('serveur: l enveloppe SSE est composee ici, et le canal n est pas broadcastSSE nu', () => {
+  assert.match(
+    SOURCE_SERVEUR,
+    /broadcastAlert:\s*(\w+)\s*=>\s*broadcastSSE\(\{\s*type:\s*'alert',\s*alert\s*\}\)/,
+    'le chien de garde rend une alerte nue ; c est ICI que le protocole du serveur l habille',
+  );
+});
+
 test('index: initWatchdog(null) ne fabrique pas une promesse rejetee', async () => {
   const idx = neufIndex();
   // La destructuration des parametres est HORS du `try` de `fabriquer` : un
