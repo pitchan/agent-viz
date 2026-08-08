@@ -259,7 +259,7 @@ export const PATTERNS = Object.freeze([
   // counted either: the detector's filter returns before its counter. This is
   // a correction of a first calibration rather than a nuance.
   //
-  // It is silenced for the opposite reason to the net seven lines above, and
+  // It is silenced for the opposite reason to the net above, and
   // the difference is the whole rule. The net was silenced while it still
   // covered a shape that used to ring, with nothing to catch it: that was a
   // hole. This one was silenced because it rang WRONGLY — the same failure is
