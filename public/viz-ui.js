@@ -22,7 +22,7 @@ import {
   composeNarrator, setRenderFn, resumeTick,
 } from './viz-narrator.js';
 import {
-  getActiveAlerts, acknowledgeAlert, onAlertsChanged,
+  getActiveAlerts, acknowledgeAlert, onAlertsChanged, initAlertReader, refreshAlerts,
 } from './viz-watchdog-client.js';
 import {
   alertActor, alertDetailLines, notificationPayload, truncate,
@@ -462,7 +462,7 @@ function alertItemHTML(a) {
       ${details}
       <div class="alert-meta">${esc(meta)}</div>
     </div>
-    <button class="alert-ack" data-id="${esc(a.id)}">Ack</button>
+    <button class="alert-ack" data-id="${esc(a.id)}" data-created="${esc(String(a.createdAt ?? ''))}">Ack</button>
   </div>`;
 }
 
@@ -503,7 +503,8 @@ document.getElementById('alerts-close').addEventListener('click', () => {
 document.getElementById('alerts-list').addEventListener('click', (e) => {
   const btn = e.target.closest('.alert-ack');
   if (!btn) return;
-  acknowledgeAlert(btn.dataset.id);
+  // Both halves of the key: the same id at another time is another incident.
+  acknowledgeAlert(btn.dataset.id, Number(btn.dataset.created));
   renderWatchdogPill();
 });
 
@@ -530,6 +531,10 @@ onAlertsChanged((alerts) => {
 
 // Initial render so the pill is green from the first paint.
 renderWatchdogPill();
+
+// The badge reads the server's journal: once at load, then every 30s to catch
+// up on whatever a broken stream missed. Live pushes come through SSE.
+initAlertReader().then(() => setInterval(refreshAlerts, 30_000));
 
 // ─── Wire cross-module hooks ──────────────────────────────────────────────
 // Canvas pointer click → detail + feed highlight.

@@ -1,74 +1,137 @@
-// viz-watchdog-client.js — browser-side orchestration around viz-watchdog.mjs.
+// viz-watchdog-client.js — the browser side of the watchdog: a reader, not a
+// detector.
 //
-// Owns the single watchdog instance, the wall-clock tick loop, and an
-// observer registry. Stays narrow on purpose: detection logic lives in
-// viz-watchdog.mjs (pure, testable, server-portable), DOM rendering and
-// Notification API calls live in viz-ui.js, and the SSE pipeline (viz-layout
-// → viz-network) just forwards events into here.
+// Detection and memory live on the server (lib/server/watchdog/): it sees
+// every event whether or not a tab is open, and it writes what it sees to a
+// journal that survives a reload, a restart and an acknowledgement. This
+// module's whole job is the LIVE case — say what is wrong right now — so it
+// takes the server's journal and keeps only what is still worth shouting
+// about. The lasting record is read in the Conseils drawer, not here.
+//
+// Two sieves, not one, because GET /alerts answers two different questions:
+//
+//   * `alerts` is the MEMORY. The journal has no notion of liveness at all —
+//     it hands back what was written down over the requested window.
+//   * `activeIds` is what the server's detector still judges LIVE, and it is
+//     the only thing that can say so. A standing alert (`stuck`) describes a
+//     STATE, so it has no expiry: `isFresh` answers true for it for ever, by
+//     design. Served from the journal alone, a session stuck yesterday would
+//     shout until someone clicked it.
+//
+// So: an event-driven alert is judged by freshness, a standing alert by
+// `activeIds`. Not the union of the two — `loop` and `retryStorm` declare no
+// `isStale`, so their alert sits in the server's registry until it is
+// acknowledged; taking membership as sufficient would keep the badge red on a
+// loop that ended an hour ago, which is the exact thing the freshness rule
+// exists to prevent.
+//
+// External alerts (the pricing vigil) do not come from the hook stream and
+// carry no triggering event, hence no createdAt. They are current by
+// construction and are kept in their own registry, out of both sieves.
 
-import { createWatchdog } from './viz-watchdog.mjs';
 import { isFresh } from './viz-alert-freshness.mjs';
 
-const TICK_MS = 5_000;
-
-// Whether events would currently reach us. Owned here and pushed in by the
-// transport (viz-network) rather than read from it, so this module keeps
-// knowing nothing about EventSource, fetch or the Page Visibility API.
-let observing = true;
-export function setObserving(v) { observing = !!v; }
-
-const watchdog = createWatchdog({ canObserve: () => observing });
 const listeners = new Set();
-let tickTimer = null;
-
-// External alerts — server-side detections (e.g. the pricing drift vigil).
-// Same shape and same dedup/ack contract as watchdog alerts, kept in their
-// own registry because they do not come from the hook event stream.
 const externalAlerts = new Map();
+
+// id → the most recent journal entry carrying that id. The journal's key is
+// the PAIR (id, createdAt) and it legitimately holds several incidents under
+// one id — the same tool looping twice in a day is two entries. The badge
+// speaks about the present, so of those it keeps the latest; indexing by id
+// and letting the last one written win would silence a live loop behind a
+// finished one, because the journal answers newest-first.
+let serverAlerts = new Map();
+// What the server still judges live. Kept as a set of ids, never as alerts:
+// the alert itself comes from the journal, with its `acknowledged` recomputed
+// there, and a second copy would be a second truth for one fact.
+let activeIds = new Set();
+
+let _fetch = (...args) => fetch(...args);
+let _now = () => Date.now();
+
+// One incident, as the journal identifies it. Not the id alone: a new episode
+// under the same id is a new incident and has to be announceable.
+// A separator is indispensable, and it is the journal's own: glued together,
+// ('a1', 2) and ('a', 12) both give 'a12'. NUL can appear neither in an id nor
+// in a number, and ids already carry punctuation (loop:s1:Bash).
+const keyOf = a => `${a.id}\u0000${a.createdAt}`;
 
 function notify(newAlerts) {
   for (const fn of listeners) fn(newAlerts);
 }
 
-// What the user can actually see right now — which is what the tick loop has
-// to watch, since a change it cannot see is a change not worth re-rendering
-// for, and one it can see must never go unnoticed.
-function activeCount() {
-  return getActiveAlerts().length;
+// Is this journal entry something the badge should be lit about right now?
+// The alert declares which kind it is; nothing here sniffs its type.
+function isLive(alert, now) {
+  if (alert.standing) return activeIds.has(alert.id);
+  return isFresh(alert, now);
 }
 
-function ensureTicker() {
-  if (tickTimer != null) return;
-  tickTimer = setInterval(() => {
-    // A tick can *withdraw* an alert as well as raise one — a stuck session
-    // that came back, or one that went past the point of being worth
-    // reporting. Notifying only on new alerts would leave a retracted alert
-    // on the badge for as long as the tab stays open.
-    //
-    // No freshness filter on this path, unlike feedEvent. A tick-raised alert
-    // is stamped with the tick's own clock, so it is fresh by construction —
-    // and `stuck`, the only detector with an onTick today, is `standing`
-    // anyway. A fourth detector raising a dated alert on tick would break that
-    // silently, and would have to filter here too.
-    const before = activeCount();
-    const { newAlerts } = watchdog.tick();
-    if (newAlerts.length || activeCount() !== before) notify(newAlerts);
-  }, TICK_MS);
-  // Node exposes .unref() on the timer handle — call it so unit tests that
-  // transitively import this module don't hang waiting for the interval.
-  // No-op in browsers (handle is a plain number there).
-  if (tickTimer && typeof tickTimer.unref === 'function') tickTimer.unref();
+function liveServerAlerts() {
+  const now = _now();
+  return [...serverAlerts.values()].filter(a => isLive(a, now));
 }
 
-// The watchdog records the past now, so it can hand back an alert about an
-// event from an hour ago. Recording it is right; announcing it is not — this
-// signal is what fires the desktop notification, and a page reload replays a
-// whole session file. Only what the display would show gets announced.
-export function feedEvent(evt) {
-  ensureTicker();
-  const now = Date.now();
-  const newAlerts = watchdog.processEvent(evt).newAlerts.filter(a => isFresh(a, now));
-  if (newAlerts.length) notify(newAlerts);
+export function getActiveAlerts() {
+  const external = [...externalAlerts.values()].filter(a => !a.acknowledged);
+  return [...liveServerAlerts(), ...external];
+}
+
+export async function refreshAlerts() {
+  let payload;
+  try {
+    const res = await _fetch('/alerts?days=30');
+    // A read that failed is not evidence that all is well: leave the badge on
+    // what it already knew rather than blanking it.
+    if (!res || !res.ok) return;
+    payload = await res.json();
+  } catch { return; }            // server gone: the badge simply stops moving
+  // Both fields are read defensively, and not out of ceremony: neither
+  // `for...of` nor `new Set` tolerates a non-iterable, and nobody awaits this
+  // promise. A malformed 200 would therefore reject into nothing and stop the
+  // 30s refresh for good, without a word — the badge would go on showing
+  // whatever it last knew, looking perfectly healthy.
+  const journal = payload && Array.isArray(payload.alerts) ? payload.alerts : [];
+  const live = payload && Array.isArray(payload.activeIds) ? payload.activeIds : [];
+  const before = new Set(liveServerAlerts().map(keyOf));
+  const next = new Map();
+  for (const a of journal) {
+    if (!a || !a.id || a.acknowledged) continue;
+    const held = next.get(a.id);
+    if (!held || a.createdAt > held.createdAt) next.set(a.id, a);
+  }
+  serverAlerts = next;
+  activeIds = new Set(live);
+  const after = liveServerAlerts();
+  // Only what the display would show gets announced, and only the first time.
+  // This signal is what fires the desktop notification, and this function runs
+  // on a timer: announcing the whole live set every poll would ring once per
+  // alert per poll for as long as the tab stays open. External alerts are
+  // excluded by construction — they never come back from the journal.
+  const raised = after.filter(a => !before.has(keyOf(a)));
+  // A refresh can also WITHDRAW — an alert acknowledged from another tab, or
+  // one the server no longer counts. Notifying on new alerts only would leave
+  // a retracted alert on the badge until something else moved.
+  if (raised.length || after.length !== before.size) notify(raised);
+}
+
+// Pushed by the SSE stream the moment the server records something, so the
+// badge does not wait for the next poll.
+export function applyServerAlert(alert) {
+  if (!alert || !alert.id) return;
+  const held = serverAlerts.get(alert.id);
+  // Same rule as the refresh: of two incidents sharing an id, the latest one
+  // is the one that speaks. A live stream can carry an alert built from an old
+  // event, and it must not push the current incident off the badge.
+  if (held && held.createdAt > alert.createdAt) return;
+  serverAlerts.set(alert.id, alert);
+  // The server would not be broadcasting it if it had not just recorded it, so
+  // this IS the liveness signal — the one thing the journal cannot give. Wait
+  // for the next GET /alerts to supply it and a `stuck` pushed here would stay
+  // invisible for up to thirty seconds, which is the delay this path exists to
+  // remove.
+  activeIds.add(alert.id);
+  notify(isLive(alert, _now()) ? [alert] : []);
 }
 
 export function raiseExternalAlert(alert) {
@@ -79,25 +142,43 @@ export function raiseExternalAlert(alert) {
   notify([fresh]);
 }
 
-// The watchdog's registry is a record and keeps everything it saw; the badge
-// speaks about the present, so it shows only what is still current.
+// createdAt is half the identity of an incident: the same id at another time
+// is another incident, and acknowledging one must not silence the next.
 //
-// External alerts (the pricing vigil) never go through that sieve. They do not
-// come from the hook event stream and have no triggering event: depending on
-// the caller they carry the wall-clock instant they were raised, or no
-// createdAt at all. Either way freshness is not their rule, and applying it
-// would make the drift report expire — or vanish on the spot.
-export function getActiveAlerts() {
-  const now = Date.now();
-  const own = watchdog.getActiveAlerts().filter(a => isFresh(a, now));
-  const external = [...externalAlerts.values()].filter(a => !a.acknowledged);
-  return [...own, ...external];
-}
-
-export function acknowledgeAlert(id) {
-  watchdog.acknowledge(id);
+// The pair that goes on the wire is the one the JOURNAL gave us, not the one
+// the caller rebuilt — the panel reads it back off a DOM attribute, where a
+// missing value reads as `Number('')`, which is 0 and not NaN. The route
+// validates the SHAPE of a key, never its existence: a well-formed pair that
+// matches nothing writes a permanent line acknowledging nothing, and
+// acknowledgements are not deduplicated the way alerts are. Hence also the
+// guard below: we never post an id we were not served.
+export async function acknowledgeAlert(id, createdAt) {
   const external = externalAlerts.get(id);
-  if (external) external.acknowledged = true;
+  if (external) { external.acknowledged = true; notify([]); return; }
+  const held = serverAlerts.get(id);
+  if (!held) return;
+  const wasActive = activeIds.has(id);
+  serverAlerts.delete(id);
+  activeIds.delete(id);
+  notify([]);
+  let recorded = false;
+  try {
+    const res = await _fetch('/alerts/ack', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, createdAt: held.createdAt }),
+    });
+    recorded = !!res && !!res.ok;
+  } catch { recorded = false; }
+  if (recorded) return;
+  // 400 on a malformed key, 503 while the port is served but the watchdog is
+  // not built yet — a real window. Nothing was written down, so the alert is
+  // coming back at the next reload: showing it again now is the difference
+  // between a visible refusal and the silent failure this whole chantier
+  // repairs.
+  serverAlerts.set(id, held);
+  if (wasActive) activeIds.add(id);
+  notify([]);
 }
 
 // Subscribe to changes in the active-alert set. Returns the unsubscribe
@@ -109,4 +190,10 @@ export function acknowledgeAlert(id) {
 export function onAlertsChanged(fn) {
   listeners.add(fn);
   return () => listeners.delete(fn);
+}
+
+export async function initAlertReader({ fetchImpl, now } = {}) {
+  if (fetchImpl) _fetch = fetchImpl;
+  if (now) _now = now;
+  await refreshAlerts();
 }

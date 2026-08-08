@@ -9,7 +9,6 @@ import {
   state, vis, markDirty, parseMcpName,
 } from './viz-state.js';
 import { markNarratorDirty } from './viz-narrator.js';
-import { feedEvent as feedWatchdog } from './viz-watchdog-client.js';
 import { toolSubject } from './viz-tool-subject.mjs';
 
 // ─── Feed-cursor adjust hook ──────────────────────────────────────────────
@@ -333,7 +332,9 @@ export function processEvent(evt) {
   layoutDirtyRoots.add(`s:${sid}`);
   const handler = EVENT_HANDLERS[evt.hook_event_name];
   if (handler) handler(evt, sid, ts);
-  feedWatchdog(evt);
+  // No watchdog feed here any more. The events this function receives are the
+  // ones a tab happened to be open for; the server sees all of them, and it is
+  // where detection lives now.
   markNarratorDirty();
 }
 

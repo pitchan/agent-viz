@@ -13,15 +13,12 @@ import {
 import {
   pauseTick, resumeTick, markNarratorDirty,
 } from './viz-narrator.js';
-import { raiseExternalAlert, setObserving } from './viz-watchdog-client.js';
+import { raiseExternalAlert, applyServerAlert } from './viz-watchdog-client.js';
 
-// ─── Transport health ─────────────────────────────────────────────────────
-// The watchdog's stuck detector concludes from an absence of events, so it
-// has to be told when an absence means nothing: the stream is down, or the
-// tab is hidden and we closed it ourselves. Healthy = the stream is up, or
-// the poll fallback is still answering.
-let _lastPollOk = true;
-function refreshObserving() { setObserving(sseConnected || _lastPollOk); }
+// Nothing here tells the watchdog whether we can still hear the agent. That
+// question belonged to a detector running in the tab; detection now runs on
+// the server, which keeps listening whether or not a tab is open, and answers
+// it from its own catch-up state.
 
 // Render a small pill badge identifying the source agent. Returns HTML safe to
 // inline (label is fixed, no user input).
@@ -92,14 +89,12 @@ export function connectSSE() {
     sseConnected = true;
     connDot.classList.add('connected');
     connDot.title = 'Connected';
-    refreshObserving();
     stopPollFallback();
   };
   sseSource.onerror = () => {
     sseConnected = false;
     connDot.classList.remove('connected');
     connDot.title = 'Disconnected';
-    refreshObserving();
     startPollFallback();
   };
   sseSource.onmessage = (msg) => {
@@ -126,6 +121,13 @@ export function connectSSE() {
       // panel can follow it without this module importing the observatory.
       if (data.type === 'analysisScan') {
         window.dispatchEvent(new CustomEvent('agentviz:analysisScan', { detail: data }));
+        return;
+      }
+      // The server has just recorded a failure: show it without waiting for
+      // the next poll. The journal stays the source of truth — this is only a
+      // display shortcut.
+      if (data.type === 'alert') {
+        applyServerAlert(data.alert);
         return;
       }
       if (data.type === 'pricingDrift') {
@@ -211,12 +213,7 @@ export async function poll(force) {
     }
     if (firstBatch && state.nodes.size) { firstBatch = false; _pendingFitView = true; }
     scheduleRender();
-    _lastPollOk = true;
-    refreshObserving();
-  } catch {
-    _lastPollOk = false;
-    refreshObserving();
-  }
+  } catch {}
 }
 
 // ─── Sessions list ────────────────────────────────────────────────────────
@@ -338,9 +335,9 @@ function pauseApp() {
   _paused = true;
   if (sseSource) { sseSource.close(); sseSource = null; sseConnected = false; }
   stopPollFallback();
-  // We are about to stop listening on purpose. Nothing that follows is the
-  // agent going quiet.
-  setObserving(false);
+  // We stop listening on purpose here, and it no longer needs saying: the
+  // server never stopped, so the silence that follows is ours alone and
+  // nothing concludes anything from it.
   stopDurationsTicker();
   pauseTick();
   if (vis.rafHandle != null) { cancelAnimationFrame(vis.rafHandle); vis.rafHandle = null; }
