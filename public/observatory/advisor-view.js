@@ -14,6 +14,7 @@ import {
 import { evidenceLines } from './evidence.js';
 import { initPeriodSelector } from './period-selector.js';
 import { initConfirmButton } from './confirm-button.js';
+import { renderFailures } from './failures-view.js';
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -107,15 +108,31 @@ function render() {
   renderList(list, state.recommendations);
 }
 
+// Les pannes ne passent pas par le magasin de l'observatoire : elles ne
+// viennent pas du scan, elles viennent du chien de garde. Un chargement
+// separe, une erreur qui ne prend pas le tiroir en otage.
+async function loadFailures() {
+  const node = document.getElementById('advisor-failures');
+  try {
+    const { alerts } = await api.fetchAlerts({ days: getState().periodDays });
+    renderFailures(node, alerts);
+  } catch {
+    node.textContent = '';
+  }
+}
+
 export function initAdvisor() {
   const panel = document.getElementById('advisor-overlay');
   subscribe(() => { if (panel.classList.contains('visible')) render(); });
 
-  initPeriodSelector(document.getElementById('advisor-period'), () => loadAdvisor(api));
+  initPeriodSelector(document.getElementById('advisor-period'), () => {
+    loadAdvisor(api);
+    loadFailures();
+  });
 
   document.getElementById('btn-advisor').addEventListener('click', () => {
     panel.classList.toggle('visible');
-    if (panel.classList.contains('visible')) loadAdvisor(api);
+    if (panel.classList.contains('visible')) { loadAdvisor(api); loadFailures(); }
   });
 
   document.getElementById('advisor-close').addEventListener('click', () => {
@@ -149,6 +166,9 @@ export function initAdvisor() {
   // it finishes so the page never shows advice from before the rescan.
   window.addEventListener('agentviz:analysisScan', e => {
     applyScanEvent(e.detail);
-    if (e.detail.phase === 'done' && panel.classList.contains('visible')) loadAdvisor(api);
+    if (e.detail.phase === 'done' && panel.classList.contains('visible')) {
+      loadAdvisor(api);
+      loadFailures();
+    }
   });
 }

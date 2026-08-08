@@ -64,3 +64,11 @@ export function fetchModelCosts(opts = {}) {
 }
 
 export const fetchPricing = () => getJson('/pricing');
+
+// Le journal des pannes. Meme fenetre que les conseils : la page n'a qu'une
+// seule notion de periode, et le serveur retombe seul sur son defaut hors de la
+// table 7/30/90.
+export function fetchAlerts(opts = {}) {
+  const q = windowParams(opts).toString();
+  return getJson(`/alerts${q ? `?${q}` : ''}`);
+}
