@@ -185,6 +185,31 @@ test('service: acquitter ecrit une ligne et le relit', async () => {
   assert.equal((await svc(filePath)).list({ sinceDays: 90 })[0].acknowledged, true);
 });
 
+test('service: activeIds dit ce qui est ENCORE vif, ce que le journal ignore', async () => {
+  // Le journal est la memoire : il rend ce qui a ete consigne, sans aucune
+  // notion de vivacite. Une alerte `standing` decrit un ETAT, pas un moment, et
+  // n'a donc pas de peremption — servie depuis le seul journal, une session
+  // bloquee hier ressortirait vive pour toujours. Seul le detecteur sait
+  // laquelle l'est encore, et le service est le seul a pouvoir le lui demander.
+  const filePath = tmpFile();
+  let maintenant = T + 4 * 60_000;
+  const s = await svc(filePath, { now: () => maintenant });
+  assert.deepEqual(s.activeIds(), [], 'rien n a encore ete leve');
+  s.onEvent(pre(1, T));                       // outil encore en vol
+  const [a] = s.tick();
+  assert.equal(a.type, 'stuck');
+  // Consignee ET vive : les deux reponses sont vraies en meme temps, et ce sont
+  // deux questions differentes.
+  assert.deepEqual(s.activeIds(), [a.id]);
+  assert.equal(s.list({ sinceDays: 90 }).length, 1);
+  s.ack(a.id, a.createdAt);
+  // Acquittee : le journal la garde — c'est sa memoire — mais elle n'est plus
+  // vive. Si `activeIds` rendait les alertes au lieu de leurs identifiants, ou
+  // relisait le journal, cette ligne ne pourrait pas distinguer les deux.
+  assert.deepEqual(s.activeIds(), []);
+  assert.equal(s.list({ sinceDays: 90 }).length, 1, 'la memoire, elle, ne perd rien');
+});
+
 test('service: list se mesure sur l horloge du service, pas sur celle du journal', async () => {
   // Un journal construit avec l'horloge reelle — ce que fait tout appelant qui
   // fournit son propre journal — pendant que le service rejoue une vieille
