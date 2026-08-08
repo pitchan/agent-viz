@@ -31,6 +31,11 @@ touch('projects/F--DEV-proj-a/sess-new/subagents/workflows/wf_123/agent-ghi.json
 touch('projects/F--DEV-proj-a/sess-new/subagents/workflows/wf_123/agent-ghi.meta.json', '{"agentType":"Plan"}', T3);
 touch('projects/F--DEV-proj-a/sess-new/subagents/workflows/wf_123/journal.jsonl', '{"type":"other"}\n', T3);
 touch('projects/F--DEV-proj-a/sess-new/subagents/workflows/wf_123.json', '{"meta":true}', T3);
+// Second dossier de workflow, avec un agentId IDENTIQUE ('ghi') et un agentType
+// DIFFÉRENT : si le meta était un jour reclé sur le nom seul au lieu du chemin
+// complet, ce dossier volerait le meta de l'autre et le test le verrait.
+touch('projects/F--DEV-proj-a/sess-new/subagents/workflows/wf_456/agent-ghi.jsonl', '{"type":"assistant"}\n', T3);
+touch('projects/F--DEV-proj-a/sess-new/subagents/workflows/wf_456/agent-ghi.meta.json', '{"agentType":"Debug"}', T3);
 touch('projects/F--DEV-proj-a/notes.txt', 'pas un transcript', T3);
 touch('projects/D--other-proj/sess-mid.jsonl', '{"type":"user"}\n', T2);
 
@@ -45,7 +50,9 @@ describe('discoverSessions', () => {
   test('attache les sous-agents avec meta.json quand présent, null sinon', async () => {
     const sessions = await discoverSessions(claudeDir, {});
     const withAgents = sessions.find((s) => s.sessionId === 'sess-new');
-    expect(withAgents?.subagents.map((a) => a.agentId).sort()).toEqual(['abc', 'def', 'ghi']);
+    // 'ghi' apparaît deux fois : un agentId identique dans deux dossiers de workflow
+    // distincts (wf_123 et wf_456), cf. le test dédié ci-dessous pour le meta de chacun.
+    expect(withAgents?.subagents.map((a) => a.agentId).sort()).toEqual(['abc', 'def', 'ghi', 'ghi']);
     const abc = withAgents?.subagents.find((a) => a.agentId === 'abc');
     const def = withAgents?.subagents.find((a) => a.agentId === 'def');
     expect(abc?.metaPath?.endsWith('agent-abc.meta.json')).toBe(true);
@@ -57,18 +64,26 @@ describe('discoverSessions', () => {
   test('descend sous subagents/workflows/ sans y ramasser autre chose que des agent-*.jsonl', async () => {
     const sessions = await discoverSessions(claudeDir, {});
     const withAgents = sessions.find((s) => s.sessionId === 'sess-new');
-    const ghi = withAgents?.subagents.find((a) => a.agentId === 'ghi');
+    const ghis = withAgents?.subagents.filter((a) => a.agentId === 'ghi') ?? [];
+    expect(ghis).toHaveLength(2);
+    const wf123 = ghis.find((a) => a.jsonlPath.includes(path.join('workflows', 'wf_123')));
+    const wf456 = ghis.find((a) => a.jsonlPath.includes(path.join('workflows', 'wf_456')));
 
-    // Le transcript profond est découvert, et son meta.json est celui de SON dossier.
-    expect(ghi?.jsonlPath.includes(path.join('workflows', 'wf_123'))).toBe(true);
-    expect(ghi?.metaPath?.endsWith(path.join('wf_123', 'agent-ghi.meta.json'))).toBe(true);
+    // Les deux transcripts profonds sont découverts, et chacun résout le meta.json de
+    // SON PROPRE dossier — pas celui de l'autre dossier de workflow (même nom de fichier,
+    // agentType différent : Plan pour wf_123, Debug pour wf_456 dans les fixtures).
+    expect(wf123?.metaPath?.endsWith(path.join('wf_123', 'agent-ghi.meta.json'))).toBe(true);
+    expect(wf456?.metaPath?.endsWith(path.join('wf_456', 'agent-ghi.meta.json'))).toBe(true);
+    // Non croisé : le meta d'un dossier ne doit jamais pointer vers l'autre.
+    expect(wf123?.metaPath?.includes('wf_456')).toBe(false);
+    expect(wf456?.metaPath?.includes('wf_123')).toBe(false);
 
     // Les non-transcripts du même dossier restent dehors.
     const paths = withAgents?.subagents.map((a) => a.jsonlPath) ?? [];
     expect(paths.some((p) => p.endsWith('journal.jsonl'))).toBe(false);
     expect(paths.some((p) => p.endsWith('wf_123.json'))).toBe(false);
 
-    // L'ordre est déterministe (readdir récursif ne le garantit pas).
+    // L'ordre est déterministe (la marche en pile ne le garantit pas nativement).
     expect([...paths].sort()).toEqual(paths);
   });
 

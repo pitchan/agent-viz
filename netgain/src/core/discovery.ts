@@ -77,30 +77,47 @@ export async function discoverSessions(claudeDir: string, filters: DiscoveryFilt
 }
 
 async function discoverSubagents(dir: string): Promise<SubagentRef[]> {
-  let entries;
-  try {
-    entries = await readdir(dir, { recursive: true, withFileTypes: true });
-  } catch {
-    return [];
+  // Descente volontairement agnostique de la mise en page : tout sous-dossier de subagents/
+  // est descendu, pas seulement workflows/ — résiste au prochain changement de layout.
+  // Marche en pile plutôt qu'un readdir({recursive:true}) unique : un readdir récursif
+  // rejette la promesse entière au premier dossier illisible (EPERM/ENOENT en session live),
+  // et la session perdrait TOUS ses sous-agents, pas seulement ceux du dossier fautif.
+  const files: { parentPath: string; name: string }[] = [];
+  const queue = [dir];
+  while (queue.length > 0) {
+    const cur = queue.pop() as string;
+    let entries;
+    try {
+      entries = await readdir(cur, { withFileTypes: true });
+    } catch {
+      continue; // dossier illisible : on perd CE dossier, pas les autres
+    }
+    for (const e of entries) {
+      // isDirectory() (et non isSymbolicLink()) : un lien/jonction ne redescend pas,
+      // même comportement de non-suivi des symlinks qu'offrait { recursive: true }.
+      if (e.isDirectory()) queue.push(path.join(cur, e.name));
+      else if (e.isFile()) files.push({ parentPath: cur, name: e.name });
+    }
   }
-  // Clé sur le CHEMIN complet, pas sur le nom : en récursif, deux dossiers de
-  // workflow peuvent porter le même nom de meta, et le nom seul les confondrait.
+  // Clé sur le CHEMIN complet, pas sur le nom : deux dossiers de workflow peuvent porter
+  // le même nom de meta, et le nom seul les confondrait.
   const metaPaths = new Set(
-    entries.filter((e) => e.isFile() && e.name.endsWith('.meta.json')).map((e) => path.join(e.parentPath, e.name)),
+    files.filter((f) => f.name.endsWith('.meta.json')).map((f) => path.join(f.parentPath, f.name)),
   );
   const refs: SubagentRef[] = [];
-  for (const e of entries) {
-    if (!e.isFile() || !e.name.startsWith('agent-') || !e.name.endsWith('.jsonl')) continue;
-    const agentId = e.name.slice('agent-'.length, -'.jsonl'.length);
-    const metaPath = path.join(e.parentPath, `agent-${agentId}.meta.json`);
+  for (const f of files) {
+    if (!f.name.startsWith('agent-') || !f.name.endsWith('.jsonl')) continue;
+    const agentId = f.name.slice('agent-'.length, -'.jsonl'.length);
+    const metaPath = path.join(f.parentPath, `agent-${agentId}.meta.json`);
     refs.push({
       agentId,
-      jsonlPath: path.join(e.parentPath, e.name),
+      jsonlPath: path.join(f.parentPath, f.name),
       metaPath: metaPaths.has(metaPath) ? metaPath : null,
     });
   }
-  // L'ordre d'un readdir récursif n'est pas garanti d'une plateforme à l'autre :
-  // sans ce tri, les rapports et les tests deviennent dépendants du système de fichiers.
+  // L'ordre d'une marche en pile dépend de l'ordre des sous-dossiers, pas garanti d'une
+  // plateforme à l'autre : sans ce tri, les rapports et les tests deviennent dépendants
+  // du système de fichiers.
   refs.sort((a, b) => (a.jsonlPath < b.jsonlPath ? -1 : a.jsonlPath > b.jsonlPath ? 1 : 0));
   return refs;
 }
