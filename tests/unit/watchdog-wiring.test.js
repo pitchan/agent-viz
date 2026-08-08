@@ -238,19 +238,36 @@ test('event-reader: ce que le chien de garde voit part sur le flux, apres l even
   // disque : la meme regle qu'au niveau du service, mesuree cette fois au bout
   // de toute la chaine.
   //
-  // INERTE, ET SU (differe par le controleur) : `sse.js` enveloppe chaque
+  // On OBSERVE dans la callback, on AFFIRME dehors. Assertion et observation
+  // ne peuvent pas tenir au meme endroit ici : `sse.js` enveloppe chaque
   // ecriture client dans un `try { … } catch {}` pour se debarrasser des
-  // clients morts, et il y avale donc aussi l'`AssertionError` de ce controle.
-  // Il ne peut pas faire echouer ce test. Ne pas s'y fier : l'anteriorite
-  // reellement mesuree l'est par le test du battement, dont le
-  // `broadcastAlert` est appele en direct et non a travers `sse.js`.
+  // clients morts, et il y avalerait donc aussi l'`AssertionError`. Un controle
+  // pose dans la callback ne peut pas faire echouer ce test — il en aurait
+  // l'air, ce qui est pire que son absence. Ce qui doit traverser la frontiere
+  // du `try/catch` est une VALEUR, jugee une fois le flux referme.
+  //
+  // L'observation elle-meme ne doit pas pouvoir lever : un journal pas encore
+  // cree fait un ENOENT, que le meme `try/catch` avalerait — l'observation
+  // resterait nulle et l'echec se lirait « aucune alerte diffusee », ce qui
+  // designerait le mauvais coupable. Fichier absent = journal vide, et c'est
+  // la comparaison qui tranche.
+  let journalAuMomentDeLaDiffusion = null;
   const surMessage = (m) => {
-    if (m.type !== 'alert') return;
-    assert.match(fs.readFileSync(journalPath, 'utf8'), new RegExp(echapper(m.alert.id)));
+    if (m.type !== 'alert' || journalAuMomentDeLaDiffusion !== null) return;
+    let contenu = '';
+    try { contenu = fs.readFileSync(journalPath, 'utf8'); } catch { /* pas encore de journal */ }
+    journalAuMomentDeLaDiffusion = { id: m.alert.id, contenu };
   };
   const recus = ecouterSSE(surMessage);
   await readAndBroadcast(fichierDeSession('avec-garde', flotJusquAuDeclencheur()));
   recus.fermer();
+
+  assert.ok(journalAuMomentDeLaDiffusion, 'une alerte a bien ete diffusee');
+  assert.match(
+    journalAuMomentDeLaDiffusion.contenu,
+    new RegExp(echapper(journalAuMomentDeLaDiffusion.id)),
+    'la ligne du journal precede la diffusion',
+  );
 
   const types = recus.map(m => m.type);
   assert.equal(types.filter(t => t === 'event').length, 7, 'le canevas recoit tout, comme avant');

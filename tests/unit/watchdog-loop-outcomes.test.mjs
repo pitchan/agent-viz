@@ -98,6 +98,48 @@ test('une interruption humaine n est pas un echec de la commande', () => {
   assert.doesNotMatch(last.message, /failing/);
 });
 
+// Ce que ce test protege : la DONNEE, pas seulement sa mise en forme.
+//
+// `count` est derive de `occurrences.length`, donc une troncature chez le
+// producteur reste AUTO-COHERENTE : plafonner la liste a cinq ferait dire
+// « called 5× » d'une boucle de deux cent quarante, sans qu'aucune assertion
+// de libelle ni de plafond d'affichage ne bronche — le plafond d'affichage
+// vit dans viz-alert-format.mjs et dit lui-meme combien il en a laisse de
+// cote. Un compte faux dans le journal, lui, y reste quatre-vingt-dix jours.
+//
+// La propriete affirmee est donc : l'alerte porte TOUTES les repetitions
+// encore dans la fenetre. Le chemin pour depasser le seuil est celui du
+// produit et non un artifice : une alerte deja levee dedoublonne jusqu'a son
+// acquittement, les repetitions s'accumulent pendant ce temps, et la suivante
+// — levee au premier appel apres que le verrou a saute — les porte toutes.
+//
+// Mutation attrapee : `occ.slice(0, N).map(...)` chez le producteur.
+test('loop: l alerte porte toutes les repetitions de la fenetre, jamais un echantillon', () => {
+  const wd = createWatchdog({ now: () => T + 60_000 });
+  let premiere = null;
+  for (let i = 1; i <= 4; i++) {
+    const r = wd.processEvent(pre(i, T + i * 1000));
+    if (r.newAlerts.length) premiere = r.newAlerts[0];
+  }
+  assert.equal(premiere.count, 4, 'la premiere alerte se leve au seuil');
+
+  // Sous le verrou : la boucle continue, rien ne se leve, tout s'accumule.
+  for (let i = 5; i <= 7; i++) {
+    assert.equal(wd.processEvent(pre(i, T + i * 1000)).newAlerts.length, 0,
+      'une alerte deja active dedoublonne');
+  }
+
+  wd.acknowledge(premiere.id);
+  const seconde = wd.processEvent(pre(8, T + 8000)).newAlerts[0];
+
+  assert.ok(seconde, 'le verrou a saute : la boucle qui dure doit se redire');
+  assert.equal(seconde.count, 8, 'les huit appels tiennent dans la fenetre de 60 s');
+  assert.equal(seconde.occurrences.length, 8, 'le compte n est pas plus riche que la donnee');
+  assert.deepEqual(seconde.occurrences.map(o => o.toolUseId),
+    ['t1', 't2', 't3', 't4', 't5', 't6', 't7', 't8']);
+  assert.match(seconde.message, /called 8×/);
+});
+
 test('toute alerte porte le projet ou elle s est produite', () => {
   const wd = createWatchdog({ now: () => T + 10_000 });
   assert.equal(runFailingLoop(wd).cwd, 'f:\\DEV\\projet');
