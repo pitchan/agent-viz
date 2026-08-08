@@ -53,12 +53,14 @@ async function freshClient({ alerts = [], activeIds = [], now = T, ack } = {}) {
   };
   const mod = await import(`../../public/viz-watchdog-client.js?t=${T}-${Math.random()}`);
   await mod.initAlertReader({ fetchImpl, now: () => clock });
-  // Collect everything the module announces from here on — this is the signal
-  // the desktop notification hangs off, so what lands in it matters as much as
-  // what the panel renders.
+  // Two different things, and the difference matters. `seen` is what gets
+  // ANNOUNCED — the signal the desktop notification hangs off. `calls` is how
+  // many times the interface was told to re-render at all, which is the only
+  // thing that can carry a WITHDRAWAL: an alert leaving carries no alert.
   const seen = [];
-  mod.onAlertsChanged(a => seen.push(...a));
-  return { mod, journal, posts, seen, at(ms) { clock = ms; } };
+  const calls = [];
+  mod.onAlertsChanged(a => { calls.push(a); seen.push(...a); });
+  return { mod, journal, posts, seen, calls, at(ms) { clock = ms; } };
 }
 
 const ids = list => list.map(a => a.id);
@@ -181,6 +183,41 @@ test('une alerte externe n est pas re-annoncee a chaque rechargement', async () 
     'controle positif : elle est toujours affichee');
 });
 
+test('le retrait d une alerte previent quand meme l interface', async () => {
+  // La SEULE voie qui ETEINT la pastille. Un retrait ne porte aucune alerte —
+  // le serveur a cesse de compter un `stuck`, ou un autre onglet vient de
+  // l acquitter — donc n avertir que sur `raised.length` laisserait l alerte
+  // affichee jusqu a ce qu autre chose bouge. C est ce que gardait le
+  // commentaire de l ancienne boucle de battement, retire avec elle.
+  const { mod, journal, calls } = await freshClient({ alerts: [evt(T - 1000, 'a')] });
+  assert.deepEqual(ids(mod.getActiveAlerts()), ['a'], 'controle positif : elle est la');
+  journal.alerts = [];
+  await mod.refreshAlerts();
+  assert.equal(calls.length, 1, 'l interface doit apprendre que la pastille s eteint');
+  assert.deepEqual(calls[0], [], 'et ce changement n annonce rien : rien n est arrive');
+  assert.deepEqual(mod.getActiveAlerts(), []);
+});
+
+test('le premier chargement montre, il n annonce pas', async () => {
+  // `before` est vide au chargement, donc tout le vif y passerait pour du
+  // nouveau. Une alerte permanente encore vraie sonnerait a CHAQUE F5 : la
+  // notification bureau est faite pour ce qui SURVIENT pendant qu on regarde
+  // ailleurs, la pastille rouge suffit a qui vient d ouvrir la page.
+  const mod = await import(`../../public/viz-watchdog-client.js?t=${T}-premier-${Math.random()}`);
+  const calls = [];
+  mod.onAlertsChanged(a => calls.push(a));
+  await mod.initAlertReader({
+    fetchImpl: async () => ({
+      ok: true,
+      json: async () => ({ alerts: [stuck(T - 20 * 60_000, 'stuck:s')], activeIds: ['stuck:s'] }),
+    }),
+    now: () => T,
+  });
+  assert.deepEqual(calls, [[]], 'l interface est prevenue, personne n est reveille');
+  assert.deepEqual(ids(mod.getActiveAlerts()), ['stuck:s'],
+    'controle positif : la pastille rougit quand meme');
+});
+
 test('un incident nouveau sous une identite deja connue est bien annonce', async () => {
   // Controle positif de la deduplication ci-dessus : deduire de l `id` seul
   // rendrait muet le deuxieme episode d une meme boucle.
@@ -226,6 +263,29 @@ test('acquitter poste la paire au serveur et retire l alerte', async () => {
     'la cle du journal est la paire, pas le seul identifiant');
   assert.equal(posts[0].method, 'POST');
   assert.deepEqual(mod.getActiveAlerts(), []);
+});
+
+test('on acquitte l incident affiche, pas celui qui vient d arriver', async () => {
+  // Un incident plus recent sous le meme id a pu atterrir entre le rendu et le
+  // clic. Envoyer ce que le module TIENT acquitterait celui que personne n a
+  // lu, et laisserait au journal, non acquitte, celui que l utilisateur
+  // regardait — donc visible pour toujours dans le bloc Pannes.
+  const { mod, posts } = await freshClient({ alerts: [evt(T - 1000, 'loop:s:Bash')] });
+  await mod.acknowledgeAlert('loop:s:Bash', T - 30_000);
+  assert.deepEqual(posts.map(p => p.body), [{ id: 'loop:s:Bash', createdAt: T - 30_000 }],
+    'la moitie de la cle qui dit LEQUEL vient de l appelant');
+  assert.deepEqual(mod.getActiveAlerts().map(a => a.createdAt), [T - 1000],
+    'et le plus recent, jamais vu, reste a l ecran');
+});
+
+test('un createdAt inutilisable retombe sur celui du journal', async () => {
+  // Le panneau reconstruit cette valeur depuis un attribut du DOM. Envoyer un
+  // NaN ferait refuser la route (400) et le geste de l utilisateur serait
+  // perdu ; le journal, lui, nous a donne une valeur sure.
+  const { mod, posts } = await freshClient({ alerts: [evt(T - 1000, 'a')] });
+  await mod.acknowledgeAlert('a', Number('pas un nombre'));
+  assert.deepEqual(posts.map(p => p.body), [{ id: 'a', createdAt: T - 1000 }]);
+  assert.deepEqual(mod.getActiveAlerts(), [], 'controle positif : l acquittement a bien eu lieu');
 });
 
 test('un acquittement refuse par le serveur ne fait pas disparaitre l alerte', async () => {
@@ -308,6 +368,18 @@ test('un serveur qui repond n importe quoi ne casse pas la pastille', async () =
     now: () => T,
   });
   assert.deepEqual(mod.getActiveAlerts(), []);
+});
+
+test('une entree hors forme dans le journal ne casse pas la lecture', async () => {
+  // La garde par TABLEAU ne protege pas de ce qu il y a DEDANS. `null.id` leve,
+  // et personne n attend cette promesse : meme panne muette qu une charge hors
+  // contrat, une case plus bas. Une entree sans identifiant est aussi
+  // inutilisable — c est la moitie de la cle du journal.
+  const { mod } = await freshClient({
+    alerts: [null, evt(T - 1000, 'a'), { createdAt: T - 1000 }, undefined],
+  });
+  assert.deepEqual(ids(mod.getActiveAlerts()), ['a'],
+    'on saute ce qu on ne sait pas lire, on lit le reste');
 });
 
 test('un rechargement en echec laisse la pastille sur ce qu elle savait', async () => {

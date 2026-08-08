@@ -13,7 +13,7 @@ import {
 import {
   pauseTick, resumeTick, markNarratorDirty,
 } from './viz-narrator.js';
-import { raiseExternalAlert, applyServerAlert } from './viz-watchdog-client.js';
+import { raiseExternalAlert, applyServerAlert, refreshAlerts } from './viz-watchdog-client.js';
 
 // Nothing here tells the watchdog whether we can still hear the agent. That
 // question belonged to a detector running in the tab; detection now runs on
@@ -213,6 +213,11 @@ export async function poll(force) {
     }
     if (firstBatch && state.nodes.size) { firstBatch = false; _pendingFitView = true; }
     scheduleRender();
+    // Swallowed on purpose, and it costs nothing now: a failed poll used to
+    // have to be reported, because the watchdog ran here and had to be told
+    // that the coming silence was ours and not the agent's. Detection has left
+    // the tab, so a poll that did not answer means only that this round showed
+    // nothing new — the next one, or the stream, will catch up.
   } catch {}
 }
 
@@ -348,6 +353,12 @@ function resumeApp() {
   _paused = false;
   connectSSE();
   poll(true);   // re-poll first: the file, not the gap, says what happened
+  // Same reasoning for the alerts, and the same word: the journal, not the
+  // gap, says what happened. Waiting for the 30s timer would not do — browsers
+  // throttle the timers of a hidden tab, so on return the badge can be further
+  // behind than its own period, and the stream carries only what the server
+  // recorded while we were listening.
+  refreshAlerts();
   resumeTick();
   markDirty();
 }

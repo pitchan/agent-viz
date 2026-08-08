@@ -534,7 +534,15 @@ renderWatchdogPill();
 
 // The badge reads the server's journal: once at load, then every 30s to catch
 // up on whatever a broken stream missed. Live pushes come through SSE.
-initAlertReader().then(() => setInterval(refreshAlerts, 30_000));
+//
+// `finally`, not `then`: a first read that failed is a reason to keep trying,
+// not to stop before starting. Chained off `then` — as this line first was —
+// one rejection at load would leave the timer unarmed and the badge frozen on
+// an empty list for the rest of the session, saying nothing. Whatever refuses
+// is said out loud for the same reason.
+initAlertReader()
+  .catch(err => console.error('[viz] first alert read failed:', err))
+  .finally(() => setInterval(refreshAlerts, 30_000));
 
 // ─── Wire cross-module hooks ──────────────────────────────────────────────
 // Canvas pointer click → detail + feed highlight.

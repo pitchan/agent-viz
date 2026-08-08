@@ -48,6 +48,10 @@ let activeIds = new Set();
 
 let _fetch = (...args) => fetch(...args);
 let _now = () => Date.now();
+// Has the journal been read once? The first read is the page catching up on a
+// record that already existed, so nothing in it "just happened" — see the
+// announce rule in refreshAlerts.
+let firstRead = true;
 
 // One incident, as the journal identifies it. Not the id alone: a new episode
 // under the same id is a new incident and has to be announceable.
@@ -108,10 +112,20 @@ export async function refreshAlerts() {
   // on a timer: announcing the whole live set every poll would ring once per
   // alert per poll for as long as the tab stays open. External alerts are
   // excluded by construction — they never come back from the journal.
-  const raised = after.filter(a => !before.has(keyOf(a)));
-  // A refresh can also WITHDRAW — an alert acknowledged from another tab, or
-  // one the server no longer counts. Notifying on new alerts only would leave
-  // a retracted alert on the badge until something else moved.
+  //
+  // And nothing at all is announced on the FIRST read. `before` is empty then,
+  // so every live alert would read as new: a session that has been stuck for
+  // twenty minutes would ring a desktop notification on every page reload.
+  // The notification is for what HAPPENS while the user is looking elsewhere;
+  // for someone who has just opened the page, the red badge is the right
+  // amount of noise, and it still lights up below.
+  const raised = firstRead ? [] : after.filter(a => !before.has(keyOf(a)));
+  firstRead = false;
+  // A refresh can also WITHDRAW — an alert acknowledged from another tab, or a
+  // standing one the server has stopped counting. That change carries no alert
+  // at all, so notifying on `raised` alone would leave a retracted alert on the
+  // badge until something else happened to move. This second member is the ONLY
+  // path that turns the badge off.
   if (raised.length || after.length !== before.size) notify(raised);
 }
 
@@ -145,32 +159,49 @@ export function raiseExternalAlert(alert) {
 // createdAt is half the identity of an incident: the same id at another time
 // is another incident, and acknowledging one must not silence the next.
 //
-// The pair that goes on the wire is the one the JOURNAL gave us, not the one
-// the caller rebuilt — the panel reads it back off a DOM attribute, where a
-// missing value reads as `Number('')`, which is 0 and not NaN. The route
-// validates the SHAPE of a key, never its existence: a well-formed pair that
-// matches nothing writes a permanent line acknowledging nothing, and
-// acknowledgements are not deduplicated the way alerts are. Hence also the
-// guard below: we never post an id we were not served.
+// The user acknowledges WHAT THEY SAW, so `createdAt` — the caller naming the
+// incident it rendered — is what goes on the wire. This is not pedantry about
+// an unused parameter. A newer incident under the same id can land between the
+// render and the click; sending what we now HOLD would acknowledge the one
+// nobody has read, and leave the one they were looking at unacknowledged in the
+// journal — visible for ever in the lasting record. A divergence between the
+// two is therefore normal and WANTED, not a mismatch to reconcile: the newer
+// incident has not been seen, so it stays on the badge. Do not "simplify" this
+// to `held.createdAt`.
+//
+// The fallback is not ceremony either: the panel rebuilds this value from a DOM
+// attribute, where a missing one reads as `Number('')` — which is 0, not NaN,
+// and 0 is a well-formed key. The route validates the SHAPE of a key, never its
+// existence: a well-formed pair matching nothing writes a permanent line that
+// acknowledges nothing, and acknowledgements are not deduplicated the way
+// alerts are. Hence also the guard below — we never post an id we were not
+// served.
 export async function acknowledgeAlert(id, createdAt) {
   const external = externalAlerts.get(id);
   if (external) { external.acknowledged = true; notify([]); return; }
   const held = serverAlerts.get(id);
   if (!held) return;
+  const when = Number.isFinite(createdAt) ? createdAt : held.createdAt;
+  // Is the incident being acknowledged the one we are holding? When it is not,
+  // there is nothing of it left on the badge to take off — and what IS on the
+  // badge must stay, being precisely the incident nobody has read yet.
+  const onScreen = when === held.createdAt;
   const wasActive = activeIds.has(id);
-  serverAlerts.delete(id);
-  activeIds.delete(id);
-  notify([]);
+  if (onScreen) {
+    serverAlerts.delete(id);
+    activeIds.delete(id);
+    notify([]);
+  }
   let recorded = false;
   try {
     const res = await _fetch('/alerts/ack', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, createdAt: held.createdAt }),
+      body: JSON.stringify({ id, createdAt: when }),
     });
     recorded = !!res && !!res.ok;
   } catch { recorded = false; }
-  if (recorded) return;
+  if (recorded || !onScreen) return;
   // 400 on a malformed key, 503 while the port is served but the watchdog is
   // not built yet — a real window. Nothing was written down, so the alert is
   // coming back at the next reload: showing it again now is the difference
