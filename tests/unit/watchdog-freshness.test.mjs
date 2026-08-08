@@ -1,23 +1,23 @@
-// Unit tests for the watchdog's freshness rule.
+// What the removal of the freshness gate must NOT break.
 //
-// Why this file exists: the browser replays a session's whole event file on
-// the first poll. The watchdog used to stamp every event with wall-clock
-// now(), so an hour-old history collapsed into one instant and any four
-// identical calls the session had ever made looked like a live loop. Every
-// alert about the past is a lie.
+// The gate used to live inside processEvent, and that is exactly what made the
+// tool forget: an hour-old incident raised nothing, so nothing could ever be
+// written down about it. It is gone from detection. The watchdog now records
+// what it sees, whenever it saw it, stamped with the real time of the
+// triggering event. Deciding what is recent enough to SHOW moved to
+// viz-alert-freshness.mjs — see tests/unit/alert-freshness.test.mjs.
 //
-// The rule has two halves, and they are NOT the same rule — that is the trap:
+// What has not changed, and is what this file pins:
 //
-//   * Event-triggered detectors (loop, retryStorm) fire because something just
-//     happened. Gate them on the age of the triggering event: too old → silent.
-//   * The stuck detector fires *because of* silence. The same gate would make
-//     it unfireable — three minutes of silence is, by construction, an event
-//     three minutes old. It needs a band instead: silent long enough to be
-//     stuck, not so long that the session is simply over.
-//
-// And in both halves the gate applies to *emission only*. Book-keeping must
-// still run on old events, or a session whose tool went in flight before you
-// opened the browser would be invisible.
+//   * Every window a detector measures is measured in the event stream's own
+//     time. That, and not a recency cut, is what stops a 90s history replayed
+//     in one burst from reading as a loop.
+//   * Book-keeping runs on old events: a tool that went in flight before we
+//     started has to count.
+//   * stuck is a band, not a threshold — silent long enough to be stuck, not
+//     so long that the session is simply over — it withdraws its own alert
+//     when the condition lapses, and it still refuses to conclude anything
+//     from a silence it could not have heard.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -42,15 +42,20 @@ function fail({ at, session = 'sid1', tool = 'Bash', id = 't1' }) {
   return { session_id: session, hook_event_name: 'PostToolUseFailure', tool_name: tool, tool_use_id: id, _ts: iso(at) };
 }
 
-// ─── Event-triggered detectors: gated on the age of the trigger ────────────
+// ─── Event-triggered detectors: the record has no expiry date ──────────────
 
-test('loop: an hour-old history replayed in one burst raises nothing', () => {
+test('loop: an hour-old history replayed in one burst is still recorded', () => {
   const clock = clockAt();
   const wd = createWatchdog({ now: clock.now });
   // Four identical calls that really did happen 4× in 15s — one hour ago.
   const base = T - 60 * 60_000;
-  for (let i = 0; i < 4; i++) wd.processEvent(pre({ at: base + i * 5_000, id: `t${i}` }));
-  assert.deepEqual(wd.getActiveAlerts(), [], 'a loop that ended an hour ago is not news');
+  const raised = [];
+  for (let i = 0; i < 4; i++) {
+    raised.push(...wd.processEvent(pre({ at: base + i * 5_000, id: `t${i}` })).newAlerts);
+  }
+  assert.equal(raised.length, 1, 'recording has no expiry date');
+  assert.equal(raised[0].createdAt, base + 3 * 5_000,
+    'the time it carries is the event, never the moment we heard about it');
 });
 
 test('loop: the window is measured on event time, not arrival time', () => {
@@ -72,15 +77,19 @@ test('loop: four fresh identical calls inside the window still alert', () => {
   assert.equal(last[0].count, 4);
 });
 
-test('retryStorm: three failures replayed from an old file raise nothing', () => {
+test('retryStorm: three failures replayed from an old file are recorded too', () => {
   const clock = clockAt();
   const wd = createWatchdog({ now: clock.now });
   const base = T - 60 * 60_000;
-  for (let i = 0; i < 3; i++) wd.processEvent(fail({ at: base + i * 1_000, id: `t${i}` }));
-  assert.deepEqual(wd.getActiveAlerts(), []);
+  const raised = [];
+  for (let i = 0; i < 3; i++) {
+    raised.push(...wd.processEvent(fail({ at: base + i * 1_000, id: `t${i}` })).newAlerts);
+  }
+  assert.equal(raised.length, 1, 'a storm nobody was watching is still a storm');
+  assert.equal(raised[0].createdAt, base + 2_000, 'stamped with the event time, not ours');
 });
 
-// ─── The gate is on emission, never on book-keeping ────────────────────────
+// ─── Book-keeping runs on every event, old or new ──────────────────────────
 
 test('retryStorm: stale failures still count — a fresh third failure alerts', () => {
   const clock = clockAt();
@@ -89,15 +98,15 @@ test('retryStorm: stale failures still count — a fresh third failure alerts', 
   wd.processEvent(fail({ at: T - 60 * 60_000, id: 'a' }));
   wd.processEvent(fail({ at: T - 59 * 60_000, id: 'b' }));
   const r = wd.processEvent(fail({ at: T, id: 'c' }));
-  assert.equal(r.newAlerts.length, 1, 'the counter must have survived the freshness gate');
+  assert.equal(r.newAlerts.length, 1, 'the counter must span the replayed history');
   assert.equal(r.newAlerts[0].count, 3);
 });
 
 test('stuck: a tool that went in flight before the page opened is still seen', () => {
   const clock = clockAt();
   const wd = createWatchdog({ now: clock.now });
-  // Replayed PreToolUse, 10 minutes old, never closed. Older than the
-  // freshness gate — book-keeping must run anyway.
+  // Replayed PreToolUse, 10 minutes old, never closed. Book-keeping has to
+  // run on it or the tool would not be known to be in flight at all.
   wd.processEvent(pre({ at: T - 10 * 60_000, id: 't1' }));
   const r = wd.tick();
   assert.equal(r.newAlerts.length, 1, 'ten minutes in flight is exactly what stuck means');
@@ -136,9 +145,11 @@ test('stuck: the message states an absolute time, so it cannot rot on screen', (
   assert.doesNotMatch(message, /\bfor \d+s\b/, 'no frozen duration in a message that outlives its tick');
 });
 
-// ─── Retirement: the half the creation gate cannot cover ───────────────────
-// An alert is a claim about the present. Gating creation keeps false claims
-// out; nothing was retracting the ones that went false *after* being raised.
+// ─── Retirement ────────────────────────────────────────────────────────────
+// An alert is a claim about the present, and stuck is the one condition that
+// can un-happen on its own. Recording it is not enough: it has to be able to
+// take it back once the session speaks again, or goes past being worth
+// reporting at all.
 
 test('stuck: the alert is retired once the session passes the abandoned horizon', () => {
   const clock = clockAt();
@@ -250,14 +261,6 @@ test('partial thresholds merge over the defaults', () => {
   const r = wd.processEvent(pre({ at: T, id: 't2' }));
   assert.equal(r.newAlerts.length, 1, 'the overridden count applies');
   assert.equal(r.newAlerts[0].count, 2, 'and windowMs kept its default');
-});
-
-test('freshnessMs is configurable', () => {
-  const clock = clockAt();
-  const wd = createWatchdog({ now: clock.now, thresholds: { freshnessMs: 2 * 60 * 60_000 } });
-  const base = T - 60 * 60_000;
-  for (let i = 0; i < 4; i++) wd.processEvent(pre({ at: base + i * 5_000, id: `t${i}` }));
-  assert.equal(wd.getActiveAlerts().length, 1, 'a two-hour freshness window admits an hour-old loop');
 });
 
 test('abandonedMs is configurable', () => {

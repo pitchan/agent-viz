@@ -7,6 +7,7 @@
 // → viz-network) just forwards events into here.
 
 import { createWatchdog } from './viz-watchdog.mjs';
+import { isFresh } from './viz-alert-freshness.mjs';
 
 const TICK_MS = 5_000;
 
@@ -29,8 +30,11 @@ function notify(newAlerts) {
   for (const fn of listeners) fn(newAlerts);
 }
 
+// What the user can actually see right now — which is what the tick loop has
+// to watch, since a change it cannot see is a change not worth re-rendering
+// for, and one it can see must never go unnoticed.
 function activeCount() {
-  return watchdog.getActiveAlerts().length + [...externalAlerts.values()].filter(a => !a.acknowledged).length;
+  return getActiveAlerts().length;
 }
 
 function ensureTicker() {
@@ -50,9 +54,14 @@ function ensureTicker() {
   if (tickTimer && typeof tickTimer.unref === 'function') tickTimer.unref();
 }
 
+// The watchdog records the past now, so it can hand back an alert about an
+// event from an hour ago. Recording it is right; announcing it is not — this
+// signal is what fires the desktop notification, and a page reload replays a
+// whole session file. Only what the display would show gets announced.
 export function feedEvent(evt) {
   ensureTicker();
-  const { newAlerts } = watchdog.processEvent(evt);
+  const now = Date.now();
+  const newAlerts = watchdog.processEvent(evt).newAlerts.filter(a => isFresh(a, now));
   if (newAlerts.length) notify(newAlerts);
 }
 
@@ -64,9 +73,19 @@ export function raiseExternalAlert(alert) {
   notify([fresh]);
 }
 
+// The watchdog's registry is a record and keeps everything it saw; the badge
+// speaks about the present, so it shows only what is still current.
+//
+// External alerts (the pricing vigil) never go through that sieve. They do not
+// come from the hook event stream and have no triggering event: depending on
+// the caller they carry the wall-clock instant they were raised, or no
+// createdAt at all. Either way freshness is not their rule, and applying it
+// would make the drift report expire — or vanish on the spot.
 export function getActiveAlerts() {
+  const now = Date.now();
+  const own = watchdog.getActiveAlerts().filter(a => isFresh(a, now));
   const external = [...externalAlerts.values()].filter(a => !a.acknowledged);
-  return [...watchdog.getActiveAlerts(), ...external];
+  return [...own, ...external];
 }
 
 export function acknowledgeAlert(id) {

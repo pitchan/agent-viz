@@ -60,11 +60,11 @@ test('a loop lists the real clock time of every repeat', () => {
   assert.deepEqual(alertDetailLines(loopAlert()), ['Repeats at 14:03:09, 14:03:14, 14:03:19, 14:03:24']);
 });
 
-// Nothing bounds `occurrences` any more. It used to be capped at ten by the
-// loop buffer's fixed size; counting per signature removed that buffer, and a
-// loop that crosses its threshold while the freshness gate holds emission back
-// hands the first emitted alert a whole window of repeats — 240 of them at
-// four calls a second, the very runaway this detector exists to catch.
+// Nothing bounds `occurrences` by count any more — only loop's window does.
+// It used to be capped at ten by the loop buffer's fixed size; counting per
+// signature removed that buffer, and repeats keep piling up while an alert is
+// active and deduplicated, so the next one emitted carries a whole window —
+// 240 of them at four calls a second, the very runaway this detector catches.
 test('a loop caps how many repeat times it prints and says what it dropped', () => {
   const many = Array.from({ length: 240 }, (_, i) => ({
     ts: at(14, 3, 0) + i * 250, toolUseId: `t${i}`, failed: null,

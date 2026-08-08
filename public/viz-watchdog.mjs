@@ -17,10 +17,6 @@ const DEFAULTS = {
   loop:       { windowMs: 60_000,      count: 4 },
   retryStorm: { count: 3 },
   stuck:      { silenceMs: 3 * 60_000, abandonedMs: 30 * 60_000 },
-  // How old the *triggering* event may be for an event-driven alert to still
-  // be worth raising. The browser replays a whole session file on first poll;
-  // without this, every loop the session ever ran fires as if it were live.
-  freshnessMs: 2 * 60_000,
 };
 
 function mergeThresholds(given) {
@@ -28,7 +24,6 @@ function mergeThresholds(given) {
     loop:       { ...DEFAULTS.loop,       ...given.loop },
     retryStorm: { ...DEFAULTS.retryStorm, ...given.retryStorm },
     stuck:      { ...DEFAULTS.stuck,      ...given.stuck },
-    freshnessMs: given.freshnessMs ?? DEFAULTS.freshnessMs,
   };
 }
 
@@ -325,8 +320,8 @@ const DETECTORS = {
         if (buf.lastEventAt == null) continue;
         // A band, not a threshold. Below silenceMs the tool is simply still
         // working. Past abandonedMs the session isn't stuck — it's over, and
-        // saying "stuck" about a session that ended yesterday is the same lie
-        // the freshness gate exists to stop.
+        // "stuck" said about a session that ended yesterday is a claim about
+        // the present that the present does not support.
         const silence = tickNow - buf.lastEventAt;
         if (silence < ctx.thresholds.stuck.silenceMs) continue;
         if (silence >= ctx.thresholds.stuck.abandonedMs) continue;
@@ -388,22 +383,17 @@ export function createWatchdog({ now = () => Date.now(), thresholds = {}, canObs
   }
 
   return {
-    // The freshness gate lives here rather than inside each detector, for two
-    // reasons. It is one policy, so a fourth event-driven detector inherits it
-    // without knowing it exists (Open/Closed). And putting it *between*
-    // book-keeping and emission is the whole point: every detector still gets
-    // to see a stale event and update its state — a tool that went in flight
-    // before the browser opened has to be counted — but nothing it wants to
-    // say about the past reaches the user.
+    // Every alert a detector raises is emitted, whatever the age of the event
+    // that triggered it. This is the whole point of the journal: an incident
+    // that happened while the server was down must still be recorded, with
+    // the time it really happened. Deciding what is recent enough to SHOUT
+    // about belongs to the display — viz-alert-freshness.mjs.
     processEvent(evt) {
       const ts = eventTime(evt, now);
-      const fresh = (now() - ts) <= ctx.thresholds.freshnessMs;
       const newAlerts = [];
       for (const det of Object.values(DETECTORS)) {
         if (typeof det.onEvent !== 'function') continue;
-        const candidate = det.onEvent(ctx, evt, ts);
-        if (!fresh) continue;
-        const a = emitIfNew(candidate);
+        const a = emitIfNew(det.onEvent(ctx, evt, ts));
         if (a) newAlerts.push(a);
       }
       return { newAlerts };

@@ -113,11 +113,6 @@ test('une boucle d echecs TROP LENTE pour loop reste vue par retryStorm', () => 
 
 test('la meme boucle ASSEZ RAPIDE pour loop laisse loop parler seul', () => {
   // Même scénario, cadence 10 s : 10 × 3 = 30 ≤ 60, loop y arrivera.
-  //
-  // L'horloge se pose juste après le dernier événement, et pas plus loin : au
-  // delà de freshnessMs (120 s) la barrière de fraîcheur retiendrait l'alerte
-  // de loop, et le test rendrait [] — un vert impossible qui ne dirait rien de
-  // la cadence. Une boucle rapide est de toute façon une boucle récente.
   const wd = createWatchdog({ now: () => T + 60_000 });
   const raised = [];
   for (let i = 1; i <= 4; i++) {
