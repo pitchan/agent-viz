@@ -236,7 +236,7 @@ test('custom thresholds are honored', () => {
   const wd = createWatchdog({
     now: clock.now,
     thresholds: {
-      loop: { windowMs: 10_000, count: 2, bufferSize: 5 },
+      loop: { windowMs: 10_000, count: 2 },
       retryStorm: { count: 2 },
       stuck: { silenceMs: 30_000 },
     },

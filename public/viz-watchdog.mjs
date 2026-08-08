@@ -14,7 +14,7 @@ import { toolSubject } from './viz-tool-subject.mjs';
 import { clockTime } from './viz-alert-format.mjs';
 
 const DEFAULTS = {
-  loop:       { windowMs: 60_000,      count: 4, bufferSize: 10 },
+  loop:       { windowMs: 60_000,      count: 4 },
   retryStorm: { count: 3 },
   stuck:      { silenceMs: 3 * 60_000, abandonedMs: 30 * 60_000 },
   // How old the *triggering* event may be for an event-driven alert to still
@@ -47,19 +47,38 @@ function hashInput(toolInput) {
 }
 
 // Per-session bookkeeping. One bucket holds the state every detector needs,
-// partitioned by concern — with one deliberate exception: `recent` is written
-// by `loop` and read by `retryStorm`, which needs to know what a failure was
-// about when the failure event itself doesn't say. That read is a fallback and
-// stays read-only; every other field has exactly one writer.
+// partitioned by concern — with one deliberate exception: `sigOfCall` is
+// written by `loop` and read by `retryStorm`, which needs to know what a
+// failure was about when the failure event itself doesn't say. That read is a
+// fallback and stays read-only; every other field has exactly one writer.
 function emptyBuffer() {
   return {
-    recent: [],              // [{ ts, sig, toolUseId, failed }] — last N PreToolUse
-    failures: new Map(),     // toolName → consecutive distinct failure count
+    // Per signature, the calls still inside loop's window. A shared
+    // fixed-size buffer could not do this job: ten interleaved calls from
+    // another tool evicted the evidence, `loop` fell silent, and every
+    // attempt to predict that silence from outside failed. Counting per
+    // signature removes the thing being predicted.
+    calls: new Map(),          // sig → [{ ts, toolUseId, failed }]
+    sigOfCall: new Map(),      // tool_use_id → sig, for a failure with no tool_input
+    failures: new Map(),       // toolName → consecutive failures, repeats excluded
     lastFailureSig: new Map(), // toolName → { sig, ts } of the last failure seen
-    running: new Map(),      // tool_use_id → in-flight tool record
-    lastEventAt: null,       // event time of the last event seen for the session
-    cwd: '',                 // where the session runs — the panel groups by it
+    running: new Map(),        // tool_use_id → in-flight tool record
+    lastEventAt: null,         // event time of the last event seen for the session
+    cwd: '',                   // where the session runs — the panel groups by it
   };
+}
+
+// Drop what has left loop's window. Nothing is bounded by a count any more —
+// only by time, which is the only bound loop's rule actually names. Both maps
+// are pruned together, so neither can outlive the window it describes.
+function pruneCalls(buf, windowStart) {
+  for (const [sig, occ] of buf.calls) {
+    while (occ.length && occ[0].ts < windowStart) {
+      const gone = occ.shift();
+      if (gone.toolUseId) buf.sigOfCall.delete(gone.toolUseId);
+    }
+    if (occ.length === 0) buf.calls.delete(sig);
+  }
 }
 
 function getSessionBuffer(state, sid) {
@@ -122,36 +141,19 @@ function failureSuffix(occurrences) {
   return ` — ${failed.length} of ${occurrences.length} failing`;
 }
 
-// Does `loop` still hold this repetition — enough of it to fire on the very
-// next call? `loop` alerts when it counts `count` occurrences in its window,
-// so holding `count - 1` right now is exactly what makes the next repeat its
-// alert. Anything less is not evidence that `loop` will speak: `buf.recent` is
-// a fixed-size buffer shared by every tool of the session, so a steady trickle
-// of other calls can hold this signature at two or three occurrences forever —
-// below the threshold, for ever, however fast the failures come.
-function loopStillHolds(ctx, buf, sig, ts) {
-  const windowStart = ts - ctx.thresholds.loop.windowMs;
-  let seen = 0;
-  for (const e of buf.recent) if (e.sig === sig && e.ts >= windowStart) seen++;
-  return seen >= ctx.thresholds.loop.count - 1;
-}
-
 // Which call a failure was about. The failure event carries `tool_input` — the
 // probe's frozen sample proves it, and `toolSubject(evt)` a few lines below
 // already relies on it — so the signature is computed the same way `loop`
-// computes its own. `buf.recent` is only a fallback for an event that arrived
-// without it: reading the buffer first would tie this detector to `loop`'s
-// bufferSize, and the whole rule would stop applying, non-deterministically,
-// as soon as ten other calls interleaved between a call and its failure.
-// Returns null when we cannot tell, and null is never treated as a repeat: not
-// knowing what a call was is no reason to claim it repeated the last one.
+// computes its own. `sigOfCall` is only a fallback for an event that arrived
+// without it. Returns null when we cannot tell, and null is never treated as a
+// repeat: not knowing what a call was is no reason to claim it repeated the
+// last one.
 function failureSignature(buf, evt) {
   if (evt.tool_input !== undefined) {
     return `${evt.agent_id || ''}:${evt.tool_name}:${hashInput(evt.tool_input)}`;
   }
   if (!evt.tool_use_id) return null;
-  for (const e of buf.recent) if (e.toolUseId === evt.tool_use_id) return e.sig;
-  return null;
+  return buf.sigOfCall.get(evt.tool_use_id) ?? null;
 }
 
 const DETECTORS = {
@@ -170,8 +172,12 @@ const DETECTORS = {
         // "failed". Counting someone taking back control as a fault is the
         // exact kind of false alarm this watchdog exists to not make.
         if (evt.tool_use_id && !evt.is_interrupt) {
-          for (const e of buf.recent) {
-            if (e.toolUseId === evt.tool_use_id) { e.failed = name === 'PostToolUseFailure'; break; }
+          const sig = buf.sigOfCall.get(evt.tool_use_id);
+          const occ = sig !== undefined ? buf.calls.get(sig) : undefined;
+          if (occ) {
+            for (const e of occ) {
+              if (e.toolUseId === evt.tool_use_id) { e.failed = name === 'PostToolUseFailure'; break; }
+            }
           }
         }
         return null;
@@ -181,16 +187,16 @@ const DETECTORS = {
       // The agent is part of the signature: two subagents each calling the
       // same command twice is four calls and no loop.
       const sig = `${who.agentId}:${evt.tool_name}:${hashInput(evt.tool_input)}`;
-      buf.recent.push({ ts, sig, toolUseId: evt.tool_use_id || '', failed: null });
-      if (buf.recent.length > ctx.thresholds.loop.bufferSize) buf.recent.shift();
-      const windowStart = ts - ctx.thresholds.loop.windowMs;
-      const occurrences = [];
-      for (const e of buf.recent) {
-        if (e.sig === sig && e.ts >= windowStart) {
-          occurrences.push({ ts: e.ts, toolUseId: e.toolUseId, failed: e.failed });
-        }
-      }
-      if (occurrences.length >= ctx.thresholds.loop.count) {
+      pruneCalls(buf, ts - ctx.thresholds.loop.windowMs);
+      let occ = buf.calls.get(sig);
+      if (!occ) { occ = []; buf.calls.set(sig, occ); }
+      const toolUseId = evt.tool_use_id || '';
+      occ.push({ ts, toolUseId, failed: null });
+      if (toolUseId) buf.sigOfCall.set(toolUseId, sig);
+      if (occ.length >= ctx.thresholds.loop.count) {
+        // A snapshot, never the live array: the alert is a photograph, and the
+        // outcomes written onto `occ` after this moment must not rewrite it.
+        const occurrences = occ.map(e => ({ ts: e.ts, toolUseId: e.toolUseId, failed: e.failed }));
         const spanSecs = Math.round((ts - occurrences[0].ts) / 1000);
         return makeAlert({
           type: 'loop', sessionId: sid, toolName: evt.tool_name,
@@ -230,17 +236,21 @@ const DETECTORS = {
         // this product exists to catch. So the deference is conditional: stay
         // quiet only when the measured cadence proves `loop` will get there.
         //
-        // And proving the cadence proves the TIMING, not the CAPACITY.
-        // `loop` counts inside `buf.recent`, a fixed-size buffer shared by
-        // every tool and every subagent of the session: interleaved calls
-        // evict the earlier occurrences, and `loop` then never reaches its
-        // threshold however fast the failures come. Deferring to a detector
-        // that has lost its own evidence is the same silence by another door,
-        // so the deference also requires that `loop` still holds enough of the
-        // repetition to fire on the next call.
+        // Cadence is nearly the whole of it. `loop` now counts per signature,
+        // bounded by time alone, so nothing can evict its evidence: if the
+        // repetition fits in its window, it will reach its threshold. Earlier
+        // rounds needed a capacity forecast only because a shared fixed-size
+        // buffer could drop the proof — that failure mode went with the buffer.
+        //
+        // What remains is not a forecast but a fact: `loop` has to be watching
+        // this signature at all. A failure can arrive whose PreToolUse we never
+        // saw — the stream opened mid-flight, or the call started before the
+        // page did. `tool_input` still tells us what it was, so the signature
+        // is known, but `loop` holds no record of it and never will. Deferring
+        // then is silence with nobody left watching.
         if (sig !== null && previous && sig === previous.sig
             && (ts - previous.ts) * (ctx.thresholds.loop.count - 1) <= ctx.thresholds.loop.windowMs
-            && loopStillHolds(ctx, buf, sig, ts)) {
+            && buf.calls.has(sig)) {
           return null;
         }
         const cur = (buf.failures.get(evt.tool_name) || 0) + 1;

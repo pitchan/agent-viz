@@ -249,7 +249,7 @@ test('partial thresholds merge over the defaults', () => {
   wd.processEvent(pre({ at: T - 5_000, id: 't1' }));
   const r = wd.processEvent(pre({ at: T, id: 't2' }));
   assert.equal(r.newAlerts.length, 1, 'the overridden count applies');
-  assert.equal(r.newAlerts[0].count, 2, 'and windowMs/bufferSize kept their defaults');
+  assert.equal(r.newAlerts[0].count, 2, 'and windowMs kept its default');
 });
 
 test('freshnessMs is configurable', () => {
