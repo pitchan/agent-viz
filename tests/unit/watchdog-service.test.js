@@ -13,6 +13,7 @@
 // fichier. C'est pour ca que l'idempotence est mesuree ici sur le fichier.
 
 const test = require('node:test');
+const { after } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const os = require('os');
@@ -24,9 +25,31 @@ const { catchUpFromDisk } = require('../../lib/server/watchdog/catch-up');
 const T = 1_700_000_000_000;
 const SID = 'sess-1';
 const HORLOGE = () => T + 3_600_000;
-const tmpFile = () => path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'avtest-svc-')), 'alerts.jsonl');
-const tmpDir = () => fs.mkdtempSync(path.join(os.tmpdir(), 'avtest-events-'));
 const lignes = fp => fs.readFileSync(fp, 'utf8').split('\n').filter(l => l.trim()).length;
+
+// Les dossiers temporaires sont ramasses a la fin : cette machine porte
+// l'instrument de mesure du projet, une quinzaine de dossiers abandonnes par
+// execution finissent par se voir.
+const aNettoyer = [];
+const neufDossier = (prefixe) => {
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), prefixe));
+  aNettoyer.push(d);
+  return d;
+};
+const tmpFile = () => path.join(neufDossier('avtest-svc-'), 'alerts.jsonl');
+const tmpDir = () => neufDossier('avtest-events-');
+after(() => { for (const d of aNettoyer) fs.rmSync(d, { recursive: true, force: true }); });
+
+// Plusieurs des garanties de ce module ne se distinguent de leur absence QUE
+// par la plainte : un balayage sans dossier rend 0 comme un dossier vide, un
+// acquittement refuse ne rend rien de visible. Sans lire la plainte, le test
+// ne pourrait pas voir la difference — et ne pourrait donc pas echouer.
+async function enEcoutant(fn) {
+  const vrai = console.error;
+  const dits = [];
+  console.error = (...a) => dits.push(a.map(String).join(' '));
+  try { return { valeur: await fn(), dits }; } finally { console.error = vrai; }
+}
 
 const pre = (i, ts, sid = SID) => ({
   hook_event_name: 'PreToolUse', session_id: sid, tool_name: 'Bash',
@@ -118,6 +141,24 @@ test('service: acquitter rend la parole au detecteur, pas seulement au journal',
   // alerte-la ne pourrait plus jamais se redire de toute la session.
   assert.equal(s.tick().length, 1, 'acquittee, la condition qui dure peut se redire');
   assert.equal(lignes(filePath), 3, 'alerte, acquittement, alerte');
+});
+
+test('service: un acquittement que le journal refuse n eteint pas l alerte', async () => {
+  const filePath = tmpFile();
+  let maintenant = T + 4 * 60_000;
+  const s = await svc(filePath, { now: () => maintenant });
+  s.onEvent(pre(1, T));                       // outil encore en vol
+  const [a] = s.tick();
+  // Une cle hors contrat — exactement ce qu'un parametre de route sait
+  // produire. Le journal la refuse, donc l acquittement n a PAS eu lieu.
+  const { dits } = await enEcoutant(() => s.ack(a.id, 'pas une date'));
+  assert.match(dits.join('\n'), /acquittement sans \(id, createdAt\)/);
+  maintenant = T + 6 * 60_000;
+  // Le controle positif est le test precedent : avec une cle valide, elle
+  // reparle. Ici elle doit rester eteinte, sinon l utilisateur aurait vu son
+  // geste pris en compte et l alerte reviendrait NON acquittee au redemarrage.
+  assert.deepEqual(s.tick(), [], 'rien n a ete consigne, donc rien n a ete acquitte');
+  assert.equal(lignes(filePath), 1, 'seule l alerte est au journal');
 });
 
 test('service: acquitter ecrit une ligne et le relit', async () => {
@@ -257,6 +298,51 @@ test('index: une seule instance, et getWatchdogService la rend', async () => {
   assert.equal(b, a, 'la seconde initialisation rend la premiere instance');
   assert.equal(idx.getWatchdogService(), a);
   assert.equal(vu.sonde(), true, 'le drapeau du module fait autorite, pas l option');
+});
+
+test('index: deux initialisations CONCURRENTES ne font qu un seul service', async () => {
+  const idx = neufIndex();
+  const journalPath = tmpFile();
+  const opts = { journalPath, now: HORLOGE };
+  // Deux `await` enchaines ne prouvent rien : la garde est franchie par le
+  // premier appel AVANT que le second commence. Il faut deux appels qui se
+  // chevauchent vraiment pour atteindre le `await` interne a deux.
+  const [a, b] = await Promise.all([idx.initWatchdog(opts), idx.initWatchdog(opts)]);
+  assert.equal(a, b, 'une garde posee sur la valeur ne survit pas a un await');
+
+  // Et la consequence, qui est ce qui compte : deux services, ce serait deux
+  // journaux, donc deux `seen` — et le meme fait consigne deux fois dans le
+  // meme fichier, le doublon exact que ce module existe pour empecher.
+  for (let i = 1; i <= 5; i++) { a.onEvent(pre(i, T + i * 1000)); a.onEvent(fail(i, T + i * 1000 + 500)); }
+  for (let i = 1; i <= 5; i++) { b.onEvent(pre(i, T + i * 1000)); b.onEvent(fail(i, T + i * 1000 + 500)); }
+  assert.equal(lignes(journalPath), 1);
+});
+
+test('index: un module de detection introuvable degrade, il ne tue pas le serveur', async () => {
+  const idx = neufIndex();
+  const dir = tmpDir();
+  fs.writeFileSync(path.join(dir, `${SID}.jsonl`), flot());
+  const { valeur, dits } = await enEcoutant(() => idx.initWatchdog({
+    journalPath: tmpFile(), now: HORLOGE,
+    loadModule: async () => { throw new Error("Cannot find module 'viz-watchdog.mjs'"); },
+  }));
+  // Une promesse rejetee et non attrapee tue le processus sous Node 24 : le
+  // chien de garde est un supplement, il ne doit pas emporter le serveur.
+  assert.equal(valeur, null, 'la promesse se resout a null, elle ne rejette pas');
+  assert.equal(idx.getWatchdogService(), null);
+  assert.match(dits.join('\n'), /detection indisponible/);
+  assert.equal(await idx.runCatchUp(dir), 0, 'et le reste du demarrage continue');
+});
+
+test('index: un balayage sans dossier se plaint au lieu de passer pour un dossier vide', async () => {
+  const idx = neufIndex();
+  await idx.initWatchdog({ journalPath: tmpFile(), now: HORLOGE });
+  // `runCatchUp` n a plus de dossier par defaut : l appelant doit le nommer.
+  // S il l oublie, `catchUpFromDisk` rendrait 0 sans un mot — indiscernable
+  // d un dossier legitimement vide. La plainte est la seule difference.
+  const { valeur, dits } = await enEcoutant(() => idx.runCatchUp());
+  assert.equal(valeur, 0);
+  assert.match(dits.join('\n'), /sans dossier d evenements/);
 });
 
 test('index: le drapeau est leve pendant le rattrapage et baisse apres', async () => {
