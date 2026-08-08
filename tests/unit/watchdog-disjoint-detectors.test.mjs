@@ -285,10 +285,10 @@ test('trois echecs identiques que loop n a jamais vus ne sont pas un silence', (
     'on ne defere pas a un detecteur qui n a rien vu et ne verra rien');
 });
 
-test('la signature se lit sur l evenement d echec, pas seulement dans le tampon de loop', () => {
+test('la signature se lit sur l evenement d echec, pas seulement dans sigOfCall', () => {
   // loop détient bien la répétition — quatre PreToolUse identiques. Mais les
-  // échecs portent un tool_use_id que le tampon ne connaît pas : seule la
-  // lecture directe de `tool_input` peut voir qu'ils se répètent. Sans elle la
+  // échecs portent un tool_use_id absent de `sigOfCall` : seule la lecture
+  // directe de `tool_input` peut voir qu'ils se répètent. Sans elle la
   // signature serait nulle, retryStorm compterait ses trois échecs, et la
   // double pastille reviendrait.
   const wd = createWatchdog({ now: () => T + 60_000 });

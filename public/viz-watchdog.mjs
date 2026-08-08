@@ -248,6 +248,15 @@ const DETECTORS = {
         // page did. `tool_input` still tells us what it was, so the signature
         // is known, but `loop` holds no record of it and never will. Deferring
         // then is silence with nobody left watching.
+        //
+        // `sig !== null` is redundant with `buf.calls.has(sig)`: the keys of
+        // `calls` are always strings, so `has(null)` is always false. It is
+        // kept because it states the intent — an unknown call is never a
+        // repeat — and would still hold if `calls` ever changed shape. No test
+        // can cover it: no input reaches this line with sig === null and a
+        // matching key, so mutating it away kills nothing. Do not add a test
+        // to "close the gap" — a test that cannot fail proves nothing, which
+        // is the exact fault this task spent three rounds removing.
         if (sig !== null && previous && sig === previous.sig
             && (ts - previous.ts) * (ctx.thresholds.loop.count - 1) <= ctx.thresholds.loop.windowMs
             && buf.calls.has(sig)) {

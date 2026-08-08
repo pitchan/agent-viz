@@ -60,6 +60,31 @@ test('a loop lists the real clock time of every repeat', () => {
   assert.deepEqual(alertDetailLines(loopAlert()), ['Repeats at 14:03:09, 14:03:14, 14:03:19, 14:03:24']);
 });
 
+// Nothing bounds `occurrences` any more. It used to be capped at ten by the
+// loop buffer's fixed size; counting per signature removed that buffer, and a
+// loop that crosses its threshold while the freshness gate holds emission back
+// hands the first emitted alert a whole window of repeats — 240 of them at
+// four calls a second, the very runaway this detector exists to catch.
+test('a loop caps how many repeat times it prints and says what it dropped', () => {
+  const many = Array.from({ length: 240 }, (_, i) => ({
+    ts: at(14, 3, 0) + i * 250, toolUseId: `t${i}`, failed: null,
+  }));
+  const lines = alertDetailLines(loopAlert({ occurrences: many, count: 240 }));
+  assert.equal(lines.length, 1);
+  assert.match(lines[0], /…and 235 more$/, 'ce qui est retire doit etre annonce');
+  assert.equal(lines[0].split(',').length, 5, 'cinq horodatages, pas deux cent quarante');
+  assert.ok(lines[0].length < 120,
+    `une ligne de panneau reste lisible, celle-ci fait ${lines[0].length} caracteres`);
+});
+
+test('a loop list of exactly the cap prints no overflow line', () => {
+  const exactly = Array.from({ length: 5 }, (_, i) => ({
+    ts: at(14, 3, 0) + i * 1000, toolUseId: `t${i}`, failed: null,
+  }));
+  const lines = alertDetailLines(loopAlert({ occurrences: exactly, count: 5 }));
+  assert.doesNotMatch(lines[0], /more/, 'rien n a ete retire, rien ne doit le dire');
+});
+
 // The line leads with the clock so the list can be scanned down its left
 // edge, and names an actor only when there is one to name — repeating
 // "(main thread)" on every row is noise that pushes the subject off-screen.

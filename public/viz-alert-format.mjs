@@ -36,9 +36,19 @@ export function alertActor({ agentId, agentType }) {
 }
 
 const DETAIL_LINES = {
-  loop: a => (a.occurrences.length
-    ? [`Repeats at ${a.occurrences.map(o => clockTime(o.ts)).join(', ')}`]
-    : []),
+  loop: (a) => {
+    // The alert keeps every occurrence — it is the record, and `count` has to
+    // stay exact. The cap belongs here, at the display. Nothing else bounds
+    // this list: a loop that crosses its threshold while the freshness gate is
+    // still holding emission back accumulates a whole window of repeats, and
+    // the first alert actually emitted carries all of them.
+    if (a.occurrences.length === 0) return [];
+    const shown = a.occurrences.slice(0, LIST_MAX).map(o => clockTime(o.ts)).join(', ');
+    // Never drop silently: a list that stops at five without saying so reads
+    // as a complete list of five.
+    const dropped = a.occurrences.length - LIST_MAX;
+    return [`Repeats at ${shown}${dropped > 0 ? ` …and ${dropped} more` : ''}`];
+  },
   stuck: (a) => {
     // Clock first: the list is read by scanning its left edge. The actor is
     // appended only for a subagent — on the main thread it would repeat on
