@@ -37,10 +37,22 @@ const CHEMIN_WINDOWS =
   'Exit code 1 /usr/bin/bash: line 1: cd: D:dvf-postgis-pipelinefrontend: No such file or directory';
 
 // Un second reglage du poste, pour verifier que deux motifs distincts du meme
-// acteur font deux alertes. C'est le motif alertant le plus volumineux du
-// releve : 16 occurrences, 2 projets, 16 acteurs.
-const QUOTE_NON_FERMEE =
+// acteur font deux alertes. Cause A du releve doc/30 : un chemin de dossier
+// termine par un antislash, que le shell POSIX lit comme un guillemet echappe.
+// 11 occurrences.
+const ANTISLASH_FINAL =
   'Exit code 2 /usr/bin/bash: eval: line 1: unexpected EOF while looking for matching `"\'';
+
+// Cause B du meme releve : un heredoc de 8 a 15 Ko. 8 occurrences, et
+// 9 commandes sur 9 au-dela de 8 Ko en echec dans tout l'historique.
+const HEREDOC_TROP_GROS =
+  "Exit code 2 /usr/bin/bash: -c: line 149: unexpected EOF while looking for matching `''";
+
+// Le meme message SANS aucune des deux ancres — le scenario « le harnais a
+// change sa facon d'appeler le shell ». Reconnu, compte, mais jamais dit :
+// c'est la raison d'etre du filet.
+const QUOTE_SANS_ANCRE =
+  'Exit code 2 /usr/bin/bash: line 42: unexpected EOF while looking for matching `"\'';
 
 // Invocation reconnue, mais PAS un reglage du poste : une cmdlet PowerShell
 // sous bash ne se distinguait d'un binaire absent que par la CASSE du nom
@@ -208,9 +220,9 @@ test('deux sous-agents butant sur le meme reglage sont deux alertes', () => {
 test('deux motifs differents du meme acteur sont deux alertes', () => {
   const wd = createWatchdog({ now: () => T });
   const un = leve(wd, echec({ id: 'x1' }));
-  const deux = leve(wd, echec({ id: 'x2', at: T + 1000, error: QUOTE_NON_FERMEE }));
+  const deux = leve(wd, echec({ id: 'x2', at: T + 1000, error: ANTISLASH_FINAL }));
   assert.equal(un[0].patternId, 'inv-bash-windows-path-unquoted');
-  assert.equal(deux[0].patternId, 'inv-bash-unbalanced-quote');
+  assert.equal(deux[0].patternId, 'inv-bash-trailing-backslash-in-path');
   assert.equal(wd.getActiveAlerts().length, 2);
 });
 
@@ -220,6 +232,22 @@ test('une cmdlet PowerShell sous bash est reconnue mais ne dit rien', () => {
   // casse du nom. Le detecteur n a rien a decider ici — il lit le drapeau.
   const wd = createWatchdog({ now: () => T });
   assert.deepEqual(leve(wd, echec({ id: 'z1', error: CMDLET_SOUS_BASH })), []);
+  assert.equal(wd.getActiveAlerts().length, 0);
+});
+
+test('un heredoc trop gros leve une alerte, avec son propre motif', () => {
+  const wd = createWatchdog({ now: () => T });
+  const a = leve(wd, echec({ id: 'h1', error: HEREDOC_TROP_GROS }));
+  assert.equal(a.length, 1);
+  assert.equal(a[0].patternId, 'inv-bash-heredoc-too-large');
+});
+
+test('le meme message sans ancre est reconnu mais ne dit rien', () => {
+  // Le filtre est unique et c'est `workstationSetting`, lu sur la table. Le
+  // detecteur n'a rien a decider ici : ce test verifie que le drapeau CIRCULE,
+  // pas qu'il est bien pose — ca, c'est la tache 1 qui le tient.
+  const wd = createWatchdog({ now: () => T });
+  assert.deepEqual(leve(wd, echec({ id: 'q1', error: QUOTE_SANS_ANCRE })), []);
   assert.equal(wd.getActiveAlerts().length, 0);
 });
 
