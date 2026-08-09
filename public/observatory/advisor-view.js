@@ -129,9 +129,15 @@ async function loadFailures() {
     const { alerts } = await api.fetchAlerts({ days: getState().periodDays });
     erreur.textContent = '';
     renderFailures(node, alerts, {
-      onAckGroup: episodes => ackEpisodes(api, episodes)
-        .catch(err => { erreur.textContent = `Acquittement interrompu : ${err.message}`; })
-        .finally(loadFailures),
+      onAckGroup: episodes => ackEpisodes(api, episodes).then(
+        () => loadFailures(),
+        // L'etat vrai d'abord, le message ensuite : recharge PUIS pose le
+        // motif d'interruption — l'ordre inverse le faisait effacer par le
+        // chemin de succes du rechargement (revue finale doc/32).
+        err => loadFailures().finally(() => {
+          erreur.textContent = `Acquittement interrompu : ${err.message}`;
+        }),
+      ),
     });
   } catch (err) {
     erreur.textContent = `Pannes indisponibles : ${err.message}`;

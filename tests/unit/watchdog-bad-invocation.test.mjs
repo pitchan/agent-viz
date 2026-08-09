@@ -314,6 +314,18 @@ test('l alerte consigne la commande declenchante — arbitrage doc/32 du 2026-08
     'le message notification reste sans commande : seul subject la porte');
 });
 
+test('le texte de l erreur, lui, ne se consigne toujours pas — seul subject porte du texte', () => {
+  // La retention (doc/32) s arrete a la commande declenchante : rien du
+  // message d erreur ne traverse. Verrou repris de l ancien test de
+  // non-retention, ampute a tort lors de la reecriture.
+  const wd = createWatchdog({ now: () => T });
+  const [alerte] = leve(wd, echec({ tool_input: { command: 'npm run build' } }));
+  const serialisee = JSON.stringify(alerte);
+  assert.ok(!serialisee.includes('dvf-postgis-pipeline'),
+    'aucun fragment du message d erreur ne doit etre consigne');
+  assert.equal(alerte.subject, 'npm run build');
+});
+
 test('sans tool_input le sujet est vide, jamais absent', () => {
   const wd = createWatchdog({ now: () => T });
   const [alerte] = leve(wd, echec());

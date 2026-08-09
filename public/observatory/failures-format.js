@@ -48,10 +48,12 @@ function failureNote(occurrences) {
 // Ce que dit un identifiant de motif d'invocation, en clair.
 //
 // C'est ici, et nulle part ailleurs, que `inv-bash-windows-path-unquoted`
-// redevient une phrase. L'alerte ne porte QUE cet identifiant — ni la commande,
-// ni le message d'erreur, ni un extrait — donc le bloc n'a rien d'autre a
-// composer avec, et c'est exactement ce qui rend la promesse du produit
-// tenable : la donnee consignee ne nomme rien de la machine de l'utilisateur.
+// redevient une phrase. Elle se compose du seul `patternId` — jamais du
+// message d'erreur, qui n'est pas consigne (verrou watchdog-bad-invocation).
+// La commande, elle, vit desormais dans `subject`, consignee integrale depuis
+// l'arbitrage doc/32 du 2026-08-09, et s'affiche dans le depliage : la
+// phrase du motif n'a donc toujours rien d'autre a composer, et c'est voulu —
+// elle nomme le reglage a poser, pas l'incident.
 //
 // Chaque phrase dit ce qui a ete mal ecrit, pas ce que l'outil a repondu : ce
 // que le lecteur cherche ici, c'est le reglage a poser une fois.
