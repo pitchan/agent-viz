@@ -500,14 +500,24 @@ canvas { display: block; width: 100%; height: 100%; }
 .failures-count { color: var(--error); font-weight: 600; }
 .failures-count.is-quiet { color: var(--text-muted); font-weight: 400; }
 .failures-empty { font-size: 13px; color: var(--text-dim); line-height: 1.5; }
-.failure-row {
-  border-left: 3px solid var(--error); padding: 6px 0 6px 10px; margin-bottom: 10px;
-}
-.failure-row.is-acked { border-left-color: var(--text-dim); opacity: .55; }
+.failure-group { border-left: 3px solid var(--error); padding: 6px 10px; margin: 6px 0; }
+.failure-group.is-acked { border-left-color: var(--text-dim); opacity: .55; }
+.failure-group-head { cursor: pointer; display: flex; gap: 10px; align-items: baseline; }
+.failure-cause { font-size: 13px; font-weight: 600; }
+.failure-group-meta { font-size: 11px; color: var(--text-dim); }
+.failure-a-traiter { font-size: 10px; color: var(--error); border: 1px solid var(--error);
+  border-radius: 3px; padding: 0 4px; text-transform: uppercase; }
+.failure-episode { margin: 6px 0 6px 12px; }
+.failure-episode.is-acked { opacity: .55; }
 .failure-head { font-size: 11px; color: var(--text-dim); }
-.failure-what { font-size: 13px; font-weight: 600; }
-.failure-subject {
-  font-family: ui-monospace, monospace; font-size: 12px; color: var(--text-dim);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.failure-acked { font-size: 11px; color: var(--text-dim); font-style: italic; }
+.failure-cmd { font-family: ui-monospace, monospace; font-size: 12px; white-space: pre-wrap;
+  word-break: break-all; max-height: 3.1em; overflow: hidden; cursor: pointer; }
+.failure-cmd.is-open { max-height: none; }
+.failure-cmd.is-missing { font-style: italic; color: var(--text-dim); font-family: inherit; }
+.failure-remede { margin: 8px 0 4px 12px; border-top: 1px dashed var(--text-dim); padding-top: 6px; }
+.remede-consigne { font-size: 12px; }
+.remede-extrait { font-size: 11px; white-space: pre-wrap; word-break: break-word;
+  background: rgba(255,255,255,.04); padding: 6px; margin: 4px 0; user-select: text; }
+.remede-copier { font-size: 11px; }
+.remede-copie { font-size: 11px; color: var(--text-dim); margin-left: 8px; }
+.failure-ack { font-size: 11px; margin: 4px 0 2px 12px; }
