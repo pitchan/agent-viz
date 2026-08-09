@@ -108,16 +108,33 @@ function render() {
   renderList(list, state.recommendations);
 }
 
-// Les pannes ne passent pas par le magasin de l'observatoire : elles ne
-// viennent pas du scan, elles viennent du chien de garde. Un chargement
-// separe, une erreur qui ne prend pas le tiroir en otage.
+// L'acquittement d'un groupe : la route est unitaire, la serie est ici.
+// Sequentiel a dessein — un journal en ajout seul n'a rien a gagner a la
+// concurrence, et l'ordre rend l'interruption lisible : tout ce qui precede
+// l'erreur est acquitte, rien apres.
+export async function ackEpisodes(apiClient, episodes) {
+  for (const a of episodes.filter(e => !e.acknowledged)) {
+    await apiClient.acknowledgeAlert({ id: a.id, createdAt: a.createdAt });
+  }
+}
+
+// Les pannes ne passent pas par le magasin de l'observatoire : elles viennent
+// du chien de garde. Une erreur s'AFFICHE sans effacer la liste deja rendue —
+// un bloc vide sans un mot serait indiscernable de « aucune panne », le pire
+// mode de panne du seul panneau charge de dire qu'il y en a eu (doc/32).
 async function loadFailures() {
   const node = document.getElementById('advisor-failures');
+  const erreur = document.getElementById('advisor-failures-error');
   try {
     const { alerts } = await api.fetchAlerts({ days: getState().periodDays });
-    renderFailures(node, alerts);
-  } catch {
-    node.textContent = '';
+    erreur.textContent = '';
+    renderFailures(node, alerts, {
+      onAckGroup: episodes => ackEpisodes(api, episodes)
+        .catch(err => { erreur.textContent = `Acquittement interrompu : ${err.message}`; })
+        .finally(loadFailures),
+    });
+  } catch (err) {
+    erreur.textContent = `Pannes indisponibles : ${err.message}`;
   }
 }
 

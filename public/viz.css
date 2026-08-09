@@ -490,6 +490,8 @@ canvas { display: block; width: 100%; height: 100%; }
 
 /* Bloc « Pannes » — en tete du tiroir Conseils, la seule surface du produit
    ou une panne survit a la session qui l'a produite. */
+.failures-error { color: var(--error); font-size: 12px; margin-bottom: 6px; }
+.failures-error:empty { display: none; }
 .failures-block { margin-bottom: 18px; }
 .failures-title {
   display: flex; justify-content: space-between; align-items: baseline;
