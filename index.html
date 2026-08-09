@@ -88,16 +88,21 @@
     <div id="advisor-overlay" class="glass-panel">
       <div id="advisor-header">
         <span id="advisor-title">Conseils — actions prioritaires</span>
-        <button type="button" id="advisor-rescan">Relancer l'analyse</button>
-        <button type="button" id="advisor-close">&times;</button>
+        <button type="button" class="obs-btn" id="advisor-rescan">Relancer l'analyse</button>
+        <button type="button" class="obs-btn obs-btn--icon" id="advisor-close" aria-label="Fermer">&times;</button>
       </div>
       <div id="advisor-period" class="period-selector"></div>
       <div id="advisor-summary"></div>
-      <div id="advisor-failures-error" class="failures-error"></div>
-      <div id="advisor-failures" class="failures-block"></div>
-      <div id="advisor-list"></div>
+      <!-- Les pannes ET les recommandations partagent UN ascenseur : deux zones
+           de defilement concurrentes laissaient la seconde a 0 px de haut des
+           qu'une panne etait depliee. -->
+      <div id="advisor-body">
+        <div id="advisor-failures-error" class="failures-error"></div>
+        <div id="advisor-failures" class="failures-block"></div>
+        <div id="advisor-list"></div>
+      </div>
       <div id="advisor-footer">
-        <button type="button" id="advisor-purge"
+        <button type="button" class="obs-btn obs-btn--danger" id="advisor-purge"
           title="Vide la base d'analyse (statuts de recommandations compris) puis relance un scan complet — les transcripts ne sont pas touchés">Purger la base</button>
       </div>
     </div>
@@ -106,7 +111,7 @@
     <div id="analysis-overlay" class="glass-panel">
       <div id="analysis-header">
         <span id="analysis-title">Sessions analysées</span>
-        <button type="button" id="analysis-close">&times;</button>
+        <button type="button" class="obs-btn obs-btn--icon" id="analysis-close" aria-label="Fermer">&times;</button>
       </div>
       <div id="analysis-controls">
         <div id="analysis-period" class="period-selector"></div>
@@ -121,7 +126,7 @@
     <div id="pricing-overlay" class="glass-panel">
       <div id="pricing-header">
         <span id="pricing-title">Jetons &amp; tarifs</span>
-        <button type="button" id="pricing-close">&times;</button>
+        <button type="button" class="obs-btn obs-btn--icon" id="pricing-close" aria-label="Fermer">&times;</button>
       </div>
       <div id="pricing-period" class="period-selector"></div>
       <div id="pricing-summary"></div>

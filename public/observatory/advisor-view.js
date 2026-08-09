@@ -46,7 +46,7 @@ function recommendationCard(rec, { actionable }) {
       : [['accepted', 'J’applique'], ['ignored', 'Ignorer']];
     const buttons = el('div', 'advisor-card-buttons');
     for (const [status, label] of entries) {
-      const btn = el('button', null, label);
+      const btn = el('button', 'obs-btn', label);
       btn.type = 'button';
       btn.dataset.status = status;
       buttons.appendChild(btn);

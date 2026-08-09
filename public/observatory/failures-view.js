@@ -23,17 +23,43 @@ function stamp(ms) {
   return `${p(d.getDate())}/${p(d.getMonth() + 1)} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
+const SANS_COMMANDE = 'commande non consignée (alerte ancienne)';
+
 // La commande d'un episode. Vide chez badInvocation = anterieure a la
 // consigne du subject (doc/32) : le dire vaut mieux qu'un trou, qui se lirait
 // comme un bug du bloc.
 function commandes(alert) {
   if (alert.type === 'stuck') {
     return (Array.isArray(alert.tools) ? alert.tools : [])
-      .map(t => `${t.toolName} · ${t.subject}`);
+      .map(t => (t.subject ? `${t.toolName} · ${t.subject}` : t.toolName));
   }
   if (alert.subject) return [alert.subject];
-  if (alert.type === 'badInvocation') return ['commande non consignée (alerte ancienne)'];
+  if (alert.type === 'badInvocation') return [SANS_COMMANDE];
   return [];
+}
+
+// Une commande longue se replie par CSS et se deplie au geste. Le geste n'est
+// pas reserve a la souris : role, tabindex et clavier, et l'etat s'annonce
+// (aria-expanded) au lieu de ne vivre que dans une classe CSS. La ligne « non
+// consignee » n'a rien a deplier — la deguiser en bouton mentirait.
+function commandNode(cmd) {
+  if (cmd === SANS_COMMANDE) return el('div', 'failure-cmd is-missing', cmd);
+
+  const ligne = el('div', 'failure-cmd', cmd);
+  ligne.setAttribute('role', 'button');
+  ligne.setAttribute('tabindex', '0');
+  ligne.setAttribute('aria-expanded', 'false');
+  const basculer = () => {
+    ligne.classList.toggle('is-open');
+    ligne.setAttribute('aria-expanded', String(ligne.classList.contains('is-open')));
+  };
+  ligne.addEventListener('click', basculer);
+  ligne.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault(); // sinon l'espace defile le panneau sous les doigts
+    basculer();
+  });
+  return ligne;
 }
 
 function episodeNode(alert) {
@@ -41,14 +67,7 @@ function episodeNode(alert) {
   const faits = episodeLabel(alert);
   ep.appendChild(el('div', 'failure-head',
     `${stamp(alert.createdAt)}  ${projectLabel(alert.cwd)}${faits ? `  ·  ${faits}` : ''}`));
-  for (const cmd of commandes(alert)) {
-    const ligne = el('div', cmd === 'commande non consignée (alerte ancienne)'
-      ? 'failure-cmd is-missing' : 'failure-cmd', cmd);
-    // Une commande longue se replie par CSS ; le clic la deplie. Interaction
-    // locale : c'est le role de cette vue.
-    ligne.addEventListener('click', () => ligne.classList.toggle('is-open'));
-    ep.appendChild(ligne);
-  }
+  for (const cmd of commandes(alert)) ep.appendChild(commandNode(cmd));
   return ep;
 }
 
@@ -56,7 +75,7 @@ function remedeNode(remede) {
   const bloc = el('div', 'failure-remede');
   bloc.appendChild(el('div', 'remede-consigne', remede.consigne));
   bloc.appendChild(el('pre', 'remede-extrait', remede.extrait));
-  const copier = el('button', 'remede-copier', 'Copier');
+  const copier = el('button', 'obs-btn remede-copier', 'Copier');
   copier.type = 'button';
   const zone = el('span', 'remede-copie', '');
   zone.setAttribute('aria-live', 'polite');
@@ -87,7 +106,7 @@ function groupNode(group, onAckGroup) {
   if (remede) det.appendChild(remedeNode(remede));
 
   if (group.unacked && onAckGroup) {
-    const btn = el('button', 'failure-ack', `Tout acquitter (${group.unacked})`);
+    const btn = el('button', 'obs-btn obs-btn--primary failure-ack', `Tout acquitter (${group.unacked})`);
     btn.type = 'button';
     btn.addEventListener('click', () => {
       btn.disabled = true;

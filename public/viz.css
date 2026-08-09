@@ -20,8 +20,13 @@
   --glass-border: rgba(102, 204, 255, 0.12);
   --glass-hover: rgba(102, 204, 255, 0.08);
   --text-primary: #d0e8f8;
-  --text-dim: rgba(102, 204, 255, 0.6);
-  --text-muted: rgba(102, 204, 255, 0.3);
+  /* Contrastes mesures sur le fond des panneaux (#090d1b, --glass-bg sur
+     --void). Les valeurs precedentes — .6 et .3 — donnaient 4,4:1 et 1,9:1
+     pour du texte de 11 px : sous le seuil AA de 4,5:1, c'est-a-dire illisible
+     pour qui ne voit pas parfaitement. La hierarchie des trois niveaux est
+     conservee, elle passe juste au-dessus du plancher. */
+  --text-dim: rgba(102, 204, 255, 0.78);   /* 6,8:1 */
+  --text-muted: rgba(102, 204, 255, 0.62); /* 4,7:1 */
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -403,15 +408,50 @@ canvas { display: block; width: 100%; height: 100%; }
   font-size: 12px; font-weight: 600; color: var(--holo-bright);
   letter-spacing: 0.5px; text-transform: uppercase;
 }
-#advisor-header button, #analysis-header button, #pricing-header button {
-  background: none; border: 1px solid var(--glass-border);
-  color: var(--text-dim); border-radius: 4px; padding: 2px 8px;
-  font-size: 11px; text-transform: none; letter-spacing: 0; cursor: pointer;
-  transition: all 0.15s;
+/* ─── Boutons de l'observatoire ───────────────────────────────────────────
+   UNE definition pour tous les boutons des panneaux. Avant, chaque endroit
+   redecrivait son look, et ceux qui n'en declaraient aucun — « Tout
+   acquitter », « Copier », « Purger la base » — retombaient sur le bouton
+   natif de Windows : aplat gris #f0f0f0, bordure outset, padding nul. La
+   purge y peignait son texte en rgba(102,204,255,.6), soit 1,3:1 de
+   contraste. Un bouton = .obs-btn ; la variante dit son ROLE, jamais son
+   apparence. */
+.obs-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 26px; padding: 4px 12px;
+  font-family: inherit; font-size: 11px; line-height: 1.2;
+  text-transform: none; letter-spacing: 0; white-space: nowrap;
+  color: var(--text-primary);
+  background: rgba(102, 204, 255, 0.07);
+  border: 1px solid rgba(102, 204, 255, 0.28);
+  border-radius: 6px; cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
-#advisor-header button:hover, #analysis-header button:hover, #pricing-header button:hover { background: var(--glass-hover); }
+.obs-btn:hover { background: rgba(102, 204, 255, 0.16); border-color: var(--holo-dim); color: var(--holo-bright); }
+.obs-btn:active { background: rgba(102, 204, 255, 0.24); }
+.obs-btn:disabled { opacity: 0.45; cursor: default; }
+.obs-btn:disabled:hover {
+  background: rgba(102, 204, 255, 0.07); border-color: rgba(102, 204, 255, 0.28);
+  color: var(--text-primary);
+}
+/* Action principale d'un bloc : un aplat plein, texte sombre — 10,5:1. */
+.obs-btn--primary { color: #04121c; background: var(--holo); border-color: var(--holo); font-weight: 600; }
+.obs-btn--primary:hover { color: #04121c; background: var(--holo-bright); border-color: var(--holo-bright); }
+.obs-btn--primary:active { background: var(--holo); }
+/* Geste destructeur : rouge lisible au repos (11,5:1), aplat plein une fois
+   arme — l'etat arme doit sauter aux yeux, c'est sa seule fonction. */
+.obs-btn--danger { color: #ffb3bd; background: rgba(255, 85, 102, 0.08); border-color: rgba(255, 85, 102, 0.35); }
+.obs-btn--danger:hover { color: #fff; background: rgba(255, 85, 102, 0.22); border-color: var(--error); }
+.obs-btn--danger.confirm-armed {
+  color: #100305; background: var(--error); border-color: var(--error); font-weight: 600;
+}
+.obs-btn--icon { min-width: 26px; padding: 4px 8px; font-size: 15px; line-height: 1; }
+/* Le clavier doit VOIR ou il est : aucune regle de focus n'existait. */
+.obs-btn:focus-visible, .period-btn:focus-visible,
+.failure-cmd:focus-visible, .failure-group-head:focus-visible {
+  outline: 2px solid var(--holo-bright); outline-offset: 2px;
+}
 #advisor-rescan { margin-left: auto; }
-#advisor-purge.confirm-armed { border-color: rgba(231, 76, 60, 0.8); color: #e74c3c; }
 .advisor-scan-progress { color: var(--holo); margin-top: 4px; }
 #advisor-summary, #analysis-summary, #pricing-summary {
   font-size: 11px; color: var(--text-dim); margin-bottom: 12px;
@@ -425,12 +465,19 @@ canvas { display: block; width: 100%; height: 100%; }
    it the zone never scrolls. */
 #advisor-header, #analysis-header, #pricing-header,
 #advisor-period, #analysis-controls, #pricing-period,
-#advisor-summary, #analysis-summary, #pricing-summary { flex-shrink: 0; }
-#advisor-list, #analysis-list, #pricing-body {
+#advisor-summary, #analysis-summary, #pricing-summary,
+#advisor-footer { flex-shrink: 0; }
+/* Conseils a DEUX blocs de contenu — les pannes puis les recommandations — et
+   un seul ascenseur pour les deux. Quand seul #advisor-list defilait, deplier
+   un groupe de pannes poussait les recommandations ET le pied de page hors du
+   panneau, sans aucun ascenseur pour les rattraper : mesure du 2026-08-09,
+   liste haute de 0 px pour 1158 px de contenu, bouton de purge a y=697 dans un
+   panneau qui s'arretait a y=649. */
+#advisor-body, #analysis-list, #pricing-body {
   flex: 1; min-height: 0; overflow-y: auto;
 }
+#advisor-body { padding-right: 6px; }
 #advisor-footer { margin-top: 14px; text-align: right; }
-#advisor-footer button { font-size: 11px; color: var(--text-dim); }
 .advisor-summary-headline { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
 .advisor-summary-details { font-size: 11px; color: var(--text-dim); }
 /* "Sessions analysées" has TWO content zones: the table scrolls, the detail
@@ -459,12 +506,6 @@ canvas { display: block; width: 100%; height: 100%; }
   font-variant-numeric: tabular-nums;
 }
 .advisor-card-buttons { display: flex; gap: 8px; }
-.advisor-card-buttons button {
-  background: none; border: 1px solid var(--glass-border); color: var(--text-dim);
-  border-radius: 4px; padding: 2px 10px; font-size: 11px; cursor: pointer;
-  transition: all 0.15s;
-}
-.advisor-card-buttons button:hover { background: var(--glass-hover); color: var(--holo-bright); }
 .advisor-rest-title, .advisor-empty { font-size: 11px; color: var(--text-dim); margin: 16px 0 8px; }
 .analysis-table { width: 100%; border-collapse: collapse; font-size: 11px; font-variant-numeric: tabular-nums; }
 .analysis-table th {
@@ -508,24 +549,62 @@ canvas { display: block; width: 100%; height: 100%; }
 .failures-count { color: var(--error); font-weight: 600; }
 .failures-count.is-quiet { color: var(--text-muted); font-weight: 400; }
 .failures-empty { font-size: 13px; color: var(--text-dim); line-height: 1.5; }
-.failure-group { border-left: 3px solid var(--error); padding: 6px 10px; margin: 6px 0; }
-.failure-group.is-acked { border-left-color: var(--text-dim); opacity: .55; }
-.failure-group-head { cursor: pointer; display: flex; gap: 10px; align-items: baseline; }
+.failure-group {
+  border-left: 3px solid var(--error); border-radius: 0 8px 8px 0;
+  background: rgba(255, 85, 102, 0.04);
+  padding: 4px 10px 4px 8px; margin: 6px 0;
+}
+.failure-group.is-acked {
+  border-left-color: var(--text-muted); background: rgba(102, 204, 255, 0.03); opacity: .7;
+}
+/* `display: flex` sur un <summary> efface le triangle de repli du navigateur :
+   plus rien ne disait que la ligne s'ouvrait. Le chevron est redessine. */
+.failure-group-head {
+  cursor: pointer; display: flex; gap: 10px; align-items: center;
+  padding: 5px 6px; margin: 0 -6px; border-radius: 6px; list-style: none;
+}
+.failure-group-head::-webkit-details-marker { display: none; }
+.failure-group-head::before {
+  content: '▸'; flex: none; width: 10px; color: var(--holo);
+  font-size: 11px; transition: transform .15s;
+}
+.failure-group[open] > .failure-group-head::before { transform: rotate(90deg); }
+.failure-group-head:hover { background: var(--glass-hover); }
 .failure-cause { font-size: 13px; font-weight: 600; }
-.failure-group-meta { font-size: 11px; color: var(--text-dim); }
+/* La cause a gauche, le « quand » et le « reste-t-il a faire » alignes a
+   droite : sur huit lignes, on balaie une colonne au lieu de huit fins de
+   phrase. */
+.failure-group-meta { font-size: 11px; color: var(--text-dim); margin-left: auto; text-align: right; }
 .failure-a-traiter { font-size: 10px; color: var(--error); border: 1px solid var(--error);
-  border-radius: 3px; padding: 0 4px; text-transform: uppercase; }
-.failure-episode { margin: 6px 0 6px 12px; }
-.failure-episode.is-acked { opacity: .55; }
+  border-radius: 3px; padding: 1px 5px; text-transform: uppercase; letter-spacing: .04em; }
+.failure-episode {
+  margin: 6px 0 6px 18px; padding-left: 10px;
+  border-left: 1px solid var(--glass-border);
+}
+.failure-episode.is-acked { opacity: .6; }
 .failure-head { font-size: 11px; color: var(--text-dim); }
-.failure-cmd { font-family: ui-monospace, monospace; font-size: 12px; white-space: pre-wrap;
-  word-break: break-all; max-height: 3.1em; overflow: hidden; cursor: pointer; }
-.failure-cmd.is-open { max-height: none; }
-.failure-cmd.is-missing { font-style: italic; color: var(--text-dim); font-family: inherit; }
-.failure-remede { margin: 8px 0 4px 12px; border-top: 1px dashed var(--text-dim); padding-top: 6px; }
-.remede-consigne { font-size: 12px; }
+/* La commande reste selectionnable (le body interdit la selection partout) :
+   sans cela, impossible de recuperer a la main la commande en defaut. */
+.failure-cmd {
+  font-family: ui-monospace, monospace; font-size: 12px; white-space: pre-wrap;
+  word-break: break-all; user-select: text;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  overflow: hidden; margin-top: 2px; padding: 2px 4px; border-radius: 4px;
+}
+.failure-cmd[role="button"] { cursor: pointer; }
+.failure-cmd[role="button"]:hover { background: rgba(102, 204, 255, 0.08); }
+.failure-cmd.is-open { -webkit-line-clamp: unset; display: block; }
+.failure-cmd.is-missing {
+  font-style: italic; color: var(--text-dim); font-family: inherit;
+  display: block; user-select: none;
+}
+.failure-remede {
+  margin: 8px 0 4px 18px; padding: 8px 10px; border-radius: 6px;
+  background: rgba(102, 204, 255, 0.04); border: 1px solid var(--glass-border);
+}
+.remede-consigne { font-size: 12px; line-height: 1.45; }
 .remede-extrait { font-size: 11px; white-space: pre-wrap; word-break: break-word;
-  background: rgba(255,255,255,.04); padding: 6px; margin: 4px 0; user-select: text; }
-.remede-copier { font-size: 11px; }
+  background: rgba(5, 5, 16, .55); border: 1px solid var(--glass-border); border-radius: 4px;
+  padding: 8px; margin: 6px 0; user-select: text; }
 .remede-copie { font-size: 11px; color: var(--text-dim); margin-left: 8px; }
-.failure-ack { font-size: 11px; margin: 4px 0 2px 12px; }
+.failure-ack { margin: 8px 0 4px 18px; }

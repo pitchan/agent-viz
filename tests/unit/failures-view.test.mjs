@@ -68,12 +68,15 @@ test('une alerte stuck liste TOUS ses outils en vol', () => {
   const node = fauxElement('div');
   renderFailures(node, [invocation({
     type: 'stuck', toolName: '', patternId: '', subject: '', count: 2,
-    tools: [{ toolName: 'Bash', subject: 'npm run build' }, { toolName: 'Read', subject: 'a.js' }],
+    tools: [{ toolName: 'Bash', subject: 'npm run build' }, { toolName: 'Read', subject: 'a.js' },
+      { toolName: 'AskUserQuestion', subject: '' }],
   })]);
   const cmds = parClasse(node, 'failure-cmd');
-  assert.equal(cmds.length, 2);
+  assert.equal(cmds.length, 3);
   assert.match(cmds[0].textContent, /Bash · npm run build/);
   assert.match(cmds[1].textContent, /Read · a\.js/);
+  // Un outil sans sujet ne laisse pas un separateur suspendu a l ecran.
+  assert.equal(cmds[2].textContent, 'AskUserQuestion');
 });
 
 test('le remede s affiche avec son extrait ; le filet n en a pas', () => {
@@ -110,4 +113,37 @@ test('sans onAckGroup la vue reste muette cote reseau : aucun bouton d acquittem
   const node = fauxElement('div');
   renderFailures(node, [invocation()]);
   assert.equal(parClasse(node, 'failure-ack').length, 0);
+});
+
+// Deplier une commande tronquee etait un geste de SOURIS uniquement : ni role,
+// ni tabindex, ni annonce de l etat (WCAG 2.1.1 et 4.1.2). La ligne « non
+// consignee » n a rien a deplier — elle reste du texte inerte, pas un faux
+// bouton qui ment a la synthese vocale.
+test('la commande tronquee se deplie au clavier et annonce son etat', () => {
+  const node = fauxElement('div');
+  renderFailures(node, [invocation(), invocation({ subject: '', createdAt: T0 - 1000 })]);
+  const [cmd, absente] = parClasse(node, 'failure-cmd');
+
+  assert.equal(cmd.attrs.role, 'button');
+  assert.equal(cmd.attrs.tabindex, '0');
+  assert.equal(cmd.attrs['aria-expanded'], 'false');
+  cmd.handlers.keydown({ key: 'Enter', preventDefault() {} });
+  assert.ok(cmd.classList.contains('is-open'));
+  assert.equal(cmd.attrs['aria-expanded'], 'true');
+
+  assert.equal(absente.attrs.role, undefined, 'rien a deplier, donc pas un bouton');
+  assert.equal(absente.handlers.click, undefined);
+});
+
+// Un seul systeme de boutons pour le produit : la vue porte la classe commune
+// au lieu de redecrire un look. Sans elle, le bouton retombe sur le bouton
+// natif de l OS — gris clair sur panneau sombre, 1,3:1 de contraste.
+test('tout bouton de la vue porte la classe du systeme de boutons', () => {
+  const node = fauxElement('div');
+  renderFailures(node, [invocation()], { onAckGroup: () => {} });
+  const boutons = aPlat(node).filter(n => n.tagName === 'BUTTON');
+  assert.ok(boutons.length >= 2, 'au moins Copier et Tout acquitter');
+  for (const b of boutons) {
+    assert.ok(b.classList.contains('obs-btn'), `bouton sans style commun : ${b.textContent}`);
+  }
 });
