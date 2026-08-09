@@ -129,8 +129,11 @@ function actor(evt) {
 //
 // `patternId` is part of it too, and empty for every detector that recognises
 // no pattern. It carries the identifier of the invocation pattern and NEVER a
-// fragment of the text that was matched — which is what lets the product's
-// promise about retained content stand.
+// fragment of the text that was matched — that distinction is what a pattern
+// identifier is for. `subject`, by contrast, DOES retain text: the triggering
+// command, in full, for any detector that has one to give (arbitrage doc/32
+// du 2026-08-09) — the two fields answer different questions and neither
+// stands in for the other.
 //
 // The id scopes to the agent as well as the session, so two subagents looping
 // at once are two alerts rather than one that names whichever fired first.
@@ -505,12 +508,15 @@ const DETECTORS = {
         type: 'badInvocation', sessionId: sid, toolName: evt.tool_name,
         count, createdAt: ts, ...actor(evt), cwd: evt.cwd || '',
         patternId: pattern.id, discriminator: pattern.id,
-        // No `subject`, and its absence is the decision, not an omission. The
-        // other detectors put the command there; this one may not. What it
-        // reports was recognised by reading an error message, and the promise
-        // that goes with reading one is that neither it nor the command that
-        // produced it is kept — the pattern identifier says everything the
-        // user needs and names nothing of their machine.
+        // `subject` carries the triggering command, in full (arbitrage doc/32
+        // du 2026-08-09, retention assumee) — the same field the other
+        // detectors fill, via the same `toolSubject(evt)`. A failure without
+        // its command is not fixable by the person reading the alert, and
+        // that is what settled it: the pattern identifier says WHAT kind of
+        // setting is missing, `subject` says WHICH command hit it. `message`
+        // is the one field this detector still keeps bare — it is shared with
+        // the desktop notification, which names only the motif.
+        subject: toolSubject(evt),
         //
         // The count only appears once it means something: "1× this session"
         // is noise on the one line a desktop notification gets to show.

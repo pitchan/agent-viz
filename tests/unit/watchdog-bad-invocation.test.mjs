@@ -17,8 +17,8 @@
 //   - l'identite porte l'acteur ET le motif, jamais l'outil : deux sous-agents
 //     butant sur le meme reglage sont deux faits, et le meme reglage manquant
 //     n'est qu'une alerte ;
-//   - AUCUN texte ne sort : ni la commande, ni le message d'erreur, ni un
-//     extrait. Seul l'identifiant du motif.
+//   - le `message` (notification) ne sort aucun texte ; `subject` porte la
+//     commande declenchante — doc/32.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -301,20 +301,23 @@ test('le temps qui passe ne rouvre pas le verrou de deduplication', () => {
   assert.deepEqual(leve(wd, echec({ id: 'z2', at: T + 3_600_000 })), []);
 });
 
-// ─── Vie privee : un identifiant, jamais un texte ──────────────────────────
+// ─── Le sujet : la commande declenchante, jamais le message ni le motif seul ──
 
-test('l alerte ne porte aucun morceau du texte recu, ni de la commande', () => {
-  // La promesse du produit : aucun contenu de sortie d outil ni de commande
-  // n est conserve. L alerte part au journal, en ajout seul, pour 90 jours.
+test('l alerte consigne la commande declenchante — arbitrage doc/32 du 2026-08-09', () => {
   const wd = createWatchdog({ now: () => T });
-  const [alerte] = leve(wd, echec({
-    tool_input: { command: 'cd D:\\dvf-postgis-pipeline\\frontend && npm run build' },
-  }));
-  const serialisee = JSON.stringify(alerte);
-  assert.ok(!serialisee.includes('dvf-postgis-pipeline'),
-    'ni le chemin du message d erreur, ni celui de la commande');
-  assert.ok(!serialisee.includes('npm run build'), 'ni la commande elle-meme');
-  assert.equal(alerte.subject, '', 'le sujet est vide, et c est la decision');
+  const [alerte] = leve(wd, echec({ tool_input: { command: 'cd F:\\DEV\\agent-viz && npm test' } }));
+  assert.ok(alerte, 'le chemin Windows doit lever une alerte');
+  assert.equal(alerte.subject, 'cd F:\\DEV\\agent-viz && npm test',
+    'la commande integrale, non tronquee — retention doc/32');
+  assert.ok(alerte.message.includes('inv-bash-windows-path-unquoted'));
+  assert.ok(!alerte.message.includes('npm test'),
+    'le message notification reste sans commande : seul subject la porte');
+});
+
+test('sans tool_input le sujet est vide, jamais absent', () => {
+  const wd = createWatchdog({ now: () => T });
+  const [alerte] = leve(wd, echec());
+  assert.equal(alerte.subject, '');
 });
 
 // ─── Le contrat uniforme d alerte ──────────────────────────────────────────
