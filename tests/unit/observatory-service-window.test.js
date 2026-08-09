@@ -128,7 +128,7 @@ test('scan names the project with the real working directory, keeping the slug a
   const deps = fakeDeps({ rows: [row] });
   await serviceOf(deps).scan({ days: 7 });
   const rec = deps.calls.upserted.find(r => r.ruleId === 'R1');
-  assert.equal(rec.title, 'Préfixe de cache reconstruit en cours de session — projet D:\\dvf-postgis-pipeline');
+  assert.equal(rec.title, 'Cache perdu en cours de session : des jetons déjà servis sont refacturés — projet D:\\dvf-postgis-pipeline');
   assert.equal(rec.subject, 'F--dvf', 'the persisted identity stays the slug');
 });
 
@@ -138,7 +138,7 @@ test('a report without a cwd falls back to the slug in the title', async () => {
   const deps = fakeDeps({ rows: [HUMAN_ROW] });
   await serviceOf(deps).scan({ days: 7 });
   const rec = deps.calls.upserted.find(r => r.ruleId === 'R1');
-  assert.equal(rec.title, 'Préfixe de cache reconstruit en cours de session — projet F--dvf');
+  assert.equal(rec.title, 'Cache perdu en cours de session : des jetons déjà servis sont refacturés — projet F--dvf');
 });
 
 test('sessions() exposes projectPath — the real path, or the slug when unknown', async () => {

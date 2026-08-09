@@ -118,3 +118,29 @@ test('an unknown rule still lists its session count instead of nothing', () => {
   assert.deepEqual(evidenceLines({ ruleId: 'RX', evidence: { sessions: ['a'] } }),
     ['1 session concernée']);
 });
+
+// Fixture autonome : la forme d'evidence R1 que consomme evidenceLines.
+const recR1 = dominantMarker => ({
+  ruleId: 'R1',
+  evidence: {
+    sessions: ['s1'],
+    prefixChangeTokens: 1000, shareOfNetPercent: 10,
+    dominantMarker,
+    markerTokens: { modelSwitch: 600, toolsAppeared: 300, noMarker: 100 },
+    dominantDepth: 'facade',
+    depthTokens: { facade: 500, d10to50: 300, d50to90: 100, tail: 100 },
+  },
+});
+
+test('les trois marqueurs R1 gardent leur statut epistemique — contractuel (doc/32)', () => {
+  const attendus = {
+    modelSwitch: /changement de modèle — mécanisme certain/,
+    toolsAppeared: /coïncidence observée, sans mécanisme établi/,
+    noMarker: /aucun marqueur journalisé/,
+  };
+  for (const [marker, motif] of Object.entries(attendus)) {
+    const lignes = evidenceLines(recR1(marker));
+    assert.ok(lignes.some(l => motif.test(l)),
+      `${marker} : la formulation contractuelle a disparu — la causalite n'est permise que pour modelSwitch`);
+  }
+});

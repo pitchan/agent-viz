@@ -73,6 +73,9 @@ function renderList(node, { groups, stale }) {
     node.appendChild(el('div', 'advisor-empty', 'Aucune recommandation sur la période — rien à corriger.'));
     return;
   }
+  if (groups.length || stale.length) {
+    node.appendChild(el('div', 'advisor-section-title', 'Inefficacités observées'));
+  }
   for (const group of groups) {
     node.appendChild(el('div', 'advisor-basis-title', basisTitle(group.basis)));
     for (const rec of group.priority) node.appendChild(recommendationCard(rec, { actionable: true }));
