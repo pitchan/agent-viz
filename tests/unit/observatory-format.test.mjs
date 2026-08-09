@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {
   formatUsd, formatBytes, formatDuration, confidenceLabel, costBasisLabel, costLabel, basisTitle,
   formatDayMonth, periodLabel, basisLabel, periodHeader, scanProgressLabel, formatTokens,
-  formatUsdPerMTok, formatShare, formatUsdExact, modelLabel,
+  formatUsdPerMTok, formatShare, formatUsdExact, modelLabel, summaryHeadline, summaryDetails,
 } from '../../public/observatory/format.js';
 
 test('formatUsd uses a French decimal comma and two digits', () => {
@@ -159,6 +159,27 @@ test('formatUsdExact forbids the false zero: sub-cent non-zero shows as < 0,01 $
   assert.equal(formatUsdExact(0), '0,00 $');
   assert.equal(formatUsdExact(12.97), '12,97 $');
   assert.equal(formatUsdExact(0.01), '0,01 $');
+});
+
+test('summaryHeadline : la periode, les sessions, le cout — en francais clair', () => {
+  const s = { period: { days: 30 }, sessions: 77, costUsd: 1888.91 };
+  assert.equal(summaryHeadline(s), 'Sur 30 jours : 77 sessions, 1888,91 $ de coût équivalent API');
+  assert.equal(summaryHeadline(null), '');
+  assert.equal(summaryHeadline({ sessions: 3 }), '', 'sans periode, pas de phrase inventee');
+});
+
+test('summaryDetails : les memes chiffres qu avant, etiquetes, rien de supprime', () => {
+  const s = {
+    netTokens: 67_700_000, cacheReadTokens: 1_660_400_000,
+    priceSource: 'netgain-table-embarquee', costComplete: true,
+  };
+  const d = summaryDetails(s);
+  assert.match(d, /jetons nets/);
+  assert.match(d, /relus depuis le cache/);
+  assert.match(d, /prix : netgain-table-embarquee/);
+  assert.doesNotMatch(d, /coût partiel/);
+  assert.match(summaryDetails({ ...s, costComplete: false }), /coût partiel/);
+  assert.equal(summaryDetails(null), '');
 });
 
 test('modelLabel derives readable labels, Claude 5 single-digit families included', () => {

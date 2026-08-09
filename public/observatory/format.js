@@ -106,6 +106,23 @@ export function periodHeader(period) {
   return `Fenêtre : ${period.days} j — du ${formatDayMonth(period.from)} au ${formatDayMonth(period.to)}`;
 }
 
+// Le resume du tiroir Conseils, en deux niveaux (doc/32) : une phrase de tete
+// que tout le monde comprend, puis le detail etiquete. Memes chiffres
+// qu'avant — pure mise en forme, aucun calcul nouveau.
+export function summaryHeadline(summary) {
+  if (!summary || !summary.period) return '';
+  return `Sur ${summary.period.days} jours : ${summary.sessions} sessions, `
+    + `${formatUsd(summary.costUsd)} de coût équivalent API`;
+}
+
+export function summaryDetails(summary) {
+  if (!summary) return '';
+  const partiel = summary.costComplete === false ? ' · coût partiel (un modèle sans tarif connu)' : '';
+  return `${formatTokens(summary.netTokens)} jetons nets · `
+    + `${formatTokens(summary.cacheReadTokens)} relus depuis le cache · `
+    + `prix : ${summary.priceSource}${partiel}`;
+}
+
 // Live wording for a running scan (SSE events): the answer to "nothing is
 // moving" during the seconds between a purge/rescan click and its 'done'.
 export function scanProgressLabel(scan) {

@@ -8,8 +8,8 @@
 import * as api from './api.js';
 import { getState, subscribe, loadAdvisor, changeStatus, applyScanEvent } from './store.js';
 import {
-  formatUsd, formatTokens, confidenceLabel, costLabel, basisTitle, periodLabel, basisLabel, periodHeader,
-  scanProgressLabel,
+  confidenceLabel, costLabel, basisTitle, periodLabel, basisLabel, periodHeader,
+  scanProgressLabel, summaryHeadline, summaryDetails,
 } from './format.js';
 import { evidenceLines } from './evidence.js';
 import { initPeriodSelector } from './period-selector.js';
@@ -60,14 +60,11 @@ function renderSummary(node, summary) {
   node.textContent = '';
   if (!summary) return;
   node.append(
+    el('div', 'advisor-summary-headline', summaryHeadline(summary)),
     el('div', 'advisor-summary-period', periodHeader(summary.period)),
     el('div', 'advisor-summary-basis', basisLabel(summary.basis)),
+    el('div', 'advisor-summary-details', summaryDetails(summary)),
   );
-  const partial = summary.costComplete ? '' : ' · coût partiel';
-  node.appendChild(el('div', null, `${summary.sessions} sessions · ${formatUsd(summary.costUsd)}`
-    + ` · ${formatTokens(summary.netTokens)} jetons nets`
-    + ` · ${formatTokens(summary.cacheReadTokens)} relus depuis le cache${partial}`
-    + ` · prix : ${summary.priceSource}`));
 }
 
 function renderList(node, { groups, stale }) {
