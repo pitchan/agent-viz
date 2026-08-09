@@ -13,11 +13,14 @@ async function getJson(url) {
   return body;
 }
 
-async function postJson(url) {
-  const res = await fetch(url, { method: 'POST' });
-  const body = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(body && body.error ? body.error : `${res.status} sur ${url}`);
-  return body;
+async function postJson(url, body) {
+  const opts = body === undefined
+    ? { method: 'POST' }
+    : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
+  const res = await fetch(url, opts);
+  const payload = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(payload && payload.error ? payload.error : `${res.status} sur ${url}`);
+  return payload;
 }
 
 // The 7/30/90 window and the human/machine toggle, shared by every windowed
@@ -72,3 +75,8 @@ export function fetchAlerts(opts = {}) {
   const q = windowParams(opts).toString();
   return getJson(`/alerts${q ? `?${q}` : ''}`);
 }
+
+// L'acquittement d'UNE alerte du journal. La route est unitaire et validante
+// (id chaine non vide, createdAt en millisecondes epoch) : le groupe s'acquitte
+// en serie cote appelant, jamais par une route de lot qui n'existe pas.
+export const acknowledgeAlert = ({ id, createdAt }) => postJson('/alerts/ack', { id, createdAt });

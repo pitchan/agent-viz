@@ -3,7 +3,7 @@
 // without a real server.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fetchSummary, fetchSessions, requestScan, requestPurge, fetchModelCosts, fetchPricing } from '../../public/observatory/api.js';
+import { fetchSummary, fetchSessions, requestScan, requestPurge, fetchModelCosts, fetchPricing, acknowledgeAlert } from '../../public/observatory/api.js';
 
 function stubFetch(body = {}) {
   const calls = [];
@@ -94,6 +94,36 @@ test('fetchPricing is window-independent', async () => {
   try {
     await fetchPricing();
     assert.equal(calls[0].url, '/pricing');
+  } finally {
+    restore();
+  }
+});
+
+test('acknowledgeAlert poste id et createdAt en corps JSON', async () => {
+  const { calls, restore } = stubFetch({ ok: true });
+  try {
+    await acknowledgeAlert({ id: 'badInvocation:sid1:inv-x', createdAt: 1754700000000 });
+    assert.equal(calls[0].url, '/alerts/ack');
+    assert.equal(calls[0].opts.method, 'POST');
+    assert.equal(calls[0].opts.headers['Content-Type'], 'application/json');
+    assert.deepEqual(JSON.parse(calls[0].opts.body),
+      { id: 'badInvocation:sid1:inv-x', createdAt: 1754700000000 });
+  } finally {
+    restore();
+  }
+});
+
+// Non-regression (revue doc/32) : donner un corps a postJson ne doit pas en
+// donner un aux POST existants — la route de scan n'en attend aucun.
+test('requestScan et requestPurge continuent de poster SANS corps', async () => {
+  const { calls, restore } = stubFetch({ started: true });
+  try {
+    await requestScan({ days: 7 });
+    await requestPurge({ days: 7 });
+    for (const { opts } of calls) {
+      assert.equal(opts.body, undefined);
+      assert.equal(opts.headers, undefined);
+    }
   } finally {
     restore();
   }
