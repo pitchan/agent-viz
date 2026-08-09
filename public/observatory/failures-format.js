@@ -140,3 +140,76 @@ export function failuresSummary(alerts) {
   if (n === 0) return 'aucune';
   return `${n} non acquittée${n > 1 ? 's' : ''}`;
 }
+
+// ── Regroupement par cause ─────────────────────────────────────────────────
+//
+// Une ligne par CAUSE, plus jamais une ligne par episode (doc/32). La clef dit
+// ce qui se corrige d'un seul geste : le motif pour un appel mal forme (le meme
+// reglage traverse les outils), type+outil pour les repetitions et les orages
+// (une boucle sur Bash et une sur Grep sont deux histoires), le type seul pour
+// les silences.
+
+export function groupKey(alert) {
+  if (alert.type === 'badInvocation') return `badInvocation:${alert.patternId || ''}`;
+  if (alert.type === 'stuck') return 'stuck';
+  return `${alert.type}:${alert.toolName || ''}`;
+}
+
+export function groupAlerts(alerts) {
+  const parClef = new Map();
+  for (const a of listeDe(alerts)) {
+    const key = groupKey(a);
+    if (!parClef.has(key)) parClef.set(key, []);
+    parClef.get(key).push(a);
+  }
+  const groupes = [...parClef.entries()].map(([key, episodes]) => {
+    episodes.sort((x, y) => (y.createdAt || 0) - (x.createdAt || 0));
+    return {
+      key,
+      episodes,
+      lastAt: episodes[0].createdAt || 0,
+      unacked: episodes.filter(e => !e.acknowledged).length,
+    };
+  });
+  // « À traiter » d'abord — c'est la question que la page pose — puis le plus
+  // recent : une panne d'hier soir se cherche avant celle du mois dernier.
+  groupes.sort((a, b) => (b.unacked > 0) - (a.unacked > 0) || b.lastAt - a.lastAt);
+  return groupes;
+}
+
+// La cause se nomme SANS les chiffres d'un episode : « meme commande 4× » est
+// un fait d'episode, pas un nom de cause (revue doc/32). L'outil ne se dit que
+// s'il est uniforme — jamais celui d'un episode arbitraire.
+function outilUniforme(episodes) {
+  const outils = new Set(episodes.map(e => e.toolName || ''));
+  return outils.size === 1 ? [...outils][0] : '';
+}
+
+const CAUSES = {
+  badInvocation: (first, prefix) =>
+    `${prefix}appel mal formé : ${MOTIFS[first.patternId] || REGLAGE_INCONNU}`,
+  loop: (_first, prefix) => `${prefix}même commande répétée`,
+  retryStorm: (_first, prefix) => `${prefix}échecs consécutifs`,
+  stuck: () => 'Aucun événement · outils encore en vol',
+};
+
+export function causeLabel(group) {
+  const first = group.episodes[0];
+  const build = CAUSES[first.type];
+  if (!build) return String(first.type);
+  const outil = outilUniforme(group.episodes);
+  return build(first, outil ? `${outil} · ` : '');
+}
+
+// Les faits d'UN episode, l'outil en moins (il est dit par la cause).
+const EPISODES = {
+  loop: a => `même commande ${a.count}×${failureNote(listeDe(a.occurrences))}`,
+  retryStorm: a => `${a.count} échecs consécutifs`,
+  stuck: a => `${a.count} outil${a.count > 1 ? 's' : ''} encore en vol`,
+  badInvocation: a => (a.count > 1 ? `${a.count} fois dans la session` : ''),
+};
+
+export function episodeLabel(alert) {
+  const build = EPISODES[alert.type];
+  return build ? build(alert) : '';
+}

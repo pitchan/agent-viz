@@ -5,7 +5,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { failureLine, projectLabel, failuresSummary } from '../../public/observatory/failures-format.js';
+import { failureLine, projectLabel, failuresSummary, groupKey, groupAlerts, causeLabel, episodeLabel } from '../../public/observatory/failures-format.js';
 import { _DETECTOR_TYPES } from '../../public/viz-watchdog.mjs';
 
 const base = {
@@ -190,4 +190,82 @@ test('le resume compte les non acquittees, il ne prononce pas « en cours »', (
     failuresSummary([{ acknowledged: false }, { acknowledged: true }, { acknowledged: false }]),
     '2 non acquittées',
   );
+});
+
+// ── Regroupement par cause ─────────────────────────────────────────────────
+
+test('la clef de groupe suit la cause, pas l episode', () => {
+  assert.equal(groupKey(invocation), 'badInvocation:inv-bash-windows-path-unquoted');
+  assert.equal(groupKey(base), 'loop:Bash');
+  assert.equal(groupKey({ ...base, type: 'retryStorm', toolName: 'Grep' }), 'retryStorm:Grep');
+  assert.equal(groupKey({ ...base, type: 'stuck' }), 'stuck');
+});
+
+test('les episodes d une meme cause se regroupent, tries du plus recent au plus ancien', () => {
+  const groupes = groupAlerts([
+    { ...invocation, createdAt: 100, acknowledged: true },
+    { ...invocation, createdAt: 300, acknowledged: false },
+    { ...invocation, createdAt: 200, acknowledged: false },
+  ]);
+  assert.equal(groupes.length, 1);
+  assert.deepEqual(groupes[0].episodes.map(e => e.createdAt), [300, 200, 100]);
+  assert.equal(groupes[0].lastAt, 300);
+  assert.equal(groupes[0].unacked, 2);
+});
+
+test('les groupes a traiter passent devant, puis le plus recent', () => {
+  const groupes = groupAlerts([
+    { ...base, createdAt: 900, acknowledged: true },                       // loop, soldé, récent
+    { ...invocation, createdAt: 100, acknowledged: false },                // à traiter, ancien
+    { ...base, type: 'retryStorm', createdAt: 500, acknowledged: false },  // à traiter, récent
+  ]);
+  assert.deepEqual(groupes.map(g => g.key),
+    ['retryStorm:Bash', 'badInvocation:inv-bash-windows-path-unquoted', 'loop:Bash']);
+});
+
+test('une liste absente ou abimee rend une liste vide, sans jeter', () => {
+  assert.deepEqual(groupAlerts(undefined), []);
+  assert.equal(groupAlerts([{ type: 'loop' }]).length, 1, 'une alerte sans champs se groupe quand meme');
+});
+
+// ── Libellés : la cause n emprunte jamais les chiffres d un episode ────────
+
+test('causeLabel nomme la cause, sans compter', () => {
+  const [g] = groupAlerts([{ ...base, count: 4 }, { ...base, count: 7, createdAt: 50 }]);
+  assert.equal(causeLabel(g), 'Bash · même commande répétée');
+  assert.doesNotMatch(causeLabel(g), /\d/);
+});
+
+test('causeLabel d un appel mal forme reprend la phrase du motif', () => {
+  const [g] = groupAlerts([invocation]);
+  assert.equal(causeLabel(g),
+    'Bash · appel mal formé : un chemin Windows non protégé sous un shell POSIX');
+});
+
+test('l outil ne se dit que s il est uniforme dans le groupe', () => {
+  const [g] = groupAlerts([
+    { ...invocation, toolName: 'Bash' },
+    { ...invocation, toolName: 'PowerShell', createdAt: 50 },
+  ]);
+  assert.equal(causeLabel(g),
+    'appel mal formé : un chemin Windows non protégé sous un shell POSIX');
+});
+
+test('causeLabel des autres types', () => {
+  assert.equal(causeLabel(groupAlerts([{ ...base, type: 'retryStorm' }])[0]),
+    'Bash · échecs consécutifs');
+  assert.equal(causeLabel(groupAlerts([{ ...base, type: 'stuck', toolName: '' }])[0]),
+    'Aucun événement · outils encore en vol');
+  assert.equal(causeLabel(groupAlerts([{ ...base, type: 'pricingDrift' }])[0]),
+    'pricingDrift', 'un type inconnu se rend lisible plutot que vide');
+});
+
+test('episodeLabel dit les faits du seul episode', () => {
+  assert.equal(episodeLabel(base), 'même commande 4×, 3 sur 4 en échec');
+  assert.equal(episodeLabel({ ...base, type: 'retryStorm', count: 3 }), '3 échecs consécutifs');
+  assert.equal(episodeLabel({ ...base, type: 'stuck', count: 2 }), '2 outils encore en vol');
+  assert.equal(episodeLabel({ ...base, type: 'stuck', count: 1 }), '1 outil encore en vol');
+  assert.equal(episodeLabel({ ...invocation, count: 3 }), '3 fois dans la session');
+  assert.equal(episodeLabel(invocation), '', 'une premiere occurrence ne parle pas de repetition');
+  assert.equal(episodeLabel({ ...base, type: 'pricingDrift' }), '');
 });
