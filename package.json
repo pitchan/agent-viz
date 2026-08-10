@@ -39,6 +39,7 @@
     "test": "node --test \"tests/**/*.test.*\"",
     "test:engine": "vitest run --root netgain",
     "typecheck:engine": "tsc --noEmit -p netgain/tsconfig.json",
+    "prepare": "npm run build",
     "prepublishOnly": "npm run build && npm run test:engine && npm test && npm pack --dry-run"
   },
   "keywords": [

@@ -95,19 +95,42 @@ test('CARACTÉRISATION — _source absent laisse agentSource indéfini, jamais �
     'le commentaire du module l’exige : ne pas coercer silencieusement vers « claude »');
 });
 
-test('CARACTÉRISATION — une première ligne préfixée d’un BOM fait perdre agentSource', async () => {
+// CHANGEMENT DE COMPORTEMENT, assumé et daté — C2, 2026-08-11.
+//
+// Ce test épinglait la perte : le BOM faisait échouer le `JSON.parse` local de
+// la sonde, `_source` était perdu, et seule une ligne sur `console.error` en
+// gardait trace. Il est passé au ROUGE au moment où `indexSessionInitial` a
+// adopté `decodeJsonlLine`. Changement voulu, même arbitrage que partout :
+// tolérer le BOM, comme le moteur.
+test('C2 — une première ligne préfixée d’un BOM ne fait plus perdre agentSource', async () => {
   const BOM = String.fromCharCode(0xFEFF);
   const { fp, id } = poseUnFichier(BOM + evenement({ _source: 'copilot' }) + '\n');
 
   await indexSessionInitial(fp);
 
   const rec = sessionIndex.get(id);
-  assert.notEqual(rec, undefined, 'la session doit être indexée malgré l’échec de la sonde');
-  assert.equal(rec.agentSource, undefined,
-    'comportement ACTUEL : le BOM fait échouer JSON.parse et la source est perdue. ' +
-    'Troisième tolérance au BOM différente parmi les sept sites de C2 — celle-ci journalise ' +
-    'sur console.error, là où housekeep.js avale en silence.');
-  assert.equal(rec.eventCount, 1, 'le reste de l’indexation, lui, aboutit');
+  assert.notEqual(rec, undefined);
+  assert.equal(rec.agentSource, 'copilot', 'le BOM ne doit plus coûter la source de l’agent');
+  assert.equal(rec.eventCount, 1);
+});
+
+test('CARACTÉRISATION — une première ligne illisible laisse toujours une trace journalisée', async () => {
+  // Le décodeur ne lève plus, donc le `catch` ne peut plus servir de filet :
+  // c'est le verdict `{ok:false}` qui doit être lu. On vérifie que l'échec reste
+  // VISIBLE — la leçon de C1 : ne jamais échouer en silence.
+  const { fp, id } = poseUnFichier('{tronquee\n' + evenement({ _source: 'copilot' }) + '\n');
+  const erreurs = [];
+  const original = console.error;
+  console.error = msg => erreurs.push(String(msg));
+  try {
+    await indexSessionInitial(fp);
+  } finally {
+    console.error = original;
+  }
+
+  assert.equal(sessionIndex.get(id).agentSource, undefined, 'une première ligne cassée ne donne pas de source');
+  assert.equal(erreurs.length, 1, 'l’échec doit laisser exactement une trace');
+  assert.match(erreurs[0], /première ligne illisible/, 'la trace doit nommer la cause');
 });
 
 test('CARACTÉRISATION — une première ligne de plus de 4 Ko est tronquée, donc illisible', async () => {

@@ -132,27 +132,29 @@ test('CARACTÉRISATION — une ligne illisible est comptée dans totalEvents mai
   }
 });
 
-test('CARACTÉRISATION — ce décodeur ne tolère PAS le BOM : l’événement est perdu en silence', async () => {
+// CHANGEMENT DE COMPORTEMENT, assumé et daté — C2, 2026-08-11.
+//
+// Ce test épinglait l’inverse jusqu’au passage à la primitive commune : une
+// ligne préfixée d’un BOM ailleurs qu’en tête de fichier était rejetée par le
+// `JSON.parse` local, et l’événement disparaissait du résumé sans un mot. Il
+// est passé au ROUGE quand `compactSession` a adopté `decodeJsonlLine` — c’est
+// exactement ce pour quoi il avait été écrit : rendre le changement visible et
+// obliger à le valider, au lieu de le laisser passer inaperçu.
+//
+// Arbitrage retenu : tolérer le BOM partout, comme le moteur le fait déjà.
+test('C2 — un BOM est désormais toléré où qu’il soit dans le fichier', async () => {
   const BOM = String.fromCharCode(0xFEFF);
   const lignes = Array.from({ length: COMPACT_KEEP_EVENTS + 20 }, (_, i) => evenementOutil(i));
-  lignes[3] = BOM + lignes[3];
+  lignes[3] = BOM + lignes[3]; // au milieu : aucun `content.trim()` ne peut l’atteindre
   const s = poseUneSession(lignes);
 
   await compactSession(s.fp);
 
   const resume = litResume(s.resume);
   const vus = new Set(resume.tools.map(t => t.id));
-  // Assertion discriminante : on nomme la ligne perdue, au lieu d’en compter une
-  // de moins — sinon le test passerait aussi si c’était une autre qui manquait.
-  assert.equal(vus.has('t3'), false,
-    'comportement ACTUEL : la ligne préfixée d’un BOM est rejetée et disparaît du résumé. ' +
-    'C’est précisément la tolérance « incidente et inégale » que décrit C2 — si C2 la rend ' +
-    'uniforme, ce test devient rouge et devra être mis à jour SCIEMMENT, pas contourné.');
-  assert.equal(vus.size, lignes.length - 1, 'une seule ligne doit manquer, et c’est celle au BOM');
-  for (let i = 0; i < lignes.length; i++) {
-    if (i === 3) continue;
-    assert.equal(vus.has(`t${i}`), true, `l’événement t${i} a disparu alors qu’il n’a pas de BOM`);
-  }
+  assert.equal(vus.has('t3'), true,
+    'l’événement préfixé d’un BOM doit maintenant être décodé, pas perdu');
+  assert.equal(vus.size, lignes.length, 'aucune ligne ne doit plus manquer');
 });
 
 test('CARACTÉRISATION — une ligne vide au milieu est traitée comme une ligne illisible', async () => {
