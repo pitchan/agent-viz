@@ -350,8 +350,10 @@ du code si elle n'est faite que dans un des trois fichiers.
 ## Ce qui est sain
 
 Un rapport qui ne liste que des défauts ment par omission (doc/34), et des
-développeurs le sentent. Huit réponses « c'est sain » suivent, chacune avec
-sa preuve exécutable.
+développeurs le sentent. Huit réponses « c'est sain » suivent. Deux se
+rejouent par une commande (`node --test`, sortie citée) ; les six autres
+citent le fichier exact ou le résultat JSON qui porte la preuve — aucune
+n'avance sans source vérifiable.
 
 ### Le miroir tarifaire de `lib/server/pricing.js`
 
@@ -546,8 +548,8 @@ produit alors aucun groupe commun.
 ### Limites de `docs/audit/resultats/d6.json` (bloc `limites`, verbatim)
 
 > - Un chargement dynamique (import() calculé, VM, processus enfant) échappe aux deux mesures.
-> - Le moteur n'a pas de couverture d'exécution : atteignabilité statique seulement.
-> - Un fichier « sans preuve d'exécution » n'est PAS un fichier non testé.
+> - Le moteur n’a pas de couverture d’exécution : atteignabilité statique seulement.
+> - Un fichier « sans preuve d’exécution » n’est PAS un fichier non testé.
 
 ### Limites des détecteurs (en-têtes, verbatim)
 
@@ -579,14 +581,19 @@ Recopiées sans reformulation depuis l'en-tête de chaque script cité.
 >      `const r = /re/ / 2; const s = 10 / 5;` tokenise en
 >      `["const","r","=","/re/","/ 2; const s = 10 /","NUM",";"]` — le
 >      deuxième `/` de `/re/` combiné à celui de la division fabrique une
->      fausse regex qui avale `2; const s = 10 ` en entier. Corollaire
->      vérifié : une regex AVEC drapeau est saine, car la lettre du drapeau
->      se lit comme un pseudo-identifiant et disqualifie le `/` suivant.
+>      fausse regex qui avale `2; const s = 10 ` en entier, la même famille
+>      de panne que celle que cette heuristique existe pour éliminer,
+>      atteinte par une autre route. Corollaire vérifié : une regex AVEC
+>      drapeau est saine, car la lettre du drapeau se lit comme un
+>      pseudo-identifiant et disqualifie le `/` suivant :
+>      `const r = /re/g / 2; const s = 10 / 5;` tokenise correctement en
+>      `["const","r","=","/re/g","/","NUM",";","const","s","=","NUM","/","NUM",";"]`.
 >      VÉRIFIÉ ABSENT de ce dépôt à ce commit (642 portées D5 stables,
 >      `d1.json` identique au jeton près, 0 fichier déséquilibré sur 113
 >      après le correctif de cette même tâche) : c'est une limite NOMMÉE, pas
 >      un défaut vivant. Non corrigée — chaque changement du socle coûte un
 >      nouveau cycle D1/D5 et une revue, pour un cas absent de ce corpus.
+>      Arbitrage du contrôleur (2026-08-10).
 
 **`d1-clones.mjs`** :
 
@@ -625,6 +632,15 @@ Recopiées sans reformulation depuis l'en-tête de chaque script cité.
 
 **`d3-many-paths.mjs`** :
 
+*Exception déclarée à la règle « verbatim » : le fragment cité juste en
+dessous, ``['"`]\s*\$``, contient un guillemet oblique en son sein (le
+caractère qui, dans cette classe de caractères regex, détecte un guillemet
+oblique littéral). Le commentaire source l'encadre d'un seul niveau de
+guillemets obliques ; recopié tel quel, ce guillemet interne casserait le
+rendu Markdown en fermant la portée de code trop tôt. Le texte est identique
+au caractère près à celui du fichier source ; seul le délimiteur Markdown
+qui l'entoure a été élargi à deux guillemets obliques.*
+
 > LIMITE ASSUMÉE : ces motifs sont syntaxiques. Un formatage écrit autrement
 > (Intl, bibliothèque tierce) passerait au travers — aucun n'existe dans ce
 > dépôt au commit audité, et c'est précisément ce que dit le constat sur les
@@ -639,8 +655,9 @@ Recopiées sans reformulation depuis l'en-tête de chaque script cité.
 > (la 2ᵉ et la 4ᵉ) ; la 1ʳᵉ et la 3ᵉ, où le `$` précède le guillemet ou suit
 > `USD`, n'avaient pas ce problème et sont inchangées. LIMITE RESTANTE,
 > vérifiée : un `$` nu suivant un guillemet est toujours pris pour une devise
-> qu'il en soit une ou non ; et un formatage monétaire écrit sans `$` ni
-> `USD` reste invisible à cette famille.
+> qu'il en soit une ou non (ex. un séparateur de fin de motif quelconque) ;
+> et un formatage monétaire écrit sans `$` ni `USD` reste invisible à cette
+> famille.
 
 *Note du rapport (correction différée depuis la tâche 3) : la phrase
 ci-dessus, recopiée verbatim, décrit la 3ᵉ alternative comme un cas où
@@ -659,35 +676,37 @@ commentaire l'était.*
 > annonce « aucun cycle » sans dire combien d'arêtes il n'a pas vues ment par
 > omission.
 >
-> Ce qui reste NON couvert, faute d'usage constaté pour le justifier :
-> `usesFetch` teste le texte BRUT, pas neutralisé — un `fetch(` écrit dans un
-> commentaire fabriquerait un import d'E/S fantôme exactement sur le même
-> principe. Mesuré sur ce dépôt à ce commit : aucun cas (`fetch(` n'apparaît
-> jamais UNIQUEMENT dans un commentaire) — c'est donc une zone aveugle non
-> déclenchée, pas un défaut corrigé. Par ailleurs la première alternative de
-> `SPEC` (`import|export ... from ...`) utilise `[^'"()]*?` qui franchit
-> toujours les retours à la ligne : une construction inhabituelle en code
-> réel (pas en commentaire) pourrait en principe encore faire pont entre deux
-> instructions distinctes.
+> Ce qui reste NON couvert par ce correctif, faute d'usage constaté pour le
+> justifier : `usesFetch`, plus bas, teste le texte BRUT, pas neutralisé — un
+> `fetch(` écrit dans un commentaire fabriquerait un import d'I/O fantôme
+> exactement sur le même principe. Mesuré sur ce dépôt à ce commit : aucun
+> cas (`fetch(` n'apparaît jamais UNIQUEMENT dans un commentaire) — c'est
+> donc une zone aveugle non déclenchée, pas un défaut corrigé. Par ailleurs
+> la première alternative de SPEC (`import|export ... from ...`) utilise
+> `[^'"()]*?` qui franchit toujours les retours à la ligne : une construction
+> inhabituelle en code réel (pas en commentaire) pourrait en principe encore
+> faire pont entre deux instructions distinctes.
 >
 > Ce qui reste : l'heuristique regex-vs-division reprend celle de
 > `lib/tokens.mjs` telle quelle, y compris son ambiguïté résiduelle assumée
-> sur `}`. Un risque distinct, plus grave, a aussi été soulevé par relecture :
-> un `/*` littéral À L'INTÉRIEUR d'une classe de caractères d'une regex
-> (ex. `/[/*]/`) pourrait, si l'heuristique classe par erreur cette position
-> comme une division, être lu par l'alternative de commentaire de BLOC comme
-> une ouverture réelle — celui-là BLANCHIRAIT du code réel et pourrait donc
-> faire perdre une arête, contrairement au guillemet non apparié qui n'en
-> fait jamais perdre. VÉRIFIÉ ABSENT de ce dépôt (recherché sur les
-> 113 fichiers : aucune classe de caractères de regex ne contient de
+> sur `}` (un `/` après `}` est traité comme une regex par défaut — voir la
+> « DÉCISION ÉCRITE » de `lib/tokens.mjs` pour le détail et sa justification,
+> non répétée ici). Un risque distinct, plus grave, a aussi été soulevé par
+> relecture : un `/*` littéral À L'INTÉRIEUR d'une classe de caractères d'une
+> regex (ex. `/[/*]/`) pourrait, si l'heuristique classe par erreur cette
+> position comme une division, être lu par l'alternative de commentaire de
+> BLOC comme une ouverture réelle — celui-là BLANCHIRAIT du code réel et
+> pourrait donc faire perdre une arête, contrairement au guillemet non
+> apparié qui n'en fait jamais perdre. VÉRIFIÉ ABSENT de ce dépôt (recherché
+> sur les 113 fichiers : aucune classe de caractères de regex ne contient de
 > séquence `/*` littérale) — risque nommé, non rencontré, non couvert par un
 > contrôle automatisé.
 >
 > Autre limite constatée : un spécificateur relatif qui vise un fichier réel
 > mais d'une extension hors périmètre (`.js`/`.mjs`/`.ts` seulement — voir
-> `lib/source-files.mjs`) ne résout jamais et finit dans `nonResolus` sans
-> être une faute de frappe. Constaté sur
-> `lib/server/observatory/engine.js` → `../../../package.json`.
+> lib/source-files.mjs) ne résout jamais et finit dans `nonResolus` sans être
+> une faute de frappe. Constaté sur `lib/server/observatory/engine.js` →
+> `../../../package.json`.
 
 **`d5-volumetry.mjs`** :
 
@@ -697,19 +716,21 @@ commentaire l'était.*
 > sont absentes. La v1 appelait ça « fonctions » tout court, ce qui laissait
 > croire à une couverture qu'elle n'avait pas.
 >
-> Ce qui RESTE vrai après le correctif du socle : D5 hérite de toute limite
-> résiduelle de `lib/tokens.mjs` (voir son en-tête pour le détail, non
-> dupliqué ici) — l'ambiguïté de `}` non résolue par construction, le
-> mot-clé contextuel `of` délibérément non couvert, ET une division qui suit
-> immédiatement une regex SANS DRAPEAU. Aucun de ces cas n'a été mesuré dans
-> ce dépôt à ce commit.
+> Ce qui RESTE vrai après le correctif : D5 hérite de toute limite résiduelle
+> de `lib/tokens.mjs` (voir son en-tête pour le détail, non dupliqué ici) —
+> l'ambiguïté de `}` non résolue par construction, le mot-clé contextuel `of`
+> délibérément non couvert, ET une division qui suit immédiatement une regex
+> SANS DRAPEAU (trouvé par la revue, 2026-08-10 — mécanisme, reproduction et
+> vérification d'absence dans l'en-tête de `lib/tokens.mjs`). Aucun de ces
+> cas n'a été mesuré dans ce dépôt à ce commit.
 
 **`d7-boundary.mjs`** :
 
 > LIMITES DE CE DÉTECTEUR, écrites au moment où elles sont acceptées
 > (tâche 7) :
->   1. `verifyMatrix` ne regarde que les zones `server` et `engine`. Un site
->      qui correspond au motif dans la zone `web` est invisible par
+>   1. `verifyMatrix` ne regarde que les zones `server` et `engine` (voir le
+>      filtre dans la boucle `sitesInattendus` ci-dessous). Un site qui
+>      correspond au motif dans la zone `web` est invisible par
 >      construction — ce n'est pas un oubli, c'est le périmètre : D7
 >      surveille la frontière produit/moteur, pas le client web. Exemple
 >      mesuré sur ce dépôt : `public/viz-network.js:212` correspond au motif
@@ -732,7 +753,7 @@ commentaire l'était.*
 
 Les champs `raison` de `d7.json` ne disent pas toujours pourquoi un fichier
 hors-propos figure dans `coteMoteur` — l'explication vit dans un commentaire
-de code (`d7-boundary.mjs:95-98` pour `decodage-jsonl`, `:60-64` pour
+de code (`d7-boundary.mjs:95-98` pour `decodage-jsonl`, `:60-63` pour
 `resolution-du-dossier-de-configuration`), invisible à qui lit `d7.json`
 seul. Deux exemples réels : `netgain/src/mcp/main.ts` figure dans
 `coteMoteur` du geste `decodage-jsonl` sans aucun rapport avec
