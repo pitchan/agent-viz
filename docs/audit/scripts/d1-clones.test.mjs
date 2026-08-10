@@ -38,9 +38,13 @@ test('contrôle négatif : un même fichier ne se clone pas avec lui-même', () 
   assert.equal(findClones([{ path: 'a.js', zone: 'server', text: CLONE }]).length, 0);
 });
 
-test('contrôle négatif : deux fragments de même empreinte mais de contenu différent ne sont jamais groupés', () => {
-  // On force la collision en appelant directement le regroupement exact :
-  // deux séquences distinctes ne doivent pas se retrouver dans un même groupe.
+test('contrôle négatif : deux fragments de contenu différent ne sont jamais groupés', () => {
+  // Ce contrôle vérifie que deux contenus distincts restent séparés. Il
+  // n'exerce PAS la levée de collision d'empreinte : forcer deux séquences de
+  // 60 jetons dans un même seau demanderait de piloter `fingerprint`, qui n'est
+  // pas exporté. Cette garantie-là reste structurelle et non couverte par un
+  // test — l'étape 2 regroupe sur la séquence de jetons elle-même, jamais sur
+  // l'empreinte.
   const a = `function f() {\n${'  const a1 = 1;\n'.repeat(30)}}\n`;
   const b = `function f() {\n${'  const b1 = 2;\n'.repeat(30)}}\n`;
   const groups = findClones([
