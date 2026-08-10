@@ -19,6 +19,7 @@ export const DETECTORS = {
   d4: async (files) => (await import('./d4-import-graph.mjs')).analyseGraph(files),
   d5: async (files) => (await import('./d5-volumetry.mjs')).measure(files),
   d6: async (files) => (await import('./d6-coverage.mjs')).coverageReport(files, lireTests(), lireCouverture()),
+  d7: async (files) => (await import('./d7-boundary.mjs')).verifyMatrix(files),
 };
 
 export async function runOne(name) {

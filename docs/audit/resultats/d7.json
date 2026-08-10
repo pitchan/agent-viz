@@ -1,0 +1,97 @@
+{
+  "detecteur": "d7",
+  "commitSources": "4a4dc46",
+  "commitOutils": "6d57876",
+  "nonSuivis": [
+    "M docs/audit/scripts/run.mjs",
+    "?? docs/audit/scripts/d7-boundary.mjs",
+    "?? docs/audit/scripts/d7-boundary.test.mjs",
+    "?? tests/CLAUDE.md"
+  ],
+  "node": "v24.15.0",
+  "genereLe": "2026-08-10T16:31:39.249Z",
+  "gestes": [
+    {
+      "geste": "decouverte-de-sessions",
+      "verdict": "strategies-opposees",
+      "raison": "le serveur reçoit transcript_path poussé par le crochet (transcript-adapters/claude.js) ; le moteur balaie ~/.claude/projects (core/discovery.ts). Ce n’est pas une duplication, et la fusion ne doit pas les confondre.",
+      "coteServeur": [
+        "lib/server/transcript-adapters/claude.js"
+      ],
+      "coteMoteur": [
+        "netgain/src/core/discovery.ts"
+      ],
+      "sitesManquants": [],
+      "sitesInattendus": []
+    },
+    {
+      "geste": "resolution-du-dossier-de-configuration",
+      "verdict": "duplique",
+      "raison": "deux variables d’environnement pour désigner le même dossier dans un seul paquet npm : CLAUDE_CONFIG_DIR côté produit, NETGAIN_CLAUDE_DIR côté moteur. Un utilisateur qui en pose une n’agit que sur une moitié.",
+      "coteServeur": [
+        "lib/server/observatory/index.js"
+      ],
+      "coteMoteur": [
+        "netgain/src/doctor/index.ts",
+        "netgain/src/cli.ts"
+      ],
+      "sitesManquants": [],
+      "sitesInattendus": []
+    },
+    {
+      "geste": "decodage-jsonl",
+      "verdict": "duplique",
+      "raison": "le moteur a UN module dédié au décodage ligne à ligne, netgain/src/core/jsonl.ts : lecture en flux, BOM retiré, lignes vides sautées, une ligne cassée signalée { ok: false } plutôt qu’avalée. Le serveur réimplémente ce décodage à 8 sites répartis sur 7 fichiers. La tolérance au BOM y est incidente et inégale : lib/server/housekeep.js:33 et lib/server/event-reader.js:120 ne survivent à un BOM que parce qu’ils trim() le buffer entier pour une raison sans rapport — U+FEFF appartient à la production WhiteSpace d’ECMAScript, donc trim() l’enlève, alors que JSON.parse le rejette net ; lib/server/watchdog/catch-up.js:84 et lib/server/watchdog/journal.js:141 ne trim() que pour tester une ligne vide puis parsent la chaîne NON trimmée ; les autres sites ne trim() jamais. Cible : une seule primitive de décodage de ligne, partagée par les différents modes de lecture. Le suivi incrémental de lib/server/transcript.js:199, qui porte un `leftover` pour une ligne partielle en suivant un fichier qui grossit, reste spécialisé et ne doit pas y être replié.",
+      "coteServeur": [
+        "lib/server/transcript.js",
+        "lib/server/event-reader.js",
+        "lib/server/housekeep.js",
+        "lib/server/session-index.js",
+        "lib/server/transcript-adapters/claude.js",
+        "lib/server/watchdog/catch-up.js",
+        "lib/server/watchdog/journal.js"
+      ],
+      "coteMoteur": [
+        "netgain/src/core/jsonl.ts",
+        "netgain/src/mcp/main.ts"
+      ],
+      "sitesManquants": [],
+      "sitesInattendus": []
+    },
+    {
+      "geste": "agregation-de-jetons",
+      "verdict": "duplique",
+      "raison": "les deux côtés accumulent les quatre mêmes champs bruts d’usage avec les mêmes gardes à zéro — accumulateUsage de lib/server/tokens.js et addUsage de netgain/src/doctor/aggregators/tokens.ts. Les DEUX dédupliquent par identifiant de message, et les DEUX seulement quand un identifiant est présent (if (msgId) côté serveur, if (evt.msgId !== null) côté moteur) : il n’y a pas de divergence là — un brouillon précédent de cette matrice en affirmait une, et il a été corrigé. Le moteur suit en plus cacheCreate1h et cacheCreate5m, que le serveur ne suit pas. tokenSum et netTokens sont DEUX métriques DISTINCTES, pas deux implémentations d’un même geste — netTokens est la convention de mesure (cache_read exclu, énoncé comme tel) et tokenSum un total de débogage ; ne pas les présenter comme quelque chose à fusionner. Cible : une seule primitive d’accumulation d’usage, partagée.",
+      "coteServeur": [
+        "lib/server/observatory/provenance.js",
+        "lib/server/pricing.js",
+        "lib/server/tokens.js"
+      ],
+      "coteMoteur": [
+        "netgain/src/core/events.ts",
+        "netgain/src/core/pricing.ts",
+        "netgain/src/doctor/aggregators/context.ts",
+        "netgain/src/doctor/aggregators/tokens.ts",
+        "netgain/src/doctor/aggregators/turns.ts"
+      ],
+      "sitesManquants": [],
+      "sitesInattendus": []
+    },
+    {
+      "geste": "tarification",
+      "verdict": "duplique",
+      "raison": "l’arithmétique est identique et le mirroring est délibéré — le docblock de netgain/src/core/pricing.ts dit littéralement « Reproduit la formule agent-viz (pricing.js) », et un test de mirroring contrôlé (netgain/tests/core/pricing.test.ts) le tient en place. La divergence porte sur le contrat de résultat pour un modèle inconnu, et elle est délibérée en sens opposés : le computeCost de lib/server/pricing.js rend 0 et journalise une fois, quand celui de netgain/src/core/pricing.ts rend { usd: null, known: false } avec la raison énoncée qu’un tarif qu’on ne connaît pas ne s’invente pas. Un seul paquet npm, deux moitiés, une seule session : l’une dit zéro dollar, l’autre dit qu’elle ne sait pas. Cible : unifier le contrat de résultat ET propager l’inconnu jusqu’à l’affichage en direct, pour qu’un utilisateur ne voie jamais un 0 $ silencieux.",
+      "coteServeur": [
+        "lib/server/pricing.js",
+        "lib/server/tokens.js"
+      ],
+      "coteMoteur": [
+        "netgain/src/core/pricing.ts",
+        "netgain/src/doctor/aggregators/tokens.ts"
+      ],
+      "sitesManquants": [],
+      "sitesInattendus": []
+    }
+  ],
+  "coherente": true
+}
