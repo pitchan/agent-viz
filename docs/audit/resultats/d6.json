@@ -1,0 +1,397 @@
+{
+  "detecteur": "d6",
+  "commitSources": "4a4dc46",
+  "commitOutils": "4314215",
+  "nonSuivis": [
+    "M docs/audit/scripts/run.mjs",
+    "?? docs/audit/resultats/couverture.lcov",
+    "?? docs/audit/resultats/d6.json",
+    "?? docs/audit/scripts/d6-coverage.mjs",
+    "?? docs/audit/scripts/d6-coverage.test.mjs",
+    "?? tests/CLAUDE.md"
+  ],
+  "node": "v24.15.0",
+  "genereLe": "2026-08-10T15:50:11.584Z",
+  "executee": [
+    {
+      "path": "public/observatory/advisor-view.js",
+      "lignesCouvertes": 39,
+      "lignesTotales": 197
+    },
+    {
+      "path": "lib/server/housekeep.js",
+      "lignesCouvertes": 31,
+      "lignesTotales": 151
+    },
+    {
+      "path": "public/viz-layout.js",
+      "lignesCouvertes": 153,
+      "lignesTotales": 575
+    },
+    {
+      "path": "public/observatory/period-selector.js",
+      "lignesCouvertes": 8,
+      "lignesTotales": 25
+    },
+    {
+      "path": "lib/server/routes.js",
+      "lignesCouvertes": 124,
+      "lignesTotales": 325
+    },
+    {
+      "path": "public/observatory/analysis-view.js",
+      "lignesCouvertes": 67,
+      "lignesTotales": 150
+    },
+    {
+      "path": "lib/server/session-index.js",
+      "lignesCouvertes": 72,
+      "lignesTotales": 129
+    },
+    {
+      "path": "lib/server/observatory/index.js",
+      "lignesCouvertes": 23,
+      "lignesTotales": 40
+    },
+    {
+      "path": "lib/install-hooks.js",
+      "lignesCouvertes": 488,
+      "lignesTotales": 743
+    },
+    {
+      "path": "public/viz-state.js",
+      "lignesCouvertes": 151,
+      "lignesTotales": 216
+    },
+    {
+      "path": "lib/server/sse.js",
+      "lignesCouvertes": 17,
+      "lignesTotales": 24
+    },
+    {
+      "path": "lib/server/transcript.js",
+      "lignesCouvertes": 270,
+      "lignesTotales": 359
+    },
+    {
+      "path": "public/viz-watchdog-client.js",
+      "lignesCouvertes": 175,
+      "lignesTotales": 230
+    },
+    {
+      "path": "lib/server/event-reader.js",
+      "lignesCouvertes": 202,
+      "lignesTotales": 249
+    },
+    {
+      "path": "lib/server/pricing.js",
+      "lignesCouvertes": 306,
+      "lignesTotales": 357
+    },
+    {
+      "path": "public/observatory/api.js",
+      "lignesCouvertes": 75,
+      "lignesTotales": 82
+    },
+    {
+      "path": "lib/server/observatory/service.js",
+      "lignesCouvertes": 166,
+      "lignesTotales": 180
+    },
+    {
+      "path": "public/observatory/failures-view.js",
+      "lignesCouvertes": 124,
+      "lignesTotales": 134
+    },
+    {
+      "path": "public/viz-narrator.js",
+      "lignesCouvertes": 218,
+      "lignesTotales": 229
+    },
+    {
+      "path": "lib/server/tokens.js",
+      "lignesCouvertes": 131,
+      "lignesTotales": 137
+    },
+    {
+      "path": "lib/server/observatory/config-audit.js",
+      "lignesCouvertes": 101,
+      "lignesTotales": 103
+    },
+    {
+      "path": "lib/server/observatory/routes.js",
+      "lignesCouvertes": 136,
+      "lignesTotales": 138
+    },
+    {
+      "path": "lib/prompt-install.js",
+      "lignesCouvertes": 142,
+      "lignesTotales": 142
+    },
+    {
+      "path": "lib/server/observatory/engine.js",
+      "lignesCouvertes": 65,
+      "lignesTotales": 65
+    },
+    {
+      "path": "lib/server/observatory/mcp-usage.js",
+      "lignesCouvertes": 34,
+      "lignesTotales": 34
+    },
+    {
+      "path": "lib/server/observatory/migrations.js",
+      "lignesCouvertes": 25,
+      "lignesTotales": 25
+    },
+    {
+      "path": "lib/server/observatory/model-costs.js",
+      "lignesCouvertes": 63,
+      "lignesTotales": 63
+    },
+    {
+      "path": "lib/server/observatory/project-label.js",
+      "lignesCouvertes": 67,
+      "lignesTotales": 67
+    },
+    {
+      "path": "lib/server/observatory/provenance.js",
+      "lignesCouvertes": 77,
+      "lignesTotales": 77
+    },
+    {
+      "path": "lib/server/observatory/rules/cost.js",
+      "lignesCouvertes": 41,
+      "lignesTotales": 41
+    },
+    {
+      "path": "lib/server/observatory/rules/cross-links.js",
+      "lignesCouvertes": 30,
+      "lignesTotales": 30
+    },
+    {
+      "path": "lib/server/observatory/rules/r1-prefix-change.js",
+      "lignesCouvertes": 119,
+      "lignesTotales": 119
+    },
+    {
+      "path": "lib/server/observatory/rules/r2-unused-mcp.js",
+      "lignesCouvertes": 72,
+      "lignesTotales": 72
+    },
+    {
+      "path": "lib/server/observatory/rules/r3-large-tool-output.js",
+      "lignesCouvertes": 88,
+      "lignesTotales": 88
+    },
+    {
+      "path": "lib/server/observatory/rules/r4-cross-agent-reads.js",
+      "lignesCouvertes": 60,
+      "lignesTotales": 60
+    },
+    {
+      "path": "lib/server/observatory/rules/r5-compactions.js",
+      "lignesCouvertes": 56,
+      "lignesTotales": 56
+    },
+    {
+      "path": "lib/server/observatory/rules/r6-short-subagents.js",
+      "lignesCouvertes": 83,
+      "lignesTotales": 83
+    },
+    {
+      "path": "lib/server/observatory/rules/ranking.js",
+      "lignesCouvertes": 65,
+      "lignesTotales": 65
+    },
+    {
+      "path": "lib/server/observatory/rules/registry.js",
+      "lignesCouvertes": 29,
+      "lignesTotales": 29
+    },
+    {
+      "path": "lib/server/observatory/rules/thresholds.js",
+      "lignesCouvertes": 42,
+      "lignesTotales": 42
+    },
+    {
+      "path": "lib/server/observatory/scan-version.js",
+      "lignesCouvertes": 24,
+      "lignesTotales": 24
+    },
+    {
+      "path": "lib/server/observatory/scan.js",
+      "lignesCouvertes": 55,
+      "lignesTotales": 55
+    },
+    {
+      "path": "lib/server/observatory/session-mapper.js",
+      "lignesCouvertes": 53,
+      "lignesTotales": 53
+    },
+    {
+      "path": "lib/server/observatory/store.js",
+      "lignesCouvertes": 230,
+      "lignesTotales": 230
+    },
+    {
+      "path": "lib/server/observatory/summary.js",
+      "lignesCouvertes": 27,
+      "lignesTotales": 27
+    },
+    {
+      "path": "lib/server/transcript-adapters/claude.js",
+      "lignesCouvertes": 76,
+      "lignesTotales": 76
+    },
+    {
+      "path": "lib/server/transcript-adapters/copilot.js",
+      "lignesCouvertes": 13,
+      "lignesTotales": 13
+    },
+    {
+      "path": "lib/server/transcript-adapters/index.js",
+      "lignesCouvertes": 25,
+      "lignesTotales": 25
+    },
+    {
+      "path": "lib/server/watchdog/catch-up.js",
+      "lignesCouvertes": 94,
+      "lignesTotales": 94
+    },
+    {
+      "path": "lib/server/watchdog/index.js",
+      "lignesCouvertes": 227,
+      "lignesTotales": 227
+    },
+    {
+      "path": "lib/server/watchdog/journal.js",
+      "lignesCouvertes": 339,
+      "lignesTotales": 339
+    },
+    {
+      "path": "lib/server/watchdog/routes.js",
+      "lignesCouvertes": 191,
+      "lignesTotales": 191
+    },
+    {
+      "path": "lib/server/watchdog/service.js",
+      "lignesCouvertes": 87,
+      "lignesTotales": 87
+    },
+    {
+      "path": "public/observatory/confirm-button.js",
+      "lignesCouvertes": 24,
+      "lignesTotales": 24
+    },
+    {
+      "path": "public/observatory/evidence.js",
+      "lignesCouvertes": 78,
+      "lignesTotales": 78
+    },
+    {
+      "path": "public/observatory/failures-format.js",
+      "lignesCouvertes": 217,
+      "lignesTotales": 217
+    },
+    {
+      "path": "public/observatory/format.js",
+      "lignesCouvertes": 162,
+      "lignesTotales": 162
+    },
+    {
+      "path": "public/observatory/remedies.js",
+      "lignesCouvertes": 72,
+      "lignesTotales": 72
+    },
+    {
+      "path": "public/observatory/store.js",
+      "lignesCouvertes": 111,
+      "lignesTotales": 111
+    },
+    {
+      "path": "public/viz-alert-format.mjs",
+      "lignesCouvertes": 82,
+      "lignesTotales": 82
+    },
+    {
+      "path": "public/viz-alert-freshness.mjs",
+      "lignesCouvertes": 28,
+      "lignesTotales": 28
+    },
+    {
+      "path": "public/viz-invocation-patterns.mjs",
+      "lignesCouvertes": 369,
+      "lignesTotales": 369
+    },
+    {
+      "path": "public/viz-tool-subject.mjs",
+      "lignesCouvertes": 33,
+      "lignesTotales": 33
+    },
+    {
+      "path": "public/viz-watchdog.mjs",
+      "lignesCouvertes": 655,
+      "lignesTotales": 655
+    }
+  ],
+  "sansPreuveDExecution": [
+    "bin/agent-viz.js",
+    "lib/hook.js",
+    "lib/lifecycle.js",
+    "lib/server.js",
+    "public/observatory/pricing-view.js",
+    "public/viz-canvas.js",
+    "public/viz-drawers.js",
+    "public/viz-network.js",
+    "public/viz-ui.js"
+  ],
+  "atteignableStatiquement": [
+    "netgain/src/cli-args.ts",
+    "netgain/src/core/discovery.ts",
+    "netgain/src/core/events.ts",
+    "netgain/src/core/index.ts",
+    "netgain/src/core/jsonl.ts",
+    "netgain/src/core/pricing.ts",
+    "netgain/src/doctor/aggregators/agent-gestures.ts",
+    "netgain/src/doctor/aggregators/clock.ts",
+    "netgain/src/doctor/aggregators/context.ts",
+    "netgain/src/doctor/aggregators/prompts.ts",
+    "netgain/src/doctor/aggregators/reads.ts",
+    "netgain/src/doctor/aggregators/recognizers.ts",
+    "netgain/src/doctor/aggregators/session-kind.ts",
+    "netgain/src/doctor/aggregators/subagents.ts",
+    "netgain/src/doctor/aggregators/tokens.ts",
+    "netgain/src/doctor/aggregators/tool-results.ts",
+    "netgain/src/doctor/aggregators/turns.ts",
+    "netgain/src/doctor/index.ts",
+    "netgain/src/doctor/report/json.ts",
+    "netgain/src/doctor/report/terminal.ts",
+    "netgain/src/doctor/report/types.ts",
+    "netgain/src/doctor/scan-session.ts",
+    "netgain/src/install/hook-edit.ts",
+    "netgain/src/install/json-file.ts",
+    "netgain/src/install/mcp-edit.ts",
+    "netgain/src/install/paths.ts",
+    "netgain/src/install/status.ts",
+    "netgain/src/map/budget.ts",
+    "netgain/src/map/engine.ts",
+    "netgain/src/map/env.ts",
+    "netgain/src/map/graph.ts",
+    "netgain/src/map/health.ts",
+    "netgain/src/map/routes.ts",
+    "netgain/src/mcp/server.ts",
+    "netgain/src/router/detector.ts",
+    "netgain/src/router/hook.ts",
+    "netgain/src/version.ts"
+  ],
+  "inatteignable": [
+    "netgain/src/cli.ts",
+    "netgain/src/install/index.ts",
+    "netgain/src/mcp/main.ts"
+  ],
+  "limites": [
+    "Un chargement dynamique (import() calculé, VM, processus enfant) échappe aux deux mesures.",
+    "Le moteur n’a pas de couverture d’exécution : atteignabilité statique seulement.",
+    "Un fichier « sans preuve d’exécution » n’est PAS un fichier non testé."
+  ]
+}

@@ -18,6 +18,7 @@ export const DETECTORS = {
   d3: async (files) => ({ primitives: (await import('./d3-many-paths.mjs')).findManyPaths(files) }),
   d4: async (files) => (await import('./d4-import-graph.mjs')).analyseGraph(files),
   d5: async (files) => (await import('./d5-volumetry.mjs')).measure(files),
+  d6: async (files) => (await import('./d6-coverage.mjs')).coverageReport(files, lireTests(), lireCouverture()),
 };
 
 export async function runOne(name) {
