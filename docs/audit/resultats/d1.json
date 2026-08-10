@@ -1,14 +1,14 @@
 {
   "detecteur": "d1",
   "commitSources": "4a4dc46",
-  "commitOutils": "79a5895",
+  "commitOutils": "ffc3abd",
   "nonSuivis": [
-    "M docs/audit/scripts/lib/tokens.mjs",
-    " M docs/audit/scripts/lib/tokens.test.mjs",
+    "M docs/audit/resultats/couverture.lcov",
+    "?? docs/audit/scripts/run-all.mjs",
     "?? tests/CLAUDE.md"
   ],
   "node": "v24.15.0",
-  "genereLe": "2026-08-10T15:02:47.377Z",
+  "genereLe": "2026-08-10T16:49:52.521Z",
   "groupes": [
     {
       "empreinte": "c4c41252",

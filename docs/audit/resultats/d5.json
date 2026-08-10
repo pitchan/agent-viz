@@ -1,15 +1,18 @@
 {
   "detecteur": "d5",
   "commitSources": "4a4dc46",
-  "commitOutils": "79a5895",
+  "commitOutils": "ffc3abd",
   "nonSuivis": [
-    "M docs/audit/resultats/d1.json",
-    " M docs/audit/scripts/lib/tokens.mjs",
-    " M docs/audit/scripts/lib/tokens.test.mjs",
+    "M docs/audit/resultats/couverture.lcov",
+    " M docs/audit/resultats/d1.json",
+    " M docs/audit/resultats/d2.json",
+    " M docs/audit/resultats/d3.json",
+    " M docs/audit/resultats/d4.json",
+    "?? docs/audit/scripts/run-all.mjs",
     "?? tests/CLAUDE.md"
   ],
   "node": "v24.15.0",
-  "genereLe": "2026-08-10T15:02:47.573Z",
+  "genereLe": "2026-08-10T16:49:52.881Z",
   "parFichier": [
     {
       "path": "lib/install-hooks.js",

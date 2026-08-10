@@ -1,15 +1,20 @@
 {
   "detecteur": "d7",
   "commitSources": "4a4dc46",
-  "commitOutils": "6d57876",
+  "commitOutils": "ffc3abd",
   "nonSuivis": [
-    "M docs/audit/scripts/run.mjs",
-    "?? docs/audit/scripts/d7-boundary.mjs",
-    "?? docs/audit/scripts/d7-boundary.test.mjs",
+    "M docs/audit/resultats/couverture.lcov",
+    " M docs/audit/resultats/d1.json",
+    " M docs/audit/resultats/d2.json",
+    " M docs/audit/resultats/d3.json",
+    " M docs/audit/resultats/d4.json",
+    " M docs/audit/resultats/d5.json",
+    " M docs/audit/resultats/d6.json",
+    "?? docs/audit/scripts/run-all.mjs",
     "?? tests/CLAUDE.md"
   ],
   "node": "v24.15.0",
-  "genereLe": "2026-08-10T16:31:39.249Z",
+  "genereLe": "2026-08-10T16:49:53.018Z",
   "gestes": [
     {
       "geste": "decouverte-de-sessions",

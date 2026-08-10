@@ -1,14 +1,16 @@
 {
   "detecteur": "d3",
   "commitSources": "4a4dc46",
-  "commitOutils": "3cb3ebf",
+  "commitOutils": "ffc3abd",
   "nonSuivis": [
-    "M docs/audit/scripts/d3-many-paths.mjs",
-    " M docs/audit/scripts/d3-many-paths.test.mjs",
+    "M docs/audit/resultats/couverture.lcov",
+    " M docs/audit/resultats/d1.json",
+    " M docs/audit/resultats/d2.json",
+    "?? docs/audit/scripts/run-all.mjs",
     "?? tests/CLAUDE.md"
   ],
   "node": "v24.15.0",
-  "genereLe": "2026-08-10T12:02:16.356Z",
+  "genereLe": "2026-08-10T16:49:52.743Z",
   "primitives": [
     {
       "primitive": "lecture-json-de-fichier",

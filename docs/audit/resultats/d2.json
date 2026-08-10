@@ -1,15 +1,15 @@
 {
   "detecteur": "d2",
   "commitSources": "4a4dc46",
-  "commitOutils": "73f3b31",
+  "commitOutils": "ffc3abd",
   "nonSuivis": [
-    "M docs/audit/scripts/run.mjs",
-    "?? docs/audit/scripts/d2-truth-sources.mjs",
-    "?? docs/audit/scripts/d2-truth-sources.test.mjs",
+    "M docs/audit/resultats/couverture.lcov",
+    " M docs/audit/resultats/d1.json",
+    "?? docs/audit/scripts/run-all.mjs",
     "?? tests/CLAUDE.md"
   ],
   "node": "v24.15.0",
-  "genereLe": "2026-08-10T10:08:16.563Z",
+  "genereLe": "2026-08-10T16:49:52.648Z",
   "candidats": [
     {
       "categorie": "tarif-de-modele",
