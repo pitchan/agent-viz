@@ -1,0 +1,682 @@
+{
+  "detecteur": "d4",
+  "commitSources": "4a4dc46",
+  "commitOutils": "bbd438e",
+  "nonSuivis": [
+    "M docs/audit/scripts/run.mjs",
+    "?? docs/audit/resultats/d4.json",
+    "?? docs/audit/scripts/d4-import-graph.mjs",
+    "?? docs/audit/scripts/d4-import-graph.test.mjs",
+    "?? tests/CLAUDE.md"
+  ],
+  "node": "v24.15.0",
+  "genereLe": "2026-08-10T12:19:27.000Z",
+  "fanIn": [
+    {
+      "path": "netgain/src/core/events.ts",
+      "count": 10
+    },
+    {
+      "path": "lib/server/observatory/rules/cost.js",
+      "count": 7
+    },
+    {
+      "path": "lib/server/sse.js",
+      "count": 7
+    },
+    {
+      "path": "lib/server/observatory/rules/thresholds.js",
+      "count": 6
+    },
+    {
+      "path": "public/viz-state.js",
+      "count": 6
+    },
+    {
+      "path": "netgain/src/doctor/aggregators/prompts.ts",
+      "count": 6
+    },
+    {
+      "path": "lib/server/session-index.js",
+      "count": 5
+    },
+    {
+      "path": "lib/server/observatory/session-mapper.js",
+      "count": 4
+    },
+    {
+      "path": "lib/server/tokens.js",
+      "count": 4
+    },
+    {
+      "path": "public/observatory/format.js",
+      "count": 4
+    },
+    {
+      "path": "public/observatory/store.js",
+      "count": 4
+    },
+    {
+      "path": "netgain/src/doctor/aggregators/context.ts",
+      "count": 4
+    },
+    {
+      "path": "netgain/src/install/json-file.ts",
+      "count": 4
+    },
+    {
+      "path": "netgain/src/map/engine.ts",
+      "count": 4
+    },
+    {
+      "path": "lib/server/event-reader.js",
+      "count": 3
+    },
+    {
+      "path": "lib/server/observatory/scan-version.js",
+      "count": 3
+    },
+    {
+      "path": "lib/server/transcript.js",
+      "count": 3
+    },
+    {
+      "path": "lib/server/watchdog/index.js",
+      "count": 3
+    },
+    {
+      "path": "public/observatory/api.js",
+      "count": 3
+    },
+    {
+      "path": "public/observatory/period-selector.js",
+      "count": 3
+    },
+    {
+      "path": "public/viz-narrator.js",
+      "count": 3
+    },
+    {
+      "path": "netgain/src/cli-args.ts",
+      "count": 3
+    },
+    {
+      "path": "netgain/src/core/discovery.ts",
+      "count": 3
+    },
+    {
+      "path": "netgain/src/doctor/aggregators/reads.ts",
+      "count": 3
+    },
+    {
+      "path": "netgain/src/doctor/aggregators/session-kind.ts",
+      "count": 3
+    },
+    {
+      "path": "netgain/src/doctor/aggregators/subagents.ts",
+      "count": 3
+    },
+    {
+      "path": "netgain/src/doctor/aggregators/tokens.ts",
+      "count": 3
+    },
+    {
+      "path": "netgain/src/doctor/report/types.ts",
+      "count": 3
+    },
+    {
+      "path": "netgain/src/install/paths.ts",
+      "count": 3
+    },
+    {
+      "path": "netgain/src/router/detector.ts",
+      "count": 3
+    },
+    {
+      "path": "netgain/src/version.ts",
+      "count": 3
+    },
+    {
+      "path": "lib/server/housekeep.js",
+      "count": 2
+    },
+    {
+      "path": "lib/server/observatory/engine.js",
+      "count": 2
+    },
+    {
+      "path": "lib/server/observatory/index.js",
+      "count": 2
+    },
+    {
+      "path": "lib/server/observatory/mcp-usage.js",
+      "count": 2
+    },
+    {
+      "path": "lib/server/pricing.js",
+      "count": 2
+    },
+    {
+      "path": "public/viz-alert-format.mjs",
+      "count": 2
+    },
+    {
+      "path": "public/viz-layout.js",
+      "count": 2
+    },
+    {
+      "path": "public/viz-tool-subject.mjs",
+      "count": 2
+    },
+    {
+      "path": "public/viz-watchdog-client.js",
+      "count": 2
+    },
+    {
+      "path": "netgain/src/core/pricing.ts",
+      "count": 2
+    },
+    {
+      "path": "netgain/src/doctor/aggregators/tool-results.ts",
+      "count": 2
+    },
+    {
+      "path": "netgain/src/doctor/aggregators/turns.ts",
+      "count": 2
+    },
+    {
+      "path": "netgain/src/install/hook-edit.ts",
+      "count": 2
+    },
+    {
+      "path": "netgain/src/install/mcp-edit.ts",
+      "count": 2
+    },
+    {
+      "path": "lib/install-hooks.js",
+      "count": 1
+    },
+    {
+      "path": "lib/server/observatory/config-audit.js",
+      "count": 1
+    },
+    {
+      "path": "lib/server/observatory/migrations.js",
+      "count": 1
+    },
+    {
+      "path": "lib/server/observatory/model-costs.js",
+      "count": 1
+    },
+    {
+      "path": "lib/server/observatory/project-label.js",
+      "count": 1
+    },
+    {
+      "path": "lib/server/observatory/provenance.js",
+      "count": 1
+    },
+    {
+      "path": "lib/server/observatory/routes.js",
+      "count": 1
+    },
+    {
+      "path": "lib/server/observatory/rules/cross-links.js",
+      "count": 1
+    },
+    {
+      "path": "lib/server/observatory/rules/r1-prefix-change.js",
+      "count": 1
+    },
+    {
+      "path": "lib/server/observatory/rules/r2-unused-mcp.js",
+      "count": 1
+    },
+    {
+      "path": "lib/server/observatory/rules/r3-large-tool-output.js",
+      "count": 1
+    },
+    {
+      "path": "lib/server/observatory/rules/r4-cross-agent-reads.js",
+      "count": 1
+    },
+    {
+      "path": "lib/server/observatory/rules/r5-compactions.js",
+      "count": 1
+    },
+    {
+      "path": "lib/server/observatory/rules/r6-short-subagents.js",
+      "count": 1
+    },
+    {
+      "path": "lib/server/observatory/rules/ranking.js",
+      "count": 1
+    },
+    {
+      "path": "lib/server/observatory/rules/registry.js",
+      "count": 1
+    },
+    {
+      "path": "lib/server/observatory/scan.js",
+      "count": 1
+    },
+    {
+      "path": "lib/server/observatory/service.js",
+      "count": 1
+    },
+    {
+      "path": "lib/server/observatory/store.js",
+      "count": 1
+    },
+    {
+      "path": "lib/server/observatory/summary.js",
+      "count": 1
+    },
+    {
+      "path": "lib/server/routes.js",
+      "count": 1
+    },
+    {
+      "path": "lib/server/transcript-adapters/claude.js",
+      "count": 1
+    },
+    {
+      "path": "lib/server/transcript-adapters/copilot.js",
+      "count": 1
+    },
+    {
+      "path": "lib/server/transcript-adapters/index.js",
+      "count": 1
+    },
+    {
+      "path": "lib/server/watchdog/catch-up.js",
+      "count": 1
+    },
+    {
+      "path": "lib/server/watchdog/journal.js",
+      "count": 1
+    },
+    {
+      "path": "lib/server/watchdog/routes.js",
+      "count": 1
+    },
+    {
+      "path": "lib/server/watchdog/service.js",
+      "count": 1
+    },
+    {
+      "path": "public/observatory/confirm-button.js",
+      "count": 1
+    },
+    {
+      "path": "public/observatory/evidence.js",
+      "count": 1
+    },
+    {
+      "path": "public/observatory/failures-format.js",
+      "count": 1
+    },
+    {
+      "path": "public/observatory/failures-view.js",
+      "count": 1
+    },
+    {
+      "path": "public/observatory/remedies.js",
+      "count": 1
+    },
+    {
+      "path": "public/viz-alert-freshness.mjs",
+      "count": 1
+    },
+    {
+      "path": "public/viz-canvas.js",
+      "count": 1
+    },
+    {
+      "path": "public/viz-drawers.js",
+      "count": 1
+    },
+    {
+      "path": "public/viz-invocation-patterns.mjs",
+      "count": 1
+    },
+    {
+      "path": "public/viz-network.js",
+      "count": 1
+    },
+    {
+      "path": "public/viz-ui.js",
+      "count": 1
+    },
+    {
+      "path": "netgain/src/core/jsonl.ts",
+      "count": 1
+    },
+    {
+      "path": "netgain/src/doctor/aggregators/agent-gestures.ts",
+      "count": 1
+    },
+    {
+      "path": "netgain/src/doctor/aggregators/clock.ts",
+      "count": 1
+    },
+    {
+      "path": "netgain/src/doctor/aggregators/recognizers.ts",
+      "count": 1
+    },
+    {
+      "path": "netgain/src/doctor/index.ts",
+      "count": 1
+    },
+    {
+      "path": "netgain/src/doctor/report/json.ts",
+      "count": 1
+    },
+    {
+      "path": "netgain/src/doctor/report/terminal.ts",
+      "count": 1
+    },
+    {
+      "path": "netgain/src/doctor/scan-session.ts",
+      "count": 1
+    },
+    {
+      "path": "netgain/src/install/index.ts",
+      "count": 1
+    },
+    {
+      "path": "netgain/src/install/status.ts",
+      "count": 1
+    },
+    {
+      "path": "netgain/src/map/budget.ts",
+      "count": 1
+    },
+    {
+      "path": "netgain/src/map/env.ts",
+      "count": 1
+    },
+    {
+      "path": "netgain/src/map/graph.ts",
+      "count": 1
+    },
+    {
+      "path": "netgain/src/map/health.ts",
+      "count": 1
+    },
+    {
+      "path": "netgain/src/map/routes.ts",
+      "count": 1
+    },
+    {
+      "path": "netgain/src/mcp/server.ts",
+      "count": 1
+    },
+    {
+      "path": "netgain/src/router/hook.ts",
+      "count": 1
+    },
+    {
+      "path": "lib/hook.js",
+      "count": 0
+    },
+    {
+      "path": "lib/lifecycle.js",
+      "count": 0
+    },
+    {
+      "path": "lib/prompt-install.js",
+      "count": 0
+    },
+    {
+      "path": "lib/server.js",
+      "count": 0
+    },
+    {
+      "path": "bin/agent-viz.js",
+      "count": 0
+    },
+    {
+      "path": "public/observatory/advisor-view.js",
+      "count": 0
+    },
+    {
+      "path": "public/observatory/analysis-view.js",
+      "count": 0
+    },
+    {
+      "path": "public/observatory/pricing-view.js",
+      "count": 0
+    },
+    {
+      "path": "public/viz-watchdog.mjs",
+      "count": 0
+    },
+    {
+      "path": "netgain/src/cli.ts",
+      "count": 0
+    },
+    {
+      "path": "netgain/src/core/index.ts",
+      "count": 0
+    },
+    {
+      "path": "netgain/src/mcp/main.ts",
+      "count": 0
+    }
+  ],
+  "seuilP90": 4,
+  "cycles": [
+    [
+      "lib/install-hooks.js"
+    ],
+    [
+      "public/viz-network.js",
+      "public/viz-ui.js"
+    ]
+  ],
+  "importsDIO": [
+    {
+      "path": "lib/hook.js",
+      "zone": "server",
+      "modules": [
+        "fs",
+        "http"
+      ]
+    },
+    {
+      "path": "lib/install-hooks.js",
+      "zone": "server",
+      "modules": [
+        "fs"
+      ]
+    },
+    {
+      "path": "lib/lifecycle.js",
+      "zone": "server",
+      "modules": [
+        "child_process",
+        "fs",
+        "http"
+      ]
+    },
+    {
+      "path": "lib/server/event-reader.js",
+      "zone": "server",
+      "modules": [
+        "fs"
+      ]
+    },
+    {
+      "path": "lib/server/housekeep.js",
+      "zone": "server",
+      "modules": [
+        "fs"
+      ]
+    },
+    {
+      "path": "lib/server/observatory/index.js",
+      "zone": "server",
+      "modules": [
+        "fs"
+      ]
+    },
+    {
+      "path": "lib/server/observatory/store.js",
+      "zone": "server",
+      "modules": [
+        "fs"
+      ]
+    },
+    {
+      "path": "lib/server/pricing.js",
+      "zone": "server",
+      "modules": [
+        "https"
+      ]
+    },
+    {
+      "path": "lib/server/routes.js",
+      "zone": "server",
+      "modules": [
+        "fs"
+      ]
+    },
+    {
+      "path": "lib/server/session-index.js",
+      "zone": "server",
+      "modules": [
+        "fs"
+      ]
+    },
+    {
+      "path": "lib/server/transcript.js",
+      "zone": "server",
+      "modules": [
+        "fs"
+      ]
+    },
+    {
+      "path": "lib/server/watchdog/catch-up.js",
+      "zone": "server",
+      "modules": [
+        "fs"
+      ]
+    },
+    {
+      "path": "lib/server/watchdog/journal.js",
+      "zone": "server",
+      "modules": [
+        "fs"
+      ]
+    },
+    {
+      "path": "lib/server.js",
+      "zone": "server",
+      "modules": [
+        "child_process",
+        "fs",
+        "http"
+      ]
+    },
+    {
+      "path": "bin/agent-viz.js",
+      "zone": "server",
+      "modules": [
+        "child_process",
+        "fs"
+      ]
+    },
+    {
+      "path": "public/observatory/api.js",
+      "zone": "web",
+      "modules": [
+        "(fetch global)"
+      ]
+    },
+    {
+      "path": "public/viz-network.js",
+      "zone": "web",
+      "modules": [
+        "(fetch global)"
+      ]
+    },
+    {
+      "path": "public/viz-watchdog-client.js",
+      "zone": "web",
+      "modules": [
+        "(fetch global)"
+      ]
+    },
+    {
+      "path": "netgain/src/core/discovery.ts",
+      "zone": "engine",
+      "modules": [
+        "node:fs/promises"
+      ]
+    },
+    {
+      "path": "netgain/src/core/jsonl.ts",
+      "zone": "engine",
+      "modules": [
+        "node:fs"
+      ]
+    },
+    {
+      "path": "netgain/src/doctor/aggregators/context.ts",
+      "zone": "engine",
+      "modules": [
+        "node:fs"
+      ]
+    },
+    {
+      "path": "netgain/src/doctor/scan-session.ts",
+      "zone": "engine",
+      "modules": [
+        "node:fs/promises"
+      ]
+    },
+    {
+      "path": "netgain/src/install/index.ts",
+      "zone": "engine",
+      "modules": [
+        "node:fs"
+      ]
+    },
+    {
+      "path": "netgain/src/install/json-file.ts",
+      "zone": "engine",
+      "modules": [
+        "node:fs"
+      ]
+    },
+    {
+      "path": "netgain/src/install/paths.ts",
+      "zone": "engine",
+      "modules": [
+        "node:fs"
+      ]
+    },
+    {
+      "path": "netgain/src/map/engine.ts",
+      "zone": "engine",
+      "modules": [
+        "node:fs",
+        "node:fs/promises"
+      ]
+    },
+    {
+      "path": "netgain/src/version.ts",
+      "zone": "engine",
+      "modules": [
+        "node:fs"
+      ]
+    }
+  ],
+  "nonResolus": [
+    {
+      "path": "lib/server/observatory/engine.js",
+      "spec": "../../../package.json"
+    }
+  ]
+}

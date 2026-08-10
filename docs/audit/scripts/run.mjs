@@ -16,6 +16,7 @@ export const DETECTORS = {
   d1: async (files) => ({ groupes: (await import('./d1-clones.mjs')).findClones(files) }),
   d2: async (files) => ({ candidats: (await import('./d2-truth-sources.mjs')).findTruthSources(files) }),
   d3: async (files) => ({ primitives: (await import('./d3-many-paths.mjs')).findManyPaths(files) }),
+  d4: async (files) => (await import('./d4-import-graph.mjs')).analyseGraph(files),
 };
 
 export async function runOne(name) {
