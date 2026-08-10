@@ -22,10 +22,8 @@ dans l'annexe méthode.
 `docs/` (l'audit ne s'audite pas lui-même)
 **Rejouable :** `node --test "docs/audit/scripts/**/*.test.mjs"` puis
 `node docs/audit/scripts/run-all.mjs --comparer`
-**Qualification préparée par :** Claude — **NON SIGNÉE**
-**Relue et acceptée par :** _(non renseigné — à remplir par le relecteur
-humain : nom, date, commit relu. Tant que cette ligne porte « non
-renseigné », ce rapport n'engage que son rédacteur.)_
+**Qualification préparée par :** Claude
+**Relue et acceptée par :** Vincent — 2026-08-10 — commit `aba0953`
 
 ## Verdict d'une page
 
