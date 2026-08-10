@@ -22,7 +22,10 @@ dans l'annexe méthode.
 `docs/` (l'audit ne s'audite pas lui-même)
 **Rejouable :** `node --test "docs/audit/scripts/**/*.test.mjs"` puis
 `node docs/audit/scripts/run-all.mjs --comparer`
-**Qualification préparée par :** Claude — **NON SIGNÉE** (voir tâche 12)
+**Qualification préparée par :** Claude — **NON SIGNÉE**
+**Relue et acceptée par :** _(non renseigné — à remplir par le relecteur
+humain : nom, date, commit relu. Tant que cette ligne porte « non
+renseigné », ce rapport n'engage que son rédacteur.)_
 
 ## Verdict d'une page
 
@@ -66,8 +69,19 @@ laquelle est « la bonne » sans arbitrage humain séparé : c'est une
 seul », qui n'entre dans la définition ni de P0 ni de P1 et place
 directement en P2 — deux d'entre eux (C6, C8) trouvés dans le code, un
 (C7) trouvé dans le rapport lui-même, en vérifiant sa propre citation.
-Aucun constat ne descend en P3 : les huit portent un coût de correction
-chiffré (S/M/L), signe qu'aucun n'est jugé sans risque à ignorer — mais la
+Aucun constat ne descend en P3 — et **ce n'est pas parce qu'ils portent tous
+un coût chiffré (S/M/L)** : le gabarit de fiche impose cette colonne à
+chacun, l'argument serait circulaire et ne discriminerait rien. La raison est
+que chacun nomme une conséquence observable aujourd'hui, là où P3 suppose
+« sans risque immédiat ». Pour les quatre constats à impact « coût de
+maintenance seul » — les seuls candidats plausibles à P3 — cette conséquence
+est écrite dans leur fiche : **C3**, deux accumulations d'usage à faire
+évoluer en parallèle, dont une seule ventile le cache par fenêtre ;
+**C6**, un correctif de robustesse (délai d'attente, nouvelle tentative,
+message d'erreur homogène) n'atteindrait qu'un tiers du code ; **C7**, trois
+fichiers LIVRÉS envoient leur lecteur vers un chemin qui n'a jamais existé
+dans ce dépôt ; **C8**, trois copies des deux mêmes seuils (1000 ms,
+60 000 ms), qu'aucun mécanisme ne tient synchronisées. Mais la
 fenêtre n'est plus uniforme : C1 est urgent et sans rapport avec la fusion
 (« à traiter séparément ») ; C6 et C8 vivent entièrement côté `public/`, la
 fusion ne les touche pas (« transportable tel quel ») ; C2, C3, C4, C5 et
@@ -1083,7 +1097,7 @@ prose plutôt que de laisser le lecteur la reconstruire seul.
   fragments. L'écart de jetons n'est donc pas partiellement expliqué par ce
   correctif : il l'est ENTIÈREMENT, à l'unité près.
 
-### Sept défauts d'instrument trouvés et refermés pendant l'audit
+### Sept défauts d'instrument trouvés pendant l'audit : cinq corrigés, deux explicitement bornés
 
 Chacun trouvé en FAISANT TOURNER le détecteur sur le vrai dépôt, aucun par
 seule lecture de son code — la preuve la plus solide que ces instruments ont
@@ -1091,6 +1105,14 @@ seule lecture de son code — la preuve la plus solide que ces instruments ont
 affirme ce qui n'existe pas), trois omissions silencieuses (le détecteur
 tait ce qui existe — **les plus dangereuses : une entrée manquante ressemble
 en tout point à une absence de défaut**), un non-déterminisme.
+
+**Distinction à ne pas lisser : cinq de ces sept ont été CORRIGÉS dans
+l'instrument** (items 1 à 4 et 7 — le détecteur ne produit plus le résultat
+fautif) **et deux ont seulement été BORNÉS** (items 5 et 6, tous deux dans
+D2 — le détecteur souffre toujours de la limite, qui est nommée en tête de
+`d2-truth-sources.mjs` et dont la conséquence a été vérifiée par un autre
+moyen). Un défaut borné reste un défaut : `d2.json` ne verra pas plus une
+table de tarifs scindée en deux littéraux demain qu'aujourd'hui.
 
 1. **[faux positif] D3, `formatage-monetaire`.** Le motif attrapait toute
    ouverture d'interpolation de gabarit (`` `${ ``). Aurait fait dire au
@@ -1131,15 +1153,19 @@ en tout point à une absence de défaut**), un non-déterminisme.
    champs reconnus et est écarté. Aurait fait dire : « 10 modèles `claude-*`
    ont des tarifs divergents entre serveur et moteur » — une fausse alerte
    sérieuse — alors que les 4 taux ET `maxInput` s'accordent sur les 10.
-   Refermé par une limite documentée en tête de `d2-truth-sources.mjs`,
-   corroborée par le test de miroir tarifaire (2/2 pass).
+   **BORNÉ, NON CORRIGÉ** : l'extracteur ne sait toujours pas lire une table
+   scindée. La limite est documentée en tête de `d2-truth-sources.mjs`, et la
+   conclusion (« le miroir tarifaire est sain ») est établie par un autre
+   moyen — le test de miroir tarifaire, 2/2 pass — pas par le détecteur.
 6. **[omission silencieuse] D2, `claude-sonnet-5`.** Le motif interne
    (`[^{}]{0,400}`) interdit toute accolade ; `claude-sonnet-5` est la seule
    entrée de `FALLBACK` à porter un champ `history` imbriqué, donc invisible
    côté serveur. Aurait fait dire : rien du tout — ce modèle n'apparaît dans
    AUCUNE liste de `d2.json`, ni comme sain ni comme divergent, simplement
-   absent, indiscernable d'une entrée qui n'existerait pas. Refermé par une
-   limite documentée en tête de `d2-truth-sources.mjs`.
+   absent, indiscernable d'une entrée qui n'existerait pas. **BORNÉ, NON
+   CORRIGÉ** : le motif interdit toujours les accolades, donc toute entrée
+   de `FALLBACK` portant un champ imbriqué restera invisible. La limite est
+   documentée en tête de `d2-truth-sources.mjs`.
 7. **[non-déterminisme] D6, `couverture.lcov`.** `parseLcov` ne gardait que
    le DERNIER bloc `SF:` par chemin ; l'ordre des blocs dépend de
    l'ordonnancement parallèle de `node --test`, donc change d'un lancement à
