@@ -1,0 +1,3474 @@
+{
+  "detecteur": "d5",
+  "commitSources": "4a4dc46",
+  "commitOutils": "d4fdb17",
+  "nonSuivis": [
+    "M docs/audit/scripts/run.mjs",
+    "?? docs/audit/scripts/d5-volumetry.mjs",
+    "?? docs/audit/scripts/d5-volumetry.test.mjs",
+    "?? tests/CLAUDE.md"
+  ],
+  "node": "v24.15.0",
+  "genereLe": "2026-08-10T14:07:07.819Z",
+  "parFichier": [
+    {
+      "path": "lib/install-hooks.js",
+      "zone": "server",
+      "lignes": 744,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 58,
+          "ligneFin": 60
+        },
+        {
+          "ligneDebut": 71,
+          "ligneFin": 87
+        },
+        {
+          "ligneDebut": 89,
+          "ligneFin": 95
+        },
+        {
+          "ligneDebut": 97,
+          "ligneFin": 100
+        },
+        {
+          "ligneDebut": 102,
+          "ligneFin": 105
+        },
+        {
+          "ligneDebut": 116,
+          "ligneFin": 135
+        },
+        {
+          "ligneDebut": 137,
+          "ligneFin": 142
+        },
+        {
+          "ligneDebut": 148,
+          "ligneFin": 162
+        },
+        {
+          "ligneDebut": 164,
+          "ligneFin": 170
+        },
+        {
+          "ligneDebut": 172,
+          "ligneFin": 185
+        },
+        {
+          "ligneDebut": 195,
+          "ligneFin": 195
+        },
+        {
+          "ligneDebut": 220,
+          "ligneFin": 220
+        },
+        {
+          "ligneDebut": 241,
+          "ligneFin": 241
+        },
+        {
+          "ligneDebut": 262,
+          "ligneFin": 272
+        },
+        {
+          "ligneDebut": 283,
+          "ligneFin": 285
+        },
+        {
+          "ligneDebut": 286,
+          "ligneFin": 288
+        },
+        {
+          "ligneDebut": 293,
+          "ligneFin": 298
+        },
+        {
+          "ligneDebut": 300,
+          "ligneFin": 306
+        },
+        {
+          "ligneDebut": 310,
+          "ligneFin": 319
+        },
+        {
+          "ligneDebut": 321,
+          "ligneFin": 321
+        },
+        {
+          "ligneDebut": 343,
+          "ligneFin": 343
+        },
+        {
+          "ligneDebut": 397,
+          "ligneFin": 397
+        },
+        {
+          "ligneDebut": 407,
+          "ligneFin": 407
+        },
+        {
+          "ligneDebut": 430,
+          "ligneFin": 430
+        },
+        {
+          "ligneDebut": 444,
+          "ligneFin": 444
+        },
+        {
+          "ligneDebut": 487,
+          "ligneFin": 487
+        },
+        {
+          "ligneDebut": 497,
+          "ligneFin": 497
+        },
+        {
+          "ligneDebut": 526,
+          "ligneFin": 526
+        },
+        {
+          "ligneDebut": 572,
+          "ligneFin": 581
+        },
+        {
+          "ligneDebut": 583,
+          "ligneFin": 585
+        },
+        {
+          "ligneDebut": 587,
+          "ligneFin": 598
+        },
+        {
+          "ligneDebut": 602,
+          "ligneFin": 602
+        },
+        {
+          "ligneDebut": 610,
+          "ligneFin": 615
+        },
+        {
+          "ligneDebut": 617,
+          "ligneFin": 617
+        },
+        {
+          "ligneDebut": 618,
+          "ligneFin": 618
+        },
+        {
+          "ligneDebut": 619,
+          "ligneFin": 619
+        },
+        {
+          "ligneDebut": 628,
+          "ligneFin": 628
+        },
+        {
+          "ligneDebut": 637,
+          "ligneFin": 637
+        },
+        {
+          "ligneDebut": 666,
+          "ligneFin": 677
+        },
+        {
+          "ligneDebut": 679,
+          "ligneFin": 738
+        }
+      ]
+    },
+    {
+      "path": "public/viz-watchdog.mjs",
+      "zone": "web",
+      "lignes": 656,
+      "exports": 3,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 37,
+          "ligneFin": 43
+        },
+        {
+          "ligneDebut": 49,
+          "ligneFin": 52
+        },
+        {
+          "ligneDebut": 58,
+          "ligneFin": 60
+        },
+        {
+          "ligneDebut": 62,
+          "ligneFin": 65
+        },
+        {
+          "ligneDebut": 72,
+          "ligneFin": 92
+        },
+        {
+          "ligneDebut": 97,
+          "ligneFin": 105
+        },
+        {
+          "ligneDebut": 107,
+          "ligneFin": 111
+        },
+        {
+          "ligneDebut": 116,
+          "ligneFin": 118
+        },
+        {
+          "ligneDebut": 148,
+          "ligneFin": 152
+        },
+        {
+          "ligneDebut": 189,
+          "ligneFin": 193
+        },
+        {
+          "ligneDebut": 202,
+          "ligneFin": 208
+        },
+        {
+          "ligneDebut": 549,
+          "ligneFin": 552
+        },
+        {
+          "ligneDebut": 567,
+          "ligneFin": 567
+        },
+        {
+          "ligneDebut": 578,
+          "ligneFin": 584
+        }
+      ]
+    },
+    {
+      "path": "netgain/src/map/env.ts",
+      "zone": "engine",
+      "lignes": 625,
+      "exports": 4,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 32,
+          "ligneFin": 35
+        },
+        {
+          "ligneDebut": 38,
+          "ligneFin": 45
+        },
+        {
+          "ligneDebut": 48,
+          "ligneFin": 54
+        },
+        {
+          "ligneDebut": 57,
+          "ligneFin": 69
+        },
+        {
+          "ligneDebut": 77,
+          "ligneFin": 85
+        },
+        {
+          "ligneDebut": 87,
+          "ligneFin": 95
+        },
+        {
+          "ligneDebut": 102,
+          "ligneFin": 109
+        },
+        {
+          "ligneDebut": 112,
+          "ligneFin": 115
+        },
+        {
+          "ligneDebut": 149,
+          "ligneFin": 154
+        },
+        {
+          "ligneDebut": 156,
+          "ligneFin": 160
+        },
+        {
+          "ligneDebut": 162,
+          "ligneFin": 167
+        },
+        {
+          "ligneDebut": 169,
+          "ligneFin": 171
+        },
+        {
+          "ligneDebut": 174,
+          "ligneFin": 213
+        },
+        {
+          "ligneDebut": 216,
+          "ligneFin": 216
+        },
+        {
+          "ligneDebut": 229,
+          "ligneFin": 235
+        },
+        {
+          "ligneDebut": 237,
+          "ligneFin": 241
+        },
+        {
+          "ligneDebut": 263,
+          "ligneFin": 291
+        },
+        {
+          "ligneDebut": 299,
+          "ligneFin": 336
+        },
+        {
+          "ligneDebut": 345,
+          "ligneFin": 398
+        },
+        {
+          "ligneDebut": 401,
+          "ligneFin": 408
+        },
+        {
+          "ligneDebut": 411,
+          "ligneFin": 415
+        },
+        {
+          "ligneDebut": 418,
+          "ligneFin": 433
+        },
+        {
+          "ligneDebut": 436,
+          "ligneFin": 446
+        },
+        {
+          "ligneDebut": 454,
+          "ligneFin": 463
+        },
+        {
+          "ligneDebut": 470,
+          "ligneFin": 624
+        }
+      ]
+    },
+    {
+      "path": "public/viz-layout.js",
+      "zone": "web",
+      "lignes": 576,
+      "exports": 17,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 19,
+          "ligneFin": 19
+        },
+        {
+          "ligneDebut": 22,
+          "ligneFin": 32
+        },
+        {
+          "ligneDebut": 34,
+          "ligneFin": 59
+        },
+        {
+          "ligneDebut": 61,
+          "ligneFin": 71
+        },
+        {
+          "ligneDebut": 73,
+          "ligneFin": 76
+        },
+        {
+          "ligneDebut": 82,
+          "ligneFin": 108
+        },
+        {
+          "ligneDebut": 112,
+          "ligneFin": 126
+        },
+        {
+          "ligneDebut": 130,
+          "ligneFin": 139
+        },
+        {
+          "ligneDebut": 143,
+          "ligneFin": 159
+        },
+        {
+          "ligneDebut": 165,
+          "ligneFin": 171
+        },
+        {
+          "ligneDebut": 173,
+          "ligneFin": 179
+        },
+        {
+          "ligneDebut": 181,
+          "ligneFin": 194
+        },
+        {
+          "ligneDebut": 196,
+          "ligneFin": 205
+        },
+        {
+          "ligneDebut": 207,
+          "ligneFin": 234
+        },
+        {
+          "ligneDebut": 240,
+          "ligneFin": 255
+        },
+        {
+          "ligneDebut": 257,
+          "ligneFin": 280
+        },
+        {
+          "ligneDebut": 282,
+          "ligneFin": 291
+        },
+        {
+          "ligneDebut": 293,
+          "ligneFin": 301
+        },
+        {
+          "ligneDebut": 303,
+          "ligneFin": 311
+        },
+        {
+          "ligneDebut": 325,
+          "ligneFin": 339
+        },
+        {
+          "ligneDebut": 341,
+          "ligneFin": 347
+        },
+        {
+          "ligneDebut": 352,
+          "ligneFin": 354
+        },
+        {
+          "ligneDebut": 361,
+          "ligneFin": 364
+        },
+        {
+          "ligneDebut": 366,
+          "ligneFin": 369
+        },
+        {
+          "ligneDebut": 371,
+          "ligneFin": 371
+        },
+        {
+          "ligneDebut": 374,
+          "ligneFin": 378
+        },
+        {
+          "ligneDebut": 383,
+          "ligneFin": 387
+        },
+        {
+          "ligneDebut": 394,
+          "ligneFin": 445
+        },
+        {
+          "ligneDebut": 447,
+          "ligneFin": 475
+        },
+        {
+          "ligneDebut": 477,
+          "ligneFin": 491
+        },
+        {
+          "ligneDebut": 493,
+          "ligneFin": 523
+        },
+        {
+          "ligneDebut": 525,
+          "ligneFin": 529
+        },
+        {
+          "ligneDebut": 534,
+          "ligneFin": 575
+        }
+      ]
+    },
+    {
+      "path": "public/viz-ui.js",
+      "zone": "web",
+      "lignes": 565,
+      "exports": 11,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 35,
+          "ligneFin": 49
+        },
+        {
+          "ligneDebut": 51,
+          "ligneFin": 75
+        },
+        {
+          "ligneDebut": 77,
+          "ligneFin": 80
+        },
+        {
+          "ligneDebut": 101,
+          "ligneFin": 132
+        },
+        {
+          "ligneDebut": 141,
+          "ligneFin": 192
+        },
+        {
+          "ligneDebut": 208,
+          "ligneFin": 216
+        },
+        {
+          "ligneDebut": 218,
+          "ligneFin": 266
+        },
+        {
+          "ligneDebut": 270,
+          "ligneFin": 275
+        },
+        {
+          "ligneDebut": 284,
+          "ligneFin": 296
+        },
+        {
+          "ligneDebut": 299,
+          "ligneFin": 316
+        },
+        {
+          "ligneDebut": 319,
+          "ligneFin": 339
+        },
+        {
+          "ligneDebut": 342,
+          "ligneFin": 344
+        },
+        {
+          "ligneDebut": 346,
+          "ligneFin": 350
+        },
+        {
+          "ligneDebut": 395,
+          "ligneFin": 398
+        },
+        {
+          "ligneDebut": 399,
+          "ligneFin": 401
+        },
+        {
+          "ligneDebut": 403,
+          "ligneFin": 426
+        },
+        {
+          "ligneDebut": 436,
+          "ligneFin": 444
+        },
+        {
+          "ligneDebut": 448,
+          "ligneFin": 467
+        },
+        {
+          "ligneDebut": 469,
+          "ligneFin": 475
+        },
+        {
+          "ligneDebut": 477,
+          "ligneFin": 490
+        },
+        {
+          "ligneDebut": 515,
+          "ligneFin": 525
+        }
+      ]
+    },
+    {
+      "path": "netgain/src/map/routes.ts",
+      "zone": "engine",
+      "lignes": 564,
+      "exports": 4,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 35,
+          "ligneFin": 38
+        },
+        {
+          "ligneDebut": 46,
+          "ligneFin": 54
+        },
+        {
+          "ligneDebut": 56,
+          "ligneFin": 59
+        },
+        {
+          "ligneDebut": 61,
+          "ligneFin": 68
+        },
+        {
+          "ligneDebut": 70,
+          "ligneFin": 98
+        },
+        {
+          "ligneDebut": 104,
+          "ligneFin": 111
+        },
+        {
+          "ligneDebut": 114,
+          "ligneFin": 127
+        },
+        {
+          "ligneDebut": 130,
+          "ligneFin": 143
+        },
+        {
+          "ligneDebut": 145,
+          "ligneFin": 150
+        },
+        {
+          "ligneDebut": 163,
+          "ligneFin": 206
+        },
+        {
+          "ligneDebut": 209,
+          "ligneFin": 213
+        },
+        {
+          "ligneDebut": 236,
+          "ligneFin": 249
+        },
+        {
+          "ligneDebut": 252,
+          "ligneFin": 257
+        },
+        {
+          "ligneDebut": 259,
+          "ligneFin": 377
+        },
+        {
+          "ligneDebut": 386,
+          "ligneFin": 391
+        },
+        {
+          "ligneDebut": 394,
+          "ligneFin": 394
+        },
+        {
+          "ligneDebut": 414,
+          "ligneFin": 427
+        },
+        {
+          "ligneDebut": 429,
+          "ligneFin": 452
+        },
+        {
+          "ligneDebut": 455,
+          "ligneFin": 459
+        },
+        {
+          "ligneDebut": 461,
+          "ligneFin": 465
+        },
+        {
+          "ligneDebut": 467,
+          "ligneFin": 510
+        },
+        {
+          "ligneDebut": 516,
+          "ligneFin": 523
+        },
+        {
+          "ligneDebut": 525,
+          "ligneFin": 546
+        },
+        {
+          "ligneDebut": 552,
+          "ligneFin": 563
+        }
+      ]
+    },
+    {
+      "path": "public/viz-canvas.js",
+      "zone": "web",
+      "lignes": 511,
+      "exports": 2,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 29,
+          "ligneFin": 51
+        },
+        {
+          "ligneDebut": 53,
+          "ligneFin": 53
+        },
+        {
+          "ligneDebut": 62,
+          "ligneFin": 62
+        },
+        {
+          "ligneDebut": 64,
+          "ligneFin": 77
+        },
+        {
+          "ligneDebut": 82,
+          "ligneFin": 82
+        },
+        {
+          "ligneDebut": 153,
+          "ligneFin": 155
+        },
+        {
+          "ligneDebut": 157,
+          "ligneFin": 182
+        },
+        {
+          "ligneDebut": 190,
+          "ligneFin": 204
+        },
+        {
+          "ligneDebut": 206,
+          "ligneFin": 219
+        },
+        {
+          "ligneDebut": 222,
+          "ligneFin": 244
+        },
+        {
+          "ligneDebut": 246,
+          "ligneFin": 275
+        },
+        {
+          "ligneDebut": 280,
+          "ligneFin": 317
+        },
+        {
+          "ligneDebut": 319,
+          "ligneFin": 347
+        },
+        {
+          "ligneDebut": 352,
+          "ligneFin": 357
+        },
+        {
+          "ligneDebut": 359,
+          "ligneFin": 368
+        },
+        {
+          "ligneDebut": 370,
+          "ligneFin": 375
+        },
+        {
+          "ligneDebut": 377,
+          "ligneFin": 423
+        },
+        {
+          "ligneDebut": 425,
+          "ligneFin": 434
+        },
+        {
+          "ligneDebut": 436,
+          "ligneFin": 438
+        },
+        {
+          "ligneDebut": 442,
+          "ligneFin": 451
+        },
+        {
+          "ligneDebut": 453,
+          "ligneFin": 504
+        }
+      ]
+    },
+    {
+      "path": "netgain/src/doctor/report/terminal.ts",
+      "zone": "engine",
+      "lignes": 448,
+      "exports": 12,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 17,
+          "ligneFin": 19
+        },
+        {
+          "ligneDebut": 21,
+          "ligneFin": 24
+        },
+        {
+          "ligneDebut": 26,
+          "ligneFin": 28
+        },
+        {
+          "ligneDebut": 40,
+          "ligneFin": 45
+        },
+        {
+          "ligneDebut": 61,
+          "ligneFin": 70
+        },
+        {
+          "ligneDebut": 78,
+          "ligneFin": 93
+        },
+        {
+          "ligneDebut": 103,
+          "ligneFin": 112
+        },
+        {
+          "ligneDebut": 115,
+          "ligneFin": 115
+        },
+        {
+          "ligneDebut": 148,
+          "ligneFin": 156
+        },
+        {
+          "ligneDebut": 164,
+          "ligneFin": 164
+        },
+        {
+          "ligneDebut": 196,
+          "ligneFin": 203
+        },
+        {
+          "ligneDebut": 206,
+          "ligneFin": 208
+        },
+        {
+          "ligneDebut": 210,
+          "ligneFin": 212
+        },
+        {
+          "ligneDebut": 224,
+          "ligneFin": 230
+        },
+        {
+          "ligneDebut": 251,
+          "ligneFin": 260
+        },
+        {
+          "ligneDebut": 286,
+          "ligneFin": 447
+        }
+      ]
+    },
+    {
+      "path": "bin/agent-viz.js",
+      "zone": "server",
+      "lignes": 428,
+      "exports": 0,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 35,
+          "ligneFin": 59
+        },
+        {
+          "ligneDebut": 61,
+          "ligneFin": 61
+        },
+        {
+          "ligneDebut": 89,
+          "ligneFin": 94
+        },
+        {
+          "ligneDebut": 96,
+          "ligneFin": 100
+        },
+        {
+          "ligneDebut": 102,
+          "ligneFin": 116
+        },
+        {
+          "ligneDebut": 118,
+          "ligneFin": 169
+        },
+        {
+          "ligneDebut": 171,
+          "ligneFin": 214
+        },
+        {
+          "ligneDebut": 216,
+          "ligneFin": 244
+        },
+        {
+          "ligneDebut": 246,
+          "ligneFin": 335
+        },
+        {
+          "ligneDebut": 337,
+          "ligneFin": 358
+        },
+        {
+          "ligneDebut": 360,
+          "ligneFin": 364
+        },
+        {
+          "ligneDebut": 373,
+          "ligneFin": 392
+        },
+        {
+          "ligneDebut": 394,
+          "ligneFin": 422
+        }
+      ]
+    },
+    {
+      "path": "public/viz-drawers.js",
+      "zone": "web",
+      "lignes": 392,
+      "exports": 5,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 24,
+          "ligneFin": 38
+        },
+        {
+          "ligneDebut": 40,
+          "ligneFin": 47
+        },
+        {
+          "ligneDebut": 51,
+          "ligneFin": 53
+        },
+        {
+          "ligneDebut": 55,
+          "ligneFin": 116
+        },
+        {
+          "ligneDebut": 121,
+          "ligneFin": 143
+        },
+        {
+          "ligneDebut": 145,
+          "ligneFin": 221
+        },
+        {
+          "ligneDebut": 223,
+          "ligneFin": 283
+        },
+        {
+          "ligneDebut": 285,
+          "ligneFin": 340
+        },
+        {
+          "ligneDebut": 342,
+          "ligneFin": 391
+        }
+      ]
+    },
+    {
+      "path": "public/viz-network.js",
+      "zone": "web",
+      "lignes": 375,
+      "exports": 11,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 25,
+          "ligneFin": 29
+        },
+        {
+          "ligneDebut": 47,
+          "ligneFin": 65
+        },
+        {
+          "ligneDebut": 69,
+          "ligneFin": 79
+        },
+        {
+          "ligneDebut": 80,
+          "ligneFin": 82
+        },
+        {
+          "ligneDebut": 85,
+          "ligneFin": 161
+        },
+        {
+          "ligneDebut": 105,
+          "ligneFin": 119
+        },
+        {
+          "ligneDebut": 166,
+          "ligneFin": 180
+        },
+        {
+          "ligneDebut": 185,
+          "ligneFin": 193
+        },
+        {
+          "ligneDebut": 196,
+          "ligneFin": 222
+        },
+        {
+          "ligneDebut": 225,
+          "ligneFin": 252
+        },
+        {
+          "ligneDebut": 254,
+          "ligneFin": 272
+        },
+        {
+          "ligneDebut": 274,
+          "ligneFin": 280
+        },
+        {
+          "ligneDebut": 298,
+          "ligneFin": 320
+        },
+        {
+          "ligneDebut": 324,
+          "ligneFin": 324
+        },
+        {
+          "ligneDebut": 326,
+          "ligneFin": 333
+        },
+        {
+          "ligneDebut": 338,
+          "ligneFin": 350
+        },
+        {
+          "ligneDebut": 351,
+          "ligneFin": 364
+        }
+      ]
+    },
+    {
+      "path": "public/viz-invocation-patterns.mjs",
+      "zone": "web",
+      "lignes": 370,
+      "exports": 2,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 350,
+          "ligneFin": 369
+        }
+      ]
+    },
+    {
+      "path": "lib/server/transcript.js",
+      "zone": "server",
+      "lignes": 360,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 21,
+          "ligneFin": 34
+        },
+        {
+          "ligneDebut": 41,
+          "ligneFin": 55
+        },
+        {
+          "ligneDebut": 60,
+          "ligneFin": 62
+        },
+        {
+          "ligneDebut": 65,
+          "ligneFin": 67
+        },
+        {
+          "ligneDebut": 70,
+          "ligneFin": 93
+        },
+        {
+          "ligneDebut": 97,
+          "ligneFin": 111
+        },
+        {
+          "ligneDebut": 114,
+          "ligneFin": 138
+        },
+        {
+          "ligneDebut": 144,
+          "ligneFin": 146
+        },
+        {
+          "ligneDebut": 153,
+          "ligneFin": 159
+        },
+        {
+          "ligneDebut": 164,
+          "ligneFin": 173
+        },
+        {
+          "ligneDebut": 181,
+          "ligneFin": 216
+        },
+        {
+          "ligneDebut": 221,
+          "ligneFin": 231
+        },
+        {
+          "ligneDebut": 241,
+          "ligneFin": 264
+        },
+        {
+          "ligneDebut": 271,
+          "ligneFin": 320
+        },
+        {
+          "ligneDebut": 325,
+          "ligneFin": 329
+        },
+        {
+          "ligneDebut": 335,
+          "ligneFin": 341
+        },
+        {
+          "ligneDebut": 343,
+          "ligneFin": 347
+        }
+      ]
+    },
+    {
+      "path": "lib/server/pricing.js",
+      "zone": "server",
+      "lignes": 358,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 75,
+          "ligneFin": 89
+        },
+        {
+          "ligneDebut": 95,
+          "ligneFin": 109
+        },
+        {
+          "ligneDebut": 126,
+          "ligneFin": 159
+        },
+        {
+          "ligneDebut": 164,
+          "ligneFin": 171
+        },
+        {
+          "ligneDebut": 177,
+          "ligneFin": 181
+        },
+        {
+          "ligneDebut": 186,
+          "ligneFin": 196
+        },
+        {
+          "ligneDebut": 225,
+          "ligneFin": 266
+        },
+        {
+          "ligneDebut": 271,
+          "ligneFin": 271
+        },
+        {
+          "ligneDebut": 281,
+          "ligneFin": 313
+        },
+        {
+          "ligneDebut": 318,
+          "ligneFin": 326
+        },
+        {
+          "ligneDebut": 329,
+          "ligneFin": 331
+        },
+        {
+          "ligneDebut": 337,
+          "ligneFin": 345
+        }
+      ]
+    },
+    {
+      "path": "netgain/src/doctor/aggregators/context.ts",
+      "zone": "engine",
+      "lignes": 345,
+      "exports": 17,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 33,
+          "ligneFin": 41
+        },
+        {
+          "ligneDebut": 82,
+          "ligneFin": 100
+        },
+        {
+          "ligneDebut": 106,
+          "ligneFin": 111
+        },
+        {
+          "ligneDebut": 119,
+          "ligneFin": 127
+        },
+        {
+          "ligneDebut": 166,
+          "ligneFin": 171
+        },
+        {
+          "ligneDebut": 177,
+          "ligneFin": 187
+        },
+        {
+          "ligneDebut": 328,
+          "ligneFin": 328
+        }
+      ]
+    },
+    {
+      "path": "lib/server/watchdog/journal.js",
+      "zone": "server",
+      "lignes": 340,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 88,
+          "ligneFin": 88
+        },
+        {
+          "ligneDebut": 95,
+          "ligneFin": 104
+        },
+        {
+          "ligneDebut": 109,
+          "ligneFin": 118
+        },
+        {
+          "ligneDebut": 120,
+          "ligneFin": 186
+        },
+        {
+          "ligneDebut": 188,
+          "ligneFin": 205
+        }
+      ]
+    },
+    {
+      "path": "lib/server/routes.js",
+      "zone": "server",
+      "lignes": 326,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 37,
+          "ligneFin": 37
+        },
+        {
+          "ligneDebut": 43,
+          "ligneFin": 47
+        },
+        {
+          "ligneDebut": 52,
+          "ligneFin": 70
+        },
+        {
+          "ligneDebut": 72,
+          "ligneFin": 79
+        },
+        {
+          "ligneDebut": 87,
+          "ligneFin": 104
+        },
+        {
+          "ligneDebut": 106,
+          "ligneFin": 115
+        },
+        {
+          "ligneDebut": 117,
+          "ligneFin": 133
+        },
+        {
+          "ligneDebut": 135,
+          "ligneFin": 175
+        },
+        {
+          "ligneDebut": 177,
+          "ligneFin": 198
+        },
+        {
+          "ligneDebut": 200,
+          "ligneFin": 213
+        },
+        {
+          "ligneDebut": 219,
+          "ligneFin": 227
+        },
+        {
+          "ligneDebut": 229,
+          "ligneFin": 272
+        },
+        {
+          "ligneDebut": 297,
+          "ligneFin": 301
+        },
+        {
+          "ligneDebut": 305,
+          "ligneFin": 323
+        }
+      ]
+    },
+    {
+      "path": "lib/server/event-reader.js",
+      "zone": "server",
+      "lignes": 250,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 40,
+          "ligneFin": 49
+        },
+        {
+          "ligneDebut": 93,
+          "ligneFin": 96
+        },
+        {
+          "ligneDebut": 99,
+          "ligneFin": 172
+        },
+        {
+          "ligneDebut": 174,
+          "ligneFin": 190
+        },
+        {
+          "ligneDebut": 192,
+          "ligneFin": 209
+        },
+        {
+          "ligneDebut": 211,
+          "ligneFin": 211
+        },
+        {
+          "ligneDebut": 220,
+          "ligneFin": 223
+        },
+        {
+          "ligneDebut": 226,
+          "ligneFin": 242
+        }
+      ]
+    },
+    {
+      "path": "lib/server/observatory/store.js",
+      "zone": "server",
+      "lignes": 231,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 54,
+          "ligneFin": 63
+        },
+        {
+          "ligneDebut": 65,
+          "ligneFin": 75
+        },
+        {
+          "ligneDebut": 77,
+          "ligneFin": 228
+        }
+      ]
+    },
+    {
+      "path": "public/viz-watchdog-client.js",
+      "zone": "web",
+      "lignes": 231,
+      "exports": 7,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 63,
+          "ligneFin": 65
+        },
+        {
+          "ligneDebut": 69,
+          "ligneFin": 72
+        },
+        {
+          "ligneDebut": 74,
+          "ligneFin": 77
+        },
+        {
+          "ligneDebut": 79,
+          "ligneFin": 82
+        },
+        {
+          "ligneDebut": 84,
+          "ligneFin": 130
+        },
+        {
+          "ligneDebut": 134,
+          "ligneFin": 149
+        },
+        {
+          "ligneDebut": 151,
+          "ligneFin": 157
+        },
+        {
+          "ligneDebut": 179,
+          "ligneFin": 213
+        },
+        {
+          "ligneDebut": 221,
+          "ligneFin": 224
+        },
+        {
+          "ligneDebut": 226,
+          "ligneFin": 226
+        }
+      ]
+    },
+    {
+      "path": "public/viz-narrator.js",
+      "zone": "web",
+      "lignes": 230,
+      "exports": 6,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 12,
+          "ligneFin": 30
+        },
+        {
+          "ligneDebut": 37,
+          "ligneFin": 72
+        },
+        {
+          "ligneDebut": 75,
+          "ligneFin": 111
+        },
+        {
+          "ligneDebut": 113,
+          "ligneFin": 125
+        },
+        {
+          "ligneDebut": 127,
+          "ligneFin": 147
+        },
+        {
+          "ligneDebut": 149,
+          "ligneFin": 160
+        },
+        {
+          "ligneDebut": 162,
+          "ligneFin": 165
+        },
+        {
+          "ligneDebut": 169,
+          "ligneFin": 186
+        },
+        {
+          "ligneDebut": 188,
+          "ligneFin": 195
+        },
+        {
+          "ligneDebut": 207,
+          "ligneFin": 209
+        },
+        {
+          "ligneDebut": 211,
+          "ligneFin": 218
+        },
+        {
+          "ligneDebut": 220,
+          "ligneFin": 223
+        },
+        {
+          "ligneDebut": 225,
+          "ligneFin": 229
+        }
+      ]
+    },
+    {
+      "path": "lib/server/watchdog/index.js",
+      "zone": "server",
+      "lignes": 228,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 39,
+          "ligneFin": 42
+        },
+        {
+          "ligneDebut": 61,
+          "ligneFin": 61
+        },
+        {
+          "ligneDebut": 90,
+          "ligneFin": 90
+        },
+        {
+          "ligneDebut": 91,
+          "ligneFin": 91
+        },
+        {
+          "ligneDebut": 110,
+          "ligneFin": 119
+        },
+        {
+          "ligneDebut": 152,
+          "ligneFin": 152
+        }
+      ]
+    },
+    {
+      "path": "netgain/src/map/graph.ts",
+      "zone": "engine",
+      "lignes": 222,
+      "exports": 9,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 53,
+          "ligneFin": 75
+        },
+        {
+          "ligneDebut": 83,
+          "ligneFin": 85
+        },
+        {
+          "ligneDebut": 87,
+          "ligneFin": 103
+        },
+        {
+          "ligneDebut": 105,
+          "ligneFin": 113
+        },
+        {
+          "ligneDebut": 121,
+          "ligneFin": 149
+        },
+        {
+          "ligneDebut": 154,
+          "ligneFin": 168
+        },
+        {
+          "ligneDebut": 174,
+          "ligneFin": 211
+        },
+        {
+          "ligneDebut": 214,
+          "ligneFin": 221
+        }
+      ]
+    },
+    {
+      "path": "public/observatory/failures-format.js",
+      "zone": "web",
+      "lignes": 218,
+      "exports": 7,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 19,
+          "ligneFin": 22
+        },
+        {
+          "ligneDebut": 42,
+          "ligneFin": 46
+        },
+        {
+          "ligneDebut": 109,
+          "ligneFin": 115
+        },
+        {
+          "ligneDebut": 117,
+          "ligneFin": 127
+        },
+        {
+          "ligneDebut": 140,
+          "ligneFin": 144
+        },
+        {
+          "ligneDebut": 154,
+          "ligneFin": 158
+        },
+        {
+          "ligneDebut": 160,
+          "ligneFin": 180
+        },
+        {
+          "ligneDebut": 185,
+          "ligneFin": 188
+        },
+        {
+          "ligneDebut": 198,
+          "ligneFin": 204
+        },
+        {
+          "ligneDebut": 214,
+          "ligneFin": 217
+        }
+      ]
+    },
+    {
+      "path": "public/viz-state.js",
+      "zone": "web",
+      "lignes": 217,
+      "exports": 34,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 87,
+          "ligneFin": 87
+        },
+        {
+          "ligneDebut": 89,
+          "ligneFin": 92
+        },
+        {
+          "ligneDebut": 94,
+          "ligneFin": 98
+        },
+        {
+          "ligneDebut": 102,
+          "ligneFin": 115
+        },
+        {
+          "ligneDebut": 117,
+          "ligneFin": 129
+        },
+        {
+          "ligneDebut": 132,
+          "ligneFin": 142
+        },
+        {
+          "ligneDebut": 145,
+          "ligneFin": 152
+        },
+        {
+          "ligneDebut": 158,
+          "ligneFin": 169
+        },
+        {
+          "ligneDebut": 171,
+          "ligneFin": 171
+        },
+        {
+          "ligneDebut": 172,
+          "ligneFin": 172
+        },
+        {
+          "ligneDebut": 173,
+          "ligneFin": 173
+        },
+        {
+          "ligneDebut": 174,
+          "ligneFin": 174
+        },
+        {
+          "ligneDebut": 177,
+          "ligneFin": 182
+        },
+        {
+          "ligneDebut": 185,
+          "ligneFin": 188
+        },
+        {
+          "ligneDebut": 192,
+          "ligneFin": 195
+        },
+        {
+          "ligneDebut": 200,
+          "ligneFin": 206
+        },
+        {
+          "ligneDebut": 209,
+          "ligneFin": 211
+        },
+        {
+          "ligneDebut": 214,
+          "ligneFin": 216
+        }
+      ]
+    },
+    {
+      "path": "netgain/src/mcp/server.ts",
+      "zone": "engine",
+      "lignes": 214,
+      "exports": 4,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 79,
+          "ligneFin": 83
+        },
+        {
+          "ligneDebut": 85,
+          "ligneFin": 207
+        },
+        {
+          "ligneDebut": 86,
+          "ligneFin": 160
+        }
+      ]
+    },
+    {
+      "path": "netgain/src/core/events.ts",
+      "zone": "engine",
+      "lignes": 213,
+      "exports": 8,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 53,
+          "ligneFin": 55
+        },
+        {
+          "ligneDebut": 57,
+          "ligneFin": 59
+        },
+        {
+          "ligneDebut": 66,
+          "ligneFin": 75
+        },
+        {
+          "ligneDebut": 77,
+          "ligneFin": 106
+        },
+        {
+          "ligneDebut": 108,
+          "ligneFin": 151
+        },
+        {
+          "ligneDebut": 157,
+          "ligneFin": 175
+        },
+        {
+          "ligneDebut": 178,
+          "ligneFin": 189
+        },
+        {
+          "ligneDebut": 191,
+          "ligneFin": 199
+        },
+        {
+          "ligneDebut": 201,
+          "ligneFin": 212
+        }
+      ]
+    },
+    {
+      "path": "netgain/src/doctor/aggregators/turns.ts",
+      "zone": "engine",
+      "lignes": 202,
+      "exports": 6,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 37,
+          "ligneFin": 39
+        },
+        {
+          "ligneDebut": 41,
+          "ligneFin": 43
+        },
+        {
+          "ligneDebut": 46,
+          "ligneFin": 48
+        },
+        {
+          "ligneDebut": 50,
+          "ligneFin": 54
+        }
+      ]
+    },
+    {
+      "path": "public/observatory/advisor-view.js",
+      "zone": "web",
+      "lignes": 198,
+      "exports": 2,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 19,
+          "ligneFin": 24
+        },
+        {
+          "ligneDebut": 26,
+          "ligneFin": 26
+        },
+        {
+          "ligneDebut": 59,
+          "ligneFin": 68
+        },
+        {
+          "ligneDebut": 70,
+          "ligneFin": 70
+        },
+        {
+          "ligneDebut": 95,
+          "ligneFin": 109
+        },
+        {
+          "ligneDebut": 115,
+          "ligneFin": 119
+        },
+        {
+          "ligneDebut": 125,
+          "ligneFin": 145
+        },
+        {
+          "ligneDebut": 147,
+          "ligneFin": 197
+        }
+      ]
+    },
+    {
+      "path": "lib/lifecycle.js",
+      "zone": "server",
+      "lignes": 195,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 14,
+          "ligneFin": 23
+        },
+        {
+          "ligneDebut": 25,
+          "ligneFin": 27
+        },
+        {
+          "ligneDebut": 29,
+          "ligneFin": 31
+        },
+        {
+          "ligneDebut": 33,
+          "ligneFin": 36
+        },
+        {
+          "ligneDebut": 39,
+          "ligneFin": 52
+        },
+        {
+          "ligneDebut": 54,
+          "ligneFin": 64
+        },
+        {
+          "ligneDebut": 66,
+          "ligneFin": 81
+        },
+        {
+          "ligneDebut": 84,
+          "ligneFin": 97
+        },
+        {
+          "ligneDebut": 100,
+          "ligneFin": 113
+        },
+        {
+          "ligneDebut": 116,
+          "ligneFin": 116
+        },
+        {
+          "ligneDebut": 153,
+          "ligneFin": 181
+        }
+      ]
+    },
+    {
+      "path": "lib/server/watchdog/routes.js",
+      "zone": "server",
+      "lignes": 192,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 32,
+          "ligneFin": 35
+        },
+        {
+          "ligneDebut": 48,
+          "ligneFin": 51
+        },
+        {
+          "ligneDebut": 69,
+          "ligneFin": 72
+        },
+        {
+          "ligneDebut": 88,
+          "ligneFin": 92
+        },
+        {
+          "ligneDebut": 106,
+          "ligneFin": 115
+        },
+        {
+          "ligneDebut": 117,
+          "ligneFin": 189
+        }
+      ]
+    },
+    {
+      "path": "netgain/src/core/pricing.ts",
+      "zone": "engine",
+      "lignes": 189,
+      "exports": 10,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 74,
+          "ligneFin": 82
+        },
+        {
+          "ligneDebut": 88,
+          "ligneFin": 97
+        },
+        {
+          "ligneDebut": 112,
+          "ligneFin": 133
+        },
+        {
+          "ligneDebut": 141,
+          "ligneFin": 146
+        },
+        {
+          "ligneDebut": 170,
+          "ligneFin": 188
+        }
+      ]
+    },
+    {
+      "path": "lib/server/observatory/service.js",
+      "zone": "server",
+      "lignes": 181,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 26,
+          "ligneFin": 178
+        },
+        {
+          "ligneDebut": 40,
+          "ligneFin": 48
+        }
+      ]
+    },
+    {
+      "path": "public/observatory/pricing-view.js",
+      "zone": "web",
+      "lignes": 178,
+      "exports": 2,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 24,
+          "ligneFin": 28
+        },
+        {
+          "ligneDebut": 30,
+          "ligneFin": 38
+        },
+        {
+          "ligneDebut": 40,
+          "ligneFin": 49
+        },
+        {
+          "ligneDebut": 51,
+          "ligneFin": 66
+        },
+        {
+          "ligneDebut": 68,
+          "ligneFin": 73
+        },
+        {
+          "ligneDebut": 75,
+          "ligneFin": 89
+        },
+        {
+          "ligneDebut": 91,
+          "ligneFin": 100
+        },
+        {
+          "ligneDebut": 102,
+          "ligneFin": 119
+        },
+        {
+          "ligneDebut": 128,
+          "ligneFin": 161
+        },
+        {
+          "ligneDebut": 163,
+          "ligneFin": 177
+        }
+      ]
+    },
+    {
+      "path": "public/observatory/format.js",
+      "zone": "web",
+      "lignes": 163,
+      "exports": 19,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 10,
+          "ligneFin": 12
+        },
+        {
+          "ligneDebut": 14,
+          "ligneFin": 18
+        },
+        {
+          "ligneDebut": 22,
+          "ligneFin": 29
+        },
+        {
+          "ligneDebut": 32,
+          "ligneFin": 34
+        },
+        {
+          "ligneDebut": 40,
+          "ligneFin": 42
+        },
+        {
+          "ligneDebut": 58,
+          "ligneFin": 69
+        },
+        {
+          "ligneDebut": 77,
+          "ligneFin": 79
+        },
+        {
+          "ligneDebut": 82,
+          "ligneFin": 85
+        },
+        {
+          "ligneDebut": 88,
+          "ligneFin": 91
+        },
+        {
+          "ligneDebut": 95,
+          "ligneFin": 102
+        },
+        {
+          "ligneDebut": 104,
+          "ligneFin": 107
+        },
+        {
+          "ligneDebut": 112,
+          "ligneFin": 116
+        },
+        {
+          "ligneDebut": 118,
+          "ligneFin": 124
+        },
+        {
+          "ligneDebut": 128,
+          "ligneFin": 132
+        },
+        {
+          "ligneDebut": 137,
+          "ligneFin": 139
+        },
+        {
+          "ligneDebut": 141,
+          "ligneFin": 143
+        },
+        {
+          "ligneDebut": 148,
+          "ligneFin": 151
+        },
+        {
+          "ligneDebut": 156,
+          "ligneFin": 162
+        }
+      ]
+    },
+    {
+      "path": "netgain/src/doctor/index.ts",
+      "zone": "engine",
+      "lignes": 157,
+      "exports": 9,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 21,
+          "ligneFin": 83
+        },
+        {
+          "ligneDebut": 85,
+          "ligneFin": 109
+        },
+        {
+          "ligneDebut": 111,
+          "ligneFin": 144
+        }
+      ]
+    },
+    {
+      "path": "netgain/src/install/hook-edit.ts",
+      "zone": "engine",
+      "lignes": 157,
+      "exports": 8,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 9,
+          "ligneFin": 12
+        },
+        {
+          "ligneDebut": 14,
+          "ligneFin": 16
+        },
+        {
+          "ligneDebut": 22,
+          "ligneFin": 24
+        },
+        {
+          "ligneDebut": 26,
+          "ligneFin": 35
+        },
+        {
+          "ligneDebut": 38,
+          "ligneFin": 42
+        },
+        {
+          "ligneDebut": 45,
+          "ligneFin": 47
+        },
+        {
+          "ligneDebut": 56,
+          "ligneFin": 85
+        },
+        {
+          "ligneDebut": 87,
+          "ligneFin": 94
+        },
+        {
+          "ligneDebut": 101,
+          "ligneFin": 116
+        },
+        {
+          "ligneDebut": 118,
+          "ligneFin": 131
+        },
+        {
+          "ligneDebut": 139,
+          "ligneFin": 156
+        }
+      ]
+    },
+    {
+      "path": "lib/server/housekeep.js",
+      "zone": "server",
+      "lignes": 152,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 27,
+          "ligneFin": 64
+        },
+        {
+          "ligneDebut": 66,
+          "ligneFin": 133
+        },
+        {
+          "ligneDebut": 136,
+          "ligneFin": 149
+        }
+      ]
+    },
+    {
+      "path": "public/observatory/analysis-view.js",
+      "zone": "web",
+      "lignes": 151,
+      "exports": 3,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 21,
+          "ligneFin": 33
+        },
+        {
+          "ligneDebut": 38,
+          "ligneFin": 63
+        },
+        {
+          "ligneDebut": 65,
+          "ligneFin": 90
+        },
+        {
+          "ligneDebut": 92,
+          "ligneFin": 124
+        },
+        {
+          "ligneDebut": 126,
+          "ligneFin": 150
+        }
+      ]
+    },
+    {
+      "path": "netgain/src/doctor/scan-session.ts",
+      "zone": "engine",
+      "lignes": 145,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 20,
+          "ligneFin": 144
+        },
+        {
+          "ligneDebut": 39,
+          "ligneFin": 93
+        }
+      ]
+    },
+    {
+      "path": "lib/prompt-install.js",
+      "zone": "server",
+      "lignes": 143,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 21,
+          "ligneFin": 26
+        },
+        {
+          "ligneDebut": 36,
+          "ligneFin": 36
+        },
+        {
+          "ligneDebut": 90,
+          "ligneFin": 107
+        },
+        {
+          "ligneDebut": 97,
+          "ligneFin": 106
+        },
+        {
+          "ligneDebut": 109,
+          "ligneFin": 109
+        }
+      ]
+    },
+    {
+      "path": "lib/server/observatory/routes.js",
+      "zone": "server",
+      "lignes": 139,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 12,
+          "ligneFin": 15
+        },
+        {
+          "ligneDebut": 19,
+          "ligneFin": 29
+        },
+        {
+          "ligneDebut": 38,
+          "ligneFin": 136
+        }
+      ]
+    },
+    {
+      "path": "lib/server/tokens.js",
+      "zone": "server",
+      "lignes": 138,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 21,
+          "ligneFin": 33
+        },
+        {
+          "ligneDebut": 35,
+          "ligneFin": 43
+        },
+        {
+          "ligneDebut": 45,
+          "ligneFin": 48
+        },
+        {
+          "ligneDebut": 50,
+          "ligneFin": 85
+        },
+        {
+          "ligneDebut": 87,
+          "ligneFin": 100
+        },
+        {
+          "ligneDebut": 105,
+          "ligneFin": 109
+        },
+        {
+          "ligneDebut": 111,
+          "ligneFin": 114
+        },
+        {
+          "ligneDebut": 116,
+          "ligneFin": 123
+        },
+        {
+          "ligneDebut": 126,
+          "ligneFin": 131
+        }
+      ]
+    },
+    {
+      "path": "public/observatory/failures-view.js",
+      "zone": "web",
+      "lignes": 135,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 11,
+          "ligneFin": 16
+        },
+        {
+          "ligneDebut": 20,
+          "ligneFin": 24
+        },
+        {
+          "ligneDebut": 31,
+          "ligneFin": 39
+        },
+        {
+          "ligneDebut": 45,
+          "ligneFin": 63
+        },
+        {
+          "ligneDebut": 65,
+          "ligneFin": 72
+        },
+        {
+          "ligneDebut": 74,
+          "ligneFin": 91
+        },
+        {
+          "ligneDebut": 93,
+          "ligneFin": 118
+        },
+        {
+          "ligneDebut": 120,
+          "ligneFin": 120
+        }
+      ]
+    },
+    {
+      "path": "netgain/src/core/discovery.ts",
+      "zone": "engine",
+      "lignes": 133,
+      "exports": 5,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 32,
+          "ligneFin": 77
+        },
+        {
+          "ligneDebut": 79,
+          "ligneFin": 123
+        },
+        {
+          "ligneDebut": 126,
+          "ligneFin": 132
+        }
+      ]
+    },
+    {
+      "path": "lib/server/session-index.js",
+      "zone": "server",
+      "lignes": 130,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 39,
+          "ligneFin": 41
+        },
+        {
+          "ligneDebut": 43,
+          "ligneFin": 43
+        },
+        {
+          "ligneDebut": 48,
+          "ligneFin": 50
+        },
+        {
+          "ligneDebut": 53,
+          "ligneFin": 63
+        },
+        {
+          "ligneDebut": 65,
+          "ligneFin": 97
+        },
+        {
+          "ligneDebut": 99,
+          "ligneFin": 109
+        },
+        {
+          "ligneDebut": 111,
+          "ligneFin": 117
+        }
+      ]
+    },
+    {
+      "path": "lib/server.js",
+      "zone": "server",
+      "lignes": 128,
+      "exports": 0,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 54,
+          "ligneFin": 73
+        },
+        {
+          "ligneDebut": 75,
+          "ligneFin": 89
+        }
+      ]
+    },
+    {
+      "path": "netgain/src/install/index.ts",
+      "zone": "engine",
+      "lignes": 127,
+      "exports": 3,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 11,
+          "ligneFin": 15
+        },
+        {
+          "ligneDebut": 17,
+          "ligneFin": 23
+        },
+        {
+          "ligneDebut": 26,
+          "ligneFin": 32
+        },
+        {
+          "ligneDebut": 34,
+          "ligneFin": 69
+        },
+        {
+          "ligneDebut": 71,
+          "ligneFin": 95
+        },
+        {
+          "ligneDebut": 97,
+          "ligneFin": 126
+        }
+      ]
+    },
+    {
+      "path": "netgain/src/install/mcp-edit.ts",
+      "zone": "engine",
+      "lignes": 127,
+      "exports": 8,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 15,
+          "ligneFin": 17
+        },
+        {
+          "ligneDebut": 19,
+          "ligneFin": 25
+        },
+        {
+          "ligneDebut": 27,
+          "ligneFin": 39
+        },
+        {
+          "ligneDebut": 42,
+          "ligneFin": 48
+        },
+        {
+          "ligneDebut": 51,
+          "ligneFin": 58
+        },
+        {
+          "ligneDebut": 64,
+          "ligneFin": 86
+        },
+        {
+          "ligneDebut": 89,
+          "ligneFin": 97
+        },
+        {
+          "ligneDebut": 107,
+          "ligneFin": 126
+        }
+      ]
+    },
+    {
+      "path": "netgain/src/doctor/aggregators/tokens.ts",
+      "zone": "engine",
+      "lignes": 122,
+      "exports": 6,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 16,
+          "ligneFin": 18
+        },
+        {
+          "ligneDebut": 20,
+          "ligneFin": 27
+        },
+        {
+          "ligneDebut": 29,
+          "ligneFin": 36
+        },
+        {
+          "ligneDebut": 39,
+          "ligneFin": 41
+        }
+      ]
+    },
+    {
+      "path": "lib/server/observatory/rules/r1-prefix-change.js",
+      "zone": "server",
+      "lignes": 120,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 61,
+          "ligneFin": 68
+        },
+        {
+          "ligneDebut": 70,
+          "ligneFin": 117
+        }
+      ]
+    },
+    {
+      "path": "public/observatory/store.js",
+      "zone": "web",
+      "lignes": 112,
+      "exports": 11,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 25,
+          "ligneFin": 27
+        },
+        {
+          "ligneDebut": 29,
+          "ligneFin": 32
+        },
+        {
+          "ligneDebut": 34,
+          "ligneFin": 37
+        },
+        {
+          "ligneDebut": 39,
+          "ligneFin": 41
+        },
+        {
+          "ligneDebut": 43,
+          "ligneFin": 46
+        },
+        {
+          "ligneDebut": 51,
+          "ligneFin": 58
+        },
+        {
+          "ligneDebut": 106,
+          "ligneFin": 111
+        }
+      ]
+    },
+    {
+      "path": "netgain/src/doctor/aggregators/tool-results.ts",
+      "zone": "engine",
+      "lignes": 110,
+      "exports": 4,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 15,
+          "ligneFin": 17
+        }
+      ]
+    },
+    {
+      "path": "lib/server/observatory/config-audit.js",
+      "zone": "server",
+      "lignes": 104,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 15,
+          "ligneFin": 21
+        },
+        {
+          "ligneDebut": 23,
+          "ligneFin": 28
+        },
+        {
+          "ligneDebut": 33,
+          "ligneFin": 33
+        },
+        {
+          "ligneDebut": 48,
+          "ligneFin": 48
+        },
+        {
+          "ligneDebut": 57,
+          "ligneFin": 57
+        },
+        {
+          "ligneDebut": 78,
+          "ligneFin": 78
+        },
+        {
+          "ligneDebut": 87,
+          "ligneFin": 87
+        },
+        {
+          "ligneDebut": 98,
+          "ligneFin": 101
+        }
+      ]
+    },
+    {
+      "path": "netgain/src/doctor/aggregators/reads.ts",
+      "zone": "engine",
+      "lignes": 98,
+      "exports": 5,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 27,
+          "ligneFin": 35
+        }
+      ]
+    },
+    {
+      "path": "lib/server/watchdog/catch-up.js",
+      "zone": "server",
+      "lignes": 95,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 36,
+          "ligneFin": 92
+        }
+      ]
+    },
+    {
+      "path": "netgain/src/doctor/report/types.ts",
+      "zone": "engine",
+      "lignes": 94,
+      "exports": 4,
+      "fonctionsMotCleFunction": []
+    },
+    {
+      "path": "netgain/src/install/status.ts",
+      "zone": "engine",
+      "lignes": 94,
+      "exports": 4,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 32,
+          "ligneFin": 39
+        },
+        {
+          "ligneDebut": 41,
+          "ligneFin": 45
+        },
+        {
+          "ligneDebut": 47,
+          "ligneFin": 78
+        },
+        {
+          "ligneDebut": 80,
+          "ligneFin": 93
+        }
+      ]
+    },
+    {
+      "path": "netgain/src/map/engine.ts",
+      "zone": "engine",
+      "lignes": 91,
+      "exports": 5,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 29,
+          "ligneFin": 32
+        },
+        {
+          "ligneDebut": 39,
+          "ligneFin": 85
+        },
+        {
+          "ligneDebut": 44,
+          "ligneFin": 80
+        },
+        {
+          "ligneDebut": 88,
+          "ligneFin": 90
+        }
+      ]
+    },
+    {
+      "path": "lib/server/observatory/rules/r3-large-tool-output.js",
+      "zone": "server",
+      "lignes": 89,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 41,
+          "ligneFin": 86
+        }
+      ]
+    },
+    {
+      "path": "lib/server/watchdog/service.js",
+      "zone": "server",
+      "lignes": 88,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 21,
+          "ligneFin": 26
+        }
+      ]
+    },
+    {
+      "path": "netgain/src/cli-args.ts",
+      "zone": "engine",
+      "lignes": 87,
+      "exports": 5,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 26,
+          "ligneFin": 78
+        },
+        {
+          "ligneDebut": 80,
+          "ligneFin": 86
+        }
+      ]
+    },
+    {
+      "path": "lib/server/observatory/rules/r6-short-subagents.js",
+      "zone": "server",
+      "lignes": 84,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 22,
+          "ligneFin": 24
+        },
+        {
+          "ligneDebut": 26,
+          "ligneFin": 30
+        },
+        {
+          "ligneDebut": 33,
+          "ligneFin": 37
+        },
+        {
+          "ligneDebut": 39,
+          "ligneFin": 81
+        }
+      ]
+    },
+    {
+      "path": "public/observatory/api.js",
+      "zone": "web",
+      "lignes": 83,
+      "exports": 12,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 5,
+          "ligneFin": 14
+        },
+        {
+          "ligneDebut": 16,
+          "ligneFin": 24
+        },
+        {
+          "ligneDebut": 35,
+          "ligneFin": 35
+        },
+        {
+          "ligneDebut": 40,
+          "ligneFin": 40
+        },
+        {
+          "ligneDebut": 49,
+          "ligneFin": 49
+        },
+        {
+          "ligneDebut": 54,
+          "ligneFin": 54
+        },
+        {
+          "ligneDebut": 64,
+          "ligneFin": 64
+        },
+        {
+          "ligneDebut": 74,
+          "ligneFin": 74
+        }
+      ]
+    },
+    {
+      "path": "public/viz-alert-format.mjs",
+      "zone": "web",
+      "lignes": 83,
+      "exports": 5,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 22,
+          "ligneFin": 24
+        },
+        {
+          "ligneDebut": 26,
+          "ligneFin": 29
+        },
+        {
+          "ligneDebut": 33,
+          "ligneFin": 33
+        },
+        {
+          "ligneDebut": 69,
+          "ligneFin": 72
+        },
+        {
+          "ligneDebut": 76,
+          "ligneFin": 82
+        }
+      ]
+    },
+    {
+      "path": "netgain/src/cli.ts",
+      "zone": "engine",
+      "lignes": 81,
+      "exports": 0,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 28,
+          "ligneFin": 70
+        }
+      ]
+    },
+    {
+      "path": "lib/hook.js",
+      "zone": "server",
+      "lignes": 80,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 19,
+          "ligneFin": 27
+        },
+        {
+          "ligneDebut": 29,
+          "ligneFin": 75
+        }
+      ]
+    },
+    {
+      "path": "public/observatory/evidence.js",
+      "zone": "web",
+      "lignes": 79,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 73,
+          "ligneFin": 78
+        }
+      ]
+    },
+    {
+      "path": "lib/server/observatory/provenance.js",
+      "zone": "server",
+      "lignes": 77,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 10,
+          "ligneFin": 10
+        }
+      ]
+    },
+    {
+      "path": "lib/server/transcript-adapters/claude.js",
+      "zone": "server",
+      "lignes": 77,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 20,
+          "ligneFin": 22
+        },
+        {
+          "ligneDebut": 24,
+          "ligneFin": 70
+        }
+      ]
+    },
+    {
+      "path": "lib/server/observatory/rules/r2-unused-mcp.js",
+      "zone": "server",
+      "lignes": 73,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 24,
+          "ligneFin": 28
+        },
+        {
+          "ligneDebut": 30,
+          "ligneFin": 70
+        }
+      ]
+    },
+    {
+      "path": "public/observatory/remedies.js",
+      "zone": "web",
+      "lignes": 73,
+      "exports": 2,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 69,
+          "ligneFin": 72
+        }
+      ]
+    },
+    {
+      "path": "netgain/src/doctor/aggregators/prompts.ts",
+      "zone": "engine",
+      "lignes": 69,
+      "exports": 5,
+      "fonctionsMotCleFunction": []
+    },
+    {
+      "path": "netgain/src/router/detector.ts",
+      "zone": "engine",
+      "lignes": 69,
+      "exports": 3,
+      "fonctionsMotCleFunction": []
+    },
+    {
+      "path": "lib/server/observatory/project-label.js",
+      "zone": "server",
+      "lignes": 68,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 28,
+          "ligneFin": 54
+        },
+        {
+          "ligneDebut": 59,
+          "ligneFin": 65
+        }
+      ]
+    },
+    {
+      "path": "lib/server/observatory/engine.js",
+      "zone": "server",
+      "lignes": 66,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 31,
+          "ligneFin": 57
+        },
+        {
+          "ligneDebut": 61,
+          "ligneFin": 63
+        }
+      ]
+    },
+    {
+      "path": "lib/server/observatory/rules/ranking.js",
+      "zone": "server",
+      "lignes": 66,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 24,
+          "ligneFin": 26
+        },
+        {
+          "ligneDebut": 31,
+          "ligneFin": 38
+        },
+        {
+          "ligneDebut": 40,
+          "ligneFin": 44
+        },
+        {
+          "ligneDebut": 46,
+          "ligneFin": 46
+        }
+      ]
+    },
+    {
+      "path": "lib/server/observatory/model-costs.js",
+      "zone": "server",
+      "lignes": 64,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 16,
+          "ligneFin": 61
+        }
+      ]
+    },
+    {
+      "path": "lib/server/observatory/rules/r4-cross-agent-reads.js",
+      "zone": "server",
+      "lignes": 61,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 17,
+          "ligneFin": 58
+        }
+      ]
+    },
+    {
+      "path": "lib/server/observatory/rules/r5-compactions.js",
+      "zone": "server",
+      "lignes": 57,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 15,
+          "ligneFin": 54
+        }
+      ]
+    },
+    {
+      "path": "netgain/src/install/json-file.ts",
+      "zone": "engine",
+      "lignes": 57,
+      "exports": 5,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 8,
+          "ligneFin": 13
+        },
+        {
+          "ligneDebut": 24,
+          "ligneFin": 43
+        },
+        {
+          "ligneDebut": 46,
+          "ligneFin": 56
+        }
+      ]
+    },
+    {
+      "path": "lib/server/observatory/scan.js",
+      "zone": "server",
+      "lignes": 56,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 12,
+          "ligneFin": 53
+        }
+      ]
+    },
+    {
+      "path": "netgain/src/doctor/aggregators/recognizers.ts",
+      "zone": "engine",
+      "lignes": 56,
+      "exports": 4,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 25,
+          "ligneFin": 30
+        },
+        {
+          "ligneDebut": 40,
+          "ligneFin": 55
+        }
+      ]
+    },
+    {
+      "path": "lib/server/observatory/session-mapper.js",
+      "zone": "server",
+      "lignes": 54,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 12,
+          "ligneFin": 20
+        },
+        {
+          "ligneDebut": 22,
+          "ligneFin": 39
+        },
+        {
+          "ligneDebut": 41,
+          "ligneFin": 49
+        }
+      ]
+    },
+    {
+      "path": "netgain/src/doctor/aggregators/agent-gestures.ts",
+      "zone": "engine",
+      "lignes": 53,
+      "exports": 2,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 16,
+          "ligneFin": 18
+        },
+        {
+          "ligneDebut": 21,
+          "ligneFin": 50
+        },
+        {
+          "ligneDebut": 27,
+          "ligneFin": 29
+        }
+      ]
+    },
+    {
+      "path": "netgain/src/doctor/aggregators/session-kind.ts",
+      "zone": "engine",
+      "lignes": 51,
+      "exports": 2,
+      "fonctionsMotCleFunction": []
+    },
+    {
+      "path": "netgain/src/install/paths.ts",
+      "zone": "engine",
+      "lignes": 47,
+      "exports": 6,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 13,
+          "ligneFin": 15
+        },
+        {
+          "ligneDebut": 23,
+          "ligneFin": 25
+        },
+        {
+          "ligneDebut": 28,
+          "ligneFin": 30
+        },
+        {
+          "ligneDebut": 32,
+          "ligneFin": 40
+        },
+        {
+          "ligneDebut": 44,
+          "ligneFin": 46
+        }
+      ]
+    },
+    {
+      "path": "netgain/src/map/budget.ts",
+      "zone": "engine",
+      "lignes": 45,
+      "exports": 3,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 24,
+          "ligneFin": 44
+        }
+      ]
+    },
+    {
+      "path": "lib/server/observatory/rules/thresholds.js",
+      "zone": "server",
+      "lignes": 43,
+      "exports": 1,
+      "fonctionsMotCleFunction": []
+    },
+    {
+      "path": "lib/server/observatory/rules/cost.js",
+      "zone": "server",
+      "lignes": 42,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 21,
+          "ligneFin": 24
+        },
+        {
+          "ligneDebut": 26,
+          "ligneFin": 28
+        },
+        {
+          "ligneDebut": 30,
+          "ligneFin": 32
+        },
+        {
+          "ligneDebut": 37,
+          "ligneFin": 39
+        }
+      ]
+    },
+    {
+      "path": "lib/server/observatory/index.js",
+      "zone": "server",
+      "lignes": 41,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 22,
+          "ligneFin": 38
+        }
+      ]
+    },
+    {
+      "path": "netgain/src/core/jsonl.ts",
+      "zone": "engine",
+      "lignes": 37,
+      "exports": 2,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 11,
+          "ligneFin": 36
+        }
+      ]
+    },
+    {
+      "path": "netgain/src/router/hook.ts",
+      "zone": "engine",
+      "lignes": 37,
+      "exports": 2,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 9,
+          "ligneFin": 23
+        },
+        {
+          "ligneDebut": 26,
+          "ligneFin": 36
+        }
+      ]
+    },
+    {
+      "path": "netgain/src/doctor/aggregators/clock.ts",
+      "zone": "engine",
+      "lignes": 36,
+      "exports": 1,
+      "fonctionsMotCleFunction": []
+    },
+    {
+      "path": "lib/server/observatory/mcp-usage.js",
+      "zone": "server",
+      "lignes": 35,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 10,
+          "ligneFin": 14
+        },
+        {
+          "ligneDebut": 19,
+          "ligneFin": 32
+        }
+      ]
+    },
+    {
+      "path": "public/viz-tool-subject.mjs",
+      "zone": "web",
+      "lignes": 34,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 12,
+          "ligneFin": 14
+        },
+        {
+          "ligneDebut": 27,
+          "ligneFin": 33
+        }
+      ]
+    },
+    {
+      "path": "lib/server/observatory/rules/cross-links.js",
+      "zone": "server",
+      "lignes": 31,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 23,
+          "ligneFin": 28
+        }
+      ]
+    },
+    {
+      "path": "netgain/src/doctor/aggregators/subagents.ts",
+      "zone": "engine",
+      "lignes": 31,
+      "exports": 3,
+      "fonctionsMotCleFunction": []
+    },
+    {
+      "path": "lib/server/observatory/rules/registry.js",
+      "zone": "server",
+      "lignes": 30,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 17,
+          "ligneFin": 27
+        }
+      ]
+    },
+    {
+      "path": "public/viz-alert-freshness.mjs",
+      "zone": "web",
+      "lignes": 29,
+      "exports": 2,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 15,
+          "ligneFin": 28
+        }
+      ]
+    },
+    {
+      "path": "netgain/src/mcp/main.ts",
+      "zone": "engine",
+      "lignes": 29,
+      "exports": 0,
+      "fonctionsMotCleFunction": []
+    },
+    {
+      "path": "lib/server/observatory/summary.js",
+      "zone": "server",
+      "lignes": 28,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 9,
+          "ligneFin": 9
+        }
+      ]
+    },
+    {
+      "path": "lib/server/observatory/migrations.js",
+      "zone": "server",
+      "lignes": 26,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 7,
+          "ligneFin": 9
+        },
+        {
+          "ligneDebut": 17,
+          "ligneFin": 23
+        }
+      ]
+    },
+    {
+      "path": "lib/server/transcript-adapters/index.js",
+      "zone": "server",
+      "lignes": 26,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 16,
+          "ligneFin": 23
+        }
+      ]
+    },
+    {
+      "path": "public/observatory/period-selector.js",
+      "zone": "web",
+      "lignes": 26,
+      "exports": 2,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 8,
+          "ligneFin": 25
+        }
+      ]
+    },
+    {
+      "path": "lib/server/observatory/scan-version.js",
+      "zone": "server",
+      "lignes": 25,
+      "exports": 1,
+      "fonctionsMotCleFunction": []
+    },
+    {
+      "path": "lib/server/sse.js",
+      "zone": "server",
+      "lignes": 25,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 6,
+          "ligneFin": 11
+        },
+        {
+          "ligneDebut": 16,
+          "ligneFin": 22
+        }
+      ]
+    },
+    {
+      "path": "public/observatory/confirm-button.js",
+      "zone": "web",
+      "lignes": 25,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 5,
+          "ligneFin": 5
+        }
+      ]
+    },
+    {
+      "path": "netgain/src/map/health.ts",
+      "zone": "engine",
+      "lignes": 24,
+      "exports": 2,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 15,
+          "ligneFin": 23
+        }
+      ]
+    },
+    {
+      "path": "netgain/src/version.ts",
+      "zone": "engine",
+      "lignes": 18,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 12,
+          "ligneFin": 17
+        }
+      ]
+    },
+    {
+      "path": "netgain/src/doctor/report/json.ts",
+      "zone": "engine",
+      "lignes": 16,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 2,
+          "ligneFin": 4
+        },
+        {
+          "ligneDebut": 6,
+          "ligneFin": 15
+        }
+      ]
+    },
+    {
+      "path": "lib/server/transcript-adapters/copilot.js",
+      "zone": "server",
+      "lignes": 14,
+      "exports": 1,
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 6,
+          "ligneFin": 6
+        },
+        {
+          "ligneDebut": 7,
+          "ligneFin": 7
+        }
+      ]
+    },
+    {
+      "path": "netgain/src/core/index.ts",
+      "zone": "engine",
+      "lignes": 7,
+      "exports": 4,
+      "fonctionsMotCleFunction": []
+    }
+  ],
+  "distribution": {
+    "lignes": {
+      "mediane": 94,
+      "p90": 370,
+      "max": 744
+    },
+    "fonctionsMotCleFunction": {
+      "mediane": 8,
+      "p90": 37,
+      "max": 162
+    },
+    "exports": {
+      "mediane": 1,
+      "p90": 9,
+      "max": 34
+    }
+  }
+}
