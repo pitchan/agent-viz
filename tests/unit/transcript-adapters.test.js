@@ -9,6 +9,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { TRANSCRIPT_ADAPTERS, getAdapter } = require('../../lib/server/transcript-adapters');
+const { ensureTokens } = require('../../lib/server/tokens');
 
 const REQUIRED_FIELDS = {
   tokensSupported: 'boolean',
@@ -64,5 +65,40 @@ test('copilot adapter declares tokens unsupported and parseUsageLine is a no-op'
   assert.equal(a.discoverPath({ session_id: 'x' }), null);
   assert.equal(a.parseUsageLine('any line', { tokens: null }), false);
   assert.equal(a.parseUsageLine('', {}), false);
+});
+
+// TEST AJOUTÉ, daté — C2, 2026-08-11.
+//
+// Ce fichier ne vérifiait que le contrat du registre : avant la migration, une
+// mutation qui détruisait entièrement une des trois formes reconnues par
+// l'adaptateur claude le laissait VERT (vérifié par exécution ; ce sont
+// `transcript.test.js` et `transcript-subagents.test.js` qui virent au rouge).
+// Le seul changement de comportement apporté par C2 sur ce site n'était donc
+// épinglé nulle part : il l'est ici.
+//
+// Pourquoi il compte plus qu'ailleurs : ce site décode la QUEUE du transcript
+// en direct, ligne par ligne, au fil de l'écriture. Une ligne perdue ici n'est
+// rattrapée par aucune relecture ultérieure, contrairement aux deux sites déjà
+// migrés. Arbitrage retenu, le même que partout : tolérer le BOM, comme le
+// moteur le fait déjà.
+test('C2 — une ligne d’usage préfixée d’un BOM est désormais comptabilisée', () => {
+  const BOM = String.fromCharCode(0xFEFF);
+  const ligne = JSON.stringify({
+    type: 'assistant', isSidechain: false,
+    message: {
+      id: 'msg_bom', model: 'claude-sonnet-4-5',
+      usage: { input_tokens: 123, output_tokens: 45 },
+    },
+  });
+  const rec = { id: 'sess-bom', tokens: null };
+  ensureTokens(rec);
+
+  assert.equal(TRANSCRIPT_ADAPTERS.claude.parseUsageLine(BOM + ligne, rec), true,
+    'le décodage passe par la primitive commune, qui tolère le BOM');
+  // Assertion discriminante : on nomme les jetons attendus, pas seulement le
+  // booléen — un `true` sans comptabilisation serait une régression muette.
+  assert.equal(rec.tokens.main.in, 123);
+  assert.equal(rec.tokens.main.out, 45);
+  assert.equal(rec.tokens.main.lastModel, 'claude-sonnet-4-5');
 });
 

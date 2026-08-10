@@ -67,6 +67,54 @@ test('getTranscriptPath extracts transcript_path when the first event exceeds 16
   await fsp.rm(dir, { recursive: true, force: true });
 });
 
+// ───────────────────────────── C2 ─────────────────────────────
+// 2026-08-11 : le décodage d'une ligne passe désormais par la primitive commune
+// du moteur, qui ne lève jamais. Le `catch` de `getTranscriptPath` a donc cessé
+// d'être le filet d'une première ligne illisible, et la trace qu'il écrivait est
+// maintenant écrite explicitement. Ces deux tests tiennent les deux bouts de ce
+// changement : ce qui ne doit pas disparaître, et ce qui doit désormais passer.
+
+test('getTranscriptPath still leaves a trace when the first line is unreadable', async () => {
+  // Arrange — une première ligne coupée en plein milieu, comme un fichier
+  // tronqué par un arrêt brutal. Sans trace, la découverte échouerait sans un
+  // mot et la session perdrait tout son suivi de jetons : la perte silencieuse
+  // que C1 a coûté une fois déjà.
+  const dir = await tmpDir();
+  const sessionFile = path.join(dir, 'sess.jsonl');
+  await fsp.writeFile(sessionFile, '{"hook_event_name":"UserPro\n');
+  const dits = [];
+  const vraiErr = console.error;
+  console.error = (...a) => dits.push(a.map(String).join(' '));
+
+  // Act
+  let trouve;
+  try { trouve = await getTranscriptPath(sessionFile); }
+  finally { console.error = vraiErr; }
+
+  // Assert
+  assert.equal(trouve, null);
+  assert.match(dits.join('\n'), /unreadable first line/);
+  await fsp.rm(dir, { recursive: true, force: true });
+});
+
+test('getTranscriptPath decodes a first line prefixed with a BOM', async () => {
+  // Arrange
+  const dir = await tmpDir();
+  const sessionFile = path.join(dir, 'sess.jsonl');
+  const transcriptPath = path.join(dir, 'transcript.jsonl');
+  await fsp.writeFile(sessionFile, '\uFEFF' + JSON.stringify({
+    hook_event_name: 'SessionStart', _source: 'claude', session_id: 'sess',
+    transcript_path: transcriptPath,
+  }) + '\n');
+
+  // Act
+  const trouve = await getTranscriptPath(sessionFile);
+
+  // Assert
+  assert.equal(trouve, transcriptPath);
+  await fsp.rm(dir, { recursive: true, force: true });
+});
+
 // ───────────────────────────── Bug 2 ─────────────────────────────
 
 test('ensureTranscriptWatcher retries discovery after a transient missing transcript', async () => {

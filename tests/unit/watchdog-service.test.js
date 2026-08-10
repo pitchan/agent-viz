@@ -275,6 +275,37 @@ test('catch-up: une ligne illisible est sautee, celles d apres passent', async (
   assert.equal(s.list({ sinceDays: 90 }).length, 1);
 });
 
+// 2026-08-11 — C2 : ce que la migration de `catch-up.js` vers la primitive
+// commune `decodeJsonlLine` a CHANGE pour l appelant, et que rien ne tenait.
+//
+// Avant, la ligne franchissait la garde `!line.trim()` — U+FEFF appartient aux
+// blancs d ECMAScript, `trim` le retirait donc — puis `JSON.parse` recevait la
+// ligne BRUTE, BOM compris, et levait. Le `catch { continue; }` avalait tout :
+// l evenement etait perdu SANS UN MOT, donc invisible et indetectable. Mesure
+// avant migration sur ce meme flot : `fed` rendait 2 au lieu de 3.
+test('catch-up: une ligne prefixee d un BOM est relue, pas perdue', async () => {
+  // Arrange
+  const dir = tmpDir();
+  // Le BOM en 2e position, pas en 1re. Un fichier ecrit en UTF-8-BOM n en porte
+  // qu un, en tete ; mais une reprise d ecriture ou un concatenat en pose un en
+  // plein milieu, et ce cas-la n avait aucun `trim` de circonstance pour le
+  // sauver. C est aussi celui qui distingue la tolerance VOULUE de la tolerance
+  // incidente que C2 decrit.
+  const lines = [
+    JSON.stringify(pre(1, T + 1000)),
+    '\uFEFF' + JSON.stringify(pre(2, T + 2000)),
+    JSON.stringify(pre(3, T + 3000)),
+  ];
+  fs.writeFileSync(path.join(dir, `${SID}.jsonl`), lines.join('\n') + '\n');
+  const s = await svc(tmpFile());
+
+  // Act
+  const fed = await catchUpFromDisk(s, dir);
+
+  // Assert
+  assert.equal(fed, 3, 'les trois lignes sont relues, celle au BOM comprise');
+});
+
 test('catch-up: une entree illisible se plaint, et n arrete pas les fichiers suivants', async () => {
   const dir = tmpDir();
   // Un DOSSIER nomme comme un flux : `readFile` echoue (EISDIR). Il passe

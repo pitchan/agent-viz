@@ -357,6 +357,57 @@ test('une ligne illisible est sautee, jamais fatale', (t) => {
     'une ligne illisible ne declenche pas a elle seule une reecriture');
 });
 
+// CHANGEMENT DE COMPORTEMENT, assume et date — C2, 2026-08-11.
+//
+// Le decodage d'une ligne passe desormais par la primitive commune du moteur,
+// qui tolere le BOM (U+FEFF). Avant, le `JSON.parse` local de `load` rejetait
+// la ligne prefixee d'un BOM et l'alerte disparaissait de la memoire des
+// pannes sans un mot — perdue pour de bon, puisque la compaction suivante
+// l'effacait aussi du fichier.
+//
+// Arbitrage retenu : tolerer le BOM partout, comme le moteur le fait deja.
+test('C2 — une alerte prefixee d un BOM est relue au lieu d etre perdue', (t) => {
+  // Arrange
+  const filePath = tmp(t);
+  const BOM = String.fromCharCode(0xFEFF);
+  fs.writeFileSync(filePath,
+    JSON.stringify({ kind: 'alert', alert: alertAt(T) }) + '\n'
+    + BOM + JSON.stringify({ kind: 'alert', alert: alertAt(T, 'loop:s1:AuBOM') }) + '\n');
+
+  // Act
+  const rows = createJournal({ filePath, now: () => T }).readAll({ now: T });
+
+  // Assert
+  assert.deepEqual(rows.map(a => a.id).sort(), ['loop:s1:AuBOM', 'loop:s1:Bash'],
+    'le BOM ne doit plus couter une panne consignee');
+});
+
+// Suite du meme changement, et propre a ce fichier-ci : `gardees` retient la
+// ligne BRUTE, pas l'enregistrement re-serialise. Une ligne au BOM desormais
+// gardee est donc RECOPIEE telle quelle — BOM compris — dans le fichier
+// compacte. Ce test fige le fait que le demarrage suivant la relit quand meme ;
+// sans lui, la tolerance au BOM n'aurait fait que deplacer la perte d'un cran,
+// de la lecture vers la compaction.
+test('C2 — le BOM recopie par la compaction se relit au demarrage suivant', (t) => {
+  // Arrange
+  const filePath = tmp(t);
+  const BOM = String.fromCharCode(0xFEFF);
+  fs.writeFileSync(filePath,
+    JSON.stringify({ kind: 'alert', alert: alertAt(T - 100 * DAY, 'loop:s1:Ancetre') }) + '\n'
+    + BOM + JSON.stringify({ kind: 'alert', alert: alertAt(T - 10 * DAY, 'loop:s1:AuBOM') }) + '\n');
+  createJournal({ filePath, now: () => T });   // l'ancetre a peri : le fichier est compacte
+
+  // Act
+  const relu = createJournal({ filePath, now: () => T });
+
+  // Assert
+  assert.deepEqual(relu.readAll({ sinceDays: 90, now: T }).map(a => a.id), ['loop:s1:AuBOM'],
+    'la ligne au BOM survit au cycle complet chargement-compaction-rechargement');
+  assert.equal(lignes(filePath).length, 1, 'la compaction a bien eu lieu');
+  assert.ok(fs.readFileSync(filePath, 'utf8').includes(BOM),
+    'et elle a recopie la ligne brute, BOM compris');
+});
+
 test('un premier demarrage ne se plaint pas', (t) => {
   const spy = t.mock.method(console, 'error', () => {});
   createJournal({ filePath: tmp(t), now: () => T });

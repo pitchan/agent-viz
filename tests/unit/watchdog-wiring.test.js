@@ -225,6 +225,35 @@ test('event-reader: sans chien de garde, le flux d evenements passe quand meme',
   assert.equal(liveHandoffOffset(fp), fs.statSync(fp).size);
 });
 
+// C2, 2026-08-11 : le verdict sur une ligne vient desormais de la primitive
+// commune du moteur, et le lecteur vif tolere donc le BOM comme tout le reste.
+// La ligne eprouvee ici n'est PAS la premiere du fichier, et c'est tout
+// l'interet : un BOM en tete a toujours survecu par accident, parce que le
+// `text.trim()` du lecteur le nettoyait avant le decoupage. Au milieu, il
+// n'avait rien pour le sauver — le `JSON.parse` local levait et le `catch {}`
+// faisait disparaitre l'evenement sans un mot, invisible pour le canevas ET
+// indetectable pour le chien de garde. C'est la perte silencieuse que C2 ferme.
+test('event-reader: une ligne prefixee d un BOM en milieu de fichier atteint le canevas', async () => {
+  // Arrange
+  const recus = ecouterSSE();
+  const contenu = [
+    JSON.stringify(pre(1, T + 1000)),
+    '\uFEFF' + JSON.stringify(pre(2, T + 2000)),
+    JSON.stringify(pre(3, T + 3000)),
+  ].join('\n') + '\n';
+  const fp = fichierDeSession('bom-milieu', contenu);
+
+  // Act
+  await readAndBroadcast(fp);
+
+  // Assert
+  recus.fermer();
+  assert.deepEqual(
+    recus.filter(m => m.type === 'event').map(m => m.event.tool_use_id),
+    ['t1', 't2', 't3'],
+  );
+});
+
 // Le journal de l'instance partagee — celle qu `event-reader` tient. Il est
 // pose ici parce que plusieurs tests d'`event-reader` doivent le relire.
 const journalPartage = tmpFile();
