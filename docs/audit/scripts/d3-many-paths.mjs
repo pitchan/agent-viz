@@ -13,24 +13,24 @@
 // dépôt au commit audité, et c'est précisément ce que dit le constat sur les
 // conventions numériques.
 //
-// LIMITE DÉCOUVERTE À L'EXÉCUTION (2026-08-10) : formatage-monetaire sur-détecte
-// fortement. Ses deux branches guillemet-dollar (`\$\s*['"`]` et `['"`]\s*\$`)
-// matchent aussi l'adjacence banale d'une interpolation `${...}` — l'ouverture
-// (ou une chaîne échappée) d'un template-literal fait cohabiter un guillemet
-// et un `$` sans rapport avec une devise. Sur le dépôt audité au commit
-// 4a4dc46 : 247 sites recensés pour cette famille, dont 218 contiennent un
-// backtick (quasi tous des ouvertures de gabarit) ; moins d'une dizaine de
-// pourcent des sites relèvent réellement d'un montant (mot-clé USD ou signe
-// `$` isolé comme '$0', '0,00 $'). Le fichiersDistincts de cette famille est
-// donc une borne haute très large, pas un décompte de formatage monétaire
-// réel — la relecture humaine doit vérifier chaque site avant de conclure à
-// une divergence.
+// LIMITE CORRIGÉE À L'EXÉCUTION (2026-08-10) : le motif formatage-monetaire
+// attrapait à l'origine toute interpolation de gabarit — sa branche
+// guillemet-puis-`$` (`['"`]\s*\$`) matchait aussi bien un backtick suivi de
+// `${` que le `$` d'un vrai montant. Le premier run réel a montré 225 sites
+// sur 247 relevant de cette confusion. Une lookahead négative `(?!\{)` a été
+// ajoutée aux deux alternatives où le `$` peut être un sigil d'interpolation
+// (la 2ᵉ et la 4ᵉ) ; la 1ʳᵉ et la 3ᵉ, où le `$` précède le guillemet ou suit
+// `USD`, n'avaient pas ce problème et sont inchangées. LIMITE RESTANTE,
+// vérifiée : un `$` nu suivant un guillemet est toujours pris pour une devise
+// qu'il en soit une ou non (ex. un séparateur de fin de motif quelconque) ;
+// et un formatage monétaire écrit sans `$` ni `USD` reste invisible à cette
+// famille.
 export const PRIMITIVES = [
   { nom: 'appel-http-client', re: /\bfetch\s*\(|\bhttps?\.(?:get|request)\s*\(/g },
   { nom: 'lecture-json-de-fichier', re: /JSON\.parse\s*\(/g },
   { nom: 'decodage-jsonl', re: /\.split\((['"`])\\n\1\)|createInterface\s*\(/g },
   { nom: 'resolution-de-chemin-maison', re: /\bhomedir\s*\(\s*\)|process\.env\.(?:USERPROFILE|HOME)\b|join\s*\([^)]*['"`]\.(?:claude|agent-viz|copilot)['"`]/g },
-  { nom: 'formatage-monetaire', re: /\$\s*['"`]|['"`]\s*\$|\bUSD\b|toFixed\s*\(\s*2\s*\)[^\n]{0,20}\$/g },
+  { nom: 'formatage-monetaire', re: /\$\s*['"`]|['"`]\s*\$(?!\{)|\bUSD\b|toFixed\s*\(\s*2\s*\)[^\n]{0,20}\$(?!\{)/g },
   { nom: 'formatage-octets', re: /1024\s*\*\s*1024|\b(?:Mo|Ko|Go|KB|MB|GB)\b/g },
   { nom: 'formatage-duree', re: /\/\s*60_?000|\/\s*1000\s*\)|\bms\s*[<>]|maxDurationMs/g },
   { nom: 'formatage-pourcentage', re: /\*\s*100\s*\)[^\n]{0,25}%|%\s*['"`]|['"`]\s*%/g },

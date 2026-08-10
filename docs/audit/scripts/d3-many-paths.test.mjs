@@ -5,8 +5,8 @@ import { findManyPaths, PRIMITIVES } from './d3-many-paths.mjs';
 test('les douze familles de doc/34 sont toutes couvertes', () => {
   assert.deepEqual(PRIMITIVES.map(p => p.nom).sort(), [
     'appel-http-client',
-    'decodage-jsonl',
     'declaration-de-formateur',
+    'decodage-jsonl',
     'formatage-a-locale-implicite',
     'formatage-date',
     'formatage-duree',
