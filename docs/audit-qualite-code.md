@@ -44,8 +44,14 @@ produit dont la capture des événements est la raison d'être. La même leçon
 est apprise et documentée quatre fois côté moteur (`netgain/src/router/hook.ts`,
 `netgain/src/core/jsonl.ts:19`, `netgain/src/version.ts:14-16`,
 `netgain/src/install/json-file.ts:34`, ce dernier commenté littéralement
-« BOM U+FEFF (leçon v0.2.1) » et repris dans quatre fichiers de test dédiés) —
-et zéro fois côté serveur. Le mécanisme est démontré par lecture directe du
+« BOM U+FEFF (leçon v0.2.1) »). Un `grep -rl "BOM\|FEFF"` sur `netgain/tests/`
+en trouve cinq, mais un seul est étranger au sujet : `netgain/tests/doctor/session-kind.test.ts:108`
+contient un caractère `﻿` dans le TEXTE d'un prompt de test (fixture
+pour une détection de session sans marqueur humain), sans rapport avec une
+tolérance d'analyse JSON — ce n'est pas un test de la leçon BOM. Les quatre
+qui le sont : `netgain/tests/core/jsonl.test.ts`, `netgain/tests/install/json-file.test.ts`,
+`netgain/tests/router/hook.test.ts`, `netgain/tests/e2e/install.e2e.test.ts`.
+Zéro test de cette nature côté serveur. Le mécanisme est démontré par lecture directe du
 code (le rejet de `JSON.parse` sur un BOM est un fait du langage, pas une
 hypothèse) ; la fréquence à laquelle un BOM atteint réellement ce crochet sur
 le parc de machines des utilisateurs n'est pas mesurée par cet audit.
@@ -81,8 +87,9 @@ non testée vers un seul fichier non testé.
 **Fait brut.** `docs/audit/resultats/d7.json`, geste `decodage-jsonl`,
 `verdict: "duplique"` : `coteMoteur` = `netgain/src/core/jsonl.ts` (module
 dédié, lecture en flux, BOM retiré, lignes vides sautées, ligne cassée
-signalée `{ ok: false }` plutôt qu'avalée) ; `coteServeur` = 7 fichiers
-(`lib/server/transcript.js`, `event-reader.js`, `housekeep.js`,
+signalée `{ ok: false }` plutôt qu'avalée) et `netgain/src/mcp/main.ts`
+(consommateur du module dédié, pas une réimplémentation) ; `coteServeur` = 7
+fichiers (`lib/server/transcript.js`, `event-reader.js`, `housekeep.js`,
 `session-index.js`, `transcript-adapters/claude.js`, `watchdog/catch-up.js`,
 `watchdog/journal.js`). `docs/audit/resultats/d3.json`, primitive
 `decodage-jsonl`, dénombre 11 fichiers distincts et donne les lignes de
@@ -96,7 +103,9 @@ le cas BOM ; le serveur refait ce geste 7 fois, et pas de la même façon.
 à la production `WhiteSpace` d'ECMAScript, donc `trim()` l'enlève).
 `lib/server/watchdog/catch-up.js:83-86` et `lib/server/watchdog/journal.js:140-147`
 ne `trim()` une ligne que pour tester si elle est vide, puis analysent la
-chaîne **non retrimée** — vérifié par lecture directe : `try { rec = JSON.parse(line); } catch { continue; }`.
+chaîne **non retrimée** — vérifié par lecture directe, même forme dans les
+deux fichiers, à la variable près (`evt` dans `catch-up.js`, `rec` dans
+`journal.js`) : `try { <var> = JSON.parse(line); } catch { continue; }`.
 Une première ligne de fichier préfixée d'un BOM y échoue et est sautée en
 silence (une seule ligne perdue, pas tout le fichier — plus discret que C1,
 mais du même ordre : un jeu de règles de tolérance différent par fichier,
@@ -170,8 +179,14 @@ au résultat de cette primitive, pas des cibles de fusion elles-mêmes.
   l'ajustement de coût par `if (price) { … }` : si `getPrice(model, at)` ne
   résout rien, **rien n'est mis à jour** — ni `costUsd`, ni `lastModel`, ni
   `contextMax` — et aucun indicateur de complétude n'existe dans ce bucket.
-  `public/viz-state.js:201` (`formatUsd`) affiche alors `'$0'` sans aucune
-  annotation pour toute valeur fausse.
+  `public/viz-state.js:200-201` (`formatCost`) affiche alors `'$0'` sans
+  aucune annotation pour toute valeur fausse. À ne pas confondre avec
+  `formatUsd` (`public/observatory/format.js:10-12`) : cette fonction-là vit
+  du côté Observatoire, l'autre moitié du contraste — elle ne porte pas non
+  plus de logique de complétude en elle-même, mais ses appelants (`format.js:120`,
+  `analysis-view.js:28`, `pricing-view.js:141`) le peuvent, parce que
+  `costComplete` existe et leur est fourni. `formatCost`, côté pilote temps
+  réel, n'a rien à recevoir : le bucket qui l'alimente ne porte pas ce champ.
 
 Rejouable par `node docs/audit/scripts/run-all.mjs` pour la localisation du
 geste, puis par lecture des fichiers cités pour la chaîne complète.
