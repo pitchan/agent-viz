@@ -242,18 +242,21 @@ reste spécialisé et n'y est pas replié.
 `node docs/audit/scripts/run-all.mjs`.
 
 `coteServeur` déclare en plus `provenance.js` et `pricing.js`, `coteMoteur`
-`core/events.ts`, `context.ts` et `turns.ts` (motif du détecteur :
-`cache_creation_input_tokens`, convention de la tâche 11 — voir « Ce qui n'est
-pas motivé » en annexe). Aucun des cinq ne réimplémente `accumulateUsage`/
-`addUsage` : `provenance.js:21` ne fait que NOMMER le champ dans un texte
-d'aide destiné à l'utilisateur ; `pricing.js` et `core/pricing.ts` lisent le
-même champ brut pour CALCULER un coût, pas pour l'accumuler — c'est le geste
-`tarification`, couvert par C4 ; `context.ts:229` l'utilise pour le suivi du
-churn de cache (une troisième fin, hors périmètre de cette fiche) ; `turns.ts:47`
-en fait la somme par tour de conversation, une quatrième consommation
-indépendante du même champ. Cinq fichiers atteints par la coïncidence du
-motif de détection, aucun n'étant une sixième implémentation du geste que
-cette fiche compare.
+`core/events.ts`, `core/pricing.ts`, `context.ts` et `turns.ts` (motif du
+détecteur : `cache_creation_input_tokens` — voir la section « Convention : les
+`raison` de D7 ne couvrent pas tout, les fiches complètent » en annexe).
+Aucun des six ne réimplémente `accumulateUsage`/`addUsage` : `provenance.js:21`
+ne fait que NOMMER le champ dans un texte d'aide destiné à l'utilisateur ;
+`core/events.ts:6` ne fait que le TYPER, dans l'interface `RawUsage` (lignes
+3-12), sans lire ni écrire aucun champ — un transtypage le fait transiter tel
+quel (`normalizeAssistant`, ligne 99) ; `pricing.js` et `core/pricing.ts`
+lisent le même champ brut pour CALCULER un coût, pas pour l'accumuler — c'est
+le geste `tarification`, couvert par C4 ; `context.ts:229` l'utilise pour le
+suivi du churn de cache (une troisième fin, hors périmètre de cette fiche) ;
+`turns.ts:47` en fait la somme par tour de conversation, une quatrième
+consommation indépendante du même champ. Six fichiers atteints par la
+coïncidence du motif de détection, aucun n'étant une septième implémentation
+du geste que cette fiche compare.
 
 **Raisonnement.** Les deux fonctions accumulent les quatre mêmes champs bruts
 d'usage (`input_tokens`, `output_tokens`, `cache_creation_input_tokens`,
@@ -706,9 +709,13 @@ vrais consommateurs sont `scan-session.ts:20`
 (`export async function scanSession(...): Promise<SessionReport>`, le
 producteur) et `doctor/index.ts:28,85-86` (`totalsOf`, qui lit **5 des 8**
 sous-domaines typés — `tokens`, `toolResults`, `subagents`, `prompts`,
-`turns` ; jamais `context`, `reads` ni `sessionKind`, absents de tout le
-fichier, vérifié par relecture complète de ses 156 lignes). La conclusion
-ISP tient sur cette base-là : aucun consommateur étroit ne subit la largeur
+`turns` ; jamais `context`, `reads` ni `sessionKind` comme champ de
+`SessionReport` qu'elle lit — `context` et `SessionKind` reviennent ailleurs
+dans le fichier, sans rapport avec `totalsOf` (`findClaudeMdFiles` importé de
+`context.js` ligne 5, `NoMarkerDetail` et `SessionKind` réexportés en type
+lignes 153-154) ; `reads` n'y figure sous aucune forme — vérifié par grep sur
+les 156 lignes du fichier). La conclusion ISP tient sur cette base-là : aucun
+consommateur étroit ne subit la largeur
 d'un type dont il n'utiliserait qu'une fraction — `totalsOf` en utilise une
 majorité mais jamais la totalité, et rien dans le dépôt ne consomme les 8
 sous-domaines d'un coup en dehors du producteur lui-même. Les rendus qui ont

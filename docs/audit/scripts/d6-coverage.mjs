@@ -61,7 +61,7 @@
 // voir. (3) Si TOUS les blocs d'un même chemin sont dépourvus de toute ligne
 // `DA:`, la fusion ne passe jamais par la branche `entry.lignes.size > 0` et
 // les champs scalaires `hit`/`found` reviennent au DERNIER bloc `LH:`/`LF:`
-// lu (lignes 71-74 ci-dessus) — le non-déterminisme d'origine, corrigé pour
+// lu (lignes 78-81 ci-dessus) — le non-déterminisme d'origine, corrigé pour
 // le cas général, ressurgirait sur ce cas précis. Non attesté sur ce dépôt à
 // ce commit, et non reproductible par le rapporteur `lcov` de Node tant
 // qu'un chemin porte `LF:>0` (il émet alors toujours au moins une `DA:` par
