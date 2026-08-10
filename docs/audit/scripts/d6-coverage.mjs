@@ -58,7 +58,14 @@
 // mesurées sur ce dépôt à ce commit — ne sont pas exploités ; une ligne peut
 // être « couverte » (comptée au moins une fois) alors qu'une branche à
 // l'intérieur ne l'est pas, ce que ce détecteur ne voit pas et ne prétend pas
-// voir.
+// voir. (3) Si TOUS les blocs d'un même chemin sont dépourvus de toute ligne
+// `DA:`, la fusion ne passe jamais par la branche `entry.lignes.size > 0` et
+// les champs scalaires `hit`/`found` reviennent au DERNIER bloc `LH:`/`LF:`
+// lu (lignes 71-74 ci-dessus) — le non-déterminisme d'origine, corrigé pour
+// le cas général, ressurgirait sur ce cas précis. Non attesté sur ce dépôt à
+// ce commit, et non reproductible par le rapporteur `lcov` de Node tant
+// qu'un chemin porte `LF:>0` (il émet alors toujours au moins une `DA:` par
+// bloc).
 import { buildGraph } from './d4-import-graph.mjs';
 
 export function parseLcov(text) {

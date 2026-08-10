@@ -14,8 +14,10 @@ défaut de procédure.
 Chiffres **mesurés** par `sources()` (`docs/audit/scripts/lib/source-files.mjs`)
 et `tokenize` (`docs/audit/scripts/lib/tokens.mjs`) contre le dépôt réel à ce
 commit — pas recopiés du plan qui a préparé cet audit, qui annonçait 17 332
-lignes et 109 762 jetons à titre d'estimation de rédaction. L'écart est
-expliqué dans l'annexe méthode.
+lignes et 109 762 jetons. Les deux écarts sont eux-mêmes mesurés, pas de
+simples estimations de rédaction : une convention de comptage de lignes pour
+le premier, un correctif de fond de cet audit pour le second. Le détail est
+dans l'annexe méthode.
 **Exclus :** `netgain/dist/` (généré), `node_modules/`, `tests/fixtures/`,
 `docs/` (l'audit ne s'audite pas lui-même)
 **Rejouable :** `node --test "docs/audit/scripts/**/*.test.mjs"` puis
@@ -24,18 +26,20 @@ expliqué dans l'annexe méthode.
 
 ## Verdict d'une page
 
-Six constats, classés par rang puis par confiance décroissante. Les six
+Huit constats, classés par rang puis par confiance décroissante. Les huit
 portent une confiance « démontré » (aucun n'est resté au stade « probable »
 ou « hypothèse ») ; à confiance égale, l'ordre suit le numéro de constat.
 
 | # | Constat | Rang | Confiance | Coût | Fenêtre |
 |---|---|---|---|---|---|
-| C1 | Perte de capture totale et silencieuse sur un crochet préfixé d'un BOM | P0 | démontré | S | à absorber par la fusion |
+| C1 | Perte de capture totale et silencieuse sur un crochet préfixé d'un BOM | P0 | démontré | S | à traiter séparément |
 | C2 | Décodage JSONL réimplémenté sur 7 fichiers serveur, tolérance BOM incidente et inégale | P1 | démontré | L | à absorber par la fusion |
 | C4 | Contrat de tarification divergent : pilote temps réel muet, Observatoire honnête | P1 | démontré | M | à absorber par la fusion |
 | C5 | Deux variables d'environnement pour un seul dossier de configuration | P1 | démontré | S | à absorber par la fusion |
 | C3 | Accumulation des jetons d'usage dupliquée entre serveur et moteur | P2 | démontré | M | à absorber par la fusion |
-| C6 | Trois clients HTTP côté navigateur | P2 | démontré | S | à absorber par la fusion |
+| C6 | Trois clients HTTP côté navigateur | P2 | démontré | S | transportable tel quel |
+| C7 | Le rapport cite un document de calibration qui n'existe pas dans ce dépôt | P2 | démontré | S | à absorber par la fusion |
+| C8 | Trois formateurs de durée, réimplémentés à l'identique | P2 | démontré | S | transportable tel quel |
 
 **Rangs (doc/34) :** P0 défaut démontré affectant ce que l'utilisateur voit ou
 conserve · P1 divergence utilisateur démontrée ou très probable · P2 dette
@@ -58,21 +62,44 @@ condition d'un second système auquel se comparer : c'est un **défaut**. C2,
 C4 et C5 proviennent tous les trois d'un verdict `duplique` de D7 : deux
 implémentations existent, désaccordent, et le rapport ne tranche pas
 laquelle est « la bonne » sans arbitrage humain séparé : c'est une
-**divergence**. C3 et C6 partagent un impact « coût de maintenance seul »,
-qui n'entre dans la définition ni de P0 ni de P1 et place directement en P2.
-Aucun constat ne descend en P3 : les six portent un coût de correction
-chiffré (S/M/L) et une fenêtre déjà fixée (« à absorber par la fusion »),
-signe qu'aucun n'est jugé sans risque à ignorer.
+**divergence**. C3, C6, C7 et C8 partagent un impact « coût de maintenance
+seul », qui n'entre dans la définition ni de P0 ni de P1 et place
+directement en P2 — deux d'entre eux (C6, C8) trouvés dans le code, un
+(C7) trouvé dans le rapport lui-même, en vérifiant sa propre citation.
+Aucun constat ne descend en P3 : les huit portent un coût de correction
+chiffré (S/M/L), signe qu'aucun n'est jugé sans risque à ignorer — mais la
+fenêtre n'est plus uniforme : C1 est urgent et sans rapport avec la fusion
+(« à traiter séparément ») ; C6 et C8 vivent entièrement côté `public/`, la
+fusion ne les touche pas (« transportable tel quel ») ; C2, C3, C4, C5 et
+C7 attendent réellement la réunion des deux arbres (« à absorber par la
+fusion »). C'est la fenêtre, pas le rang, qui distingue ici QUAND agir, pas
+SI agir.
 
 ## Constats
 
-Six constats sont retenus, chacun rejouable depuis les résultats de
+Huit constats sont retenus, chacun rejouable depuis les résultats de
 `docs/audit/resultats/*.json` (régénérables par
 `node docs/audit/scripts/run-all.mjs`) ou depuis une lecture directe des
 fichiers cités. Plusieurs candidats mesurés par les détecteurs ne figurent
-volontairement pas ci-dessous parce qu'ils se sont révélés être des artefacts
-de l'instrument plutôt que des défauts du code — l'annexe méthode (tâche 11)
-et le rapport de tâche en détaillent la liste.
+volontairement pas ci-dessous, pour deux raisons distinctes — à ne pas
+confondre. **Certains sont des artefacts de l'instrument** : le détecteur
+affirme ou tait quelque chose de faux (le faux positif monétaire de D3,
+l'omission `claude-sonnet-5` de D2…) ; l'annexe méthode (tâche 11) et le
+rapport de tâche en détaillent la liste, sept au total. **D'autres sont des
+candidats réels, mesurés sans erreur d'outillage, mais jugés trop minces ou
+trop cohérents pour justifier une fiche séparée** : sept des douze familles
+de D3 (`formatage-octets`, `formatage-date`, `resolution-de-chemin-maison`,
+`formatage-numerique-en-dur`, `declaration-de-formateur`,
+`formatage-pourcentage`, `formatage-a-locale-implicite`) restent dispersées
+sur des sites isolés, un ou deux par fichier, sans implémentation concentrée
+à consolider — contrairement à `formatage-duree`,
+qui EN portait une (trois fonctions quasi identiques) et a reçu sa propre
+fiche, C8. Les cinq candidats `chemin-litteral` de D2
+(`.claude`, `projects`, `.agent-viz`, `.claude.json`, `subagents`) sont tous
+à `valeursDistinctes: 1` : des segments de chemin répétés, mais qui
+s'accordent partout, sans divergence à trancher — le même genre de
+consistance que les dix `tarif-de-modele` et les dix `code-d-evenement`
+couverts plus bas dans « Ce qui est sain », pas un défaut cousin de C5.
 
 ### C1 — Sur un crochet préfixé d'un BOM, le serveur perd l'événement en silence total
 
@@ -130,14 +157,26 @@ l'échec.
 
 | Impact | Confiance | Coût | Fenêtre | Traitement |
 |---|---|---|---|---|
-| intégrité de ce qui est conservé | démontré | S | à absorber par la fusion | à corriger |
+| intégrité de ce qui est conservé | démontré | S | à traiter séparément | à corriger |
+
+**Sur la fenêtre : ce constat n'attend pas la fusion.** Le correctif tient en
+deux lignes de `lib/hook.js` (retirer le BOM avant `JSON.parse`, écrire dans
+`_hook-errors.log` même quand l'analyse échoue) et ne touche à rien côté
+`netgain/src/` — rien dans le déplacement des deux arbres ne le facilite ni
+ne le complique. Le classer « à absorber par la fusion » comme les cinq
+autres constats aurait fait attendre un P0 de perte de données silencieuse
+pour une raison de calendrier sans rapport avec lui. **C1 se corrige
+maintenant, avant tout le reste** — y compris avant les tests de
+caractérisation ci-dessous, qui préparent C2 à C4 mais n'ont aucune raison de
+retarder C1.
 
 ---
 
 Les trois constats suivants (C2 à C4) portent sur les trois gestes que la
 tâche 7 a mesurés comme dupliqués entre `lib/` et `netgain/src/` avec une
 cible déjà arbitrée par Vincent. Leur ordre de traitement, à respecter dans
-doc/36, est fixé une fois ici : **tests de caractérisation d'abord**, puis
+doc/36, est fixé une fois ici — **après C1, qui n'attend personne** :
+**tests de caractérisation d'abord**, puis
 décodeur JSONL commun, puis primitive d'accumulation d'usage, puis contrat de
 tarification structuré et affichage honnête. La raison de commencer par les
 tests de caractérisation n'est pas un principe abstrait : `docs/audit/resultats/d6.json`,
@@ -180,14 +219,14 @@ deux fichiers, à la variable près (`evt` dans `catch-up.js`, `rec` dans
 Une première ligne de fichier préfixée d'un BOM y échoue et est sautée en
 silence (une seule ligne perdue, pas tout le fichier — plus discret que C1,
 mais du même ordre : un jeu de règles de tolérance différent par fichier,
-jamais énoncé nulle part comme une politique commune). `lib/server/transcript.js:199`
+jamais énoncé nulle part comme une politique commune). `lib/server/transcript.js:198-200`
 porte en plus un `leftover` pour suivre un fichier qui grossit (lecture
 incrémentale d'un flux en direct) : ce geste est réellement spécialisé et ne
 doit pas être replié dans la primitive commune.
 
 **Cible.** Une seule primitive de décodage de ligne (BOM retiré, ligne vide
 sautée, ligne cassée signalée plutôt qu'avalée), réutilisée par les
-différents modes de lecture. Le suivi incrémental de `lib/server/transcript.js:199`
+différents modes de lecture. Le suivi incrémental de `lib/server/transcript.js:198`
 reste spécialisé et n'y est pas replié.
 
 | Impact | Confiance | Coût | Fenêtre | Traitement |
@@ -201,6 +240,20 @@ reste spécialisé et n'y est pas replié.
 `netgain/src/doctor/aggregators/tokens.ts:20-27` (`addUsage`, appelée depuis
 `TokensAggregator.addAssistant`, lignes 79-104). Rejouable par
 `node docs/audit/scripts/run-all.mjs`.
+
+`coteServeur` déclare en plus `provenance.js` et `pricing.js`, `coteMoteur`
+`core/events.ts`, `context.ts` et `turns.ts` (motif du détecteur :
+`cache_creation_input_tokens`, convention de la tâche 11 — voir « Ce qui n'est
+pas motivé » en annexe). Aucun des cinq ne réimplémente `accumulateUsage`/
+`addUsage` : `provenance.js:21` ne fait que NOMMER le champ dans un texte
+d'aide destiné à l'utilisateur ; `pricing.js` et `core/pricing.ts` lisent le
+même champ brut pour CALCULER un coût, pas pour l'accumuler — c'est le geste
+`tarification`, couvert par C4 ; `context.ts:229` l'utilise pour le suivi du
+churn de cache (une troisième fin, hors périmètre de cette fiche) ; `turns.ts:47`
+en fait la somme par tour de conversation, une quatrième consommation
+indépendante du même champ. Cinq fichiers atteints par la coïncidence du
+motif de détection, aucun n'étant une sixième implémentation du geste que
+cette fiche compare.
 
 **Raisonnement.** Les deux fonctions accumulent les quatre mêmes champs bruts
 d'usage (`input_tokens`, `output_tokens`, `cache_creation_input_tokens`,
@@ -244,8 +297,16 @@ au résultat de cette primitive, pas des cibles de fusion elles-mêmes.
   `public/observatory/pricing-view.js:141` (« coût partiel »). Ce chemin passe
   par `lib/server/observatory/engine.js:31-57`, qui importe dynamiquement le
   moteur netgain compilé précisément pour cette raison — son commentaire
-  ligne 44-47 dit littéralement viser une unification future du pilote temps
-  réel sur la même table.
+  ligne 44-46 dit, en anglais dans le texte : *« the real-time pill can adopt
+  the same table (unification) »*. L'unification qu'il évoque porte sur la
+  TABLE de prix, pas sur le CONTRAT de résultat pour un modèle inconnu — et
+  cette unification-là de la table est déjà faite : `lib/server/pricing.js:333-336`
+  documente `applyEnginePrices`, appelée au démarrage par `lib/server.js:97`,
+  qui remplace le mirroir `FALLBACK` par la table embarquée du moteur. Le
+  pilote temps réel lit donc aujourd'hui la même table que l'Observatoire ;
+  ce n'est pas ce qui diverge. Ce qui diverge, et persiste malgré cette table
+  commune, c'est la forme du résultat quand un modèle n'y figure pas — le
+  sujet réel de ce constat.
 - `lib/server/tokens.js:77-84` (`accumulateUsage`), à l'inverse, encadre tout
   l'ajustement de coût par `if (price) { … }` : si `getPrice(model, at)` ne
   résout rien, **rien n'est mis à jour** — ni `costUsd`, ni `lastModel`, ni
@@ -330,9 +391,13 @@ Node, un geste différent). `docs/audit/resultats/d4.json`, tableau
 (`modules: ["(fetch global)"]`). Rejouable par
 `node docs/audit/scripts/run-all.mjs`.
 
-**Raisonnement.** `public/observatory/api.js:5-24` expose déjà `getJson` et
-`postJson` avec une gestion d'erreur qui transforme un statut HTTP non-OK en
-`Error` lisible. `public/viz-network.js` (lignes 187, 200, 227, 329) appelle
+**Raisonnement.** `public/observatory/api.js:5-24` définit déjà `getJson` et
+`postJson`, avec une gestion d'erreur qui transforme un statut HTTP non-OK en
+`Error` lisible — mais **les deux fonctions ne sont pas exportées** (`async
+function getJson(url)`, `async function postJson(url, body)`, sans `export` ;
+seuls les appelants de haut niveau du fichier, `fetchSummary`,
+`fetchSessions`… le sont). `api.js` ne les « expose » qu'à lui-même
+aujourd'hui. `public/viz-network.js` (lignes 187, 200, 227, 329) appelle
 `fetch(...)` directement à quatre endroits, sans passer par `api.js` ni
 refaire de gestion d'erreur homogène. `public/viz-watchdog-client.js:49`
 déclare son propre alias `_fetch` — un point d'injection pour les tests, pas
@@ -341,11 +406,108 @@ qui les distingue : une correction de robustesse (ajout d'un timeout, d'une
 nouvelle tentative, d'un message d'erreur uniforme) n'atteindrait qu'un tiers
 du code si elle n'est faite que dans un des trois fichiers.
 
-**Cible.** Un seul client HTTP, importé par les trois fichiers.
+**Cible.** Un seul client HTTP, importé par les trois fichiers — ce qui
+suppose d'abord d'EXPORTER `getJson`/`postJson` (ou une factory équivalente)
+depuis `api.js`, pas seulement de les réutiliser tels quels.
+
+| Impact | Confiance | Coût | Fenêtre | Traitement |
+|---|---|---|---|---|
+| coût de maintenance seul | démontré | S | transportable tel quel | à corriger |
+
+**Sur la fenêtre :** les trois fichiers sont tous en zone `web`, aucun ne
+touche `netgain/src/` — le déplacement de `netgain/src/` dans l'arbre
+d'`agent-viz` ne rend ce constat ni plus facile ni plus difficile à corriger.
+Contrairement à C2 à C5, rien ici n'attend que les deux arbres soient
+réunis.
+
+### C7 — Le rapport cite un document de calibration qui n'existe pas dans ce dépôt
+
+**Fait brut.** Trois fichiers LIVRÉS pointent vers le même chemin mort :
+`lib/server/observatory/rules/thresholds.js:6` (« report
+(netgain/docs/calibration-observatoire-m1.md, dated 2026-07-27: 1695
+sessions, 14 projects) »), `tests/unit/observatory-rule-r1.test.js:6` (même
+chemin, même date), `tests/unit/observatory-rules-cost.test.js:63` (même
+chemin). Vérifié : `netgain/docs/` n'existe pas (`ls netgain/docs` échoue),
+`git ls-files | grep -i calibration` est vide, et aucun commit de
+l'historique du dépôt ne l'a jamais touché
+(`git log --all --full-history -- "*calibration*"` est vide). Rejouable par
+ces trois commandes.
+
+**Raisonnement.** Les chiffres eux-mêmes sont réels, pas inventés : ils
+vivent dans le commentaire de `thresholds.js:6-22`, qui les recopie et
+ajoute le raisonnement complet — pourquoi R1 est passé de 0,05 à 0,20 (9
+projets sur 14 déclenchés à 0,05, contre le critère de sortie « jamais plus
+de la moitié »), et pourquoi 0,20 précisément (7 sur 14, tout en couvrant
+89 % des jetons de changement de préfixe). Le document externe que les trois
+fichiers citent, lui, n'a jamais fait partie de ce dépôt : ni du commit
+audité, ni d'aucun commit avant ou après. Trois lecteurs différents — qui
+maintient les seuils, et les auteurs des deux fichiers de test qui les
+épinglent — suivraient la même citation vers un chemin introuvable, sans
+autre repli que relire le commentaire qui la contient déjà. C'est une dette
+de traçabilité, pas un défaut de calcul : la mesure derrière `calibration`
+est correcte et documentée, seule son adresse est fausse.
+
+**Cible.** Faire converger la citation et la réalité : soit importer
+l'enregistrement de calibration dans ce dépôt (sous `docs/`, à l'endroit que
+la fusion choisira pour la documentation transversale), soit corriger les
+trois citations pour pointer vers `thresholds.js:6-22`, qui porte déjà tout
+ce qu'un lecteur peut vérifier.
 
 | Impact | Confiance | Coût | Fenêtre | Traitement |
 |---|---|---|---|---|
 | coût de maintenance seul | démontré | S | à absorber par la fusion | à corriger |
+
+Une symétrie mérite une phrase : cet audit a trouvé ce défaut en vérifiant
+sa propre citation — exactement la discipline qu'il revendique par ailleurs
+(on calibre, on ne fait pas confiance).
+
+### C8 — Trois formateurs de durée, réimplémentés à l'identique
+
+**Fait brut.** `docs/audit/resultats/d3.json`, primitive `formatage-duree` :
+10 fichiers / 30 sites au total (la primitive détecte toute comparaison ou
+division liée à une durée en millisecondes, un filet plus large que le seul
+geste de formatage — elle attrape aussi des seuils de règles, `thresholds.js`,
+`r6-short-subagents.js`). En son sein, trois fichiers portent la MÊME
+fonction, presque au caractère près : `public/viz-layout.js:341-346`
+(`calcDuration`, exportée), `public/viz-narrator.js:188-194`
+(`formatSessionDuration`, privée au module), `public/viz-ui.js:403-411`
+(`updateLiveDurations`, la même logique compressée en un ternaire imbriqué à
+la ligne 410, sans nom propre). Rejouable par
+`node docs/audit/scripts/run-all.mjs` pour la localisation, puis par lecture
+directe des trois fichiers pour le mécanisme.
+
+**Raisonnement.** Les trois partagent les deux mêmes seuils (1000 ms,
+60 000 ms) et le même gabarit de sortie :
+
+```
+if (ms < 1000) return `${ms}ms`;
+if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+return `${(ms / 60000).toFixed(1)}m`;
+```
+
+`viz-layout.js` et `viz-narrator.js` ne diffèrent que par leurs gardes
+d'entrée (nom des paramètres, valeur de repli sur une entrée invalide —
+`null` contre `'?'`) ; `viz-ui.js` porte la même arithmétique, réécrite en
+une expression, sans jamais appeler l'une des deux fonctions déjà exportées
+ou déclarées ailleurs dans le même dossier `public/`. C'est une famille plus
+large que celle des trois clients HTTP de C6 (`appel-http-client` : 7
+fichiers / 12 sites au total, 3 promus) : ici, 10 fichiers / 30 sites, et
+une triplication littérale démontrée sur trois d'entre eux, jamais
+consolidée. Vérité terrain établie avant le premier run d'aucun détecteur
+(tâche 0 du plan) : `viz-layout.js`, `viz-narrator.js` et `viz-ui.js`
+contiennent chacun un motif de formatage de durée — ce même fait, mesuré à
+la main, tient toujours après lecture du code.
+
+**Cible.** Une seule fonction de formatage de durée, exportée depuis un
+module partagé de `public/`, importée par les trois fichiers — le même
+geste de consolidation que C6, sur une famille plus large.
+
+| Impact | Confiance | Coût | Fenêtre | Traitement |
+|---|---|---|---|---|
+| coût de maintenance seul | démontré | S | transportable tel quel | à corriger |
+
+Comme C6, les trois fichiers sont tous en zone `web` ; rien n'attend la
+fusion avec `netgain/src/`.
 
 ## Ce qui est sain
 
@@ -376,7 +538,14 @@ modèles `claude-*` à `valeursDistinctes: 2` — dix candidats qui, lus tels
 quels, ressemblent à dix divergences tarifaires entre le serveur et le
 moteur. Il n'y en a aucune. Les quatre taux (`input`, `output`,
 `cacheCreate`, `cacheRead`) ET `maxInput` s'accordent sur les dix modèles,
-vérifié à la main puis confirmé par le test ci-dessus. La cause est un
+vérifié à la main puis confirmé par le test ci-dessus. **Le test ci-dessus
+va plus loin que les dix modèles vus par D2** : sa première assertion boucle
+sur `Object.keys(_FALLBACK).length === table.entries.length`, soit les
+**onze** entrées de la table (`claude-sonnet-5` inclus), et sa seconde
+exerce `claude-sonnet-5` nommément. Le modèle qu'un motif interne de D2 ne
+peut pas voir (limite n°2 ci-dessous, l'imbrication de `history`) est donc
+bel et bien couvert — par ce test, indépendamment de D2 — et cette omission
+précise n'a aucune conséquence pratique. La cause est un
 artefact d'extraction : `netgain/src/core/pricing.ts` range les taux dans un
 littéral `PRICES` et le plafond de contexte dans un second littéral
 `MODEL_INFO`, là où `lib/server/pricing.js` réunit tous les champs sous une
@@ -427,15 +596,19 @@ son origine :
 | R5 | `minCompactions = 2` | `spec` |
 | R6 | `maxDurationMs = 5*60*1000`, `minSubagentShare = 0.3` | `spec` |
 
-`calibration` renvoie à un document daté
-(`netgain/docs/calibration-observatoire-m1.md`, 2026-07-27, 1695 sessions sur
-14 projets) qui enregistre la distribution observée et la raison de chaque
-valeur retenue — le fichier note même l'écart avec la première proposition
-du plan pour R1 (0,05 → 0,20, pour ne jamais dépasser la moitié des projets
-déclenchés). `spec` renvoie à doc/12 §7 : la changer, c'est changer la
-spécification. Zéro candidat `seuil-de-regle` n'est ressorti de D2 —
-cohérent avec des seuils déjà centralisés en un seul fichier plutôt que
-recopiés ailleurs.
+`calibration` renvoie au commentaire d'en-tête de ce même fichier
+(`lib/server/observatory/rules/thresholds.js:6-22`), qui enregistre la
+distribution observée sur 90 jours (1695 sessions, 14 projets, mesure du
+2026-07-27) et la raison de chaque valeur retenue — il note même l'écart
+avec la première proposition du plan pour R1 (0,05 → 0,20, pour ne jamais
+dépasser la moitié des projets déclenchés). Ce commentaire cite lui-même un
+document séparé, `netgain/docs/calibration-observatoire-m1.md` — **un
+chemin qui n'existe pas dans ce dépôt** (constat C7 ci-dessus) ; les
+chiffres qui comptent pour un lecteur de cette table sont ceux que le
+commentaire porte directement, pas ce chemin mort. `spec` renvoie à doc/12
+§7 : la changer, c'est changer la spécification. Zéro candidat
+`seuil-de-regle` n'est ressorti de D2 — cohérent avec des seuils déjà
+centralisés en un seul fichier plutôt que recopiés ailleurs.
 
 ### La découverte de sessions : deux stratégies opposées, assumées
 
@@ -481,7 +654,7 @@ de fenêtre voisins) → **1**. Les deux groupes restants (`c4c41252`, règles
 `r5-compactions.js` / `r6-short-subagents.js` ; `0d718902`,
 `context.ts` / `tokens.ts`) sont isolés, sans second groupe à fusionner avec
 eux. Total : **4 duplications textuelles distinctes**, toutes intra-zone,
-6 à 17 lignes chacune — trop minces à côté des six constats retenus (le
+6 à 17 lignes chacune — trop minces à côté des huit constats retenus (le
 terrain inter-zone, à bien plus fort enjeu, est déjà couvert par C2 à C5,
 issus de D7) pour justifier une fiche séparée.
 
@@ -492,14 +665,30 @@ Les dix candidats `code-d-evenement` de D2 (`session`, `agent`, `assistant`,
 `valeursDistinctes: 1` partout) auraient pu annoncer un répartiteur central
 fragile, qu'ajouter un type d'événement forcerait à rouvrir. Lecture
 directe : `public/viz-canvas.js`, `viz-layout.js`, `viz-narrator.js` et
-`viz-ui.js` branchent chacun sur le même `n.type`, mais aucun répartiteur
-central unique n'existe — quatre fichiers indépendants, chacun avec sa
-propre responsabilité déjà établie (dessin du nœud, mise en page, texte de
-narration, comptage pour l'UI). Ajouter un type oblige à toucher les quatre,
-mais chaque édition est justifiée par la responsabilité propre du fichier,
-jamais par la réouverture d'un aiguillage partagé. La duplication littérale
-reste réelle comme défaut DRY (dix chaînes recopiées sans constante
-partagée) mais n'est pas un défaut d'architecture.
+`viz-ui.js` branchent chacun sur le même `n.type`, et pour CET axe-là, aucun
+répartiteur central unique n'existe — quatre fichiers indépendants, chacun
+avec sa propre responsabilité déjà établie (dessin du nœud, mise en page,
+texte de narration, comptage pour l'UI). Ajouter un type oblige à toucher
+les quatre, mais chaque édition est justifiée par la responsabilité propre
+du fichier, jamais par la réouverture d'un aiguillage partagé. La
+duplication littérale reste réelle comme défaut DRY (dix chaînes recopiées
+sans constante partagée) mais n'est pas un défaut d'architecture.
+
+**Il faut nommer une chose que l'énoncé ci-dessus, pris seul, pourrait
+laisser croire absente du dépôt : un répartiteur central existe bel et bien,
+juste sur un AUTRE axe.** `public/viz-layout.js:313-323` définit
+`EVENT_HANDLERS`, une table qui associe chaque `evt.hook_event_name`
+(`SessionStart`, `SubagentStart`, `PostToolUse`…) à sa fonction de
+traitement, dispatchée en une ligne à `:333`
+(`const handler = EVENT_HANDLERS[evt.hook_event_name]; if (handler)
+handler(evt, sid, ts);`). Le commentaire qui la précède, ligne 162-163, dit
+ce que c'est : *« Adding a new hook event = one entry in EVENT_HANDLERS »*.
+C'est exactement la réponse Open/Closed que la spec demande, et de la bonne
+espèce : étendre par une entrée de données, pas par une branche de code. Les
+deux constats ne se contredisent pas — `n.type` (dessin/mise en page/texte)
+et `evt.hook_event_name` (dispatch d'événement de crochet) sont deux axes
+distincts, et le second, qui vit dans le même fichier que l'un des quatre
+brancheurs du premier, a déjà son registre central, ouvert à l'extension.
 
 ### Interface Segregation : `SessionReport` ne fait subir sa largeur à personne
 
@@ -507,11 +696,25 @@ partagée) mais n'est pas un défaut d'architecture.
 1 optionnel, `skipped?`), composés de types nommés et étroits par
 sous-domaine (`ContextStats`, `PromptsStats`, `ReadStats`, `SessionKind`,
 `SubagentStats`, `TokensResult`, `ToolResultStats`, `TurnsStats`), chacun
-défini et consommé indépendamment par son propre agrégateur. Les seuls
-consommateurs du type complet (`report/terminal.ts`, `report/json.ts`) sont
-des rendus qui ont légitimement besoin de la totalité du rapport — aucun
-consommateur étroit ne subit la largeur d'un type dont il n'utiliserait
-qu'une fraction.
+défini et consommé indépendamment par son propre agrégateur. **Les deux
+fichiers d'abord cités comme consommateurs du type complet ne le sont pas** :
+`report/json.ts` tient en 15 lignes, `stableStringify(value: unknown)`, sans
+aucun import de type — sérialisation générique, indifférente à la forme du
+rapport ; `report/terminal.ts` importe `DoctorReport` (ligne 15,
+`renderReport(r: DoctorReport)` ligne 286), jamais `SessionReport`. Les
+vrais consommateurs sont `scan-session.ts:20`
+(`export async function scanSession(...): Promise<SessionReport>`, le
+producteur) et `doctor/index.ts:28,85-86` (`totalsOf`, qui lit **5 des 8**
+sous-domaines typés — `tokens`, `toolResults`, `subagents`, `prompts`,
+`turns` ; jamais `context`, `reads` ni `sessionKind`, absents de tout le
+fichier, vérifié par relecture complète de ses 156 lignes). La conclusion
+ISP tient sur cette base-là : aucun consommateur étroit ne subit la largeur
+d'un type dont il n'utiliserait qu'une fraction — `totalsOf` en utilise une
+majorité mais jamais la totalité, et rien dans le dépôt ne consomme les 8
+sous-domaines d'un coup en dehors du producteur lui-même. Les rendus qui ont
+légitimement besoin de la totalité du rapport travaillent sur `DoctorReport`
+(l'agrégat), pas sur `SessionReport` (l'unité) — un niveau plus haut que ce
+que la fiche affirmait à l'origine.
 
 ## Annexe méthode
 
@@ -526,11 +729,25 @@ node docs/audit/scripts/run-all.mjs --comparer
 La première commande lance les contrôles unitaires des sept détecteurs
 (`d1` à `d7`) plus la vérité terrain. La deuxième régénère les sept fichiers
 de `docs/audit/resultats/*.json` (et `couverture.lcov`). La troisième
-régénère puis compare au résultat déjà committé, champs volatils
-(`commitOutils`, `genereLe`, `nonSuivis` et la liste `CLES_VOLATILES` de
-`write-result.mjs`) exclus de la comparaison, et sort en code 1 au premier
-écart — **elle régénère et laisse donc l'arbre de travail sale** ; restaurer
-`docs/audit/resultats/` avant de committer quoi que ce soit d'autre.
+régénère puis compare au résultat déjà committé, champs volatils exclus de
+la comparaison — les quatre clés de `CLES_VOLATILES`
+(`write-result.mjs:35` : `commitOutils`, `genereLe`, `node`, `nonSuivis`) —
+et sort en code 1 au premier écart — **elle régénère et laisse donc l'arbre
+de travail sale** ; restaurer `docs/audit/resultats/` avant de committer
+quoi que ce soit d'autre.
+
+*Note du rapport : le champ `nonSuivis` d'un résultat donné (par exemple
+`d1.json`, qui porte aujourd'hui `M docs/audit/resultats/couverture.lcov` et
+`?? docs/audit/scripts/run-all.mjs` en plus de `?? tests/CLAUDE.md`) peut
+donc contenir plus que la seule exception nommée en en-tête de ce document.
+Ce n'est pas une contradiction : l'en-tête décrit l'état À L'OUVERTURE de
+l'audit (avant la tâche 0), alors que `nonSuivis` est un instantané de
+`git status --porcelain` pris au moment où CE résultat précis a été
+régénéré — en cours de branche, avec les artefacts de travail encore non
+committés de ce moment-là (l'outillage de l'audit lui-même, avant son propre
+commit ; une couverture fraîchement recalculée). C'est précisément pour
+cette raison que `nonSuivis` fait partie de `CLES_VOLATILES` et sort de la
+comparaison de rejouabilité.*
 
 ### Budget de faux positifs assumé (doc/34)
 
@@ -544,6 +761,17 @@ discréditer tout le rapport, sans qu'on sache lequel. La comparaison exacte
 de séquence lève cette probabilité résiduelle à zéro par construction : une
 collision de hachage sans identité de séquence tombe dans un seau qui ne
 produit alors aucun groupe commun.
+
+**Note du rapport :** le chiffre de 103 192 fenêtres, recopié ci-dessus
+depuis l'en-tête d'origine de `d1-clones.mjs` (non modifié — code plan-
+mandaté, verbatim), est une mesure PRÉ-correctif de la tâche 5 : avant que
+`lib/tokens.mjs` n'apprenne à reconnaître une expression rationnelle
+littérale comme un seul jeton, le même texte tokenisait en davantage de
+jetons, donc davantage de fenêtres. Mesuré directement sur le dépôt à ce
+commit, avec le tokenizer corrigé : **102 303 fenêtres**. L'espérance de
+collision recalculée à cette valeur reste **≈ 1,2** (1,218 précisément) —
+l'argument que ce paragraphe défend n'en est pas affecté, seul le chiffre
+d'entrée a changé.
 
 ### Limites de `docs/audit/resultats/d6.json` (bloc `limites`, verbatim)
 
@@ -645,7 +873,20 @@ qui l'entoure a été élargi à deux guillemets obliques.*
 > (Intl, bibliothèque tierce) passerait au travers — aucun n'existe dans ce
 > dépôt au commit audité, et c'est précisément ce que dit le constat sur les
 > conventions numériques.
->
+
+*Note du rapport : ce fragment, cité verbatim ci-dessus, renvoie en avant à
+« le constat sur les conventions numériques » — un constat que ce rapport ne
+contient pas. La passe de qualification (tâches 10-11) a examiné les
+familles numériques de D3 (`formatage-octets`, `formatage-numerique-en-dur`,
+`formatage-pourcentage`, `formatage-a-locale-implicite`, entre autres — voir
+la section « Constats » ci-dessus) et les a jugées trop dispersées, sur des
+sites isolés sans implémentation concentrée, pour justifier une fiche
+propre — la même conclusion que pour les trois autres familles de formatage
+non retenues (`formatage-date`, `resolution-de-chemin-maison`,
+`declaration-de-formateur`). Le renvoi que fait ce commentaire pointait donc vers une
+intention de rédaction du détecteur, jamais matérialisée en constat final ;
+il n'a plus de cible dans ce document.*
+
 > LIMITE CORRIGÉE À L'EXÉCUTION (2026-08-10) : le motif formatage-monetaire
 > attrapait à l'origine toute interpolation de gabarit — sa branche
 > guillemet-puis-`$` (``['"`]\s*\$``) matchait aussi bien un backtick suivi de
@@ -707,6 +948,14 @@ commentaire l'était.*
 > lib/source-files.mjs) ne résout jamais et finit dans `nonResolus` sans être
 > une faute de frappe. Constaté sur `lib/server/observatory/engine.js` →
 > `../../../package.json`.
+
+*Note du rapport : le passage cité ci-dessus renvoie à une section
+« DÉCISION ÉCRITE » de `lib/tokens.mjs`. Ce nom ne correspond plus à rien
+dans le fichier actuel (`grep -n "DÉCISION" docs/audit/scripts/lib/tokens.mjs`
+ne renvoie rien) — le contenu visé existe toujours, sous le titre
+`HEURISTIQUE (division vs regex…)`, réécrit lors de la correction de la
+tâche 5. Le renvoi n'est pas cassé sur le fond (le lecteur retrouve
+l'explication), seulement sur le nom qu'il cherche.*
 
 **`d5-volumetry.mjs`** :
 
@@ -779,7 +1028,8 @@ prose plutôt que de laisser le lecteur la reconstruire seul.
   la reproductibilité de l'instrument, jamais l'exactitude de ce qu'il
   affirme.
 - **`stdio: 'ignore'` sur la régénération de couverture** (l'appel à
-  `node --test --experimental-test-coverage` dans `run.mjs`) : une panne
+  `node --test --experimental-test-coverage` dans `run-all.mjs:38`, pas dans
+  `run.mjs` — `run.mjs` ne contient aucun `execFileSync`) : une panne
   réelle de cette étape ne laisse qu'un code de sortie non nul, sans aucun
   message de diagnostic à lire.
 - **`couverture.lcov` change d'environ 1272 lignes à chaque régénération**,
@@ -799,16 +1049,32 @@ prose plutôt que de laisser le lecteur la reconstruire seul.
   dans le résultat ; elle n'est donc nommée qu'ici, dans cette annexe et dans
   l'en-tête du détecteur — nulle part dans `d2.json` lui-même.
 - **Les chiffres de périmètre de l'en-tête diffèrent de ceux annoncés par le
-  plan** (17 445 lignes mesurées contre 17 332 estimées ; 108 873 jetons
-  mesurés contre 109 762 estimés ; 113 fichiers dans les deux cas). Le plan
-  doc/34 a été rédigé avant l'écriture de `source-files.mjs` et `tokens.mjs` ;
-  ses chiffres de lignes et de jetons sont des estimations de rédaction, pas
-  une mesure par cet outillage — seul le compte de fichiers, plus facile à
-  établir à la main, tombe juste dès le départ. Une partie de l'écart sur les
-  jetons s'explique en plus par un correctif de fond fait pendant cet audit
-  (tâche 5) : une expression rationnelle littérale émet désormais **un seul
-  jeton** au lieu de plusieurs fragments — ce qui réduit le compte total,
-  dans le même sens que l'écart observé entre le mesuré et l'estimé.
+  plan (17 445 lignes mesurées contre 17 332 ; 108 873 jetons mesurés contre
+  109 762 ; 113 fichiers dans les deux cas), et ce ne sont PAS des
+  estimations de rédaction — les deux écarts se vérifient exactement, pour
+  deux raisons différentes, ni l'une ni l'autre une marge d'erreur.**
+  **Lignes :** `wc -l` sur les 113 fichiers du périmètre donne **17 332**,
+  le chiffre du plan à l'unité près — mesuré directement, pas estimé. L'écart
+  avec les 17 445 publiées vient d'une convention de comptage, la même que la
+  tâche 5 avait déjà mise au jour sur un seul fichier
+  (`lib/install-hooks.js`, 744 contre 743) : `text.split('\n').length`,
+  utilisé par `source-files.mjs`, compte une ligne fantôme de plus que
+  `wc -l` pour chaque fichier qui se termine par un saut de ligne — et les
+  113 fichiers du périmètre s'y terminent tous. 17 445 − 17 332 = **113**,
+  exactement un fantôme par fichier, vérifié par un décompte indépendant des
+  deux conventions sur les mêmes 113 fichiers.
+  **Jetons :** l'écart, 109 762 − 108 873 = **889**, n'est pas une marge
+  d'estimation non plus. Le nombre de fenêtres de 60 jetons que produit ce
+  même périmètre est passé de 103 192 (chiffre pré-correctif, cité en tête de
+  `d1-clones.mjs`) à **102 303** mesuré aujourd'hui — une baisse de,
+  exactement, **889** également. Ces deux écarts indépendants, calculés par
+  deux détecteurs différents sur la même correction de fond, tombent
+  EXACTEMENT sur la même valeur : la preuve que 109 762 n'était pas un
+  chiffre de rédaction mais une mesure réelle **PRÉ-correctif**, par ce même
+  tokenizer, avant que la tâche 5 n'apprenne à `lib/tokens.mjs` à émettre un
+  seul jeton pour une expression rationnelle littérale plutôt que plusieurs
+  fragments. L'écart de jetons n'est donc pas partiellement expliqué par ce
+  correctif : il l'est ENTIÈREMENT, à l'unité près.
 
 ### Sept défauts d'instrument trouvés et refermés pendant l'audit
 
