@@ -1,15 +1,15 @@
 {
   "detecteur": "d5",
   "commitSources": "4a4dc46",
-  "commitOutils": "d4fdb17",
+  "commitOutils": "79a5895",
   "nonSuivis": [
-    "M docs/audit/scripts/run.mjs",
-    "?? docs/audit/scripts/d5-volumetry.mjs",
-    "?? docs/audit/scripts/d5-volumetry.test.mjs",
+    "M docs/audit/resultats/d1.json",
+    " M docs/audit/scripts/lib/tokens.mjs",
+    " M docs/audit/scripts/lib/tokens.test.mjs",
     "?? tests/CLAUDE.md"
   ],
   "node": "v24.15.0",
-  "genereLe": "2026-08-10T14:07:07.819Z",
+  "genereLe": "2026-08-10T15:02:47.573Z",
   "parFichier": [
     {
       "path": "lib/install-hooks.js",
@@ -23,6 +23,10 @@
         },
         {
           "ligneDebut": 71,
+          "ligneFin": 77
+        },
+        {
+          "ligneDebut": 83,
           "ligneFin": 87
         },
         {
@@ -2907,14 +2911,28 @@
       "zone": "engine",
       "lignes": 69,
       "exports": 5,
-      "fonctionsMotCleFunction": []
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 26,
+          "ligneFin": 31
+        },
+        {
+          "ligneDebut": 34,
+          "ligneFin": 38
+        }
+      ]
     },
     {
       "path": "netgain/src/router/detector.ts",
       "zone": "engine",
       "lignes": 69,
       "exports": 3,
-      "fonctionsMotCleFunction": []
+      "fonctionsMotCleFunction": [
+        {
+          "ligneDebut": 54,
+          "ligneFin": 60
+        }
+      ]
     },
     {
       "path": "lib/server/observatory/project-label.js",
@@ -3088,11 +3106,15 @@
         },
         {
           "ligneDebut": 21,
-          "ligneFin": 50
+          "ligneFin": 24
         },
         {
           "ligneDebut": 27,
           "ligneFin": 29
+        },
+        {
+          "ligneDebut": 33,
+          "ligneFin": 52
         }
       ]
     },
@@ -3462,7 +3484,7 @@
     },
     "fonctionsMotCleFunction": {
       "mediane": 8,
-      "p90": 37,
+      "p90": 36,
       "max": 162
     },
     "exports": {
