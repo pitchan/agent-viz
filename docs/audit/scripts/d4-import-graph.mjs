@@ -35,6 +35,35 @@
 // inhabituelle en code réel (pas en commentaire) pourrait en principe encore
 // faire pont entre deux instructions distinctes.
 //
+// LIMITE CONSTATÉE, NON CORRIGÉE (2026-08-10) : `sansCommentaires` peut lui
+// aussi se faire déjouer. Un guillemet non apparié à l'intérieur d'une
+// expression rationnelle littérale (une classe de caractères comme `["'\s]`,
+// ou simplement une contraction anglaise comme `doesn't` écrite en clair dans
+// le motif) désynchronise l'alternative « chaîne » de `COMMENTAIRE_OU_CHAINE` :
+// elle croit ouvrir une chaîne à cet endroit et avale tout, verbatim, jusqu'au
+// PROCHAIN guillemet identique rencontré — des commentaires entiers peuvent se
+// retrouver emportés dans ce tronçon et en ressortir intacts, jamais blanchis.
+// Mesuré sur ce dépôt, à ce commit : `lib/install-hooks.js` (4 lignes de
+// commentaire non blanchies, 79-82, le bloc « Standard shape », déclenché par
+// les guillemets de `["'\s]` aux lignes 75-76) et
+// `public/viz-invocation-patterns.mjs` (29 lignes de commentaire non
+// blanchies, comptées une à une : 155-160, 163-164, 176-178, 228-234, 237-242,
+// 324-328 — la plage 228-242 contient deux lignes de CODE réel, 235-236, qui
+// ne sont pas concernées).
+//
+// Panne À SENS UNIQUE : un commentaire peut donc survivre sans être examiné,
+// mais aucun caractère de code réel n'est jamais changé en espace par ce
+// mécanisme — le risque est une FAUSSE arête, jamais une arête perdue.
+// Dormante dans cet état du dépôt : les lignes non blanchies ci-dessus ne
+// contiennent, vérifié une à une, ni `require(...)` ni `import ... from` —
+// aucune arête supplémentaire n'en résulte aujourd'hui. Non corrigée :
+// distinguer une expression rationnelle littérale d'une division réclame le
+// jeton significatif précédent, l'ambiguïté classique de lexing JavaScript,
+// insoluble par une seule alternation — `lib/tokens.mjs` nomme déjà cette même
+// famille de limite dans son propre en-tête. La résoudre proprement
+// demanderait un vrai analyseur lexical, hors mandat et hors budget
+// zéro-dépendance de cet audit.
+//
 // Autre limite constatée : un spécificateur relatif qui vise un fichier réel
 // mais d'une extension hors périmètre (`.js`/`.mjs`/`.ts` seulement — voir
 // lib/source-files.mjs) ne résout jamais et finit dans `nonResolus` sans être
