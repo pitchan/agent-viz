@@ -1,0 +1,2308 @@
+{
+  "detecteur": "d3",
+  "commitSources": "4a4dc46",
+  "commitOutils": "00f3c64",
+  "nonSuivis": [
+    "M docs/audit/scripts/run.mjs",
+    "?? docs/audit/resultats/d3.json",
+    "?? docs/audit/scripts/d3-many-paths.mjs",
+    "?? docs/audit/scripts/d3-many-paths.test.mjs",
+    "?? tests/CLAUDE.md"
+  ],
+  "node": "v24.15.0",
+  "genereLe": "2026-08-10T10:39:25.738Z",
+  "primitives": [
+    {
+      "primitive": "formatage-monetaire",
+      "sites": [
+        {
+          "path": "lib/hook.js",
+          "zone": "server",
+          "line": 56
+        },
+        {
+          "path": "lib/hook.js",
+          "zone": "server",
+          "line": 60
+        },
+        {
+          "path": "lib/install-hooks.js",
+          "zone": "server",
+          "line": 93
+        },
+        {
+          "path": "lib/install-hooks.js",
+          "zone": "server",
+          "line": 245
+        },
+        {
+          "path": "lib/install-hooks.js",
+          "zone": "server",
+          "line": 249
+        },
+        {
+          "path": "lib/install-hooks.js",
+          "zone": "server",
+          "line": 270
+        },
+        {
+          "path": "lib/install-hooks.js",
+          "zone": "server",
+          "line": 304
+        },
+        {
+          "path": "lib/lifecycle.js",
+          "zone": "server",
+          "line": 26
+        },
+        {
+          "path": "lib/prompt-install.js",
+          "zone": "server",
+          "line": 112
+        },
+        {
+          "path": "lib/server/observatory/project-label.js",
+          "zone": "server",
+          "line": 24
+        },
+        {
+          "path": "lib/server/observatory/project-label.js",
+          "zone": "server",
+          "line": 63
+        },
+        {
+          "path": "lib/server/observatory/rules/r2-unused-mcp.js",
+          "zone": "server",
+          "line": 47
+        },
+        {
+          "path": "lib/server/pricing.js",
+          "zone": "server",
+          "line": 27
+        },
+        {
+          "path": "lib/server/pricing.js",
+          "zone": "server",
+          "line": 111
+        },
+        {
+          "path": "lib/server/pricing.js",
+          "zone": "server",
+          "line": 139
+        },
+        {
+          "path": "lib/server/pricing.js",
+          "zone": "server",
+          "line": 167
+        },
+        {
+          "path": "lib/server/pricing.js",
+          "zone": "server",
+          "line": 168
+        },
+        {
+          "path": "lib/server/pricing.js",
+          "zone": "server",
+          "line": 168
+        },
+        {
+          "path": "lib/server/tokens.js",
+          "zone": "server",
+          "line": 15
+        },
+        {
+          "path": "lib/server/transcript-adapters/index.js",
+          "zone": "server",
+          "line": 21
+        },
+        {
+          "path": "lib/server/watchdog/journal.js",
+          "zone": "server",
+          "line": 71
+        },
+        {
+          "path": "lib/server/watchdog/journal.js",
+          "zone": "server",
+          "line": 110
+        },
+        {
+          "path": "bin/agent-viz.js",
+          "zone": "server",
+          "line": 138
+        },
+        {
+          "path": "bin/agent-viz.js",
+          "zone": "server",
+          "line": 147
+        },
+        {
+          "path": "bin/agent-viz.js",
+          "zone": "server",
+          "line": 149
+        },
+        {
+          "path": "bin/agent-viz.js",
+          "zone": "server",
+          "line": 162
+        },
+        {
+          "path": "bin/agent-viz.js",
+          "zone": "server",
+          "line": 166
+        },
+        {
+          "path": "bin/agent-viz.js",
+          "zone": "server",
+          "line": 199
+        },
+        {
+          "path": "bin/agent-viz.js",
+          "zone": "server",
+          "line": 207
+        },
+        {
+          "path": "bin/agent-viz.js",
+          "zone": "server",
+          "line": 212
+        },
+        {
+          "path": "bin/agent-viz.js",
+          "zone": "server",
+          "line": 221
+        },
+        {
+          "path": "bin/agent-viz.js",
+          "zone": "server",
+          "line": 238
+        },
+        {
+          "path": "bin/agent-viz.js",
+          "zone": "server",
+          "line": 261
+        },
+        {
+          "path": "bin/agent-viz.js",
+          "zone": "server",
+          "line": 285
+        },
+        {
+          "path": "bin/agent-viz.js",
+          "zone": "server",
+          "line": 302
+        },
+        {
+          "path": "bin/agent-viz.js",
+          "zone": "server",
+          "line": 306
+        },
+        {
+          "path": "bin/agent-viz.js",
+          "zone": "server",
+          "line": 308
+        },
+        {
+          "path": "bin/agent-viz.js",
+          "zone": "server",
+          "line": 309
+        },
+        {
+          "path": "bin/agent-viz.js",
+          "zone": "server",
+          "line": 322
+        },
+        {
+          "path": "bin/agent-viz.js",
+          "zone": "server",
+          "line": 332
+        },
+        {
+          "path": "bin/agent-viz.js",
+          "zone": "server",
+          "line": 352
+        },
+        {
+          "path": "bin/agent-viz.js",
+          "zone": "server",
+          "line": 353
+        },
+        {
+          "path": "bin/agent-viz.js",
+          "zone": "server",
+          "line": 354
+        },
+        {
+          "path": "bin/agent-viz.js",
+          "zone": "server",
+          "line": 381
+        },
+        {
+          "path": "bin/agent-viz.js",
+          "zone": "server",
+          "line": 384
+        },
+        {
+          "path": "bin/agent-viz.js",
+          "zone": "server",
+          "line": 385
+        },
+        {
+          "path": "bin/agent-viz.js",
+          "zone": "server",
+          "line": 386
+        },
+        {
+          "path": "bin/agent-viz.js",
+          "zone": "server",
+          "line": 418
+        },
+        {
+          "path": "bin/agent-viz.js",
+          "zone": "server",
+          "line": 425
+        },
+        {
+          "path": "public/observatory/advisor-view.js",
+          "zone": "web",
+          "line": 31
+        },
+        {
+          "path": "public/observatory/analysis-view.js",
+          "zone": "web",
+          "line": 28
+        },
+        {
+          "path": "public/observatory/analysis-view.js",
+          "zone": "web",
+          "line": 40
+        },
+        {
+          "path": "public/observatory/analysis-view.js",
+          "zone": "web",
+          "line": 43
+        },
+        {
+          "path": "public/observatory/analysis-view.js",
+          "zone": "web",
+          "line": 47
+        },
+        {
+          "path": "public/observatory/analysis-view.js",
+          "zone": "web",
+          "line": 50
+        },
+        {
+          "path": "public/observatory/analysis-view.js",
+          "zone": "web",
+          "line": 53
+        },
+        {
+          "path": "public/observatory/analysis-view.js",
+          "zone": "web",
+          "line": 56
+        },
+        {
+          "path": "public/observatory/analysis-view.js",
+          "zone": "web",
+          "line": 60
+        },
+        {
+          "path": "public/observatory/analysis-view.js",
+          "zone": "web",
+          "line": 102
+        },
+        {
+          "path": "public/observatory/analysis-view.js",
+          "zone": "web",
+          "line": 115
+        },
+        {
+          "path": "public/observatory/api.js",
+          "zone": "web",
+          "line": 11
+        },
+        {
+          "path": "public/observatory/api.js",
+          "zone": "web",
+          "line": 22
+        },
+        {
+          "path": "public/observatory/evidence.js",
+          "zone": "web",
+          "line": 32
+        },
+        {
+          "path": "public/observatory/evidence.js",
+          "zone": "web",
+          "line": 35
+        },
+        {
+          "path": "public/observatory/evidence.js",
+          "zone": "web",
+          "line": 48
+        },
+        {
+          "path": "public/observatory/evidence.js",
+          "zone": "web",
+          "line": 49
+        },
+        {
+          "path": "public/observatory/evidence.js",
+          "zone": "web",
+          "line": 50
+        },
+        {
+          "path": "public/observatory/evidence.js",
+          "zone": "web",
+          "line": 53
+        },
+        {
+          "path": "public/observatory/evidence.js",
+          "zone": "web",
+          "line": 54
+        },
+        {
+          "path": "public/observatory/evidence.js",
+          "zone": "web",
+          "line": 55
+        },
+        {
+          "path": "public/observatory/evidence.js",
+          "zone": "web",
+          "line": 58
+        },
+        {
+          "path": "public/observatory/evidence.js",
+          "zone": "web",
+          "line": 58
+        },
+        {
+          "path": "public/observatory/evidence.js",
+          "zone": "web",
+          "line": 62
+        },
+        {
+          "path": "public/observatory/evidence.js",
+          "zone": "web",
+          "line": 67
+        },
+        {
+          "path": "public/observatory/evidence.js",
+          "zone": "web",
+          "line": 69
+        },
+        {
+          "path": "public/observatory/evidence.js",
+          "zone": "web",
+          "line": 75
+        },
+        {
+          "path": "public/observatory/failures-format.js",
+          "zone": "web",
+          "line": 21
+        },
+        {
+          "path": "public/observatory/failures-format.js",
+          "zone": "web",
+          "line": 101
+        },
+        {
+          "path": "public/observatory/failures-format.js",
+          "zone": "web",
+          "line": 102
+        },
+        {
+          "path": "public/observatory/failures-format.js",
+          "zone": "web",
+          "line": 105
+        },
+        {
+          "path": "public/observatory/failures-format.js",
+          "zone": "web",
+          "line": 112
+        },
+        {
+          "path": "public/observatory/failures-format.js",
+          "zone": "web",
+          "line": 143
+        },
+        {
+          "path": "public/observatory/failures-format.js",
+          "zone": "web",
+          "line": 157
+        },
+        {
+          "path": "public/observatory/failures-format.js",
+          "zone": "web",
+          "line": 192
+        },
+        {
+          "path": "public/observatory/failures-format.js",
+          "zone": "web",
+          "line": 193
+        },
+        {
+          "path": "public/observatory/failures-format.js",
+          "zone": "web",
+          "line": 194
+        },
+        {
+          "path": "public/observatory/failures-format.js",
+          "zone": "web",
+          "line": 203
+        },
+        {
+          "path": "public/observatory/failures-format.js",
+          "zone": "web",
+          "line": 209
+        },
+        {
+          "path": "public/observatory/failures-format.js",
+          "zone": "web",
+          "line": 210
+        },
+        {
+          "path": "public/observatory/failures-format.js",
+          "zone": "web",
+          "line": 211
+        },
+        {
+          "path": "public/observatory/failures-view.js",
+          "zone": "web",
+          "line": 23
+        },
+        {
+          "path": "public/observatory/failures-view.js",
+          "zone": "web",
+          "line": 34
+        },
+        {
+          "path": "public/observatory/failures-view.js",
+          "zone": "web",
+          "line": 69
+        },
+        {
+          "path": "public/observatory/failures-view.js",
+          "zone": "web",
+          "line": 99
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 11
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 11
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 15
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 16
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 17
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 27
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 28
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 51
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 52
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 53
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 54
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 55
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 62
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 65
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 68
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 84
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 99
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 100
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 101
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 115
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 121
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 122
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 136
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 138
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 138
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 142
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 146
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 146
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 150
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 150
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 160
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 161
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 161
+        },
+        {
+          "path": "public/observatory/period-selector.js",
+          "zone": "web",
+          "line": 16
+        },
+        {
+          "path": "public/observatory/pricing-view.js",
+          "zone": "web",
+          "line": 96
+        },
+        {
+          "path": "public/observatory/pricing-view.js",
+          "zone": "web",
+          "line": 141
+        },
+        {
+          "path": "public/observatory/pricing-view.js",
+          "zone": "web",
+          "line": 142
+        },
+        {
+          "path": "public/observatory/pricing-view.js",
+          "zone": "web",
+          "line": 152
+        },
+        {
+          "path": "public/viz-alert-format.mjs",
+          "zone": "web",
+          "line": 28
+        },
+        {
+          "path": "public/viz-alert-format.mjs",
+          "zone": "web",
+          "line": 35
+        },
+        {
+          "path": "public/viz-alert-format.mjs",
+          "zone": "web",
+          "line": 58
+        },
+        {
+          "path": "public/viz-alert-format.mjs",
+          "zone": "web",
+          "line": 59
+        },
+        {
+          "path": "public/viz-drawers.js",
+          "zone": "web",
+          "line": 112
+        },
+        {
+          "path": "public/viz-drawers.js",
+          "zone": "web",
+          "line": 190
+        },
+        {
+          "path": "public/viz-drawers.js",
+          "zone": "web",
+          "line": 217
+        },
+        {
+          "path": "public/viz-drawers.js",
+          "zone": "web",
+          "line": 271
+        },
+        {
+          "path": "public/viz-drawers.js",
+          "zone": "web",
+          "line": 277
+        },
+        {
+          "path": "public/viz-drawers.js",
+          "zone": "web",
+          "line": 329
+        },
+        {
+          "path": "public/viz-drawers.js",
+          "zone": "web",
+          "line": 335
+        },
+        {
+          "path": "public/viz-drawers.js",
+          "zone": "web",
+          "line": 386
+        },
+        {
+          "path": "public/viz-layout.js",
+          "zone": "web",
+          "line": 344
+        },
+        {
+          "path": "public/viz-layout.js",
+          "zone": "web",
+          "line": 345
+        },
+        {
+          "path": "public/viz-layout.js",
+          "zone": "web",
+          "line": 346
+        },
+        {
+          "path": "public/viz-narrator.js",
+          "zone": "web",
+          "line": 144
+        },
+        {
+          "path": "public/viz-narrator.js",
+          "zone": "web",
+          "line": 159
+        },
+        {
+          "path": "public/viz-narrator.js",
+          "zone": "web",
+          "line": 159
+        },
+        {
+          "path": "public/viz-narrator.js",
+          "zone": "web",
+          "line": 192
+        },
+        {
+          "path": "public/viz-narrator.js",
+          "zone": "web",
+          "line": 193
+        },
+        {
+          "path": "public/viz-narrator.js",
+          "zone": "web",
+          "line": 194
+        },
+        {
+          "path": "public/viz-network.js",
+          "zone": "web",
+          "line": 242
+        },
+        {
+          "path": "public/viz-network.js",
+          "zone": "web",
+          "line": 277
+        },
+        {
+          "path": "public/viz-network.js",
+          "zone": "web",
+          "line": 278
+        },
+        {
+          "path": "public/viz-network.js",
+          "zone": "web",
+          "line": 279
+        },
+        {
+          "path": "public/viz-state.js",
+          "zone": "web",
+          "line": 197
+        },
+        {
+          "path": "public/viz-state.js",
+          "zone": "web",
+          "line": 197
+        },
+        {
+          "path": "public/viz-state.js",
+          "zone": "web",
+          "line": 197
+        },
+        {
+          "path": "public/viz-state.js",
+          "zone": "web",
+          "line": 197
+        },
+        {
+          "path": "public/viz-state.js",
+          "zone": "web",
+          "line": 201
+        },
+        {
+          "path": "public/viz-state.js",
+          "zone": "web",
+          "line": 202
+        },
+        {
+          "path": "public/viz-state.js",
+          "zone": "web",
+          "line": 203
+        },
+        {
+          "path": "public/viz-state.js",
+          "zone": "web",
+          "line": 204
+        },
+        {
+          "path": "public/viz-state.js",
+          "zone": "web",
+          "line": 205
+        },
+        {
+          "path": "public/viz-ui.js",
+          "zone": "web",
+          "line": 41
+        },
+        {
+          "path": "public/viz-ui.js",
+          "zone": "web",
+          "line": 54
+        },
+        {
+          "path": "public/viz-ui.js",
+          "zone": "web",
+          "line": 183
+        },
+        {
+          "path": "public/viz-ui.js",
+          "zone": "web",
+          "line": 260
+        },
+        {
+          "path": "public/viz-ui.js",
+          "zone": "web",
+          "line": 273
+        },
+        {
+          "path": "public/viz-ui.js",
+          "zone": "web",
+          "line": 410
+        },
+        {
+          "path": "public/viz-ui.js",
+          "zone": "web",
+          "line": 410
+        },
+        {
+          "path": "public/viz-ui.js",
+          "zone": "web",
+          "line": 410
+        },
+        {
+          "path": "public/viz-ui.js",
+          "zone": "web",
+          "line": 465
+        },
+        {
+          "path": "public/viz-ui.js",
+          "zone": "web",
+          "line": 465
+        },
+        {
+          "path": "public/viz-ui.js",
+          "zone": "web",
+          "line": 484
+        },
+        {
+          "path": "public/viz-watchdog-client.js",
+          "zone": "web",
+          "line": 61
+        },
+        {
+          "path": "public/viz-watchdog.mjs",
+          "zone": "web",
+          "line": 59
+        },
+        {
+          "path": "public/viz-watchdog.mjs",
+          "zone": "web",
+          "line": 153
+        },
+        {
+          "path": "public/viz-watchdog.mjs",
+          "zone": "web",
+          "line": 155
+        },
+        {
+          "path": "public/viz-watchdog.mjs",
+          "zone": "web",
+          "line": 155
+        },
+        {
+          "path": "public/viz-watchdog.mjs",
+          "zone": "web",
+          "line": 204
+        },
+        {
+          "path": "public/viz-watchdog.mjs",
+          "zone": "web",
+          "line": 255
+        },
+        {
+          "path": "public/viz-watchdog.mjs",
+          "zone": "web",
+          "line": 271
+        },
+        {
+          "path": "public/viz-watchdog.mjs",
+          "zone": "web",
+          "line": 371
+        },
+        {
+          "path": "public/viz-watchdog.mjs",
+          "zone": "web",
+          "line": 504
+        },
+        {
+          "path": "public/viz-watchdog.mjs",
+          "zone": "web",
+          "line": 523
+        },
+        {
+          "path": "netgain/src/cli-args.ts",
+          "zone": "engine",
+          "line": 40
+        },
+        {
+          "path": "netgain/src/cli-args.ts",
+          "zone": "engine",
+          "line": 83
+        },
+        {
+          "path": "netgain/src/core/pricing.ts",
+          "zone": "engine",
+          "line": 12
+        },
+        {
+          "path": "netgain/src/core/pricing.ts",
+          "zone": "engine",
+          "line": 161
+        },
+        {
+          "path": "netgain/src/doctor/aggregators/context.ts",
+          "zone": "engine",
+          "line": 223
+        },
+        {
+          "path": "netgain/src/doctor/aggregators/reads.ts",
+          "zone": "engine",
+          "line": 45
+        },
+        {
+          "path": "netgain/src/doctor/aggregators/reads.ts",
+          "zone": "engine",
+          "line": 47
+        },
+        {
+          "path": "netgain/src/doctor/aggregators/reads.ts",
+          "zone": "engine",
+          "line": 60
+        },
+        {
+          "path": "netgain/src/doctor/aggregators/reads.ts",
+          "zone": "engine",
+          "line": 72
+        },
+        {
+          "path": "netgain/src/doctor/aggregators/reads.ts",
+          "zone": "engine",
+          "line": 79
+        },
+        {
+          "path": "netgain/src/doctor/aggregators/reads.ts",
+          "zone": "engine",
+          "line": 85
+        },
+        {
+          "path": "netgain/src/doctor/aggregators/recognizers.ts",
+          "zone": "engine",
+          "line": 52
+        },
+        {
+          "path": "netgain/src/doctor/aggregators/tokens.ts",
+          "zone": "engine",
+          "line": 82
+        },
+        {
+          "path": "netgain/src/doctor/aggregators/turns.ts",
+          "zone": "engine",
+          "line": 126
+        },
+        {
+          "path": "netgain/src/doctor/index.ts",
+          "zone": "engine",
+          "line": 131
+        },
+        {
+          "path": "netgain/src/doctor/index.ts",
+          "zone": "engine",
+          "line": 133
+        },
+        {
+          "path": "netgain/src/doctor/index.ts",
+          "zone": "engine",
+          "line": 142
+        },
+        {
+          "path": "netgain/src/doctor/report/terminal.ts",
+          "zone": "engine",
+          "line": 22
+        },
+        {
+          "path": "netgain/src/doctor/report/terminal.ts",
+          "zone": "engine",
+          "line": 23
+        },
+        {
+          "path": "netgain/src/doctor/report/terminal.ts",
+          "zone": "engine",
+          "line": 27
+        },
+        {
+          "path": "netgain/src/doctor/report/terminal.ts",
+          "zone": "engine",
+          "line": 27
+        },
+        {
+          "path": "netgain/src/doctor/report/terminal.ts",
+          "zone": "engine",
+          "line": 42
+        },
+        {
+          "path": "netgain/src/doctor/report/terminal.ts",
+          "zone": "engine",
+          "line": 63
+        },
+        {
+          "path": "netgain/src/doctor/report/terminal.ts",
+          "zone": "engine",
+          "line": 67
+        },
+        {
+          "path": "netgain/src/doctor/report/terminal.ts",
+          "zone": "engine",
+          "line": 106
+        },
+        {
+          "path": "netgain/src/doctor/report/terminal.ts",
+          "zone": "engine",
+          "line": 108
+        },
+        {
+          "path": "netgain/src/doctor/report/terminal.ts",
+          "zone": "engine",
+          "line": 133
+        },
+        {
+          "path": "netgain/src/doctor/report/terminal.ts",
+          "zone": "engine",
+          "line": 150
+        },
+        {
+          "path": "netgain/src/doctor/report/terminal.ts",
+          "zone": "engine",
+          "line": 152
+        },
+        {
+          "path": "netgain/src/doctor/report/terminal.ts",
+          "zone": "engine",
+          "line": 155
+        },
+        {
+          "path": "netgain/src/doctor/report/terminal.ts",
+          "zone": "engine",
+          "line": 207
+        },
+        {
+          "path": "netgain/src/doctor/report/terminal.ts",
+          "zone": "engine",
+          "line": 211
+        },
+        {
+          "path": "netgain/src/doctor/report/terminal.ts",
+          "zone": "engine",
+          "line": 292
+        },
+        {
+          "path": "netgain/src/doctor/report/terminal.ts",
+          "zone": "engine",
+          "line": 292
+        },
+        {
+          "path": "netgain/src/doctor/report/terminal.ts",
+          "zone": "engine",
+          "line": 298
+        },
+        {
+          "path": "netgain/src/doctor/report/terminal.ts",
+          "zone": "engine",
+          "line": 304
+        },
+        {
+          "path": "netgain/src/doctor/report/terminal.ts",
+          "zone": "engine",
+          "line": 380
+        },
+        {
+          "path": "netgain/src/doctor/report/terminal.ts",
+          "zone": "engine",
+          "line": 384
+        },
+        {
+          "path": "netgain/src/doctor/report/terminal.ts",
+          "zone": "engine",
+          "line": 395
+        },
+        {
+          "path": "netgain/src/doctor/report/terminal.ts",
+          "zone": "engine",
+          "line": 397
+        },
+        {
+          "path": "netgain/src/doctor/report/terminal.ts",
+          "zone": "engine",
+          "line": 399
+        },
+        {
+          "path": "netgain/src/doctor/report/terminal.ts",
+          "zone": "engine",
+          "line": 401
+        },
+        {
+          "path": "netgain/src/doctor/report/terminal.ts",
+          "zone": "engine",
+          "line": 403
+        },
+        {
+          "path": "netgain/src/doctor/report/terminal.ts",
+          "zone": "engine",
+          "line": 408
+        },
+        {
+          "path": "netgain/src/doctor/report/terminal.ts",
+          "zone": "engine",
+          "line": 413
+        },
+        {
+          "path": "netgain/src/doctor/report/terminal.ts",
+          "zone": "engine",
+          "line": 420
+        },
+        {
+          "path": "netgain/src/doctor/report/terminal.ts",
+          "zone": "engine",
+          "line": 421
+        },
+        {
+          "path": "netgain/src/doctor/report/terminal.ts",
+          "zone": "engine",
+          "line": 432
+        },
+        {
+          "path": "netgain/src/doctor/report/terminal.ts",
+          "zone": "engine",
+          "line": 443
+        },
+        {
+          "path": "netgain/src/install/hook-edit.ts",
+          "zone": "engine",
+          "line": 10
+        },
+        {
+          "path": "netgain/src/install/hook-edit.ts",
+          "zone": "engine",
+          "line": 11
+        },
+        {
+          "path": "netgain/src/install/json-file.ts",
+          "zone": "engine",
+          "line": 48
+        },
+        {
+          "path": "netgain/src/install/json-file.ts",
+          "zone": "engine",
+          "line": 49
+        },
+        {
+          "path": "netgain/src/install/mcp-edit.ts",
+          "zone": "engine",
+          "line": 23
+        },
+        {
+          "path": "netgain/src/install/status.ts",
+          "zone": "engine",
+          "line": 92
+        },
+        {
+          "path": "netgain/src/map/env.ts",
+          "zone": "engine",
+          "line": 281
+        },
+        {
+          "path": "netgain/src/map/env.ts",
+          "zone": "engine",
+          "line": 406
+        },
+        {
+          "path": "netgain/src/mcp/main.ts",
+          "zone": "engine",
+          "line": 22
+        },
+        {
+          "path": "netgain/src/mcp/main.ts",
+          "zone": "engine",
+          "line": 26
+        }
+      ],
+      "fichiersDistincts": 44
+    },
+    {
+      "primitive": "lecture-json-de-fichier",
+      "sites": [
+        {
+          "path": "lib/hook.js",
+          "zone": "server",
+          "line": 46
+        },
+        {
+          "path": "lib/install-hooks.js",
+          "zone": "server",
+          "line": 90
+        },
+        {
+          "path": "lib/install-hooks.js",
+          "zone": "server",
+          "line": 301
+        },
+        {
+          "path": "lib/server/event-reader.js",
+          "zone": "server",
+          "line": 138
+        },
+        {
+          "path": "lib/server/housekeep.js",
+          "zone": "server",
+          "line": 40
+        },
+        {
+          "path": "lib/server/observatory/config-audit.js",
+          "zone": "server",
+          "line": 17
+        },
+        {
+          "path": "lib/server/observatory/service.js",
+          "zone": "server",
+          "line": 147
+        },
+        {
+          "path": "lib/server/observatory/service.js",
+          "zone": "server",
+          "line": 156
+        },
+        {
+          "path": "lib/server/observatory/session-mapper.js",
+          "zone": "server",
+          "line": 47
+        },
+        {
+          "path": "lib/server/observatory/store.js",
+          "zone": "server",
+          "line": 71
+        },
+        {
+          "path": "lib/server/observatory/store.js",
+          "zone": "server",
+          "line": 183
+        },
+        {
+          "path": "lib/server/pricing.js",
+          "zone": "server",
+          "line": 303
+        },
+        {
+          "path": "lib/server/routes.js",
+          "zone": "server",
+          "line": 57
+        },
+        {
+          "path": "lib/server/session-index.js",
+          "zone": "server",
+          "line": 82
+        },
+        {
+          "path": "lib/server/transcript-adapters/claude.js",
+          "zone": "server",
+          "line": 27
+        },
+        {
+          "path": "lib/server/transcript.js",
+          "zone": "server",
+          "line": 48
+        },
+        {
+          "path": "lib/server/transcript.js",
+          "zone": "server",
+          "line": 74
+        },
+        {
+          "path": "lib/server/watchdog/catch-up.js",
+          "zone": "server",
+          "line": 86
+        },
+        {
+          "path": "lib/server/watchdog/journal.js",
+          "zone": "server",
+          "line": 147
+        },
+        {
+          "path": "lib/server/watchdog/routes.js",
+          "zone": "server",
+          "line": 150
+        },
+        {
+          "path": "lib/server/watchdog/routes.js",
+          "zone": "server",
+          "line": 153
+        },
+        {
+          "path": "public/viz-network.js",
+          "zone": "web",
+          "line": 102
+        },
+        {
+          "path": "public/viz-network.js",
+          "zone": "web",
+          "line": 212
+        },
+        {
+          "path": "netgain/src/core/jsonl.ts",
+          "zone": "engine",
+          "line": 25
+        },
+        {
+          "path": "netgain/src/doctor/scan-session.ts",
+          "zone": "engine",
+          "line": 106
+        },
+        {
+          "path": "netgain/src/install/json-file.ts",
+          "zone": "engine",
+          "line": 37
+        },
+        {
+          "path": "netgain/src/mcp/main.ts",
+          "zone": "engine",
+          "line": 20
+        },
+        {
+          "path": "netgain/src/router/hook.ts",
+          "zone": "engine",
+          "line": 14
+        },
+        {
+          "path": "netgain/src/version.ts",
+          "zone": "engine",
+          "line": 16
+        }
+      ],
+      "fichiersDistincts": 23
+    },
+    {
+      "primitive": "formatage-octets",
+      "sites": [
+        {
+          "path": "lib/server/housekeep.js",
+          "zone": "server",
+          "line": 91
+        },
+        {
+          "path": "lib/server/observatory/rules/r3-large-tool-output.js",
+          "zone": "server",
+          "line": 5
+        },
+        {
+          "path": "lib/server/pricing.js",
+          "zone": "server",
+          "line": 18
+        },
+        {
+          "path": "lib/server/pricing.js",
+          "zone": "server",
+          "line": 19
+        },
+        {
+          "path": "lib/server/pricing.js",
+          "zone": "server",
+          "line": 20
+        },
+        {
+          "path": "lib/server/session-index.js",
+          "zone": "server",
+          "line": 71
+        },
+        {
+          "path": "lib/server/transcript.js",
+          "zone": "server",
+          "line": 21
+        },
+        {
+          "path": "lib/server/transcript.js",
+          "zone": "server",
+          "line": 123
+        },
+        {
+          "path": "lib/server/transcript.js",
+          "zone": "server",
+          "line": 123
+        },
+        {
+          "path": "lib/server/transcript.js",
+          "zone": "server",
+          "line": 124
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 15
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 15
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 15
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 16
+        },
+        {
+          "path": "public/observatory/remedies.js",
+          "zone": "web",
+          "line": 37
+        },
+        {
+          "path": "public/viz-invocation-patterns.mjs",
+          "zone": "web",
+          "line": 185
+        },
+        {
+          "path": "public/viz-invocation-patterns.mjs",
+          "zone": "web",
+          "line": 187
+        },
+        {
+          "path": "public/viz-invocation-patterns.mjs",
+          "zone": "web",
+          "line": 228
+        },
+        {
+          "path": "public/viz-invocation-patterns.mjs",
+          "zone": "web",
+          "line": 231
+        },
+        {
+          "path": "netgain/src/doctor/aggregators/tool-results.ts",
+          "zone": "engine",
+          "line": 6
+        },
+        {
+          "path": "netgain/src/doctor/aggregators/tool-results.ts",
+          "zone": "engine",
+          "line": 35
+        },
+        {
+          "path": "netgain/src/doctor/report/terminal.ts",
+          "zone": "engine",
+          "line": 23
+        },
+        {
+          "path": "netgain/src/doctor/report/terminal.ts",
+          "zone": "engine",
+          "line": 374
+        },
+        {
+          "path": "netgain/src/doctor/report/terminal.ts",
+          "zone": "engine",
+          "line": 375
+        },
+        {
+          "path": "netgain/src/doctor/report/terminal.ts",
+          "zone": "engine",
+          "line": 376
+        },
+        {
+          "path": "netgain/src/doctor/report/types.ts",
+          "zone": "engine",
+          "line": 47
+        },
+        {
+          "path": "netgain/src/map/budget.ts",
+          "zone": "engine",
+          "line": 2
+        },
+        {
+          "path": "netgain/src/map/budget.ts",
+          "zone": "engine",
+          "line": 3
+        },
+        {
+          "path": "netgain/src/mcp/server.ts",
+          "zone": "engine",
+          "line": 73
+        }
+      ],
+      "fichiersDistincts": 13
+    },
+    {
+      "primitive": "formatage-date",
+      "sites": [
+        {
+          "path": "lib/hook.js",
+          "zone": "server",
+          "line": 47
+        },
+        {
+          "path": "lib/hook.js",
+          "zone": "server",
+          "line": 56
+        },
+        {
+          "path": "lib/lifecycle.js",
+          "zone": "server",
+          "line": 26
+        },
+        {
+          "path": "lib/server/housekeep.js",
+          "zone": "server",
+          "line": 37
+        },
+        {
+          "path": "lib/server/observatory/scan.js",
+          "zone": "server",
+          "line": 16
+        },
+        {
+          "path": "lib/server/observatory/scan.js",
+          "zone": "server",
+          "line": 47
+        },
+        {
+          "path": "lib/server/observatory/service.js",
+          "zone": "server",
+          "line": 30
+        },
+        {
+          "path": "lib/server/observatory/service.js",
+          "zone": "server",
+          "line": 57
+        },
+        {
+          "path": "lib/server/observatory/service.js",
+          "zone": "server",
+          "line": 65
+        },
+        {
+          "path": "lib/server/observatory/service.js",
+          "zone": "server",
+          "line": 108
+        },
+        {
+          "path": "lib/server/observatory/service.js",
+          "zone": "server",
+          "line": 122
+        },
+        {
+          "path": "lib/server/observatory/service.js",
+          "zone": "server",
+          "line": 175
+        },
+        {
+          "path": "lib/server/pricing.js",
+          "zone": "server",
+          "line": 103
+        },
+        {
+          "path": "lib/server/pricing.js",
+          "zone": "server",
+          "line": 305
+        },
+        {
+          "path": "bin/agent-viz.js",
+          "zone": "server",
+          "line": 390
+        },
+        {
+          "path": "public/observatory/failures-view.js",
+          "zone": "web",
+          "line": 22
+        },
+        {
+          "path": "public/observatory/failures-view.js",
+          "zone": "web",
+          "line": 23
+        },
+        {
+          "path": "public/observatory/failures-view.js",
+          "zone": "web",
+          "line": 23
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 28
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 84
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 84
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 84
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 84
+        },
+        {
+          "path": "public/viz-layout.js",
+          "zone": "web",
+          "line": 63
+        },
+        {
+          "path": "public/viz-layout.js",
+          "zone": "web",
+          "line": 331
+        },
+        {
+          "path": "netgain/src/core/pricing.ts",
+          "zone": "engine",
+          "line": 119
+        },
+        {
+          "path": "netgain/src/core/pricing.ts",
+          "zone": "engine",
+          "line": 145
+        },
+        {
+          "path": "netgain/src/doctor/index.ts",
+          "zone": "engine",
+          "line": 64
+        },
+        {
+          "path": "netgain/src/doctor/index.ts",
+          "zone": "engine",
+          "line": 68
+        },
+        {
+          "path": "netgain/src/doctor/index.ts",
+          "zone": "engine",
+          "line": 131
+        },
+        {
+          "path": "netgain/src/map/health.ts",
+          "zone": "engine",
+          "line": 21
+        }
+      ],
+      "fichiersDistincts": 13
+    },
+    {
+      "primitive": "decodage-jsonl",
+      "sites": [
+        {
+          "path": "lib/install-hooks.js",
+          "zone": "server",
+          "line": 266
+        },
+        {
+          "path": "lib/lifecycle.js",
+          "zone": "server",
+          "line": 17
+        },
+        {
+          "path": "lib/lifecycle.js",
+          "zone": "server",
+          "line": 148
+        },
+        {
+          "path": "lib/server/event-reader.js",
+          "zone": "server",
+          "line": 120
+        },
+        {
+          "path": "lib/server/housekeep.js",
+          "zone": "server",
+          "line": 33
+        },
+        {
+          "path": "lib/server/session-index.js",
+          "zone": "server",
+          "line": 81
+        },
+        {
+          "path": "lib/server/transcript.js",
+          "zone": "server",
+          "line": 71
+        },
+        {
+          "path": "lib/server/transcript.js",
+          "zone": "server",
+          "line": 199
+        },
+        {
+          "path": "lib/server/watchdog/catch-up.js",
+          "zone": "server",
+          "line": 83
+        },
+        {
+          "path": "lib/server/watchdog/journal.js",
+          "zone": "server",
+          "line": 140
+        },
+        {
+          "path": "public/viz-network.js",
+          "zone": "web",
+          "line": 210
+        },
+        {
+          "path": "netgain/src/core/jsonl.ts",
+          "zone": "engine",
+          "line": 13
+        },
+        {
+          "path": "netgain/src/mcp/main.ts",
+          "zone": "engine",
+          "line": 14
+        }
+      ],
+      "fichiersDistincts": 11
+    },
+    {
+      "primitive": "formatage-duree",
+      "sites": [
+        {
+          "path": "lib/server/observatory/rules/r6-short-subagents.js",
+          "zone": "server",
+          "line": 44
+        },
+        {
+          "path": "lib/server/observatory/rules/r6-short-subagents.js",
+          "zone": "server",
+          "line": 44
+        },
+        {
+          "path": "lib/server/observatory/rules/r6-short-subagents.js",
+          "zone": "server",
+          "line": 74
+        },
+        {
+          "path": "lib/server/observatory/rules/thresholds.js",
+          "zone": "server",
+          "line": 30
+        },
+        {
+          "path": "lib/server/observatory/rules/thresholds.js",
+          "zone": "server",
+          "line": 39
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 25
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 26
+        },
+        {
+          "path": "public/viz-layout.js",
+          "zone": "web",
+          "line": 344
+        },
+        {
+          "path": "public/viz-layout.js",
+          "zone": "web",
+          "line": 345
+        },
+        {
+          "path": "public/viz-layout.js",
+          "zone": "web",
+          "line": 345
+        },
+        {
+          "path": "public/viz-layout.js",
+          "zone": "web",
+          "line": 346
+        },
+        {
+          "path": "public/viz-narrator.js",
+          "zone": "web",
+          "line": 124
+        },
+        {
+          "path": "public/viz-narrator.js",
+          "zone": "web",
+          "line": 139
+        },
+        {
+          "path": "public/viz-narrator.js",
+          "zone": "web",
+          "line": 143
+        },
+        {
+          "path": "public/viz-narrator.js",
+          "zone": "web",
+          "line": 191
+        },
+        {
+          "path": "public/viz-narrator.js",
+          "zone": "web",
+          "line": 192
+        },
+        {
+          "path": "public/viz-narrator.js",
+          "zone": "web",
+          "line": 193
+        },
+        {
+          "path": "public/viz-narrator.js",
+          "zone": "web",
+          "line": 193
+        },
+        {
+          "path": "public/viz-narrator.js",
+          "zone": "web",
+          "line": 194
+        },
+        {
+          "path": "public/viz-network.js",
+          "zone": "web",
+          "line": 277
+        },
+        {
+          "path": "public/viz-state.js",
+          "zone": "web",
+          "line": 179
+        },
+        {
+          "path": "public/viz-state.js",
+          "zone": "web",
+          "line": 180
+        },
+        {
+          "path": "public/viz-state.js",
+          "zone": "web",
+          "line": 205
+        },
+        {
+          "path": "public/viz-ui.js",
+          "zone": "web",
+          "line": 410
+        },
+        {
+          "path": "public/viz-ui.js",
+          "zone": "web",
+          "line": 410
+        },
+        {
+          "path": "public/viz-ui.js",
+          "zone": "web",
+          "line": 410
+        },
+        {
+          "path": "public/viz-ui.js",
+          "zone": "web",
+          "line": 410
+        },
+        {
+          "path": "public/viz-watchdog.mjs",
+          "zone": "web",
+          "line": 266
+        },
+        {
+          "path": "netgain/src/doctor/aggregators/clock.ts",
+          "zone": "engine",
+          "line": 18
+        },
+        {
+          "path": "netgain/src/doctor/aggregators/clock.ts",
+          "zone": "engine",
+          "line": 22
+        }
+      ],
+      "fichiersDistincts": 10
+    },
+    {
+      "primitive": "resolution-de-chemin-maison",
+      "sites": [
+        {
+          "path": "lib/install-hooks.js",
+          "zone": "server",
+          "line": 44
+        },
+        {
+          "path": "lib/install-hooks.js",
+          "zone": "server",
+          "line": 45
+        },
+        {
+          "path": "lib/install-hooks.js",
+          "zone": "server",
+          "line": 46
+        },
+        {
+          "path": "lib/install-hooks.js",
+          "zone": "server",
+          "line": 51
+        },
+        {
+          "path": "lib/install-hooks.js",
+          "zone": "server",
+          "line": 195
+        },
+        {
+          "path": "lib/install-hooks.js",
+          "zone": "server",
+          "line": 573
+        },
+        {
+          "path": "lib/install-hooks.js",
+          "zone": "server",
+          "line": 575
+        },
+        {
+          "path": "lib/install-hooks.js",
+          "zone": "server",
+          "line": 578
+        },
+        {
+          "path": "lib/server/observatory/index.js",
+          "zone": "server",
+          "line": 16
+        },
+        {
+          "path": "lib/server/observatory/index.js",
+          "zone": "server",
+          "line": 24
+        },
+        {
+          "path": "lib/server/observatory/index.js",
+          "zone": "server",
+          "line": 30
+        },
+        {
+          "path": "lib/server/watchdog/journal.js",
+          "zone": "server",
+          "line": 42
+        },
+        {
+          "path": "bin/agent-viz.js",
+          "zone": "server",
+          "line": 377
+        },
+        {
+          "path": "netgain/src/doctor/aggregators/context.ts",
+          "zone": "engine",
+          "line": 331
+        },
+        {
+          "path": "netgain/src/doctor/index.ts",
+          "zone": "engine",
+          "line": 112
+        },
+        {
+          "path": "netgain/src/install/index.ts",
+          "zone": "engine",
+          "line": 121
+        },
+        {
+          "path": "netgain/src/install/paths.ts",
+          "zone": "engine",
+          "line": 33
+        },
+        {
+          "path": "netgain/src/install/paths.ts",
+          "zone": "engine",
+          "line": 38
+        }
+      ],
+      "fichiersDistincts": 8
+    },
+    {
+      "primitive": "appel-http-client",
+      "sites": [
+        {
+          "path": "lib/hook.js",
+          "zone": "server",
+          "line": 64
+        },
+        {
+          "path": "lib/lifecycle.js",
+          "zone": "server",
+          "line": 41
+        },
+        {
+          "path": "lib/lifecycle.js",
+          "zone": "server",
+          "line": 56
+        },
+        {
+          "path": "lib/server/pricing.js",
+          "zone": "server",
+          "line": 283
+        },
+        {
+          "path": "lib/server.js",
+          "zone": "server",
+          "line": 56
+        },
+        {
+          "path": "public/observatory/api.js",
+          "zone": "web",
+          "line": 6
+        },
+        {
+          "path": "public/observatory/api.js",
+          "zone": "web",
+          "line": 20
+        },
+        {
+          "path": "public/viz-network.js",
+          "zone": "web",
+          "line": 187
+        },
+        {
+          "path": "public/viz-network.js",
+          "zone": "web",
+          "line": 200
+        },
+        {
+          "path": "public/viz-network.js",
+          "zone": "web",
+          "line": 227
+        },
+        {
+          "path": "public/viz-network.js",
+          "zone": "web",
+          "line": 329
+        },
+        {
+          "path": "public/viz-watchdog-client.js",
+          "zone": "web",
+          "line": 49
+        }
+      ],
+      "fichiersDistincts": 7
+    },
+    {
+      "primitive": "formatage-numerique-en-dur",
+      "sites": [
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 11
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 15
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 138
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 142
+        },
+        {
+          "path": "public/viz-layout.js",
+          "zone": "web",
+          "line": 345
+        },
+        {
+          "path": "public/viz-layout.js",
+          "zone": "web",
+          "line": 346
+        },
+        {
+          "path": "public/viz-narrator.js",
+          "zone": "web",
+          "line": 193
+        },
+        {
+          "path": "public/viz-narrator.js",
+          "zone": "web",
+          "line": 194
+        },
+        {
+          "path": "public/viz-state.js",
+          "zone": "web",
+          "line": 179
+        },
+        {
+          "path": "public/viz-state.js",
+          "zone": "web",
+          "line": 181
+        },
+        {
+          "path": "public/viz-state.js",
+          "zone": "web",
+          "line": 202
+        },
+        {
+          "path": "public/viz-state.js",
+          "zone": "web",
+          "line": 203
+        },
+        {
+          "path": "public/viz-state.js",
+          "zone": "web",
+          "line": 205
+        },
+        {
+          "path": "public/viz-ui.js",
+          "zone": "web",
+          "line": 260
+        },
+        {
+          "path": "public/viz-ui.js",
+          "zone": "web",
+          "line": 410
+        },
+        {
+          "path": "public/viz-ui.js",
+          "zone": "web",
+          "line": 410
+        }
+      ],
+      "fichiersDistincts": 5
+    },
+    {
+      "primitive": "declaration-de-formateur",
+      "sites": [
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 10
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 14
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 22
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 82
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 137
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 141
+        },
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 148
+        },
+        {
+          "path": "public/viz-layout.js",
+          "zone": "web",
+          "line": 352
+        },
+        {
+          "path": "public/viz-narrator.js",
+          "zone": "web",
+          "line": 188
+        },
+        {
+          "path": "public/viz-network.js",
+          "zone": "web",
+          "line": 274
+        },
+        {
+          "path": "public/viz-state.js",
+          "zone": "web",
+          "line": 177
+        },
+        {
+          "path": "public/viz-state.js",
+          "zone": "web",
+          "line": 200
+        }
+      ],
+      "fichiersDistincts": 5
+    },
+    {
+      "primitive": "formatage-pourcentage",
+      "sites": [
+        {
+          "path": "public/observatory/format.js",
+          "zone": "web",
+          "line": 142
+        },
+        {
+          "path": "public/viz-ui.js",
+          "zone": "web",
+          "line": 260
+        },
+        {
+          "path": "netgain/src/doctor/report/terminal.ts",
+          "zone": "engine",
+          "line": 133
+        },
+        {
+          "path": "netgain/src/doctor/report/terminal.ts",
+          "zone": "engine",
+          "line": 150
+        },
+        {
+          "path": "netgain/src/doctor/report/terminal.ts",
+          "zone": "engine",
+          "line": 207
+        }
+      ],
+      "fichiersDistincts": 3
+    },
+    {
+      "primitive": "formatage-a-locale-implicite",
+      "sites": [
+        {
+          "path": "public/viz-ui.js",
+          "zone": "web",
+          "line": 264
+        },
+        {
+          "path": "public/viz-ui.js",
+          "zone": "web",
+          "line": 264
+        }
+      ],
+      "fichiersDistincts": 1
+    }
+  ]
+}
