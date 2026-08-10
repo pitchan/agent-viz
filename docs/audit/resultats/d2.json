@@ -1,0 +1,467 @@
+{
+  "detecteur": "d2",
+  "commitSources": "4a4dc46",
+  "commitOutils": "73f3b31",
+  "nonSuivis": [
+    "M docs/audit/scripts/run.mjs",
+    "?? docs/audit/scripts/d2-truth-sources.mjs",
+    "?? docs/audit/scripts/d2-truth-sources.test.mjs",
+    "?? tests/CLAUDE.md"
+  ],
+  "node": "v24.15.0",
+  "genereLe": "2026-08-10T10:08:16.563Z",
+  "candidats": [
+    {
+      "categorie": "tarif-de-modele",
+      "cle": "claude-fable-5",
+      "definitions": [
+        {
+          "path": "lib/server/pricing.js",
+          "valeur": "{\"input\":\"1e-5\",\"output\":\"5e-5\",\"cacheCreate\":\"1.25e-5\",\"cacheRead\":\"1e-6\",\"maxInput\":\"1_000_000\"}"
+        },
+        {
+          "path": "netgain/src/core/pricing.ts",
+          "valeur": "{\"input\":\"1e-5\",\"output\":\"5e-5\",\"cacheCreate\":\"1.25e-5\",\"cacheRead\":\"1e-6\"}"
+        }
+      ],
+      "valeursDistinctes": 2,
+      "niveau": null
+    },
+    {
+      "categorie": "tarif-de-modele",
+      "cle": "claude-mythos-5",
+      "definitions": [
+        {
+          "path": "lib/server/pricing.js",
+          "valeur": "{\"input\":\"1e-5\",\"output\":\"5e-5\",\"cacheCreate\":\"1.25e-5\",\"cacheRead\":\"1e-6\",\"maxInput\":\"1_000_000\"}"
+        },
+        {
+          "path": "netgain/src/core/pricing.ts",
+          "valeur": "{\"input\":\"1e-5\",\"output\":\"5e-5\",\"cacheCreate\":\"1.25e-5\",\"cacheRead\":\"1e-6\"}"
+        }
+      ],
+      "valeursDistinctes": 2,
+      "niveau": null
+    },
+    {
+      "categorie": "tarif-de-modele",
+      "cle": "claude-opus-5",
+      "definitions": [
+        {
+          "path": "lib/server/pricing.js",
+          "valeur": "{\"input\":\"5e-6\",\"output\":\"2.5e-5\",\"cacheCreate\":\"6.25e-6\",\"cacheRead\":\"5e-7\",\"maxInput\":\"1_000_000\"}"
+        },
+        {
+          "path": "netgain/src/core/pricing.ts",
+          "valeur": "{\"input\":\"5e-6\",\"output\":\"2.5e-5\",\"cacheCreate\":\"6.25e-6\",\"cacheRead\":\"5e-7\"}"
+        }
+      ],
+      "valeursDistinctes": 2,
+      "niveau": null
+    },
+    {
+      "categorie": "tarif-de-modele",
+      "cle": "claude-opus-4-8",
+      "definitions": [
+        {
+          "path": "lib/server/pricing.js",
+          "valeur": "{\"input\":\"5e-6\",\"output\":\"2.5e-5\",\"cacheCreate\":\"6.25e-6\",\"cacheRead\":\"5e-7\",\"maxInput\":\"1_000_000\"}"
+        },
+        {
+          "path": "netgain/src/core/pricing.ts",
+          "valeur": "{\"input\":\"5e-6\",\"output\":\"2.5e-5\",\"cacheCreate\":\"6.25e-6\",\"cacheRead\":\"5e-7\"}"
+        }
+      ],
+      "valeursDistinctes": 2,
+      "niveau": null
+    },
+    {
+      "categorie": "tarif-de-modele",
+      "cle": "claude-opus-4-7",
+      "definitions": [
+        {
+          "path": "lib/server/pricing.js",
+          "valeur": "{\"input\":\"5e-6\",\"output\":\"2.5e-5\",\"cacheCreate\":\"6.25e-6\",\"cacheRead\":\"5e-7\",\"maxInput\":\"1_000_000\"}"
+        },
+        {
+          "path": "netgain/src/core/pricing.ts",
+          "valeur": "{\"input\":\"5e-6\",\"output\":\"2.5e-5\",\"cacheCreate\":\"6.25e-6\",\"cacheRead\":\"5e-7\"}"
+        }
+      ],
+      "valeursDistinctes": 2,
+      "niveau": null
+    },
+    {
+      "categorie": "tarif-de-modele",
+      "cle": "claude-opus-4-6",
+      "definitions": [
+        {
+          "path": "lib/server/pricing.js",
+          "valeur": "{\"input\":\"5e-6\",\"output\":\"2.5e-5\",\"cacheCreate\":\"6.25e-6\",\"cacheRead\":\"5e-7\",\"maxInput\":\"1_000_000\"}"
+        },
+        {
+          "path": "netgain/src/core/pricing.ts",
+          "valeur": "{\"input\":\"5e-6\",\"output\":\"2.5e-5\",\"cacheCreate\":\"6.25e-6\",\"cacheRead\":\"5e-7\"}"
+        }
+      ],
+      "valeursDistinctes": 2,
+      "niveau": null
+    },
+    {
+      "categorie": "tarif-de-modele",
+      "cle": "claude-opus-4-5",
+      "definitions": [
+        {
+          "path": "lib/server/pricing.js",
+          "valeur": "{\"input\":\"5e-6\",\"output\":\"2.5e-5\",\"cacheCreate\":\"6.25e-6\",\"cacheRead\":\"5e-7\",\"maxInput\":\"200_000\"}"
+        },
+        {
+          "path": "netgain/src/core/pricing.ts",
+          "valeur": "{\"input\":\"5e-6\",\"output\":\"2.5e-5\",\"cacheCreate\":\"6.25e-6\",\"cacheRead\":\"5e-7\"}"
+        }
+      ],
+      "valeursDistinctes": 2,
+      "niveau": null
+    },
+    {
+      "categorie": "tarif-de-modele",
+      "cle": "claude-sonnet-4-6",
+      "definitions": [
+        {
+          "path": "lib/server/pricing.js",
+          "valeur": "{\"input\":\"3e-6\",\"output\":\"1.5e-5\",\"cacheCreate\":\"3.75e-6\",\"cacheRead\":\"3e-7\",\"maxInput\":\"1_000_000\"}"
+        },
+        {
+          "path": "netgain/src/core/pricing.ts",
+          "valeur": "{\"input\":\"3e-6\",\"output\":\"1.5e-5\",\"cacheCreate\":\"3.75e-6\",\"cacheRead\":\"3e-7\"}"
+        }
+      ],
+      "valeursDistinctes": 2,
+      "niveau": null
+    },
+    {
+      "categorie": "tarif-de-modele",
+      "cle": "claude-sonnet-4-5",
+      "definitions": [
+        {
+          "path": "lib/server/pricing.js",
+          "valeur": "{\"input\":\"3e-6\",\"output\":\"1.5e-5\",\"cacheCreate\":\"3.75e-6\",\"cacheRead\":\"3e-7\",\"maxInput\":\"200_000\"}"
+        },
+        {
+          "path": "netgain/src/core/pricing.ts",
+          "valeur": "{\"input\":\"3e-6\",\"output\":\"1.5e-5\",\"cacheCreate\":\"3.75e-6\",\"cacheRead\":\"3e-7\"}"
+        }
+      ],
+      "valeursDistinctes": 2,
+      "niveau": null
+    },
+    {
+      "categorie": "tarif-de-modele",
+      "cle": "claude-haiku-4-5",
+      "definitions": [
+        {
+          "path": "lib/server/pricing.js",
+          "valeur": "{\"input\":\"1e-6\",\"output\":\"5e-6\",\"cacheCreate\":\"1.25e-6\",\"cacheRead\":\"1e-7\",\"maxInput\":\"200_000\"}"
+        },
+        {
+          "path": "netgain/src/core/pricing.ts",
+          "valeur": "{\"input\":\"1e-6\",\"output\":\"5e-6\",\"cacheCreate\":\"1.25e-6\",\"cacheRead\":\"1e-7\"}"
+        }
+      ],
+      "valeursDistinctes": 2,
+      "niveau": null
+    },
+    {
+      "categorie": "chemin-litteral",
+      "cle": ".claude",
+      "definitions": [
+        {
+          "path": "lib/install-hooks.js",
+          "valeur": "litteral"
+        },
+        {
+          "path": "lib/server/observatory/index.js",
+          "valeur": "litteral"
+        },
+        {
+          "path": "netgain/src/doctor/aggregators/context.ts",
+          "valeur": "litteral"
+        },
+        {
+          "path": "netgain/src/doctor/index.ts",
+          "valeur": "litteral"
+        },
+        {
+          "path": "netgain/src/install/index.ts",
+          "valeur": "litteral"
+        },
+        {
+          "path": "netgain/src/install/paths.ts",
+          "valeur": "litteral"
+        }
+      ],
+      "valeursDistinctes": 1,
+      "niveau": null
+    },
+    {
+      "categorie": "chemin-litteral",
+      "cle": "projects",
+      "definitions": [
+        {
+          "path": "lib/server/observatory/config-audit.js",
+          "valeur": "litteral"
+        },
+        {
+          "path": "netgain/src/core/discovery.ts",
+          "valeur": "litteral"
+        },
+        {
+          "path": "netgain/src/install/mcp-edit.ts",
+          "valeur": "litteral"
+        },
+        {
+          "path": "netgain/src/install/paths.ts",
+          "valeur": "litteral"
+        }
+      ],
+      "valeursDistinctes": 1,
+      "niveau": null
+    },
+    {
+      "categorie": "code-d-evenement",
+      "cle": "session",
+      "definitions": [
+        {
+          "path": "public/viz-canvas.js",
+          "valeur": "branche"
+        },
+        {
+          "path": "public/viz-layout.js",
+          "valeur": "branche"
+        },
+        {
+          "path": "public/viz-narrator.js",
+          "valeur": "branche"
+        },
+        {
+          "path": "public/viz-ui.js",
+          "valeur": "branche"
+        }
+      ],
+      "valeursDistinctes": 1,
+      "niveau": null
+    },
+    {
+      "categorie": "code-d-evenement",
+      "cle": "agent",
+      "definitions": [
+        {
+          "path": "public/viz-canvas.js",
+          "valeur": "branche"
+        },
+        {
+          "path": "public/viz-layout.js",
+          "valeur": "branche"
+        },
+        {
+          "path": "public/viz-narrator.js",
+          "valeur": "branche"
+        },
+        {
+          "path": "public/viz-ui.js",
+          "valeur": "branche"
+        }
+      ],
+      "valeursDistinctes": 1,
+      "niveau": null
+    },
+    {
+      "categorie": "chemin-litteral",
+      "cle": ".agent-viz",
+      "definitions": [
+        {
+          "path": "bin/agent-viz.js",
+          "valeur": "litteral"
+        },
+        {
+          "path": "lib/server/observatory/index.js",
+          "valeur": "litteral"
+        },
+        {
+          "path": "lib/server/watchdog/journal.js",
+          "valeur": "litteral"
+        }
+      ],
+      "valeursDistinctes": 1,
+      "niveau": null
+    },
+    {
+      "categorie": "code-d-evenement",
+      "cle": "assistant",
+      "definitions": [
+        {
+          "path": "lib/server/transcript-adapters/claude.js",
+          "valeur": "branche"
+        },
+        {
+          "path": "netgain/src/core/events.ts",
+          "valeur": "branche"
+        },
+        {
+          "path": "netgain/src/doctor/scan-session.ts",
+          "valeur": "branche"
+        }
+      ],
+      "valeursDistinctes": 1,
+      "niveau": null
+    },
+    {
+      "categorie": "code-d-evenement",
+      "cle": "stuck",
+      "definitions": [
+        {
+          "path": "public/observatory/failures-format.js",
+          "valeur": "branche"
+        },
+        {
+          "path": "public/observatory/failures-view.js",
+          "valeur": "branche"
+        },
+        {
+          "path": "public/viz-ui.js",
+          "valeur": "branche"
+        }
+      ],
+      "valeursDistinctes": 1,
+      "niveau": null
+    },
+    {
+      "categorie": "chemin-litteral",
+      "cle": ".claude.json",
+      "definitions": [
+        {
+          "path": "lib/server/observatory/index.js",
+          "valeur": "litteral"
+        },
+        {
+          "path": "netgain/src/install/paths.ts",
+          "valeur": "litteral"
+        }
+      ],
+      "valeursDistinctes": 1,
+      "niveau": null
+    },
+    {
+      "categorie": "code-d-evenement",
+      "cle": "user",
+      "definitions": [
+        {
+          "path": "lib/server/transcript.js",
+          "valeur": "branche"
+        },
+        {
+          "path": "netgain/src/core/events.ts",
+          "valeur": "branche"
+        }
+      ],
+      "valeursDistinctes": 1,
+      "niveau": null
+    },
+    {
+      "categorie": "chemin-litteral",
+      "cle": "subagents",
+      "definitions": [
+        {
+          "path": "lib/server/transcript.js",
+          "valeur": "litteral"
+        },
+        {
+          "path": "netgain/src/core/discovery.ts",
+          "valeur": "litteral"
+        }
+      ],
+      "valeursDistinctes": 1,
+      "niveau": null
+    },
+    {
+      "categorie": "code-d-evenement",
+      "cle": "alert",
+      "definitions": [
+        {
+          "path": "lib/server/watchdog/journal.js",
+          "valeur": "branche"
+        },
+        {
+          "path": "public/viz-network.js",
+          "valeur": "branche"
+        }
+      ],
+      "valeursDistinctes": 1,
+      "niveau": null
+    },
+    {
+      "categorie": "code-d-evenement",
+      "cle": "status",
+      "definitions": [
+        {
+          "path": "bin/agent-viz.js",
+          "valeur": "branche"
+        },
+        {
+          "path": "netgain/src/cli.ts",
+          "valeur": "branche"
+        }
+      ],
+      "valeursDistinctes": 1,
+      "niveau": null
+    },
+    {
+      "categorie": "code-d-evenement",
+      "cle": "badInvocation",
+      "definitions": [
+        {
+          "path": "public/observatory/failures-format.js",
+          "valeur": "branche"
+        },
+        {
+          "path": "public/observatory/failures-view.js",
+          "valeur": "branche"
+        }
+      ],
+      "valeursDistinctes": 1,
+      "niveau": null
+    },
+    {
+      "categorie": "code-d-evenement",
+      "cle": "skill",
+      "definitions": [
+        {
+          "path": "public/viz-canvas.js",
+          "valeur": "branche"
+        },
+        {
+          "path": "public/viz-layout.js",
+          "valeur": "branche"
+        }
+      ],
+      "valeursDistinctes": 1,
+      "niveau": null
+    },
+    {
+      "categorie": "code-d-evenement",
+      "cle": "mcp",
+      "definitions": [
+        {
+          "path": "public/viz-canvas.js",
+          "valeur": "branche"
+        },
+        {
+          "path": "public/viz-layout.js",
+          "valeur": "branche"
+        }
+      ],
+      "valeursDistinctes": 1,
+      "niveau": null
+    }
+  ]
+}

@@ -14,6 +14,7 @@ export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 export const DETECTORS = {
   // une entrée ajoutée par tâche, de d1 à d7
   d1: async (files) => ({ groupes: (await import('./d1-clones.mjs')).findClones(files) }),
+  d2: async (files) => ({ candidats: (await import('./d2-truth-sources.mjs')).findTruthSources(files) }),
 };
 
 export async function runOne(name) {
