@@ -13,15 +13,27 @@
 // Le seuil de fan-in « anormal » est le percentile 90 de la distribution
 // OBSERVÉE, pas un chiffre rond choisi d'avance.
 //
-// LIMITE CONSTATÉE À L'EXÉCUTION SUR LE VRAI DÉPÔT (2026-08-10) : SPEC ne
-// distingue pas le code d'un commentaire. Un `require(...)` écrit en toutes
-// lettres dans un commentaire documentaire est capté comme une arête réelle —
-// le détecteur ne se contente donc pas de RATER des arêtes (`nonResolus`), il
-// peut aussi en INVENTER. Preuve : `lib/install-hooks.js` documente son API
-// dans un commentaire `// const {...} = require('./install-hooks');` et se
-// retrouve avec un cycle d'un seul sommet qu'aucun code exécuté ne produit.
-// Tout cycle rapporté doit donc être relu sur le fichier source avant d'être
-// cru, dans les deux sens : un vrai peut manquer, un faux peut apparaître.
+// LIMITE CONSTATÉE PUIS CORRIGÉE (2026-08-10) : SPEC, appliqué au texte brut,
+// ne distingue pas le code d'un commentaire. Mesuré sur ce dépôt : 3
+// spécificateurs sur 763 vivaient dans un commentaire, dont l'exemple d'API
+// de `lib/install-hooks.js` (`// const {...} = require('./install-hooks');`)
+// qui fabriquait un cycle d'un seul sommet — le détecteur ne se contentait
+// donc pas de RATER des arêtes (`nonResolus`), il pouvait aussi en INVENTER.
+// Correctif (arbitré par Vincent) : les commentaires sont neutralisés avant
+// le balayage (`sansCommentaires`, ci-dessous), les chaînes étant reconnues
+// EN PREMIER pour qu'un `//` littéral dans une URL survive. SPEC lui-même,
+// la liste de candidats de résolution et `IO_MODULES` restent inchangés.
+//
+// Ce qui reste NON couvert par ce correctif, faute d'usage constaté pour le
+// justifier : `usesFetch`, plus bas, teste le texte BRUT, pas neutralisé — un
+// `fetch(` écrit dans un commentaire fabriquerait un import d'I/O fantôme
+// exactement sur le même principe. Mesuré sur ce dépôt à ce commit : aucun
+// cas (`fetch(` n'apparaît jamais UNIQUEMENT dans un commentaire) — c'est
+// donc une zone aveugle non déclenchée, pas un défaut corrigé. Par ailleurs
+// la première alternative de SPEC (`import|export ... from ...`) utilise
+// `[^'"()]*?` qui franchit toujours les retours à la ligne : une construction
+// inhabituelle en code réel (pas en commentaire) pourrait en principe encore
+// faire pont entre deux instructions distinctes.
 //
 // Autre limite constatée : un spécificateur relatif qui vise un fichier réel
 // mais d'une extension hors périmètre (`.js`/`.mjs`/`.ts` seulement — voir
@@ -48,6 +60,17 @@ function normalise(base, spec) {
   return out.join('/');
 }
 
+// Neutralisation des commentaires avant le balayage. Les chaînes sont
+// reconnues AVANT les commentaires — sans quoi le « // » d'une URL littérale
+// effacerait la fin de sa ligne. Les commentaires deviennent des espaces, pas
+// du vide : aucun décalage, aucun retour à la ligne perdu.
+const COMMENTAIRE_OU_CHAINE =
+  /\/\*[\s\S]*?\*\/|\/\/[^\n]*|`(?:\\[\s\S]|[^`\\])*`|'(?:\\[\s\S]|[^'\\])*'|"(?:\\[\s\S]|[^"\\])*"/g;
+
+const sansCommentaires = (text) =>
+  text.replace(COMMENTAIRE_OU_CHAINE, (m) =>
+    (m.startsWith('//') || m.startsWith('/*')) ? m.replace(/[^\n]/g, ' ') : m);
+
 export function buildGraph(files) {
   const known = new Set(files.map(f => f.path));
   const edges = new Map();
@@ -56,7 +79,7 @@ export function buildGraph(files) {
   for (const file of files) {
     const internal = [];
     const outside = [];
-    for (const match of file.text.matchAll(SPEC)) {
+    for (const match of sansCommentaires(file.text).matchAll(SPEC)) {
       const spec = match[1] ?? match[2] ?? match[3] ?? match[4];
       if (!spec) continue;
       if (!spec.startsWith('.')) { outside.push(spec); continue; }

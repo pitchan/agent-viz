@@ -34,3 +34,20 @@ test('contrôle positif : un import relatif NON RÉSOLU est publié, pas avalé'
 test('contrôle négatif : un graphe sans cycle n’en invente pas', () => {
   assert.equal(analyseGraph(FILES.slice(3)).cycles.length, 0);
 });
+
+test('contrôle négatif : un require écrit dans un commentaire ne crée ni arête ni cycle', () => {
+  const files = [
+    { path: 'lib/a.js', zone: 'server', text: `// exemple d’API :\n//   const x = require('./a.js');\nconst b = require('./b.js');` },
+    { path: 'lib/b.js', zone: 'server', text: `module.exports = {};` },
+  ];
+  assert.deepEqual(buildGraph(files).edges.get('lib/a.js'), ['lib/b.js']);
+  assert.equal(analyseGraph(files).cycles.length, 0);
+});
+
+test('contrôle négatif : un « // » dans une chaîne littérale n’efface pas la fin de la ligne', () => {
+  const files = [
+    { path: 'lib/a.js', zone: 'server', text: `const url = 'https://exemple.test'; const b = require('./b.js');` },
+    { path: 'lib/b.js', zone: 'server', text: `module.exports = {};` },
+  ];
+  assert.deepEqual(buildGraph(files).edges.get('lib/a.js'), ['lib/b.js']);
+});

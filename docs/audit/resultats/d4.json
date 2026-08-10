@@ -1,16 +1,15 @@
 {
   "detecteur": "d4",
   "commitSources": "4a4dc46",
-  "commitOutils": "bbd438e",
+  "commitOutils": "54e2fd0",
   "nonSuivis": [
-    "M docs/audit/scripts/run.mjs",
-    "?? docs/audit/resultats/d4.json",
-    "?? docs/audit/scripts/d4-import-graph.mjs",
-    "?? docs/audit/scripts/d4-import-graph.test.mjs",
+    "M docs/audit/resultats/d4.json",
+    " M docs/audit/scripts/d4-import-graph.mjs",
+    " M docs/audit/scripts/d4-import-graph.test.mjs",
     "?? tests/CLAUDE.md"
   ],
   "node": "v24.15.0",
-  "genereLe": "2026-08-10T12:19:27.000Z",
+  "genereLe": "2026-08-10T13:30:09.295Z",
   "fanIn": [
     {
       "path": "netgain/src/core/events.ts",
@@ -191,10 +190,6 @@
     {
       "path": "netgain/src/install/mcp-edit.ts",
       "count": 2
-    },
-    {
-      "path": "lib/install-hooks.js",
-      "count": 1
     },
     {
       "path": "lib/server/observatory/config-audit.js",
@@ -421,6 +416,10 @@
       "count": 0
     },
     {
+      "path": "lib/install-hooks.js",
+      "count": 0
+    },
+    {
       "path": "lib/lifecycle.js",
       "count": 0
     },
@@ -467,9 +466,6 @@
   ],
   "seuilP90": 4,
   "cycles": [
-    [
-      "lib/install-hooks.js"
-    ],
     [
       "public/viz-network.js",
       "public/viz-ui.js"
