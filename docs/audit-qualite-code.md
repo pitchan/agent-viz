@@ -87,8 +87,13 @@ non testée vers un seul fichier non testé.
 **Fait brut.** `docs/audit/resultats/d7.json`, geste `decodage-jsonl`,
 `verdict: "duplique"` : `coteMoteur` = `netgain/src/core/jsonl.ts` (module
 dédié, lecture en flux, BOM retiré, lignes vides sautées, ligne cassée
-signalée `{ ok: false }` plutôt qu'avalée) et `netgain/src/mcp/main.ts`
-(consommateur du module dédié, pas une réimplémentation) ; `coteServeur` = 7
+signalée `{ ok: false }` plutôt qu'avalée) et `netgain/src/mcp/main.ts` — ce
+second fichier n'importe ni ne mentionne `jsonl` nulle part (`grep -rn "jsonl"
+netgain/src/mcp/` ne renvoie rien) ; il décode du JSON-RPC ligne à ligne
+depuis l'entrée standard, un protocole sans rapport avec les transcripts, et
+ne figure ici que parce que le motif de détection l'atteint aussi — la
+matrice de D7 déclare tout ce que le motif touche, pas seulement ce qui sert
+le récit ; `coteServeur` = 7
 fichiers (`lib/server/transcript.js`, `event-reader.js`, `housekeep.js`,
 `session-index.js`, `transcript-adapters/claude.js`, `watchdog/catch-up.js`,
 `watchdog/journal.js`). `docs/audit/resultats/d3.json`, primitive
@@ -225,7 +230,11 @@ directe : `lib/server/observatory/index.js:24` —
 `process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude')` ;
 `netgain/src/doctor/index.ts:112` —
 `cli.claudeDir ?? process.env['NETGAIN_CLAUDE_DIR'] ?? path.join(homedir(), '.claude')`.
-Rejouable par `node docs/audit/scripts/run-all.mjs`.
+`coteMoteur` liste aussi `netgain/src/cli.ts` : ce n'est pas un troisième
+point de résolution mais le texte d'aide qui ANNONCE la variable du moteur
+(ligne 24, une chaîne de documentation) — il figure là seulement parce que
+le motif de détection l'atteint aussi. Rejouable par
+`node docs/audit/scripts/run-all.mjs`.
 
 **Raisonnement.** `CLAUDE_CONFIG_DIR` côté produit (serveur, page
 Observatoire), `NETGAIN_CLAUDE_DIR` côté moteur : deux noms différents pour
