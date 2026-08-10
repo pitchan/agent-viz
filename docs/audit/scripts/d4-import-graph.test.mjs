@@ -51,3 +51,11 @@ test('contrôle négatif : un « // » dans une chaîne littérale n’efface pa
   ];
   assert.deepEqual(buildGraph(files).edges.get('lib/a.js'), ['lib/b.js']);
 });
+
+test('contrôle négatif : une regex à guillemet ne fait plus échapper le commentaire qui la suit', () => {
+  const files = [
+    { path: 'lib/a.js', zone: 'server', text: `const re = /doesn't/;\n// exemple : require('./a.js')\nconst b = require('./b.js');` },
+    { path: 'lib/b.js', zone: 'server', text: `module.exports = {};` },
+  ];
+  assert.deepEqual(buildGraph(files).edges.get('lib/a.js'), ['lib/b.js']);
+});

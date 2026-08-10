@@ -1,15 +1,14 @@
 {
   "detecteur": "d4",
   "commitSources": "4a4dc46",
-  "commitOutils": "54e2fd0",
+  "commitOutils": "2b219c1",
   "nonSuivis": [
-    "M docs/audit/resultats/d4.json",
-    " M docs/audit/scripts/d4-import-graph.mjs",
+    "M docs/audit/scripts/d4-import-graph.mjs",
     " M docs/audit/scripts/d4-import-graph.test.mjs",
     "?? tests/CLAUDE.md"
   ],
   "node": "v24.15.0",
-  "genereLe": "2026-08-10T13:30:09.295Z",
+  "genereLe": "2026-08-10T15:27:01.760Z",
   "fanIn": [
     {
       "path": "netgain/src/core/events.ts",
