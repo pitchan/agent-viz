@@ -15,6 +15,23 @@
 // LIMITE ASSUMÉE : extraction par expression rationnelle sur des littéraux
 // d'objet à un niveau d'imbrication. Une table construite par calcul échappe à
 // la mesure ; aucune n'existe dans ce dépôt au commit audité.
+//
+// DEUX LIMITES CONSTATÉES EN COURANT SUR CE DÉPÔT, écrites ici au moment où
+// elles sont acceptées :
+//   1. TABLE SCINDÉE = FAUSSE DIVERGENCE. L'extraction ne lit qu'un littéral
+//      d'objet à la fois. `netgain/src/core/pricing.ts` range les taux dans
+//      `PRICES` et le plafond de contexte dans `MODEL_INFO`, là où
+//      `lib/server/pricing.js` réunit tous les champs sous une seule clé.
+//      L'occurrence de `MODEL_INFO` n'apporte qu'un champ reconnu, tombe sous
+//      le seuil de deux et se trouve écartée. Les dix modèles ressortent donc à
+//      `valeursDistinctes: 2` alors que les deux fichiers s'accordent sur les
+//      quatre taux ET sur `maxInput`. Vérifié à la main le 2026-08-10.
+//   2. IMBRICATION = OMISSION SILENCIEUSE. `[^{}]{0,400}` interdit toute
+//      accolade interne. `claude-sonnet-5` est la seule entrée de `FALLBACK`
+//      qui porte un champ `history` imbriqué : elle n'est pas vue côté serveur,
+//      donc n'a plus qu'une seule définition, donc disparaît des candidats.
+//      Une omission ne laisse aucune trace dans le résultat — c'est la raison
+//      d'être de cette ligne.
 const EXTRACTEURS = [
   {
     categorie: 'tarif-de-modele',
