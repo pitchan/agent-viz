@@ -1,0 +1,160 @@
+{
+  "detecteur": "d1",
+  "commitSources": "4a4dc46",
+  "commitOutils": "4400688",
+  "nonSuivis": [
+    "M docs/audit/scripts/run.mjs",
+    "?? docs/audit/scripts/d1-clones.mjs",
+    "?? docs/audit/scripts/d1-clones.test.mjs",
+    "?? tests/CLAUDE.md"
+  ],
+  "node": "v24.15.0",
+  "genereLe": "2026-08-10T09:42:59.613Z",
+  "groupes": [
+    {
+      "empreinte": "c4c41252",
+      "jetons": 94,
+      "sites": [
+        {
+          "path": "lib/server/observatory/rules/r5-compactions.js",
+          "zone": "server",
+          "lineStart": 28,
+          "lineEnd": 44
+        },
+        {
+          "path": "lib/server/observatory/rules/r6-short-subagents.js",
+          "zone": "server",
+          "lineStart": 55,
+          "lineEnd": 71
+        }
+      ],
+      "interZone": false
+    },
+    {
+      "empreinte": "54c3cb0e",
+      "jetons": 69,
+      "sites": [
+        {
+          "path": "lib/lifecycle.js",
+          "zone": "server",
+          "lineStart": 56,
+          "lineEnd": 61
+        },
+        {
+          "path": "lib/server.js",
+          "zone": "server",
+          "lineStart": 56,
+          "lineEnd": 61
+        }
+      ],
+      "interZone": false
+    },
+    {
+      "empreinte": "b8d75264",
+      "jetons": 68,
+      "sites": [
+        {
+          "path": "lib/lifecycle.js",
+          "zone": "server",
+          "lineStart": 46,
+          "lineEnd": 51
+        },
+        {
+          "path": "lib/lifecycle.js",
+          "zone": "server",
+          "lineStart": 58,
+          "lineEnd": 63
+        },
+        {
+          "path": "lib/server.js",
+          "zone": "server",
+          "lineStart": 58,
+          "lineEnd": 63
+        }
+      ],
+      "interZone": false
+    },
+    {
+      "empreinte": "0d718902",
+      "jetons": 65,
+      "sites": [
+        {
+          "path": "netgain/src/doctor/aggregators/context.ts",
+          "zone": "engine",
+          "lineStart": 220,
+          "lineEnd": 227
+        },
+        {
+          "path": "netgain/src/doctor/aggregators/tokens.ts",
+          "zone": "engine",
+          "lineStart": 79,
+          "lineEnd": 86
+        }
+      ],
+      "interZone": false
+    },
+    {
+      "empreinte": "e1493e97",
+      "jetons": 63,
+      "sites": [
+        {
+          "path": "netgain/src/map/env.ts",
+          "zone": "engine",
+          "lineStart": 162,
+          "lineEnd": 167
+        },
+        {
+          "path": "netgain/src/map/routes.ts",
+          "zone": "engine",
+          "lineStart": 145,
+          "lineEnd": 150
+        }
+      ],
+      "interZone": false
+    },
+    {
+      "empreinte": "b88f4326",
+      "jetons": 61,
+      "sites": [
+        {
+          "path": "lib/lifecycle.js",
+          "zone": "server",
+          "lineStart": 44,
+          "lineEnd": 49
+        },
+        {
+          "path": "lib/lifecycle.js",
+          "zone": "server",
+          "lineStart": 57,
+          "lineEnd": 61
+        },
+        {
+          "path": "lib/server.js",
+          "zone": "server",
+          "lineStart": 57,
+          "lineEnd": 61
+        }
+      ],
+      "interZone": false
+    },
+    {
+      "empreinte": "3a8fe126",
+      "jetons": 61,
+      "sites": [
+        {
+          "path": "netgain/src/map/env.ts",
+          "zone": "engine",
+          "lineStart": 159,
+          "lineEnd": 164
+        },
+        {
+          "path": "netgain/src/map/routes.ts",
+          "zone": "engine",
+          "lineStart": 142,
+          "lineEnd": 147
+        }
+      ],
+      "interZone": false
+    }
+  ]
+}
