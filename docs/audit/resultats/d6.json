@@ -1,17 +1,16 @@
 {
   "detecteur": "d6",
   "commitSources": "4a4dc46",
-  "commitOutils": "4314215",
+  "commitOutils": "ef54a77",
   "nonSuivis": [
-    "M docs/audit/scripts/run.mjs",
-    "?? docs/audit/resultats/couverture.lcov",
-    "?? docs/audit/resultats/d6.json",
-    "?? docs/audit/scripts/d6-coverage.mjs",
-    "?? docs/audit/scripts/d6-coverage.test.mjs",
+    "M docs/audit/resultats/couverture.lcov",
+    " M docs/audit/resultats/d6.json",
+    " M docs/audit/scripts/d6-coverage.mjs",
+    " M docs/audit/scripts/d6-coverage.test.mjs",
     "?? tests/CLAUDE.md"
   ],
   "node": "v24.15.0",
-  "genereLe": "2026-08-10T15:50:11.584Z",
+  "genereLe": "2026-08-10T16:03:51.418Z",
   "executee": [
     {
       "path": "public/observatory/advisor-view.js",
@@ -72,11 +71,6 @@
       "path": "lib/server/transcript.js",
       "lignesCouvertes": 270,
       "lignesTotales": 359
-    },
-    {
-      "path": "public/viz-watchdog-client.js",
-      "lignesCouvertes": 175,
-      "lignesTotales": 230
     },
     {
       "path": "lib/server/event-reader.js",
@@ -327,6 +321,11 @@
       "path": "public/viz-tool-subject.mjs",
       "lignesCouvertes": 33,
       "lignesTotales": 33
+    },
+    {
+      "path": "public/viz-watchdog-client.js",
+      "lignesCouvertes": 230,
+      "lignesTotales": 230
     },
     {
       "path": "public/viz-watchdog.mjs",
