@@ -73,9 +73,12 @@
 // `exports` ne dépendent pas de `tokenize` et n'ont jamais été concernés.
 //
 // Ce qui RESTE vrai après le correctif : D5 hérite de toute limite résiduelle
-// de `lib/tokens.mjs` (voir son en-tête — l'ambiguïté de `}` non résolue par
-// construction, le mot-clé contextuel `of` délibérément non couvert). Aucun
-// cas de ce type n'a été mesuré dans ce dépôt à ce commit.
+// de `lib/tokens.mjs` (voir son en-tête pour le détail, non dupliqué ici) —
+// l'ambiguïté de `}` non résolue par construction, le mot-clé contextuel `of`
+// délibérément non couvert, ET une division qui suit immédiatement une regex
+// SANS DRAPEAU (trouvé par la revue, 2026-08-10 — mécanisme, reproduction et
+// vérification d'absence dans l'en-tête de `lib/tokens.mjs`). Aucun de ces
+// cas n'a été mesuré dans ce dépôt à ce commit.
 import { tokenize } from './lib/tokens.mjs';
 
 function functionSpans(tokens) {

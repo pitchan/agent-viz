@@ -29,13 +29,39 @@
 // inclure aurait réintroduit le risque inverse — une vraie division prise
 // pour une fausse regex.
 //
-// DÉCISION ÉCRITE : le cas de `}` est l'ambiguïté restante, non résolue par
-// construction (`{}`  peut fermer un bloc — une regex suit alors presque
-// toujours — ou un littéral objet, valeur qu'une division peut suivre).
-// `}` n'est PAS dans la classe qui bloque la regex : par défaut, un `/` après
-// `}` est traité comme une regex. Choix assumé : fermer un bloc (fonction,
-// `if`, boucle) est infiniment plus fréquent en code réel que diviser un
-// littéral objet, et le row-du-dépôt ne contient aucun cas du second type.
+// DEUX AMBIGUÏTÉS RÉSIDUELLES, NON RÉSOLUES PAR CONSTRUCTION — aucune des
+// deux n'est LA seule, toutes deux sont écrites :
+//
+//   1. Le cas de `}` : `{}` peut fermer un bloc — une regex suit alors
+//      presque toujours — ou un littéral objet, valeur qu'une division peut
+//      suivre. `}` n'est PAS dans la classe qui bloque la regex : par défaut,
+//      un `/` après `}` est traité comme une regex. Choix assumé : fermer un
+//      bloc (fonction, `if`, boucle) est infiniment plus fréquent en code
+//      réel que diviser un littéral objet, et le reste du dépôt ne contient
+//      aucun cas du second type.
+//
+//   2. Une DIVISION qui suit IMMÉDIATEMENT une regex SANS DRAPEAU (trouvé par
+//      la revue, 2026-08-10). Une regex sans drapeau se termine par un `/`
+//      nu ; la lookbehind disqualifiante ne reconnaît que `)`, `]`, une fin
+//      de nombre ou une fin d'identifiant comme fin de VALEUR — pas ce `/`
+//      final. La division qui suit est donc lue comme ouvrant une SECONDE
+//      regex, qui avale tout jusqu'au prochain `/` littéral. Reproduit :
+//      `const r = /re/ / 2; const s = 10 / 5;` tokenise en
+//      `["const","r","=","/re/","/ 2; const s = 10 /","NUM",";"]` — le
+//      deuxième `/` de `/re/` combiné à celui de la division fabrique une
+//      fausse regex qui avale `2; const s = 10 ` en entier, la même famille
+//      de panne que celle que cette heuristique existe pour éliminer,
+//      atteinte par une autre route. Corollaire vérifié : une regex AVEC
+//      drapeau est saine, car la lettre du drapeau se lit comme un
+//      pseudo-identifiant et disqualifie le `/` suivant :
+//      `const r = /re/g / 2; const s = 10 / 5;` tokenise correctement en
+//      `["const","r","=","/re/g","/","NUM",";","const","s","=","NUM","/","NUM",";"]`.
+//      VÉRIFIÉ ABSENT de ce dépôt à ce commit (642 portées D5 stables,
+//      `d1.json` identique au jeton près, 0 fichier déséquilibré sur 113
+//      après le correctif de cette même tâche) : c'est une limite NOMMÉE, pas
+//      un défaut vivant. Non corrigée — chaque changement du socle coûte un
+//      nouveau cycle D1/D5 et une revue, pour un cas absent de ce corpus.
+//      Arbitrage du contrôleur (2026-08-10).
 //
 // Une expression rationnelle littérale émet SON TEXTE BRUT comme valeur de
 // jeton, jamais un `'STR'` générique : `/foo/` et `/bar/` restent deux jetons
