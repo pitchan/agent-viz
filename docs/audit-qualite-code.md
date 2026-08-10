@@ -188,16 +188,40 @@ Les trois constats suivants (C2 à C4) portent sur les trois gestes que la
 tâche 7 a mesurés comme dupliqués entre `lib/` et `netgain/src/` avec une
 cible déjà arbitrée par Vincent. Leur ordre de traitement, à respecter dans
 doc/36, est fixé une fois ici — **après C1, qui n'attend personne** :
-**tests de caractérisation d'abord**, puis
-décodeur JSONL commun, puis primitive d'accumulation d'usage, puis contrat de
-tarification structuré et affichage honnête. La raison de commencer par les
-tests de caractérisation n'est pas un principe abstrait : `docs/audit/resultats/d6.json`,
-tableau `limites`, énonce noir sur blanc que « le moteur n'a pas de couverture
-d'exécution : atteignabilité statique seulement » — les fichiers TypeScript
-de `netgain/src/` que C2, C3 et C4 vont toucher n'ont donc aujourd'hui aucune
-preuve d'exécution réelle, seulement une preuve qu'ils sont atteignables.
-Toucher ce code sans filet avant la fusion serait déplacer une duplication
-non testée vers un seul fichier non testé.
+**tests de caractérisation là où ils manquent d'abord**, puis décodeur JSONL
+commun, puis primitive d'accumulation d'usage, puis contrat de tarification
+structuré et affichage honnête.
+
+**Correction, portée après signature — la version initiale de ce passage
+justifiait « tests de caractérisation d'abord » par une inférence que
+`d6.json` INTERDIT explicitement.** Elle citait le tableau `limites` (« le
+moteur n'a pas de couverture d'exécution : atteignabilité statique
+seulement ») pour en conclure que les fichiers de `netgain/src/` visés par
+C2 à C4 n'avaient aucune preuve d'exécution — alors que la limite suivante,
+dans le même tableau, énonce : « **Un fichier "sans preuve d'exécution"
+n'est PAS un fichier non testé.** » Cette phrase existe précisément pour
+interdire cette lecture. Vérification : `netgain/` porte **37 fichiers de
+test** exécutés par `npm run test:engine` (458 contrôles), dont
+`tests/core/jsonl.test.ts`, `tests/doctor/tokens.test.ts` et
+`tests/core/pricing.test.ts` — c'est-à-dire les **trois cibles exactes** de
+C2, C3 et C4. D6 ne les voyait pas parce que son instrument mesure la
+couverture de `node --test`, qui n'exécute pas la suite `vitest` du moteur :
+c'est une limite du PÉRIMÈTRE DE MESURE, jamais un fait sur le code.
+
+**Ce que la mesure dit vraiment, une fois les deux côtés regardés.** Côté
+serveur, où D6 mesure réellement, les cibles sont majoritairement bien
+couvertes : `lib/server/tokens.js` **95,6 %** (C3),
+`lib/server/pricing.js` **85,7 %** (C4), et pour les sept fichiers de C2,
+`transcript-adapters/claude.js`, `watchdog/catch-up.js` et
+`watchdog/journal.js` à **100 %**, `event-reader.js` **81,1 %**,
+`transcript.js` **75,2 %**. **Deux trous réels, et deux seulement :
+`lib/server/housekeep.js` à 20,5 % (31/151) et
+`lib/server/session-index.js` à 55,8 % (72/129)**, tous deux dans le
+périmètre de C2. Le filet à écrire avant de toucher au décodage JSONL est
+donc étroit et nommable — ces deux fichiers — et non une campagne de
+caractérisation sur tout le moteur. `lib/hook.js` était le seul fichier
+vraiment sans aucune preuve d'exécution parmi les cibles ; C1 l'a doté de
+ses trois premiers tests.
 
 ### C2 — Le décodage JSONL est réimplémenté sur 7 fichiers côté serveur, avec une tolérance au BOM incidente et inégale
 
