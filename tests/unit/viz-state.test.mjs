@@ -39,3 +39,67 @@ test('state.tokens.transcriptMissing defaults to false', () => {
   // No "transcript not located" placeholder until the server actually says so.
   assert.equal(state.tokens.transcriptMissing, false);
 });
+
+// ---------------------------------------------------------------------------
+// C4 (2026-08-11) — la complétude du coût, agrégée côté navigateur.
+// C'est le dernier maillon de la cible : « propager cette information jusqu'à
+// l'affichage en direct ».
+// ---------------------------------------------------------------------------
+import { costCompleteness } from '../../public/viz-state.js';
+
+test('C4 — des seaux tous complets donnent un total complet', () => {
+  const r = costCompleteness([
+    { costComplete: true, unknownModels: [] },
+    { costComplete: true, unknownModels: [] },
+  ]);
+  assert.equal(r.complete, true);
+  assert.deepEqual(r.unknownModels, []);
+});
+
+test('C4 — UN SEUL seau incomplet suffit à rendre le total incomplet', () => {
+  // Le cas réel : le fil principal tourne sur un modèle tarifé, un sous-agent
+  // part sur un modèle hors table. Le total de la pastille additionne les deux.
+  const r = costCompleteness([
+    { costComplete: true, unknownModels: [] },
+    { costComplete: false, unknownModels: ['claude-opus-6'] },
+  ]);
+  assert.equal(r.complete, false);
+  assert.deepEqual(r.unknownModels, ['claude-opus-6']);
+});
+
+test('C4 — les modèles inconnus sont réunis, dédupliqués et triés', () => {
+  const r = costCompleteness([
+    { costComplete: false, unknownModels: ['zzz-modele', 'claude-opus-6'] },
+    { costComplete: false, unknownModels: ['claude-opus-6'] },
+  ]);
+  assert.deepEqual(r.unknownModels, ['claude-opus-6', 'zzz-modele']);
+});
+
+test('C4 — un seau SANS le champ compte comme complet (enveloppe additive)', () => {
+  // TÉMOIN qui borne la propriété : `undefined` n'est pas `false`. Un
+  // navigateur rechargé face à un instantané antérieur à C4 ne doit pas
+  // afficher « au moins » sur toutes ses sessions.
+  const r = costCompleteness([{ costUsd: 1.5 }, null, undefined]);
+  assert.equal(r.complete, true);
+  assert.deepEqual(r.unknownModels, []);
+});
+
+// C4 — trois énoncés, trois vérités. Le troisième existe parce que
+// « au moins $0 » est vrai et ne prétend rien : quand RIEN n'est tarifé, il
+// faut avouer l'absence, pas produire une borne inutile.
+import { formatCostBound } from '../../public/viz-state.js';
+
+test('C4 — complet : le montant nu', () => {
+  assert.equal(formatCostBound(4.172108, true), '$4.17');
+  assert.equal(formatCostBound(0, true), '$0');
+});
+
+test('C4 — partiel avec une part connue : une BORNE INFÉRIEURE, et son sens', () => {
+  assert.equal(formatCostBound(4.172108, false), 'au moins $4.17');
+  // Même une part minuscule reste une information : elle se dit.
+  assert.equal(formatCostBound(0.0004, false), 'au moins $0.0004');
+});
+
+test('C4 — partiel sans aucune part connue : l’absence s’avoue', () => {
+  assert.equal(formatCostBound(0, false), 'coût indisponible');
+});

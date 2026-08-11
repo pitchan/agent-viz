@@ -194,6 +194,29 @@ export function tokenContext(t) {
   return (t.lastIn || 0) + (t.lastCacheCreate || 0) + (t.lastCacheRead || 0);
 }
 
+// C4 (2026-08-11) — complétude du coût, agrégée sur plusieurs seaux.
+//
+// `costUsd` n'est jamais un montant faux : c'est la somme des messages dont le
+// TARIF est connu, donc une BORNE INFÉRIEURE exacte du coût réel. Quand un
+// modèle absent de la table embarquée a produit des jetons, le serveur pose
+// `costComplete: false` sur le seau et nomme le modèle — c'est ce que le
+// pilote temps réel ignorait entièrement, montrant un montant net de toute
+// réserve pendant que la page Observatoire, elle, disait « coût partiel ».
+//
+// Un seau SANS le champ (enveloppe d'un serveur antérieur, rejeu d'un ancien
+// instantané) compte comme complet : l'enveloppe SSE est additive, et
+// `undefined` n'est pas `false`.
+export function costCompleteness(buckets) {
+  const inconnus = new Set();
+  let complete = true;
+  for (const b of buckets) {
+    if (!b) continue;
+    if (b.costComplete === false) complete = false;
+    for (const m of (b.unknownModels || [])) inconnus.add(m);
+  }
+  return { complete, unknownModels: [...inconnus].sort() };
+}
+
 // Format USD cost — "$0.42", "$12.30", "$1.2k" for very large sessions.
 // 4-decimal precision for sub-cent values so cheap exploratory runs still
 // register something visible.
@@ -203,6 +226,28 @@ export function formatCost(usd) {
   if (usd < 100) return '$' + usd.toFixed(2);
   if (usd < 1000) return '$' + Math.round(usd);
   return '$' + (usd / 1000).toFixed(1) + 'k';
+}
+
+// C4 (2026-08-11) — le montant assorti de ce qu'il PRÉTEND. Trois énoncés,
+// trois vérités différentes :
+//
+//   complet            → « $4.17 ». C'est le coût.
+//   partiel, part > 0  → « au moins $4.17 ». Le montant est une BORNE
+//                        INFÉRIEURE exacte, et « au moins » dit le SENS de
+//                        l'erreur : le vrai coût est au-dessus, jamais en
+//                        dessous. Un simple « partiel » laisserait le lecteur
+//                        ignorer de quel côté se tromper — or il regarde ce
+//                        chiffre pour décider s'il brûle de l'argent.
+//   partiel, part = 0  → « coût indisponible ». Rien n'est tarifé du tout ;
+//                        « au moins $0 » serait vrai et ne prétendrait RIEN,
+//                        ce qui est pire qu'avouer l'absence.
+//
+// Le mot « partiel » — celui qu'emploie déjà la page Observatoire, à six
+// endroits — tient dans l'infobulle, où il y a la place de le qualifier et de
+// nommer les modèles fautifs. La pastille n'a la place que de l'énoncé.
+export function formatCostBound(usd, complete) {
+  if (complete) return formatCost(usd);
+  return usd > 0 ? `au moins ${formatCost(usd)}` : 'coût indisponible';
 }
 
 // Extract the bare agent id from a node id of the form "a:<agentId>".

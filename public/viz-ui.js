@@ -8,7 +8,8 @@
 
 import {
   COLORS, state, vis, markDirty, hexAlpha, esc,
-  formatTokens, tokenTotal, tokenContext, formatCost, agentIdFromNode,
+  formatTokens, tokenTotal, tokenContext, formatCost, formatCostBound, costCompleteness,
+  agentIdFromNode,
 } from './viz-state.js';
 import {
   layout, matchesFilter, markLayoutFullDirty, setFeedCursorAdjust,
@@ -152,6 +153,11 @@ function tokenCardsHTML(n) {
   let contextSize = 0;
   let totalCost = 0;
   let modelLabel = '';
+  // C4 : la même réserve que la pastille. Sans ça, le montant honnête de la
+  // barre du haut et un montant net de toute réserve dans le panneau de détail
+  // cohabiteraient à un clic l'un de l'autre — le constat rouvert un cran plus
+  // bas.
+  let cout = { complete: true, unknownModels: [] };
   if (n.type === 'session') {
     // Session's cumulative = main + all subagents (useful for raw volume view).
     bucket = { in: 0, out: 0, cacheCreate: 0, cacheRead: 0 };
@@ -163,12 +169,14 @@ function tokenCardsHTML(n) {
     for (const b of state.tokens.perAgent.values()) add(b);
     // Context size = main thread only (matches what /context reports).
     contextSize = tokenContext(state.tokens.main);
+    cout = costCompleteness([state.tokens.main, ...state.tokens.perAgent.values()]);
   } else if (n.type === 'agent') {
     const aid = agentIdFromNode(n.id);
     bucket = aid ? state.tokens.perAgent.get(aid) : null;
     contextSize = tokenContext(bucket);
     totalCost = (bucket && bucket.costUsd) || 0;
     modelLabel = (bucket && bucket.lastModel) ? labelForModel(bucket.lastModel) : '';
+    cout = costCompleteness([bucket]);
   }
   if (!bucket || tokenTotal(bucket) === 0) return '';
   const ctxCard = contextSize > 0
@@ -177,8 +185,15 @@ function tokenCardsHTML(n) {
   const modelCard = modelLabel
     ? `<div class="meta-card"><div class="meta-label">Model</div><div class="meta-value">${esc(modelLabel)}</div></div>`
     : '';
-  const costCard = totalCost > 0
-    ? `<div class="meta-card"><div class="meta-label">Cost (cumul.)</div><div class="meta-value">${formatCost(totalCost)}</div></div>`
+  // C4 : la carte s'affiche AUSSI quand le montant est nul mais incomplet —
+  // sinon une session dont aucun modèle n'est tarifé ferait disparaître la
+  // carte, et l'absence se lirait comme « rien dépensé ».
+  const costCard = (totalCost > 0 || !cout.complete)
+    ? `<div class="meta-card"><div class="meta-label">Cost (cumul.)</div>`
+      + `<div class="meta-value">${esc(formatCostBound(totalCost, cout.complete))}</div>`
+      + (cout.complete ? ''
+        : `<div class="meta-sub">coût partiel — sans tarif : ${esc(cout.unknownModels.join(', '))}</div>`)
+      + `</div>`
     : '';
   return `
     ${modelCard}
@@ -245,25 +260,54 @@ export function updateBudget() {
   const main = state.tokens.main;
   // Hide while we have no model info yet — the pill flickering empty is worse
   // than not appearing until the first assistant message lands.
-  if (!main || !main.lastModel || !main.contextMax) {
+  //
+  // C4 (2026-08-11) : la condition ne porte plus sur `contextMax`. Le serveur
+  // ne posait `lastModel` que pour un modèle TARIFÉ, si bien qu'une session
+  // n'employant que des modèles hors table faisait disparaître la pastille
+  // entièrement — ni coût, ni contexte, ni modèle, alors que le modèle et le
+  // volume de jetons, eux, sont parfaitement connus. Seule la FENÊTRE manque.
+  if (!main || !main.lastModel) {
     els.pill.hidden = true;
     return;
   }
   const ctxNow = tokenContext(main);
-  const ratio = ctxNow / main.contextMax;
+  const fenetreConnue = main.contextMax > 0;
+  const ratio = fenetreConnue ? ctxNow / main.contextMax : 0;
   // Cumulative cost = main + every subagent bucket (each computed against its
   // own model on the server side, so a multi-model session sums cleanly).
   let totalCost = main.costUsd || 0;
   for (const b of state.tokens.perAgent.values()) totalCost += b.costUsd || 0;
+  // C4 : la même somme porte sa réserve. Un seul seau incomplet suffit à
+  // rendre le total incomplet.
+  const cout = costCompleteness([main, ...state.tokens.perAgent.values()]);
 
   els.model.textContent = labelForModel(main.lastModel);
-  els.ctx.textContent = `${formatTokens(ctxNow)} / ${formatTokens(main.contextMax)} (${(ratio * 100).toFixed(1)}%)`;
-  els.cost.textContent = formatCost(totalCost);
-  els.ctx.classList.toggle('is-warn', ratio >= 0.7 && ratio < 0.9);
-  els.ctx.classList.toggle('is-crit', ratio >= 0.9);
-  els.pill.title = `Model: ${main.lastModel}\nContext: ${ctxNow.toLocaleString()} / ${main.contextMax.toLocaleString()} tokens\nCost (this session): ${formatCost(totalCost)}`;
+  // Sans fenêtre connue, la taille absolue et RIEN d'autre : un pourcentage
+  // calculé contre une fenêtre inventée serait pire que pas de pourcentage.
+  els.ctx.textContent = fenetreConnue
+    ? `${formatTokens(ctxNow)} / ${formatTokens(main.contextMax)} (${(ratio * 100).toFixed(1)}%)`
+    : formatTokens(ctxNow);
+  els.cost.textContent = formatCostBound(totalCost, cout.complete);
+  els.ctx.classList.toggle('is-warn', fenetreConnue && ratio >= 0.7 && ratio < 0.9);
+  els.ctx.classList.toggle('is-crit', fenetreConnue && ratio >= 0.9);
+  els.pill.title = [
+    `Model: ${main.lastModel}`,
+    fenetreConnue
+      ? `Context: ${ctxNow.toLocaleString()} / ${main.contextMax.toLocaleString()} tokens`
+      : `Context: ${ctxNow.toLocaleString()} tokens (fenêtre inconnue pour ce modèle)`,
+    `Cost (this session): ${formatCostBound(totalCost, cout.complete)}`,
+    ...(cout.complete ? [] : [
+      totalCost > 0
+        ? `Coût PARTIEL — modèles sans tarif connu : ${cout.unknownModels.join(', ')}`
+        : `Aucun modèle tarifé — sans tarif connu : ${cout.unknownModels.join(', ')}`,
+      totalCost > 0
+        ? 'Le coût réel est supérieur.'
+        : 'Les jetons sont comptés ; le coût n’est pas calculable.',
+    ]),
+  ].join('\n');
   els.pill.hidden = false;
 }
+
 
 // Cheap client-side label derivation — matches the server's deriveLabel() so
 // we don't have to ship the price map to the client just for display names.
