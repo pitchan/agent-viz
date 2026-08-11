@@ -172,7 +172,8 @@ function bucketOfGap(gapMs: number): PauseBucketKey {
 
 /**
  * L'écart est mesuré réponse-à-réponse : il surestime l'écart requête-à-requête
- * du temps de génération (approximation assumée, cf. docs/plan-j7-churn.md).
+ * du temps de génération (approximation assumée, cf. le plan J7 —
+ * docs/sources-externes.md).
  */
 function classifyChurn(prev: PrevTurn, cacheRead: number, timestamp: string | undefined, compacted: boolean): ChurnVerdict {
   if (prev.cachedTotal - cacheRead <= HELD_TOLERANCE) return { cause: 'growth', pause: null };

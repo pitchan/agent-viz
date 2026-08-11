@@ -3,7 +3,7 @@
 // churn dominates both compaction and expiration churn AND weighs enough
 // against ITS OWN net tokens; the qualifying sessions are then grouped by
 // project for display. Both gates are per session — that is how the 90-day
-// calibration measured them (netgain/docs/calibration-observatoire-m1.md).
+// calibration relevé measured them (private repo, docs/sources-externes.md).
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');

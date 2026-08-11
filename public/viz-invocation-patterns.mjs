@@ -11,9 +11,9 @@
 //
 // ── Where this table comes from ───────────────────────────────────────────
 // It is not guessed. It comes from a survey of 370 sessions, 8 projects,
-// 24,182 tool calls and 587 real failures (doc/27-calibration-invocation.md,
-// 2026-08-08), which measured for every pattern both its occurrences AND its
-// false positives.
+// 24,182 tool calls and 587 real failures (doc/27, 2026-08-08 — private repo,
+// see docs/sources-externes.md), which measured for every pattern both its
+// occurrences AND its false positives.
 //
 // Four of its findings are easy to undo by accident and expensive to find
 // again:

@@ -28,7 +28,7 @@ const T = 1_700_000_000_000;
 const SID = 'sid1';
 const iso = ms => new Date(ms).toISOString();
 
-// Echantillons repris du releve (doc/27-calibration-invocation.md), caviardes.
+// Echantillons repris du releve (doc/27, cf. docs/sources-externes.md), caviardes.
 // Ce ne sont pas des messages inventes.
 
 // L'incident du 5 aout : trois sous-agents de la meme session butant a quelques

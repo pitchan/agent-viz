@@ -3,7 +3,7 @@ import type { NormalizedEvent, ToolUseRef } from '../../core/events.js';
 type ToolResultEvent = Extract<NormalizedEvent, { kind: 'tool_result' }>;
 
 /**
- * Cases du plan J8 (docs/plan-j8-relectures-read.md) :
+ * Cases du plan J8 (dépôt privé, cf. docs/sources-externes.md) :
  * - firstRead : première lecture, la base irréductible ;
  * - identicalReread : même agent, même chemin+plage, même empreinte — le gisement du dédoublonneur ;
  * - modifiedReread : même clé, empreinte différente — irréductible par dédoublonnage ;

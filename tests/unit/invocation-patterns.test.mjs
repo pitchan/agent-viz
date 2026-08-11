@@ -1,9 +1,9 @@
 // Tests unitaires de public/viz-invocation-patterns.mjs — la table de motifs
 // qui distingue « l'agent n'a pas su appeler » de « la commande a répondu non ».
 //
-// La table vient d'un relevé sur 370 sessions et 587 échecs réels
-// (doc/27-calibration-invocation.md). Les échantillons ci-dessous sont repris
-// de ses extraits, caviardés ; ce ne sont pas des messages inventés.
+// La table vient d'un relevé sur 370 sessions et 587 échecs réels (doc/27 du
+// dépôt privé, cf. docs/sources-externes.md). Les échantillons ci-dessous sont
+// repris de ses extraits, caviardés ; ce ne sont pas des messages inventés.
 //
 // Six choses sont vérifiées ici et nulle part ailleurs :
 //   - la LANGUE : sur cette machine 100 % des messages PowerShell sont en
@@ -824,8 +824,8 @@ test('un message PowerShell prive de FullyQualifiedErrorId n est pas classe, Cat
 // elargi a `/cd: [^\n]*: No such file or directory/`, ce qui ferait de toute
 // exploration ratee une alerte.
 //
-// Le releve (doc/27-calibration-invocation.md) vit dans le depot PRIVE de la
-// these et n est pas distribue avec agent-viz : ses 37 expressions sont donc
+// Le releve (doc/27, cf. docs/sources-externes.md) vit dans le depot PRIVE de
+// la these et n est pas distribue avec agent-viz : ses 37 expressions sont donc
 // recopiees ici une fois, extraites programmatiquement de son bloc
 // `FAILURE_PATTERNS`, et ce fichier tient le role de temoin.
 
@@ -869,7 +869,7 @@ const RELEVE = new Map([
   ['vrd-exit-code-bare', String.raw`^\s*Exit code \d+`, ''],
 ].map(([id, source, flags]) => [id, { source, flags }]));
 
-// Le SECOND releve (doc/30-design-scission-guillemet.md, 2026-08-08) : deux
+// Le SECOND releve (doc/30, 2026-08-08, meme depot prive) : deux
 // motifs de plus, nes de la scission de `inv-bash-unbalanced-quote`, qui
 // fusionnait deux causes. Ils ne vont PAS dans RELEVE — celui-ci est le temoin
 // de doc/27, et les y glisser mentirait sur leur provenance, c est-a-dire sur

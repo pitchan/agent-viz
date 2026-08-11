@@ -60,7 +60,7 @@ test('the thresholds fixed by the spec are exactly the spec values', () => {
 
 // The five calibrated values are pinned here, not just declared as
 // 'calibration'. They are the outcome of a measurement on 90 days of real
-// history (netgain/docs/calibration-observatoire-m1.md): changing one silently
+// history (relevé of 2026-07-27, docs/sources-externes.md): changing one silently
 // would change which advice a user is given, with no trace of why.
 test('the calibrated thresholds are exactly the values the measurement retained', () => {
   assert.equal(THRESHOLDS.R1.minShareOfNet, 0.20,
