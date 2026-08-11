@@ -241,3 +241,99 @@ describe('priceTable — le barème réellement appliqué, exposé', () => {
     expect(r.usd).toBeCloseTo(0.19, 12);
   });
 });
+
+// ---------------------------------------------------------------------------
+// C4 (2026-08-11) — la normalisation du serveur devient celle du moteur.
+// Trouvé par sonde différentielle : `normalizeId` de lib/server/pricing.js est
+// un SUR-ENSEMBLE strict de `normalizeModel`. Sur un identifiant régional, le
+// moteur disait « inconnu / coût partiel » pendant que le serveur tarifait
+// correctement — exactement le symptôme que C4 doit fermer, déclenché par une
+// autre entrée. 0 occurrence sur les 833 transcripts de la machine de mesure :
+// latent ici, réel pour un déploiement Bedrock/Vertex.
+// ---------------------------------------------------------------------------
+describe('normalizeModel — routage régional et transport (C4)', () => {
+  test('retire le préfixe de routeur régional', () => {
+    expect(normalizeModel('us.anthropic.claude-opus-4-7')).toBe('claude-opus-4-7');
+    expect(normalizeModel('eu.anthropic.claude-haiku-4-5')).toBe('claude-haiku-4-5');
+    expect(normalizeModel('global.anthropic.claude-sonnet-4-5')).toBe('claude-sonnet-4-5');
+    expect(normalizeModel('au.anthropic.claude-opus-5')).toBe('claude-opus-5');
+  });
+
+  test('retire DEUX préfixes empilés, pas seulement le premier', () => {
+    // Le motif d'origine était une alternance appliquée une seule fois :
+    // `bedrock/` partait, `anthropic.` restait, et l'identifiant restait inconnu.
+    expect(normalizeModel('bedrock/anthropic.claude-opus-4-7-v1:0')).toBe('claude-opus-4-7');
+    expect(normalizeModel('vertex_ai/anthropic.claude-opus-5')).toBe('claude-opus-5');
+  });
+
+  test('retire un suffixe de version -vN seul, pas seulement -vN:M', () => {
+    expect(normalizeModel('claude-opus-4-5-v1')).toBe('claude-opus-4-5');
+    expect(normalizeModel('claude-opus-4-5-v1:0')).toBe('claude-opus-4-5');
+  });
+
+  test('TÉMOIN NÉGATIF : élargir la normalisation ne rend pas tout connu', () => {
+    // Sans ce témoin on écrirait « les identifiants régionaux sont reconnus »,
+    // plus large que le fait : ce qui est reconnu, c'est le PRÉFIXE, et le
+    // modèle dessous doit toujours figurer à la table.
+    expect(normalizeModel('us.anthropic.claude-opus-99-9')).toBe('claude-opus-99-9');
+    expect(pricingKindOf('us.anthropic.claude-opus-99-9')).toBe('inconnu');
+    expect(computeCost({ input_tokens: 10 }, 'us.anthropic.claude-opus-99-9').known).toBe(false);
+    // Et un préfixe qui n'est pas un routeur connu n'est pas retiré.
+    expect(normalizeModel('zz.anthropic.claude-opus-5')).toBe('zz.anthropic.claude-opus-5');
+  });
+
+  test('un identifiant régional est tarifé comme sa forme canonique', () => {
+    const usage = { input_tokens: 1000, output_tokens: 500 };
+    const regional = computeCost(usage, 'us.anthropic.claude-opus-4-7');
+    const canonique = computeCost(usage, 'claude-opus-4-7');
+    expect(regional.known).toBe(true);
+    expect(regional.usd).toBe(canonique.usd);
+    expect(pricingKindOf('us.anthropic.claude-opus-4-7')).toBe('tarife');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// C4 (2026-08-11) — durcissement de `cache_creation`. Le serveur délègue
+// désormais SA formule à celle-ci ; sans ces gardes, l'unification ferait
+// APPARAÎTRE côté serveur une panne qu'il n'avait pas. `cache_creation: null`
+// est du JSON parfaitement valide : 0 occurrence sur 833 transcripts, donc
+// latent, mais rien dans la chaîne ne l'arrête (`asRec` ne normalise que
+// `usage` lui-même, pas ses champs).
+// ---------------------------------------------------------------------------
+describe('computeCost — cache_creation non exploitable (C4)', () => {
+  const attendu5m = (cc: number) => 100 * 5e-6 + cc * 6.25e-6; // opus-4-8
+
+  test('cache_creation null : pas de levée, tout le total au tarif 5m', () => {
+    const r = computeCost(
+      { input_tokens: 100, cache_creation_input_tokens: 50, cache_creation: null } as never,
+      'claude-opus-4-8');
+    expect(r.known).toBe(true);
+    expect(r.usd).toBeCloseTo(attendu5m(50), 12);
+  });
+
+  test('cache_creation non-objet (0, chaîne) : traité comme absent', () => {
+    for (const cc of [0, 'x', false]) {
+      const r = computeCost(
+        { input_tokens: 100, cache_creation_input_tokens: 50, cache_creation: cc } as never,
+        'claude-opus-4-8');
+      expect(r.usd).toBeCloseTo(attendu5m(50), 12);
+    }
+  });
+
+  test('cache_creation objet vide : la ventilation est présente et vaut zéro', () => {
+    // Contraste volontaire avec le cas ci-dessus : un objet VIDE dit « la
+    // ventilation existe et vaut zéro », pas « pas de ventilation ».
+    const r = computeCost(
+      { input_tokens: 100, cache_creation_input_tokens: 50, cache_creation: {} },
+      'claude-opus-4-8');
+    expect(r.usd).toBeCloseTo(100 * 5e-6, 12);
+  });
+
+  test('usage absent : montant nul, modèle toujours reconnu', () => {
+    for (const u of [null, undefined]) {
+      const r = computeCost(u as never, 'claude-opus-4-8');
+      expect(r.known).toBe(true);
+      expect(r.usd).toBe(0);
+    }
+  });
+});

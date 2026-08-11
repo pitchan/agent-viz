@@ -83,15 +83,35 @@ function priceAt(model: string, at: string): ModelPrices | undefined {
 
 /**
  * Ramène un id modèle à sa forme canonique : retire suffixe [1m]/[200k],
- * préfixes transport (anthropic/, bedrock/, vertex/), versions -vN:M et dates.
+ * préfixes de transport et de routage régional, versions -vN[:M] et dates.
+ *
+ * C4 (2026-08-11) — définition UNIQUE de la normalisation du produit : le
+ * serveur (`lib/server/pricing.js`) la consomme désormais par un pont au lieu
+ * de porter la sienne. La sonde différentielle avait montré que les deux
+ * jumelles avaient divergé — l'ancienne forme d'ici ne connaissait ni les
+ * routeurs régionaux ni le suffixe `-vN` seul, si bien que le moteur annonçait
+ * « coût partiel » sur un identifiant que le serveur tarifait sans réserve.
+ *
+ * Les préfixes s'EMPILENT (`bedrock/anthropic.…`) : une alternance appliquée
+ * une seule fois n'en retirait qu'un et laissait l'identifiant inconnu. D'où
+ * une substitution par préfixe, dans l'ordre du plus externe au plus interne.
+ * Le routeur régional passe AVANT `anthropic.` nu, sinon `us.anthropic.X`
+ * tomberait à travers — c'est la cause d'origine des 109 fausses alertes
+ * « modèle nouveau » relevées sur le flux LiteLLM réel.
  */
 export function normalizeModel(mid: string | null | undefined): string | null {
   if (mid === null || mid === undefined) return null;
   let s = mid.trim();
   if (s === '') return null;
   s = s.replace(/\[[^\]]*\]$/, '');
-  s = s.replace(/^(anthropic[./]|bedrock\/|vertex(_ai)?\/)/, '');
+  s = s.replace(/^bedrock\//, '');
+  s = s.replace(/^vertex_ai\//, '');
+  s = s.replace(/^vertex\//, '');
+  s = s.replace(/^(global|us|eu|au)\.anthropic\./, '');
+  s = s.replace(/^anthropic\./, '');
+  s = s.replace(/^anthropic\//, '');
   s = s.replace(/-v\d+:\d+$/, '');
+  s = s.replace(/-v\d+$/, '');
   s = s.replace(/[-@]\d{8}$/, '');
   return s;
 }
@@ -119,17 +139,33 @@ export function computeCost(
   const p = norm !== null ? priceAt(norm, at ?? new Date().toISOString()) : undefined;
   if (p === undefined) return { usd: null, known: false, model: norm };
 
-  const cc = usage.cache_creation;
-  const ccTotal = usage.cache_creation_input_tokens ?? 0;
+  // C4 (2026-08-11) — `usage` et son champ `cache_creation` viennent d'un JSONL
+  // écrit par un tiers, et RIEN dans la chaîne ne garantit leur forme :
+  // `normalizeEvent` (core/events.ts) passe `usage` par `asRec`, qui neutralise
+  // un non-objet, mais ne touche pas à ses champs. `"cache_creation": null` est
+  // du JSON parfaitement valide et faisait LEVER cette fonction. Latent sur la
+  // machine de mesure (0 occurrence sur 833 transcripts), mais le serveur
+  // délègue désormais sa formule à celle-ci : sans ces gardes, l'unification
+  // ferait APPARAÎTRE côté serveur une panne qu'il n'avait pas.
+  const u: RawUsage = isRecord(usage) ? usage : {};
+  const cc = isRecord(u.cache_creation) ? u.cache_creation : undefined;
+  const ccTotal = u.cache_creation_input_tokens ?? 0;
   const cc1h = cc?.ephemeral_1h_input_tokens ?? 0;
   const cc5m = cc !== undefined ? (cc.ephemeral_5m_input_tokens ?? 0) : ccTotal; // sans split : tout en 5m
   const usd =
-    (usage.input_tokens ?? 0) * p.input +
-    (usage.output_tokens ?? 0) * p.output +
+    (u.input_tokens ?? 0) * p.input +
+    (u.output_tokens ?? 0) * p.output +
     cc5m * p.cacheCreate +
     cc1h * (p.input * 2) +
-    (usage.cache_read_input_tokens ?? 0) * p.cacheRead;
+    (u.cache_read_input_tokens ?? 0) * p.cacheRead;
   return { usd, known: true, model: norm };
+}
+
+/** Un objet exploitable par accès de champ — un tableau en est un, et se
+ *  comporte comme un objet sans les champs attendus (donc zéro), ce qui est
+ *  exactement le repli voulu. `null` n'en est pas un, malgré son `typeof`. */
+function isRecord(v: unknown): v is RawUsage & Record<string, never> {
+  return typeof v === 'object' && v !== null;
 }
 
 export type PricingKind = 'tarife' | 'zero-voulu' | 'inconnu';
