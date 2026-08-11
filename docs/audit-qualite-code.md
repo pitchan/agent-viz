@@ -95,6 +95,15 @@ SI agir.
 > observable qui justifie le rang P2 tient toujours, plus largement. Détail et
 > mesure dans la fiche C7.
 
+> **CORRIGÉ AU TRAITEMENT DE C6 (2026-08-11) : « **C6**, un correctif de
+> robustesse […] n'atteindrait qu'un tiers du code » repose sur la mauvaise
+> unité.** Les huit appels HTTP de `public/` ne consomment pas la même chose de
+> la réponse — l'un lit des en-têtes et du texte, un autre ne lit rien —, donc
+> « trois clients pour un même geste » n'était pas le défaut. Le défaut, non vu
+> par la fiche, était **deux routes écrites deux fois** (`GET /alerts`,
+> `POST /alerts/ack`). Le rang P2 tient, la conséquence observable change.
+> Détail et mesure dans la fiche C6.
+
 ## Constats
 
 Huit constats sont retenus, chacun rejouable depuis les résultats de
@@ -713,6 +722,83 @@ touche `netgain/src/` — le déplacement de `netgain/src/` dans l'arbre
 d'`agent-viz` ne rend ce constat ni plus facile ni plus difficile à corriger.
 Contrairement à C2 à C5, rien ici n'attend que les deux arbres soient
 réunis.
+
+> **TRAITÉ LE 2026-08-11 — ce n'étaient pas trois clients, c'étaient DEUX ROUTES
+> écrites deux fois. La fiche comptait les fichiers ; ce qui compte est le geste.**
+>
+> **La sonde.** Pour chacun des 8 appels HTTP de `public/`, ce que l'appelant
+> consomme réellement du `Response` — parce que le geste partagé n'est pas
+> « appeler HTTP », c'est ce qu'on fait de la réponse :
+>
+> | Site | Lit de la réponse | Teste `res.ok` | Sur échec |
+> |---|---|---|---|
+> | `observatory/api.js:6` (`getJson`) | json | oui | traité |
+> | `observatory/api.js:20` (`postJson`) | json | oui | traité |
+> | `viz-network.js:187` `fetchTokens` | json | non | silence |
+> | `viz-network.js:200` `poll` | **texte + en-têtes** | non | silence |
+> | `viz-network.js:227` `loadSessions` | json | non | silence |
+> | `viz-network.js:329` `resetEvents` | **rien** | non | propagé |
+> | `viz-watchdog-client.js:87` | json | oui | traité |
+> | `viz-watchdog-client.js:197` | rien (`ok` seul) | oui | traité |
+>
+> **`viz-network.js` n'est pas un troisième client.** `poll` lit des **en-têtes**
+> (`X-File-Size`, `X-Session-Id`) et du **texte** (du JSONL, ligne à ligne) : un
+> client JSON ne peut pas le servir — il rendrait le corps analysé et jetterait
+> le reste. `resetEvents` ne lit **rien** de la réponse. Les deux qui restent
+> avalent leur erreur **exprès** : le visualiseur temps réel ne meurt pas sur un
+> tour raté. Les faire passer par `getJson` fabriquerait un message d'erreur
+> soigné pour le jeter aussitôt dans un `catch` vide. La phrase « trois chemins
+> pour un même geste, sans raison qui les distingue » est donc fausse pour
+> quatre des huit appels, et les raisons sont écrites dans le code.
+>
+> **Le vrai défaut, que la fiche n'avait pas vu : deux ROUTES en double.**
+> `GET /alerts?days=N` et `POST /alerts/ack {id, createdAt}` vivaient à la fois
+> dans `observatory/api.js` et, recopiées à la main, dans
+> `viz-watchdog-client.js`. C'est là — et seulement là — qu'un changement de
+> contrat de route en aurait raté une moitié. Corrigé : la pastille passe par les
+> deux fonctions de route de `api.js` et garde ses **politiques** (ne rien vider
+> sur une lecture ratée, remettre l'alerte à l'écran sur un acquittement refusé),
+> qui ne sont pas celles de l'Observatoire et ont leurs raisons écrites.
+>
+> **`getJson`/`postJson` ne sont PAS exportés**, contrairement à ce que demandait
+> la cible : exporter le transport inviterait à recopier ailleurs la connaissance
+> des routes, l'inverse du défaut à corriger. Ils prennent en revanche un
+> `fetchImpl` en dernier paramètre, que les deux fonctions de route propagent —
+> la couture voyage avec l'appel, aucune variable de module à poser depuis
+> l'extérieur (CLAUDE.md § D, et rien à remettre en état entre deux tests).
+>
+> **Le filet qui manquait est celui que la mise en commun pouvait casser en
+> silence** : un 200 dont le corps n'est pas du JSON. L'ancien code levait à
+> `res.json()` et retombait dans son `catch { return; }` ; le client partagé rend
+> `null` par contrat. Sans garde, la pastille aurait pris ce `null` pour un
+> journal vide et se serait éteinte — une lecture ratée affichée comme un retour
+> au calme. Test écrit AVANT le changement, vert des deux côtés.
+>
+> **Mutations de contrôle** : garde du corps illisible retirée → 1 rouge ;
+> `postJson` qui ne lève plus sur refus → 2 rouges ; route `/alerts/ack` renommée
+> dans `api.js` → 6 rouges ; `createdAt` retiré de la charge → 3 rouges.
+> **Une mutation n'a pas tué, et c'est l'instrument qui avait tort** : renommer la
+> route en `/alerts/ack-MUT` laisse tout vert, le bouchon de test aiguillant sur
+> `startsWith('/alerts/ack')`. Rejouée en `/MUT/ack`, elle tue. *Une mutation qui
+> survit ne prouve rien tant qu'on n'a pas vérifié qu'elle était OBSERVABLE.*
+> Second défaut d'instrument corrigé avant publication : la sonde plafonnait sa
+> fenêtre à 22 lignes et classait `loadSessions` « propagé » alors que son `catch`
+> vide est 24 lignes plus bas.
+>
+> **Vérifié au navigateur**, instance isolée (home jetable, port 3334,
+> redirection prouvée avant écriture, base de mesure de la soutenance intacte) :
+> page chargée sans erreur console, `api.js` réellement téléchargé par la page
+> viz, `GET /alerts?days=30` → 200, pastille à 1 alerte, clic sur `Ack` →
+> `POST /alerts/ack` → 200, journal portant `{kind:'ack', id, createdAt}` avec la
+> paire exacte, pastille éteinte.
+>
+> **Signalé, hors périmètre :** `loadSessions` échoue en silence **sans raison
+> écrite** — le seul des quatre appels de `viz-network.js` dans ce cas. Afficher
+> quelque chose à l'utilisateur quand la liste des sessions ne répond pas est une
+> décision de produit, pas une consolidation de client HTTP.
+>
+> Serveur 803 → 804, moteur 502, typecheck propre, audit 48/48.
+> Commit `38b5f24`.
 
 ### C7 — Le rapport cite un document de calibration qui n'existe pas dans ce dépôt
 
