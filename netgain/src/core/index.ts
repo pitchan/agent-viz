@@ -1,6 +1,8 @@
 /** Surface publique du noyau : l'énumération des sessions, l'analyse de --since
  *  et le barème embarqué (exposé pour le produit — unification 2026-08-05). */
-export { CLAUDE_DIR_ENV, resolveClaudeDir } from './claude-dir.js';
+export { CLAUDE_DIR_ENV, resolveClaudeDir, resolveClaudeJsonPath } from './claude-dir.js';
+export { addUsage, emptyUsageBucket, finiteCount, isDedupableMsgId, sumUsageInto } from './usage.js';
+export type { UsageBucket } from './usage.js';
 export type { ResolveClaudeDirOptions } from './claude-dir.js';
 export { discoverSessions, parseSince } from './discovery.js';
 export type { DiscoveryFilters, SessionRef, SubagentRef } from './discovery.js';

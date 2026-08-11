@@ -1,39 +1,17 @@
-import type { NormalizedEvent, RawUsage } from '../../core/events.js';
+import type { NormalizedEvent } from '../../core/events.js';
 import { computeCost, pricingKindOf } from '../../core/pricing.js';
 import type { PricingKind } from '../../core/pricing.js';
+import { addUsage, emptyUsageBucket, isDedupableMsgId, sumUsageInto } from '../../core/usage.js';
+import type { UsageBucket } from '../../core/usage.js';
 
 type AssistantEvent = Extract<NormalizedEvent, { kind: 'assistant' }>;
 
-export interface TokenBucket {
-  in: number;
-  out: number;
-  cacheCreate: number;
-  cacheRead: number;
-  cacheCreate1h: number;
-  cacheCreate5m: number;
-}
-
-export function emptyBucket(): TokenBucket {
-  return { in: 0, out: 0, cacheCreate: 0, cacheRead: 0, cacheCreate1h: 0, cacheCreate5m: 0 };
-}
-
-function addUsage(b: TokenBucket, u: RawUsage): void {
-  b.in += u.input_tokens ?? 0;
-  b.out += u.output_tokens ?? 0;
-  b.cacheCreate += u.cache_creation_input_tokens ?? 0;
-  b.cacheRead += u.cache_read_input_tokens ?? 0;
-  b.cacheCreate1h += u.cache_creation?.ephemeral_1h_input_tokens ?? 0;
-  b.cacheCreate5m += u.cache_creation?.ephemeral_5m_input_tokens ?? 0;
-}
-
-function sumInto(target: TokenBucket, src: TokenBucket): void {
-  target.in += src.in;
-  target.out += src.out;
-  target.cacheCreate += src.cacheCreate;
-  target.cacheRead += src.cacheRead;
-  target.cacheCreate1h += src.cacheCreate1h;
-  target.cacheCreate5m += src.cacheCreate5m;
-}
+// C3 : l'accumulation des six champs bruts, la fusion de deux seaux et la règle
+// de déduplication vivent désormais dans `core/usage.ts` — une seule définition,
+// partagée avec le serveur par un pont. Ce qui reste ici est ce qui n'appartient
+// qu'au moteur : la ventilation par modèle et le coût daté.
+export type TokenBucket = UsageBucket;
+export const emptyBucket = emptyUsageBucket;
 
 /** Convention de mesure : input + cache_creation + output, cache_read EXCLU. */
 export function netTokens(b: TokenBucket): number {
@@ -78,7 +56,11 @@ export class TokensAggregator {
 
   addAssistant(evt: AssistantEvent, agentKey: string): void {
     if (evt.usage === null) return;
-    if (evt.msgId !== null) {
+    // C3 : la règle de déduplication vient de la primitive commune. Le test
+    // était `evt.msgId !== null`, qui déduplique aussi sur la CHAÎNE VIDE —
+    // donc fusionnerait des messages distincts sans identifiant en un seul, et
+    // sous-compterait. Le sens du serveur est retenu : vide ≠ identifiant.
+    if (isDedupableMsgId(evt.msgId)) {
       const key = `${agentKey}:${evt.msgId}`;
       if (this.seen.has(key)) return;
       this.seen.add(key);
@@ -105,8 +87,8 @@ export class TokensAggregator {
 
   result(): TokensResult {
     const total = emptyBucket();
-    sumInto(total, this.main);
-    for (const b of Object.values(this.perAgent)) sumInto(total, b);
+    sumUsageInto(total, this.main);
+    for (const b of Object.values(this.perAgent)) sumUsageInto(total, b);
     return {
       main: this.main,
       perAgent: this.perAgent,
