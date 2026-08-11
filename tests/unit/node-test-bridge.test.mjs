@@ -205,6 +205,37 @@ test('l erreur du corps prime sur celle du nettoyage', async () => {
   await assert.rejects(execution, /echec du corps/);
 });
 
+test('une valeur fausse jetee par le corps fait quand meme echouer le test', async () => {
+  // Arrange
+  const { journal, deps } = primitives();
+  const pont = createBridge(deps);
+  pont('sujet', () => { throw 0; });
+  // Act
+  const execution = journal.tests[0].fn();
+  // Assert
+  await assert.rejects(execution, e => e === 0);
+});
+
+test('une restauration qui jette n empeche pas le retour aux temporisateurs reels', async () => {
+  // Arrange
+  let rendus = 0;
+  const { journal, deps } = primitives({
+    vi: { useFakeTimers() {}, advanceTimersByTime() {}, useRealTimers: () => { rendus += 1; } },
+  });
+  const pont = createBridge(deps);
+  const cible = { lire: () => 'origine' };
+  pont('sujet', t => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    t.mock.method(cible, 'lire', () => 'double');
+    Object.freeze(cible);
+  });
+  // Act
+  const execution = journal.tests[0].fn();
+  // Assert
+  await assert.rejects(execution);
+  assert.equal(rendus, 1, 'les temporisateurs sont rendus malgre l echec de la restauration');
+});
+
 test('une API non implementee jette en se nommant, au lieu de ne rien faire', () => {
   // Arrange
   const { deps } = primitives();

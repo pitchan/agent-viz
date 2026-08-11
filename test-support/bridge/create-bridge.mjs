@@ -15,6 +15,13 @@
 
 const FICHIER = 'test-support/bridge/create-bridge.mjs';
 
+// `node:test` echoue sur TOUTE valeur jetee, y compris `0`, `''`, `null`,
+// `NaN` et `false`. Une sentinelle est donc obligatoire : tester la verite
+// d'une erreur au lieu de sa presence rapporterait ces tests-la VERTS —
+// un faux vert loge dans le composant meme qui existe pour les supprimer.
+// Mesure le 2026-08-11, les cinq valeurs verifiees une par une.
+const AUCUNE = Symbol('aucune erreur');
+
 function refus(api) {
   return () => {
     throw new Error(
@@ -24,7 +31,9 @@ function refus(api) {
   };
 }
 
-const NON_IMPLEMENTE_MODULE = ['skip', 'only', 'todo', 'describe', 'it', 'before', 'afterEach', 'mock'];
+const NON_IMPLEMENTE_MODULE = [
+  'skip', 'only', 'todo', 'each', 'describe', 'it', 'suite', 'before', 'afterEach', 'mock',
+];
 const NON_IMPLEMENTE_CONTEXTE = ['test', 'skip', 'todo', 'diagnostic', 'plan'];
 
 function creerContexte(vi) {
@@ -57,22 +66,25 @@ function creerContexte(vi) {
   const contexte = { mock: { method, timers }, after: fn => apresTest.push(fn) };
   for (const api of NON_IMPLEMENTE_CONTEXTE) contexte[api] = refus(`t.${api}`);
 
-  // Les trois phases sont ISOLEES : une fonction `t.after` qui jette ne doit
-  // empecher ni la restauration des mocks, ni le retour aux temporisateurs
-  // reels. Sinon l'etat fuit vers les tests suivants et la panne se manifeste
-  // ailleurs qu'a l'endroit ou elle est nee — le mode de panne le plus couteux
-  // du chantier. L'erreur n'est pas avalee pour autant : elle est rendue.
+  // Les trois phases sont isolees CHACUNE DANS SON PROPRE `try`. Une erreur
+  // dans l'une ne doit empecher aucune des deux autres : sinon l'etat fuit
+  // vers les tests suivants — mocks non restaures, faux temporisateurs
+  // toujours actifs — et la panne se manifeste ailleurs qu'a l'endroit ou
+  // elle est nee, le mode de panne le plus couteux du chantier.
+  // La premiere erreur rencontree est conservee et rendue, jamais avalee.
+  let premiereErreur = AUCUNE;
+  const garder = (e) => { if (premiereErreur === AUCUNE) premiereErreur = e; };
+
   const nettoyer = async () => {
-    let premiereErreur = null;
     while (apresTest.length) {
-      try {
-        await apresTest.shift()();
-      } catch (e) {
-        premiereErreur ??= e;
-      }
+      try { await apresTest.shift()(); } catch (e) { garder(e); }
     }
-    while (restaurations.length) restaurations.pop()();
-    if (fauxTemporisateurs) vi.useRealTimers();
+    while (restaurations.length) {
+      try { restaurations.pop()(); } catch (e) { garder(e); }
+    }
+    if (fauxTemporisateurs) {
+      try { vi.useRealTimers(); } catch (e) { garder(e); }
+    }
     return premiereErreur;
   };
 
@@ -88,7 +100,7 @@ export function createBridge({ test: runTest, afterAll, beforeEach, vi }) {
     }
     return runTest(nom, async () => {
       const { contexte, nettoyer } = creerContexte(vi);
-      let erreurDuCorps = null;
+      let erreurDuCorps = AUCUNE;
       try {
         await fn(contexte);
       } catch (e) {
@@ -96,9 +108,10 @@ export function createBridge({ test: runTest, afterAll, beforeEach, vi }) {
       }
       const erreurDeNettoyage = await nettoyer();
       // Le corps prime : son erreur dit ce que le test voulait prouver. Celle
-      // du nettoyage ne doit jamais la masquer.
-      if (erreurDuCorps) throw erreurDuCorps;
-      if (erreurDeNettoyage) throw erreurDeNettoyage;
+      // du nettoyage ne doit jamais la masquer. Comparaison a la sentinelle et
+      // non a la verite : `throw 0` est une erreur, pas une absence d'erreur.
+      if (erreurDuCorps !== AUCUNE) throw erreurDuCorps;
+      if (erreurDeNettoyage !== AUCUNE) throw erreurDeNettoyage;
     });
   };
   pont.test = pont;
