@@ -87,6 +87,14 @@ C7 attendent réellement la réunion des deux arbres (« à absorber par la
 fusion »). C'est la fenêtre, pas le rang, qui distingue ici QUAND agir, pas
 SI agir.
 
+> **CORRIGÉ AU TRAITEMENT DE C7 (2026-08-11) : « **C7**, trois fichiers LIVRÉS
+> envoient leur lecteur vers un chemin qui n'a jamais existé dans ce dépôt » est
+> faux sur les deux mots comptés.** Ils sont **dix** sites, vers **cinq**
+> documents, et non trois vers un seul ; et sur les trois que la fiche nommait,
+> **un seul** est livré au paquet npm — `tests/` n'y entre pas. La conséquence
+> observable qui justifie le rang P2 tient toujours, plus largement. Détail et
+> mesure dans la fiche C7.
+
 ## Constats
 
 Huit constats sont retenus, chacun rejouable depuis les résultats de
@@ -746,6 +754,74 @@ ce qu'un lecteur peut vérifier.
 Une symétrie mérite une phrase : cet audit a trouvé ce défaut en vérifiant
 sa propre citation — exactement la discipline qu'il revendique par ailleurs
 (on calibre, on ne fait pas confiance).
+
+> **TRAITÉ LE 2026-08-11 — la fiche comptait trois sites, il y en avait dix ;
+> et « LIVRÉS » est faux dans les deux sens.** La symétrie ci-dessus était
+> juste, mais incomplète : vérifier UNE citation trouve UN défaut ; les
+> vérifier TOUTES en trouve quatre de plus.
+>
+> **L'inventaire, mesuré et non lu.** Une sonde extrait chaque chemin `*.md`
+> écrit dans un commentaire des 255 fichiers sources suivis, puis le résout
+> contre le dépôt. Dix sites morts, vers **cinq** documents distincts :
+>
+> | Document cité | Sites | Dont dans un fichier du paquet npm |
+> |---|---|---|
+> | `netgain/docs/calibration-observatoire-m1.md` | 3 (les trois de la fiche) | 1 — `lib/server/observatory/rules/thresholds.js:6` |
+> | `doc/27-calibration-invocation.md` | 4 — **non vus** | 1 — `public/viz-invocation-patterns.mjs:14` |
+> | `doc/30-design-scission-guillemet.md` | 1 — **non vu** | 0 |
+> | `docs/plan-j7-churn.md` | 1 — **non vu** | 0 |
+> | `docs/plan-j8-relectures-read.md` | 1 — **non vu** | 0 |
+>
+> Aucun des cinq n'a jamais existé ici : `git log --all --full-history` est
+> vide pour les **neuf** motifs essayés, pas seulement pour `*calibration*`
+> que la fiche avait testé.
+>
+> **Le mot « LIVRÉS » surcompte et manque en même temps.** `package.json`
+> (`files`) n'embarque ni `tests/` ni `docs/` : des trois fichiers de la fiche,
+> **un seul** part dans le paquet. Et le site qui partait sans avoir été vu est
+> précisément dans un fichier livré — `public/viz-invocation-patterns.mjs`.
+>
+> **L'arbitrage que la cible proposait était déjà tranché.** « Importer le
+> document ou corriger les citations » : la décision existe, **datée du
+> 2026-08-06**, écrite dans le dépôt privé au moment où le moteur a déménagé
+> ici — le code est venu, les relevés et les plans sont restés privés (noms de
+> projets réels, volumes de jetons, coûts en dollars). Importer aurait défait
+> cette décision. L'audit ne pouvait pas la voir : il n'auditait que ce dépôt.
+>
+> **La forme courte était déjà la convention ; personne ne l'avait écrite.**
+> Sur les 51 citations de documents externes (27 fichiers, 10 documents),
+> **41 s'écrivent déjà `doc/NN`** — une forme qui ne prétend pas être un
+> chemin. Les dix autres mentaient en prenant la forme d'une adresse. D'où la
+> règle retenue, et `docs/sources-externes.md` qui traduit les dix documents en
+> donnant, pour chacun, ce qui porte déjà sa substance ICI (`thresholds.js:4-22`
+> pour la calibration, le bloc témoin d'`invocation-patterns.test.mjs` pour
+> `doc/27` et `doc/30`…).
+>
+> **Le filet, et ses trois restrictions mesurées.**
+> `tests/repo/documentation-citations.test.mjs` — `tests/repo/` et non
+> `tests/unit/`, il lit le vrai disque (`tests/CLAUDE.md` § 4). Il ne regarde
+> que les **commentaires** (dans le code, un nom `.md` est un fichier lu à
+> l'exécution ou un bouchon de test), que les tokens portant une **barre
+> oblique** (`CLAUDE.md` nu désigne une famille : 21 sites licites), et ignore
+> chemins absolus et URL.
+>
+> **Mutations de contrôle.** Citation morte en commentaire → rouge, site nommé.
+> **Même chemin mort dans du CODE → vert** : c'est cette discrimination qui
+> laisse vivre `'C:/u/.claude/CLAUDE.md'` (bouchon) et
+> `path.join(…, 'SKILL.md')` (nom lu à l'exécution). Registre supprimé → 11
+> rouges : le correctif porte. Et le fichier de test porte son propre
+> contre-contrôle — un filet qui ne trouve RIEN passerait aussi, il exige donc
+> de voir au moins dix citations vivantes.
+>
+> **Une limite, nommée plutôt que tue.** Le paquet npm ne contient pas
+> `docs/` : un lecteur qui n'a que le paquet installé garde le commentaire —
+> qui porte la substance — mais pas l'adresse. Le filet mesure les citations
+> **contre le dépôt**, et c'est ce qu'il annonce. Cette frontière est antérieure
+> à C7 — six citations de `docs/audit-qualite-code.md` vivent déjà dans `lib/`,
+> sur les vingt du dépôt — et n'a pas été élargie ici.
+>
+> Serveur 801 → 803, moteur 502, typecheck propre, audit 48/48.
+> Commit `7b030de`.
 
 ### C8 — Trois formateurs de durée, réimplémentés à l'identique
 
