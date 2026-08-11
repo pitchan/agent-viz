@@ -1,6 +1,6 @@
 {
   "name": "@vcueto/agent-viz",
-  "version": "0.12.8",
+  "version": "0.13.0",
   "description": "Real-time visualizer for Claude Code and GitHub Copilot CLI sessions: live event stream, token tracking, multi-agent topology with per-source badges, plus a token observatory built on the bundled netgain analysis engine.",
   "bin": {
     "agent-viz": "bin/agent-viz.js",
@@ -36,11 +36,12 @@
     "stop": "node bin/agent-viz.js stop",
     "status": "node bin/agent-viz.js status",
     "build": "tsc -p netgain/tsconfig.build.json",
-    "test": "node --test \"tests/**/*.test.*\"",
-    "test:engine": "vitest run --root netgain",
+    "test": "vitest run",
+    "test:node": "node --test \"tests/**/*.test.*\"",
+    "test:ids:node": "node --test --test-reporter=./test-support/ids/node-reporter.mjs \"tests/**/*.test.*\"",
     "typecheck:engine": "tsc --noEmit -p netgain/tsconfig.json",
     "prepare": "npm run build",
-    "prepublishOnly": "npm run build && npm run test:engine && npm test && npm pack --dry-run"
+    "prepublishOnly": "npm run build && npm test && npm pack --dry-run"
   },
   "keywords": [
     "claude-code",
