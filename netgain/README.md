@@ -116,7 +116,7 @@ git clone https://github.com/pitchan/agent-viz.git
 cd agent-viz
 npm install
 npm run build            # tsc → netgain/dist/
-npm run test:engine      # suite du moteur (vitest)
+npm test                 # un seul `vitest run`, moteur et produit ensemble
 ```
 
 ## Limites connues
