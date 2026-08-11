@@ -96,15 +96,32 @@ test('accumulateUsage stores the canonical id (normalized) regardless of input t
   }
 });
 
-test('accumulateUsage with an unknown model leaves pricing fields untouched', () => {
+// MODIFIÉ LE 2026-08-11 PAR C4 — ce filet de caractérisation est passé au
+// rouge, et c'est le résultat voulu : le comportement qu'il décrivait était
+// précisément le constat.
+//
+// AVANT : un modèle sans tarif laissait TOUS les champs de tarification
+//   intacts — `lastModel` restait `null`, et le seau ne gardait aucune trace
+//   du fait que le total ne comptait pas ce message. Le commentaire disait
+//   « pricing stays at zero », ce qui décrivait bien le code mais masquait sa
+//   conséquence : le montant affiché devenait une sous-estimation muette.
+// APRÈS : le montant reste inchangé (il n'y a toujours rien à compter, et il
+//   reste une borne inférieure exacte), mais le seau NOMME le modèle et marque
+//   le total incomplet, et `lastModel` retient l'identifiant rapporté pour que
+//   la pastille ne disparaisse pas quand aucun modèle n'est tarifé.
+test('accumulateUsage with an unknown model names it and marks the cost incomplete', () => {
   const b = newBucket();
   accumulateUsage(b, { input_tokens: 1000, output_tokens: 500 }, 'claude-mythical-99-99');
-  // Token counters still update, but pricing stays at zero — better than
-  // crashing or filling with NaN when a future model arrives before the
-  // pricing fetch resolves.
+  // Les compteurs de jetons montent toujours : ce qui manque est le TARIF,
+  // pas la mesure.
   assert.equal(b.in, 1000);
-  assert.equal(b.lastModel, null);
   assert.equal(b.costUsd, 0);
+  // Ce que C4 ajoute : le modèle est retenu et l'incomplétude est dite.
+  assert.equal(b.lastModel, 'claude-mythical-99-99');
+  assert.equal(b.costComplete, false);
+  assert.deepEqual(b.unknownModels, ['claude-mythical-99-99']);
+  // Aucune fenêtre de contexte connue pour un modèle hors table.
+  assert.equal(b.contextMax, 0);
 });
 
 test('tokensSnapshot exposes tokensSupported flag (default true)', () => {
@@ -258,4 +275,86 @@ test('C3 — le serveur passe par la primitive du moteur, pas par sa propre addi
   const duMoteur = require('../../netgain/dist/core/usage.js');
   assert.equal(emptyUsageBucket, duMoteur.emptyUsageBucket);
   assert.deepEqual(newBucket().cacheCreate1h, 0);
+});
+
+// ---------------------------------------------------------------------------
+// C4 (2026-08-11) — le seau porte la COMPLÉTUDE du coût, et la porte jusqu'à
+// l'enveloppe SSE. Avant : un message sur un modèle sans tarif était
+// entièrement IGNORÉ (ni coût, ni lastModel, ni contextMax) et rien ne le
+// disait — mesuré, une session de deux messages dont un inconnu affichait
+// $0.50 pour un coût réel de ~$1.00, sans la moindre réserve.
+// ---------------------------------------------------------------------------
+const { tokensMessage, ensureTokens } = require('../../lib/server/tokens');
+
+const AT = '2026-08-11T12:00:00.000Z';
+const usage = () => ({ input_tokens: 40_000, output_tokens: 8_000, cache_read_input_tokens: 200_000 });
+
+test('C4 — un modèle tarifé laisse le coût COMPLET', () => {
+  const b = newBucket();
+  accumulateUsage(b, usage(), 'claude-opus-5', 'm1', AT);
+  assert.equal(b.costComplete, true);
+  assert.deepEqual(b.unknownModels, []);
+  assert.ok(b.costUsd > 0);
+});
+
+test('C4 — un modèle SANS TARIF marque le coût incomplet et se nomme', () => {
+  const b = newBucket();
+  accumulateUsage(b, usage(), 'claude-opus-5', 'm1', AT);
+  const coutConnu = b.costUsd;
+  accumulateUsage(b, usage(), 'claude-opus-6', 'm2', AT);
+
+  assert.equal(b.costComplete, false);
+  assert.deepEqual(b.unknownModels, ['claude-opus-6']);
+  // Le montant reste une BORNE INFÉRIEURE exacte : la part connue, inchangée.
+  assert.equal(b.costUsd, coutConnu);
+});
+
+test('C4 — un ZÉRO VOULU ne rend PAS le coût incomplet', () => {
+  // `<synthetic>` : 80 occurrences sur les 833 transcripts de la machine.
+  // C'est le cas qui interdit de marquer l'incomplétude sur un simple test de
+  // nullité du tarif — le serveur ne savait pas distinguer « 0 $ assumé » de
+  // « tarif inconnu », et aurait signalé « partiel » sur des sessions justes.
+  const b = newBucket();
+  accumulateUsage(b, usage(), '<synthetic>', 'm1', AT);
+  accumulateUsage(b, usage(), 'claude-opus-5', 'm2', AT);
+  assert.equal(b.costComplete, true);
+  assert.deepEqual(b.unknownModels, []);
+});
+
+test('C4 — un modèle inconnu est nommé UNE fois, pas une par message', () => {
+  const b = newBucket();
+  accumulateUsage(b, usage(), 'claude-opus-6', 'm1', AT);
+  accumulateUsage(b, usage(), 'claude-opus-6', 'm2', AT);
+  accumulateUsage(b, usage(), 'zzz-autre-modele', 'm3', AT);
+  assert.deepEqual(b.unknownModels, ['claude-opus-6', 'zzz-autre-modele']);
+});
+
+test('C4 — lastModel retient le DERNIER modèle rapporté, tarifé ou non', () => {
+  // Avant : lastModel n'était posé que par un modèle tarifé, si bien qu'une
+  // session n'utilisant QUE des modèles inconnus masquait la pastille
+  // entièrement — ni coût, ni contexte, ni modèle à l'écran.
+  const b = newBucket();
+  accumulateUsage(b, usage(), 'claude-opus-6', 'm1', AT);
+  assert.equal(b.lastModel, 'claude-opus-6');
+  assert.equal(b.contextMax, 0, 'aucune fenêtre connue pour un modèle sans tarif');
+  assert.equal(b.costComplete, false);
+});
+
+test('C4 — un identifiant régional est tarifé comme sa forme canonique', () => {
+  const b = newBucket();
+  accumulateUsage(b, usage(), 'us.anthropic.claude-opus-4-7', 'm1', AT);
+  const c = newBucket();
+  accumulateUsage(c, usage(), 'claude-opus-4-7', 'm2', AT);
+  assert.equal(b.costComplete, true);
+  assert.equal(b.costUsd, c.costUsd);
+  assert.equal(b.lastModel, 'claude-opus-4-7');
+});
+
+test('C4 — la complétude traverse l\'enveloppe SSE', () => {
+  const rec = {};
+  ensureTokens(rec);
+  accumulateUsage(rec.tokens.main, usage(), 'claude-opus-6', 'm1', AT);
+  const msg = tokensMessage('s1', rec);
+  assert.equal(msg.main.costComplete, false);
+  assert.deepEqual(msg.main.unknownModels, ['claude-opus-6']);
 });

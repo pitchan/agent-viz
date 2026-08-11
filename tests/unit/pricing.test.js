@@ -6,27 +6,39 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
-  getPrice, computeCost, normalizeId, _FALLBACK, _setPricesForTest,
+  getPrice, _FALLBACK, _setPricesForTest,
 } = require('../../lib/server/pricing');
+// MODIFIÉ LE 2026-08-11 PAR C4 — `computeCost` et la normalisation ne sortent
+// plus de `lib/server/pricing.js` : elles avaient UNE jumelle dans le moteur,
+// les deux avaient divergé, et la définition unique vit désormais en
+// TypeScript. Ces filets suivent la fonction là où elle est, par le pont.
+// Le nom aussi change : `normalizeId` → `normalizeModel`, le nom du moteur —
+// un seul nom dans le produit, comme `CLAUDE_CONFIG_DIR` après C5.
+const { computeCost, normalizeModel } = require('../../lib/server/pricing-engine');
 
-test('normalizeId strips provider prefixes and date/version suffixes', () => {
-  assert.equal(normalizeId('claude-opus-4-7'), 'claude-opus-4-7');
-  assert.equal(normalizeId('anthropic.claude-opus-4-7'), 'claude-opus-4-7');
-  assert.equal(normalizeId('bedrock/claude-sonnet-4-5'), 'claude-sonnet-4-5');
-  assert.equal(normalizeId('anthropic.claude-opus-4-7-v1:0'), 'claude-opus-4-7');
-  assert.equal(normalizeId('claude-sonnet-4-5-20250929'), 'claude-sonnet-4-5');
-  assert.equal(normalizeId('claude-opus-4-7@20251101'), 'claude-opus-4-7');
-  assert.equal(normalizeId(null), null);
-  assert.equal(normalizeId(''), null);
+test('normalizeModel strips provider prefixes and date/version suffixes', () => {
+  assert.equal(normalizeModel('claude-opus-4-7'), 'claude-opus-4-7');
+  assert.equal(normalizeModel('anthropic.claude-opus-4-7'), 'claude-opus-4-7');
+  assert.equal(normalizeModel('bedrock/claude-sonnet-4-5'), 'claude-sonnet-4-5');
+  assert.equal(normalizeModel('anthropic.claude-opus-4-7-v1:0'), 'claude-opus-4-7');
+  assert.equal(normalizeModel('claude-sonnet-4-5-20250929'), 'claude-sonnet-4-5');
+  assert.equal(normalizeModel('claude-opus-4-7@20251101'), 'claude-opus-4-7');
+  assert.equal(normalizeModel(null), null);
+  assert.equal(normalizeModel(''), null);
 });
 
-test('normalizeId strips regional routing prefixes and single-digit version suffixes', () => {
+test('normalizeModel strips regional routing prefixes and single-digit version suffixes', () => {
   // Root cause of most of the 109 false "modele-nouveau" alerts: LiteLLM
   // carries per-region routing ids (global./us./eu./au.anthropic.) that
   // never normalized down to the canonical id.
-  assert.equal(normalizeId('us.anthropic.claude-opus-4-7'), 'claude-opus-4-7');
-  assert.equal(normalizeId('global.anthropic.claude-fable-5'), 'claude-fable-5');
-  assert.equal(normalizeId('claude-opus-4-6-v1'), 'claude-opus-4-6');
+  //
+  // C4 : jusqu'au 2026-08-11 cette connaissance-là n'existait QUE côté serveur.
+  // Le moteur l'ignorait, si bien qu'il annonçait « coût partiel » sur un
+  // identifiant régional que le serveur tarifait sans réserve — la divergence
+  // courait dans le sens inverse de ce que la fiche d'audit supposait.
+  assert.equal(normalizeModel('us.anthropic.claude-opus-4-7'), 'claude-opus-4-7');
+  assert.equal(normalizeModel('global.anthropic.claude-fable-5'), 'claude-fable-5');
+  assert.equal(normalizeModel('claude-opus-4-6-v1'), 'claude-opus-4-6');
 });
 
 test('getPrice resolves direct ids and provider-prefixed ids from the fallback map', () => {
@@ -58,7 +70,11 @@ test('computeCost sums input/output/cache contributions', () => {
   // 2000 * 3.75e-6 = 0.0075
   // 10000 * 3e-7 = 0.003
   // Total = 0.021
-  assert.ok(Math.abs(cost - 0.021) < 1e-9, `got ${cost}`);
+  // C4 : le retour est un CONTRAT `{ usd, known, model }`, plus un nombre nu —
+  // c'est ce qui permet de dire « ce montant est incomplet » au lieu de rendre
+  // un zéro qu'on ne sait pas distinguer d'un vrai zéro.
+  assert.equal(cost.known, true);
+  assert.ok(Math.abs(cost.usd - 0.021) < 1e-9, `got ${cost.usd}`);
 });
 
 test('computeCost charges the 1h cache tier at 2x input price (Anthropic rate card)', () => {
@@ -75,7 +91,7 @@ test('computeCost charges the 1h cache tier at 2x input price (Anthropic rate ca
     cache_creation: { ephemeral_5m_input_tokens: 0, ephemeral_1h_input_tokens: 1000 },
   }, 'claude-sonnet-4-5');
   // 1000 * 6e-6 = 0.006 (NOT 1000 * 3.75e-6 = 0.00375)
-  assert.ok(Math.abs(cost - 0.006) < 1e-9, `got ${cost}, expected 0.006 (2x input rate)`);
+  assert.ok(Math.abs(cost.usd - 0.006) < 1e-9, `got ${cost.usd}, expected 0.006 (2x input rate)`);
 });
 
 test('computeCost without a cache_creation breakdown treats it all as 5min (back-compat)', () => {
@@ -87,7 +103,7 @@ test('computeCost without a cache_creation breakdown treats it all as 5min (back
     cache_read_input_tokens: 0,
   }, 'claude-sonnet-4-5');
   // 1000 * 3.75e-6 = 0.00375
-  assert.ok(Math.abs(cost - 0.00375) < 1e-9, `got ${cost}`);
+  assert.ok(Math.abs(cost.usd - 0.00375) < 1e-9, `got ${cost.usd}`);
 });
 
 test('computeCost splits mixed 5m+1h cache creations correctly', () => {
@@ -98,25 +114,37 @@ test('computeCost splits mixed 5m+1h cache creations correctly', () => {
     cache_creation: { ephemeral_5m_input_tokens: 500, ephemeral_1h_input_tokens: 1000 },
   }, 'claude-sonnet-4-5');
   // 500 * 3.75e-6 + 1000 * 6e-6 = 0.001875 + 0.006 = 0.007875
-  assert.ok(Math.abs(cost - 0.007875) < 1e-9, `got ${cost}`);
+  assert.ok(Math.abs(cost.usd - 0.007875) < 1e-9, `got ${cost.usd}`);
 });
 
-test('computeCost returns 0 for unknown model rather than NaN/throw', () => {
+// MODIFIÉ LE 2026-08-11 PAR C4 — filet de caractérisation passé au rouge, et
+// c'est le résultat voulu : le comportement qu'il gravait EST le constat.
+//
+// AVANT : un modèle sans tarif rendait `0`. Un zéro qu'aucun appelant ne
+//   pouvait distinguer d'un vrai zéro ; le titre disait « rather than
+//   NaN/throw », ce qui compare le zéro à un plantage et non à la vérité.
+// APRÈS : `{ usd: null, known: false }`. Le montant n'est pas inventé, et
+//   l'appelant SAIT que son total est incomplet — ce qui remonte jusqu'à la
+//   pastille temps réel.
+test('computeCost reports an unknown model as unpriced, never as a zero', () => {
   const cost = computeCost(
     { input_tokens: 1000, output_tokens: 500 },
     'claude-unknown-future-model',
   );
-  assert.equal(cost, 0);
+  assert.equal(cost.usd, null, 'aucun montant inventé');
+  assert.equal(cost.known, false, 'et l’appelant peut le savoir');
+  assert.equal(cost.model, 'claude-unknown-future-model');
 });
 
-test('computeCost accepts a resolved price object directly (avoids double lookup)', () => {
-  // Hot-path: tokens.js resolves the price once and reuses it. Verify the
-  // dual signature works without going through getPrice() a second time.
-  const price = getPrice('claude-sonnet-4-5');
-  const cost = computeCost({ input_tokens: 1000, output_tokens: 500 }, price);
-  // 1000*3e-6 + 500*1.5e-5 = 0.003 + 0.0075 = 0.0105
-  assert.ok(Math.abs(cost - 0.0105) < 1e-9, `got ${cost}`);
-});
+// SUPPRIMÉ LE 2026-08-11 PAR C4 : « computeCost accepts a resolved price object
+// directly (avoids double lookup) ». La double signature
+// `computeCost(usage, priceObj)` n'existe plus — elle était l'optimisation qui
+// FABRIQUAIT le constat, puisque c'est en passant un objet que `tokens.js`
+// contournait toute la branche « modèle inconnu ». Le seul appelant de
+// production résout maintenant les métadonnées d'affichage par `getPrice` et
+// le montant par le contrat du moteur ; la consultation de table
+// supplémentaire est assumée, sur un chemin déjà amorti par une diffusion
+// différée de 250 ms.
 
 test('litellmDrift rejects __proto__ / constructor / prototype keys and never pollutes', () => {
   const { _internals } = require('../../lib/server/pricing');
@@ -197,12 +225,12 @@ test('computeCost prices 1.2M tokens of 1h cache on fable-5 at ~$24 (not $0.02)'
     cache_creation: { ephemeral_5m_input_tokens: 0, ephemeral_1h_input_tokens: 1_200_000 },
   }, 'claude-fable-5');
   // 1_200_000 * (1e-5 * 2) = 24.0
-  assert.ok(Math.abs(cost - 24.0) < 1e-9, `got ${cost}`);
+  assert.ok(Math.abs(cost.usd - 24.0) < 1e-9, `got ${cost.usd}`);
 });
 
-test('normalizeId strips the [1m] context-window suffix (netgain mirror)', () => {
-  assert.equal(normalizeId('claude-fable-5[1m]'), 'claude-fable-5');
-  assert.equal(normalizeId('claude-opus-4-8[1m]'), 'claude-opus-4-8');
+test('normalizeModel strips the [1m] context-window suffix (netgain mirror)', () => {
+  assert.equal(normalizeModel('claude-fable-5[1m]'), 'claude-fable-5');
+  assert.equal(normalizeModel('claude-opus-4-8[1m]'), 'claude-opus-4-8');
 });
 
 test('getPrice resolves the tariff in effect at the given date (sonnet-5 intro until 2026-08-31)', () => {
@@ -235,8 +263,8 @@ test('getPrice without a date means "now" (same result as an explicit current ti
 
 test('computeCost with a model string honors the message date', () => {
   const usage = { input_tokens: 1000, output_tokens: 0 };
-  const aug = computeCost(usage, 'claude-sonnet-5', '2026-08-15T00:00:00.000Z');
-  const sept = computeCost(usage, 'claude-sonnet-5', '2026-09-15T00:00:00.000Z');
+  const aug = computeCost(usage, 'claude-sonnet-5', '2026-08-15T00:00:00.000Z').usd;
+  const sept = computeCost(usage, 'claude-sonnet-5', '2026-09-15T00:00:00.000Z').usd;
   assert.ok(Math.abs(aug - 0.002) < 1e-12, `got ${aug} (intro rate expected)`);
   assert.ok(Math.abs(sept - 0.003) < 1e-12, `got ${sept} (sticker rate expected)`);
 });
@@ -259,17 +287,33 @@ test('a changed upstream tariff is REPORTED as drift, never applied to the map',
   assert.equal(getPrice('claude-fable-5').input, 1e-5);
 });
 
-test('deliberate zero-cost models cost 0 without the unknown-model warning', t => {
-  const spy = t.mock.method(console, 'error');
-  assert.equal(computeCost({ input_tokens: 1000, output_tokens: 50 }, '<synthetic>'), 0);
-  assert.equal(computeCost({ input_tokens: 1000, output_tokens: 50 }, 'ministral-3:latest'), 0);
-  assert.equal(spy.mock.callCount(), 0);
+// MODIFIÉ LE 2026-08-11 PAR C4 — ces deux filets caractérisaient un
+// avertissement dont la sonde a prouvé qu'il n'était JAMAIS émis en
+// production : le seul appelant, `tokens.js`, passait un objet prix, et la
+// branche était gardée par `typeof modelOrPrice === 'string'`. Prouvé par
+// mutation le 2026-08-11 — un `throw` dans cette branche faisait tomber 2
+// tests sur 788, ces deux-ci, tous deux des appels directs. Aucun test
+// serveur, aucun test d'intégration.
+//
+// Ce qui distingue un zéro VOULU d'un tarif inconnu n'est donc plus une trace
+// écrite dans un journal que personne ne lit (établi par C5), mais le champ
+// `known` du contrat — et il voyage jusqu'à l'écran.
+test('un zéro VOULU est connu, et ne rend pas le total incomplet', () => {
+  for (const m of ['<synthetic>', 'ministral-3:latest']) {
+    const r = computeCost({ input_tokens: 1000, output_tokens: 50 }, m);
+    assert.equal(r.usd, 0, `${m} : zéro assumé`);
+    assert.equal(r.known, true, `${m} : et assumé COMME connu`);
+  }
 });
 
-test('a model outside the zero-cost list still warns once and reports 0', t => {
+test('un modèle hors de la liste des zéros voulus est inconnu, sans rien journaliser', t => {
   const spy = t.mock.method(console, 'error');
-  assert.equal(computeCost({ input_tokens: 10 }, 'mystery-model-9'), 0);
-  assert.equal(spy.mock.callCount(), 1);
+  const r = computeCost({ input_tokens: 10 }, 'mystery-model-9');
+  assert.equal(r.usd, null);
+  assert.equal(r.known, false);
+  // TÉMOIN : plus aucune trace. L'information ne passe plus par le journal du
+  // démon, elle passe par le contrat.
+  assert.equal(spy.mock.callCount(), 0);
 });
 
 test('an identical LiteLLM feed produces zero drift', () => {
