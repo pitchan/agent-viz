@@ -486,6 +486,93 @@ montant sans réserve quand il est en réalité incomplet.
 |---|---|---|---|---|
 | exactitude de ce que voit l'utilisateur | démontré | M | à absorber par la fusion | à corriger |
 
+> **TRAITÉ LE 2026-08-11 — le constat tient, mais la fiche se contredisait, et
+> la divergence qu'elle avait manquée court dans l'autre sens.**
+>
+> **La sonde différentielle d'abord, la fiche ensuite** — quatrième fois que ce
+> geste paie. Même matrice (24 identifiants de modèle × 13 formes d'usage)
+> poussée dans les deux implémentations réelles : **18 écarts**.
+>
+> **1. La trace citée par cette fiche est du CODE MORT.** Le premier point
+> ci-dessus dit que `lib/server/pricing.js` « rend `0` pour un modèle inconnu et
+> journalise un avertissement » ; le quatrième dit que `tokens.js` encadre tout
+> par `if (price)` et que « rien n'est mis à jour ». **Les deux ne peuvent pas
+> décrire le même appel — et c'est le quatrième qui a raison.** Le seul appelant
+> de production passait un **objet prix**, et la branche fautive était gardée par
+> `typeof modelOrPrice === 'string'` : elle n'était jamais atteinte. Prouvé trois
+> fois — par `grep` (un seul appelant), par exécution (`traces = []` sur une
+> session entière à modèle inconnu), et par **mutation** (un `throw` dans la
+> branche faisait tomber **2 tests sur 788**, tous deux des appels directs ;
+> aucun test serveur, aucun test d'intégration). En production le message
+> n'était pas « tarifé à zéro » : il était **entièrement ignoré**, sans trace.
+> `ZERO_COST` du serveur était mort pour la même raison.
+>
+> **2. Le montant n'était pas faux — il était une borne inférieure muette.**
+> Mesuré au niveau produit sur une même session : Observatoire **$0,2500
+> (partiel ⚠)**, pastille **$0,2500** sans réserve. Les montants sont
+> **identiques** ; ce qui manquait était la réserve. Et **66,7 % du coût réel de
+> la session était absent des deux vues** — le moteur le disait, la pastille non.
+>
+> **3. La normalisation divergeait, dans le sens INVERSE de la thèse de la
+> fiche.** `normalizeId` du serveur était un **sur-ensemble strict** de
+> `normalizeModel` du moteur : routeurs régionaux (`us.`/`eu.`/`global.`/`au.`),
+> préfixes empilés (`bedrock/anthropic.…`), suffixe `-vN` seul. Sur
+> `us.anthropic.claude-opus-4-7` le **moteur** annonçait « partiel » pendant que
+> le **serveur** tarifait correctement. **0 occurrence sur 834 transcriptions**
+> de la machine de mesure → latent ici, réel pour un déploiement Bedrock/Vertex.
+> Traité dans C4 par arbitrage de Vincent : sans ça, le symptôme même que C4
+> ferme serait resté atteignable par une autre entrée.
+>
+> **4. `<synthetic>` est le cas qui interdisait la correction naïve.** 80
+> occurrences sur 834 transcriptions, entrelacées dans des sessions normales. Le
+> serveur ne savait pas distinguer un **0 $ assumé** d'un **tarif inconnu** :
+> marquer l'incomplétude sur un simple test de nullité du tarif aurait signalé
+> « partiel » sur des sessions parfaitement justes. C'est ce qui impose de passer
+> par `pricingKindOf` du moteur — `tarife` / `zero-voulu` / `inconnu` — et non
+> par un montant nul, qu'un modèle tarifé sans jetons produit aussi.
+>
+> **5. Deux écarts LATENTS de plus, corrigés parce que l'unification les rendait
+> atteignables.** `cache_creation: null` — du JSON valide — faisait **lever** le
+> `computeCost` du moteur et pas celui du serveur (0 occurrence sur 834) ;
+> `normalizeEvent` passe `usage` par `asRec` mais ne touche pas à ses champs. Le
+> serveur déléguant désormais sa formule au moteur, sans durcissement
+> l'unification aurait **fait apparaître** côté serveur une panne qu'il n'avait
+> pas. Idem `__proto__`, qui rendait `NaN` côté serveur.
+>
+> **Ce qui a changé.** Une seule normalisation et une seule formule, en
+> TypeScript ; **quatrième pont**, `lib/server/pricing-engine.js`, comme prévu —
+> et il n'ajoute aucun mode de panne : `netgain/dist` écarté, **le serveur
+> refuse déjà de démarrer depuis C2** (vérifié en exécutant, `jsonl.js` lève en
+> premier). Le seau porte `costComplete` et `unknownModels` jusqu'à l'enveloppe
+> SSE, additive. Le commentaire de `FALLBACK` affirmait qu'il couvrait « le
+> moteur absent » : **c'était faux**, corrigé — il ne couvre que la fenêtre
+> d'amorçage.
+>
+> **À l'écran (arbitrages de Vincent, 2026-08-11).** Coût partiel avec une part
+> connue → « **au moins $4.17** », l'énoncé exact du sens de l'erreur ;
+> infobulle « **coût PARTIEL** », le mot que la page Observatoire emploie déjà à
+> six endroits, avec les modèles nommés. Aucun modèle tarifé → « **coût
+> indisponible** » (« au moins $0 » est vrai et ne prétend rien), et **la
+> pastille s'affiche désormais** au lieu de disparaître : le modèle et le volume
+> de jetons sont connus, seule la fenêtre manque. Vérifié dans le vrai DOM sur
+> une instance de contrôle, cinq états, y compris la remontée depuis un
+> sous-agent et un **témoin** d'enveloppe antérieure à C4 (qui reste « complet »,
+> `undefined` n'étant pas `false`).
+>
+> **Filets.** Moteur 493 → **502**, serveur 788 → **801**. Les deux mutations de
+> contrôle discriminent : complétude toujours vraie → **3 rouges** ; retour au
+> silence d'avant C4 → **9 rouges**. Trois filets de caractérisation sont passés
+> au rouge et ont été **mis à jour, datés** — jamais contournés ; un quatrième
+> (« computeCost accepts a resolved price object ») a été supprimé, en disant
+> pourquoi : cette double signature était l'optimisation qui **fabriquait** le
+> constat.
+>
+> **Reste ouvert, non traité :** `netgain/src/install/paths.ts` (préséance
+> `CLAUDE_CONFIG_DIR` / `NETGAIN_HOME`, escaladé depuis C5) et l'absence de
+> `leftover` dans `readAndBroadcast` (piste non reproduite, cf. C5).
+>
+> Commits `65883c1`, `ddc7089`, `6798bb9`.
+
 ### C5 — Deux variables d'environnement désignent le même dossier de configuration
 
 **Fait brut.** `docs/audit/resultats/d7.json`, geste
