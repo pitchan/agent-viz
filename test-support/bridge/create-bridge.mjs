@@ -1,13 +1,32 @@
-// Fabrique du pont `node:test`. Pure : elle recoit les primitives de
-// l'executeur et ne connait ni `vitest` ni `node:module`.
+// Fabrique du pont `node:test` vers vitest. PURE : elle recoit les primitives
+// de l'executeur par injection et ne connait ni `vitest` ni `node:module` —
+// c'est ce qui la rend testable sans monkey-patching (regle D du CLAUDE.md
+// racine), et ce qui permet a ses tests de tourner sous les DEUX executeurs.
 //
-// `after` de node:test s'execute apres TOUS les tests du fichier — c'est
-// `afterAll` de vitest, pas `afterEach`.
-//
-// `t.mock.method` restaure AUTOMATIQUEMENT en fin de test. `vi.spyOn` ne le
-// fait pas : c'est la divergence mesuree le 2026-08-11 (doc/36, annexe A.2,
-// sonde no 1), et elle est invisible a la lecture. Le remplacement est donc
-// ecrit ici, pas delegue.
+// Trois points etablis par la mesure du 2026-08-11, qu'aucune lecture ne
+// montre :
+//   - `after` de node:test s'execute apres TOUS les tests du fichier : c'est
+//     `afterAll` de vitest, pas `afterEach` ;
+//   - `t.mock.method` RESTAURE automatiquement en fin de test, la ou
+//     `vi.spyOn` ne le fait pas — d'ou le remplacement ecrit ici plutot que
+//     delegue ;
+//   - une API non implementee doit JETER en se nommant. Un no-op retirerait
+//     des tests du filet en silence : la maladie du constat C1.
+
+const FICHIER = 'test-support/bridge/create-bridge.mjs';
+
+function refus(api) {
+  return () => {
+    throw new Error(
+      `pont node:test : ${api} n est pas implemente. Aucun test du depot ne l utilisait `
+      + `quand le pont a ete ecrit (mesure du 2026-08-11). Implemente-le dans ${FICHIER} `
+      + `et ajoute son test — ne le contourne pas.`);
+  };
+}
+
+const NON_IMPLEMENTE_MODULE = ['skip', 'only', 'todo', 'describe', 'it', 'before', 'afterEach', 'mock'];
+const NON_IMPLEMENTE_CONTEXTE = ['test', 'skip', 'todo', 'diagnostic', 'plan'];
+
 function creerContexte(vi) {
   const restaurations = [];
   const apresTest = [];
@@ -35,11 +54,14 @@ function creerContexte(vi) {
     tick: ms => vi.advanceTimersByTime(ms),
   };
 
+  const contexte = { mock: { method, timers }, after: fn => apresTest.push(fn) };
+  for (const api of NON_IMPLEMENTE_CONTEXTE) contexte[api] = refus(`t.${api}`);
+
   // Les trois phases sont ISOLEES : une fonction `t.after` qui jette ne doit
   // empecher ni la restauration des mocks, ni le retour aux temporisateurs
   // reels. Sinon l'etat fuit vers les tests suivants et la panne se manifeste
-  // ailleurs qu'a l'endroit ou elle est nee. L'erreur n'est pas avalee pour
-  // autant : elle est rendue a l'appelant.
+  // ailleurs qu'a l'endroit ou elle est nee — le mode de panne le plus couteux
+  // du chantier. L'erreur n'est pas avalee pour autant : elle est rendue.
   const nettoyer = async () => {
     let premiereErreur = null;
     while (apresTest.length) {
@@ -54,29 +76,34 @@ function creerContexte(vi) {
     return premiereErreur;
   };
 
-  return {
-    contexte: { mock: { method, timers }, after: fn => apresTest.push(fn) },
-    nettoyer,
-  };
+  return { contexte, nettoyer };
 }
 
 export function createBridge({ test: runTest, afterAll, beforeEach, vi }) {
-  const pont = (nom, fn) => runTest(nom, async () => {
-    const { contexte, nettoyer } = creerContexte(vi);
-    let erreurDuCorps = null;
-    try {
-      await fn(contexte);
-    } catch (e) {
-      erreurDuCorps = e;
+  const pont = (nom, fn) => {
+    if (typeof fn !== 'function') {
+      throw new Error(
+        `pont node:test : la forme test(nom, option, fn) n est pas implementee — aucun test `
+        + `du depot n utilisait d option (mesure du 2026-08-11). Implemente-la dans ${FICHIER}.`);
     }
-    const erreurDeNettoyage = await nettoyer();
-    // Le corps prime : son erreur dit ce que le test voulait prouver. Celle du
-    // nettoyage ne doit jamais la masquer.
-    if (erreurDuCorps) throw erreurDuCorps;
-    if (erreurDeNettoyage) throw erreurDeNettoyage;
-  });
+    return runTest(nom, async () => {
+      const { contexte, nettoyer } = creerContexte(vi);
+      let erreurDuCorps = null;
+      try {
+        await fn(contexte);
+      } catch (e) {
+        erreurDuCorps = e;
+      }
+      const erreurDeNettoyage = await nettoyer();
+      // Le corps prime : son erreur dit ce que le test voulait prouver. Celle
+      // du nettoyage ne doit jamais la masquer.
+      if (erreurDuCorps) throw erreurDuCorps;
+      if (erreurDeNettoyage) throw erreurDeNettoyage;
+    });
+  };
   pont.test = pont;
   pont.after = fn => afterAll(fn);
   pont.beforeEach = fn => beforeEach(fn);
+  for (const api of NON_IMPLEMENTE_MODULE) pont[api] = refus(`test.${api}`);
   return pont;
 }

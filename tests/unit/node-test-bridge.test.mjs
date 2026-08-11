@@ -204,3 +204,45 @@ test('l erreur du corps prime sur celle du nettoyage', async () => {
   // Assert
   await assert.rejects(execution, /echec du corps/);
 });
+
+test('une API non implementee jette en se nommant, au lieu de ne rien faire', () => {
+  // Arrange
+  const { deps } = primitives();
+  const pont = createBridge(deps);
+  // Act
+  const appel = () => pont.skip('un nom', () => {});
+  // Assert
+  assert.throws(appel, /test\.skip/);
+});
+
+test('le refus nomme le fichier ou l ajouter, pour ne pas laisser chercher', () => {
+  // Arrange
+  const { deps } = primitives();
+  const pont = createBridge(deps);
+  // Act
+  const appel = () => pont.describe('un groupe', () => {});
+  // Assert
+  assert.throws(appel, /create-bridge\.mjs/);
+});
+
+test('les sous-tests sont refuses depuis le contexte aussi', async () => {
+  // Arrange
+  const { journal, deps } = primitives();
+  const pont = createBridge(deps);
+  let capturee = null;
+  pont('sujet', t => { try { t.test('sous-test', () => {}); } catch (e) { capturee = e; } });
+  // Act
+  await journal.tests[0].fn();
+  // Assert
+  assert.match(String(capturee?.message), /t\.test/);
+});
+
+test('une option passee a test() est refusee plutot qu ignoree', () => {
+  // Arrange
+  const { deps } = primitives();
+  const pont = createBridge(deps);
+  // Act
+  const appel = () => pont('un nom', { timeout: 10 }, () => {});
+  // Assert
+  assert.throws(appel, /option/);
+});
