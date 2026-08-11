@@ -68,6 +68,19 @@ test('t.mock.method compte les appels et laisse passer le comportement d origine
   assert.equal(espion.mock.callCount(), 1);
 });
 
+test('l espion sans implementation rend la valeur de l original', async () => {
+  // Arrange
+  const { journal, deps } = primitives();
+  const pont = createBridge(deps);
+  const cible = { calcul: (a, b) => a + b };
+  let resultat = null;
+  pont('sujet', t => { t.mock.method(cible, 'calcul'); resultat = cible.calcul(2, 3); });
+  // Act
+  await journal.tests[0].fn();
+  // Assert
+  assert.equal(resultat, 5);
+});
+
 test('t.mock.method avec implementation substitue le comportement', async () => {
   // Arrange
   const { journal, deps } = primitives();
