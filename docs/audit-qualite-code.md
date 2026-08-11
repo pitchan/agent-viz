@@ -104,6 +104,14 @@ SI agir.
 > `POST /alerts/ack`). Le rang P2 tient, la conséquence observable change.
 > Détail et mesure dans la fiche C6.
 
+> **PRÉCISÉ AU TRAITEMENT DE C8 (2026-08-11) : « **C8**, trois copies des deux
+> mêmes seuils, qu'aucun mécanisme ne tient synchronisées » est vrai, et en deçà
+> du fait.** Les trois copies étaient déjà **désynchronisées** — pas sur les
+> seuils, qu'elles partageaient au caractère près, mais sur ce qu'elles font d'une
+> entrée hors contrat : deux d'entre elles écrivaient `NaNm` ou
+> `-1700000000000ms` à l'écran là où la troisième refusait. Le rang P2 tient ;
+> l'impact « coût de maintenance seul » était optimiste. Mesure dans la fiche C8.
+
 ## Constats
 
 Huit constats sont retenus, chacun rejouable depuis les résultats de
@@ -956,6 +964,66 @@ geste de consolidation que C6, sur une famille plus large.
 
 Comme C6, les trois fichiers sont tous en zone `web` ; rien n'attend la
 fusion avec `netgain/src/`.
+
+> **TRAITÉ LE 2026-08-11 — la fiche a raison sur le domaine nominal, et
+> sous-estime tout le reste : la « différence de gardes d'entrée » était la seule
+> chose qui séparait un affichage honnête de « NaNm ».**
+>
+> **La sonde différentielle.** Les trois implémentations sur la même grille —
+> `calcDuration` importée pour de vrai, les deux autres **extraites du fichier
+> réel** (l'une est privée à son module, l'autre vit dans un fichier qui touche le
+> DOM à l'initialisation) :
+>
+> | Cas | `calcDuration` | `formatSessionDuration` | `updateLiveDurations` |
+> |---|---|---|---|
+> | 0 ms · 999 ms | `0ms` · `999ms` | idem | idem |
+> | 1 000 ms · 59 999 ms | `1.0s` · `60.0s` | idem | idem |
+> | 60 000 ms · 1 h | `1.0m` · `60.0m` | idem | idem |
+> | **durée négative (−5 s)** | `-5000ms` | `?` | `-5000ms` |
+> | **date illisible** | **`NaNm`** | `?` | **`NaNm`** |
+> | **borne absente** | `null` | `?` | **`-1700000000000ms`** |
+>
+> Sur le domaine nominal : identiques au caractère près, comme annoncé. Hors
+> contrat : trois réponses différentes, dont deux qui **écrivent du bruit à
+> l'écran**.
+>
+> **Atteignabilité, mesurée et non supposée.** Les deux bornes viennent toujours
+> de `evt._ts`, estampillé par `lib/hook.js:65` avec `new Date().toISOString()`,
+> et `viz-layout.js:331` retombe sur l'horloge locale si le champ manque. Une
+> **date illisible n'est donc pas atteignable** par le flux d'événements ; une
+> **durée négative l'est**, sur un recul d'horloge (correction NTP) entre deux
+> estampilles. Défaut latent, comme ceux de C2, C3 et C5 — cela ne le rend pas
+> moins réel, cela change ce qu'on en dit.
+>
+> **La frontière retenue n'est pas « une fonction pour trois appelants ».**
+> `public/viz-duration.mjs` dit ce qu'**est** une durée et comment on l'**écrit** ;
+> il rend `null` pour ce qui n'en est pas une, et chaque appelant garde **son mot**
+> pour ce cas — `null` sur la carte du graphe (que le canevas et le panneau de
+> détail savent taire), `?` dans la phrase du narrateur (une phrase trouée se lit
+> comme un bug d'affichage), rien du tout dans le fil. Un module qui choisirait ce
+> mot imposerait la même phrase à trois écrans qui n'ont pas la même place.
+>
+> **Ce qui n'a PAS été corrigé, et c'est volontaire :** 59 999 ms s'écrit
+> « 60.0s » et non « 1.0m » — l'arrondi de la décimale se fait après le choix de
+> l'unité. Les trois copies partageaient ce comportement au caractère près ; le
+> mettre en commun n'était pas le corriger. Le test le dit par écrit, pour que
+> personne ne le prenne plus tard pour une inattention.
+>
+> **Aucun des trois n'était couvert par un test** avant ce chantier — même famille
+> de trou que C1 (« zéro test n'exerçait `runHook` »).
+>
+> **Mutations de contrôle** : seuil 1000 → 2000 dans le module partagé → 2 rouges,
+> **un dans le test du module ET un dans le test de `viz-layout`**, ce qui prouve
+> que l'appelant passe réellement par lui ; garde hors contrat retirée → 2 rouges,
+> dont le test qui interdit « NaNm » sur la carte.
+>
+> **Vérifié au navigateur**, instance isolée (home jetable, port 3335, redirection
+> prouvée avant écriture), sur un flux d'événements fabriqué : le fil affiche
+> `1.5s` et `1.5m` pour les deux outils terminés (chemin `calcDuration`) et `5.4m`
+> pour la session en cours (chemin du compteur qui tourne, `viz-ui`).
+>
+> Serveur 804 → 811, moteur 502, typecheck propre, audit 48/48.
+> Commit `a18304e`.
 
 ## Ce qui est sain
 
