@@ -1,6 +1,5 @@
-import { homedir } from 'node:os';
-import path from 'node:path';
 import type { DoctorCliOptions } from '../cli-args.js';
+import { resolveClaudeDir } from '../core/claude-dir.js';
 import { discoverSessions, parseSince } from '../core/discovery.js';
 import { findClaudeMdFiles } from './aggregators/context.js';
 import { stableStringify } from './report/json.js';
@@ -109,7 +108,7 @@ function totalsOf(sessions: SessionReport[]): AggregateTotals {
 }
 
 export async function runDoctorCli(cli: DoctorCliOptions): Promise<number> {
-  const claudeDir = cli.claudeDir ?? process.env['NETGAIN_CLAUDE_DIR'] ?? path.join(homedir(), '.claude');
+  const claudeDir = resolveClaudeDir({ explicit: cli.claudeDir });
   let since: Date | undefined;
   if (cli.since !== undefined) {
     try {

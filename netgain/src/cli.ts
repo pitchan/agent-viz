@@ -21,7 +21,7 @@ Options de doctor :
   --last <N>            ne garder que les N sessions les plus récentes
   --json                rapport JSON complet sur stdout (au lieu du rendu terminal)
   --list                lister projets/sessions découverts, sans scanner
-  --claude-dir <dir>    racine à scanner (défaut : ~/.claude, env NETGAIN_CLAUDE_DIR)
+  --claude-dir <dir>    racine à scanner (défaut : ~/.claude, env CLAUDE_CONFIG_DIR)
   --max-prompts <N>     plafond du corpus de prompts dans le rapport
 `;
 
