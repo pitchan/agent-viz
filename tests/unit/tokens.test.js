@@ -164,3 +164,98 @@ test('accumulateUsage with different msgIds cumulates normally', () => {
   assert.equal(b.in, 30);
   assert.equal(b.out, 15);
 });
+
+// ---------------------------------------------------------------------------
+// C3 (docs/audit-qualite-code.md) — l'accumulation vient désormais de la
+// primitive commune du moteur (netgain/src/core/usage.ts), partagée par un pont.
+//
+// Ces tests existent parce que la migration a changé du comportement SANS
+// qu'aucun test d'au-dessus ne vire au rouge : le filet ne couvrait ni la
+// ventilation de cache, ni les gardes, ni l'identifiant vide. Un changement sans
+// filet est un changement qu'on ne saura pas défendre au prochain passage.
+// ---------------------------------------------------------------------------
+
+const { emptyUsageBucket } = require('../../lib/server/usage');
+
+test('C3 — le seau porte les DEUX ventilations de cache, que seul le moteur suivait', () => {
+  // Arrange
+  const b = newBucket();
+  assert.equal(b.cacheCreate1h, 0, 'le seau neuf les expose à zéro');
+  assert.equal(b.cacheCreate5m, 0);
+
+  // Act
+  accumulateUsage(b, {
+    input_tokens: 1, cache_creation_input_tokens: 100,
+    cache_creation: { ephemeral_1h_input_tokens: 60, ephemeral_5m_input_tokens: 40 },
+  });
+
+  // Assert — la somme des deux fenêtres n'a PAS à valoir cache_creation : ce
+  // sont trois champs bruts distincts, la primitive ne réconcilie rien.
+  assert.equal(b.cacheCreate, 100);
+  assert.equal(b.cacheCreate1h, 60);
+  assert.equal(b.cacheCreate5m, 40);
+});
+
+// CHANGEMENT DE COMPORTEMENT ASSUMÉ ET DATÉ (2026-08-11). Avant, le serveur
+// faisait `bucket.in += usage.input_tokens || 0` : un nombre en CHAÎNE donnait
+// `0 + "100"` = "0100", et le seau partait en texte pour toute la session,
+// jusque dans l'enveloppe SSE. `Infinity` — le seul poison qu'un JSON valide
+// puisse porter, via `1e999` — passait aussi. La garde commune ramène les deux
+// à zéro. Aucun transcript réel n'en porte : mesuré, 0 sur 833 fichiers.
+test('C3 — un champ qui n\'est pas un nombre fini vaut zéro, et le seau reste numérique', () => {
+  // Arrange
+  const b = newBucket();
+
+  // Act
+  accumulateUsage(b, { input_tokens: '100', output_tokens: 5 });
+  accumulateUsage(b, JSON.parse('{"input_tokens":1e999,"output_tokens":5}'));
+  accumulateUsage(b, { input_tokens: NaN, output_tokens: 5 });
+
+  // Assert
+  assert.equal(b.in, 0);
+  assert.equal(typeof b.in, 'number');
+  assert.equal(b.out, 15, 'les champs valides du même message sont comptés normalement');
+});
+
+test('C3 — la garde vaut AUSSI pour les champs « dernier message »', () => {
+  // Sans ça, un message malformé donnerait `in: 0` mais `lastIn: "100"` : une
+  // incohérence à l'intérieur d'un seul seau, et la taille de fenêtre de
+  // contexte affichée au pilote temps réel deviendrait une chaîne.
+  // Arrange
+  const b = newBucket();
+
+  // Act
+  accumulateUsage(b, { input_tokens: '100', cache_read_input_tokens: 7 });
+
+  // Assert
+  assert.equal(b.lastIn, 0);
+  assert.equal(typeof b.lastIn, 'number');
+  assert.equal(b.lastCacheRead, 7);
+});
+
+// L'ARBITRAGE DE C3, verrouillé ici : un identifiant VIDE n'est pas un
+// identifiant. Le serveur le faisait déjà ; c'est le MOTEUR qui a changé de
+// sens (il dédupliquait sur ""), et ce test empêche qu'une future unification
+// l'emporte dans l'autre sens — celui qui SOUS-COMPTE, en fusionnant des
+// messages distincts dépourvus d'identifiant.
+test('C3 — un identifiant vide ne déduplique pas : deux messages, deux comptes', () => {
+  // Arrange
+  const b = newBucket();
+
+  // Act
+  accumulateUsage(b, { input_tokens: 10 }, null, '');
+  accumulateUsage(b, { input_tokens: 10 }, null, '');
+
+  // Assert
+  assert.equal(b.in, 20);
+});
+
+test('C3 — le serveur passe par la primitive du moteur, pas par sa propre addition', () => {
+  // Le point de C3 n'est pas « le serveur compte juste » — il comptait juste.
+  // C'est qu'il compte au MÊME ENDROIT que le moteur : deux additions jumelles
+  // mais séparées avaient déjà divergé sur les gardes sans que personne ne le
+  // voie (constat établi par sonde différentielle, pas par lecture).
+  const duMoteur = require('../../netgain/dist/core/usage.js');
+  assert.equal(emptyUsageBucket, duMoteur.emptyUsageBucket);
+  assert.deepEqual(newBucket().cacheCreate1h, 0);
+});
