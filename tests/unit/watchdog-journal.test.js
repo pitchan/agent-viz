@@ -357,6 +357,61 @@ test('une ligne illisible est sautee, jamais fatale', (t) => {
     'une ligne illisible ne declenche pas a elle seule une reecriture');
 });
 
+// Observation laissee ouverte par C2, arbitree et CORRIGEE le 2026-08-11.
+//
+// `null` est du JSON parfaitement VALIDE : la primitive rend { ok:true,
+// value:null }, et `rec.kind` — hors du `try`, ligne 160 — levait. Le voisin
+// ci-dessus promet qu'une ligne illisible est sautee, jamais fatale ; une ligne
+// valant `null` faisait mentir cette promesse, parce qu'elle n'est justement pas
+// illisible.
+//
+// CE QUE CA COUTAIT, etabli en executant `initWatchdog` sur les quatre formes,
+// et non deduit d'une lecture : le serveur ne tombait PAS — `createJournal` est
+// construit dans un try/catch. C'est le CHIEN DE GARDE ENTIER qui disparaissait
+// pour toute la duree du processus, avec pour seul message « detection
+// indisponible, les pannes ne seront pas surveillees : Cannot read properties of
+// null ». Ce message accuse une installation abimee. Le vrai cout n'etait donc
+// pas l'arret, c'etait le MAUVAIS DIAGNOSTIC : on aurait cherche un fichier
+// manquant dans le paquet pendant qu'une ligne du journal etait en cause.
+// Controles : une ligne tronquee, un fichier vide et une alerte valide laissaient
+// tous les trois le chien de garde en place — `null` etait seul a le tuer.
+test('une ligne valant null est sautee comme les autres, et n emporte pas le chien de garde', (t) => {
+  // Arrange
+  const filePath = tmp(t);
+  fs.writeFileSync(filePath,
+    JSON.stringify({ kind: 'alert', alert: alertAt(T) }) + '\n'
+    + 'null\n'
+    + JSON.stringify({ kind: 'alert', alert: alertAt(T + 1000, 'loop:s1:Apres') }) + '\n');
+
+  // Act
+  const rows = createJournal({ filePath, now: () => T + 1000 }).readAll({ now: T + 1000 });
+
+  // Assert
+  assert.equal(rows.length, 2, 'les alertes qui ENCADRENT la ligne null sont relues');
+});
+
+// Meme famille, meme fichier : ce qui n'est pas un objet n'est pas un
+// enregistrement. `42` et `"texte"` ne levaient pas — ils passaient, avec un `ts`
+// indefini, et finissaient comptes comme PERIMES. Une ligne de bruit devenait
+// donc un motif de reecriture du fichier au lieu d'etre sautee. Le filet fige
+// qu'elles sont traitees comme illisibles, au meme titre que `null`.
+test('une ligne qui n est pas un enregistrement est sautee, pas comptee perimee', (t) => {
+  // Arrange
+  const filePath = tmp(t);
+  fs.writeFileSync(filePath,
+    JSON.stringify({ kind: 'alert', alert: alertAt(T) }) + '\n'
+    + '42\n"texte"\ntrue\n[]\n'
+    + JSON.stringify({ kind: 'alert', alert: alertAt(T + 1000, 'loop:s1:Apres') }) + '\n');
+
+  // Act
+  const rows = createJournal({ filePath, now: () => T + 1000 }).readAll({ now: T + 1000 });
+
+  // Assert
+  assert.equal(rows.length, 2, 'les deux alertes survivent au bruit');
+  assert.equal(lignes(filePath).length, 6,
+    'du bruit ne declenche pas a lui seul une reecriture du fichier');
+});
+
 // CHANGEMENT DE COMPORTEMENT, assume et date — C2, 2026-08-11.
 //
 // Le decodage d'une ligne passe desormais par la primitive commune du moteur,

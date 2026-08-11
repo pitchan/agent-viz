@@ -247,6 +247,37 @@ test('catch-up: relit les fichiers en entier, deux fois sans doublon', async () 
   assert.equal(lignes(filePath), 1, 'le rattrapage est idempotent — mesure sur le FICHIER');
 });
 
+// Meme famille que la ligne `null` du journal, arbitree le 2026-08-11, et
+// trouvee par le meme balayage : `null` est du JSON VALIDE, donc la primitive
+// rend { ok:true, value:null } et `service.onEvent(null)` levait — verifie en
+// executant le vrai service : « TypeError: Cannot read properties of null
+// (reading '_ts') ».
+//
+// LE COUT N'EST PAS LE MEME QUE POUR LE JOURNAL, et il faut le dire avec
+// precision : `runCatchUp` propage, et l'appelant du demarrage RATTRAPE
+// deliberement, avec un commentaire qui l'explique — le serveur demarre. Mais
+// la boucle s'arrete a la ligne fautive : tout ce qui suit dans CE fichier, et
+// tous les fichiers d'evenements suivants, ne sont jamais relus. Une seule
+// ligne de bruit suffit donc a faire perdre le passe entier, sous un message
+// qui dit seulement « rattrapage interrompu ».
+test('catch-up: une ligne valant null est sautee, le rattrapage continue', async () => {
+  // Arrange — la ligne fautive est au MILIEU : si la boucle s'arrete, les
+  // evenements qui suivent ne sont pas relus et le compte le dit.
+  const dir = tmpDir();
+  const lignesFlot = flot().trim().split('\n');
+  fs.writeFileSync(path.join(dir, `${SID}.jsonl`),
+    lignesFlot.slice(0, 4).join('\n') + '\nnull\n42\n"texte"\n'
+    + lignesFlot.slice(4).join('\n') + '\n');
+
+  // Act
+  const s = await svc(tmpFile());
+  const relus = await catchUpFromDisk(s, dir);
+
+  // Assert — les 10 evenements valides sont relus, le bruit est saute.
+  assert.equal(relus, 10, 'le bruit ne doit pas emporter le reste du rattrapage');
+  assert.equal(s.list({ sinceDays: 90 }).length, 1, 'la panne du fichier est bien detectee');
+});
+
 test('catch-up: un fichier prefixe par _ n est pas un flux d evenements', async () => {
   const dir = tmpDir();
   // Meme contenu que le flot qui declenche `loop`, sous un nom que la
