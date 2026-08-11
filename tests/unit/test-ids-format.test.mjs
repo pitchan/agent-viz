@@ -23,16 +23,30 @@ test('deux tests homonymes dans deux fichiers restent deux identites distinctes'
   const a = formatId('F:/DEV/agent-viz/tests/unit/a.test.js', 'meme nom', RACINE);
   const b = formatId('F:/DEV/agent-viz/tests/unit/b.test.js', 'meme nom', RACINE);
   // Act
-  const trie = trierIds([b, a]);
+  const distinctes = a !== b;
   // Assert
-  assert.deepEqual(trie, [a, b]);
+  assert.equal(distinctes, true, 'le fichier fait partie de l identite, sinon le diff est aveugle');
+});
+
+test('le tri ordonne, il ne se contente pas de renverser', () => {
+  // Arrange — trois identites dans un ordre qui n est PAS l inverse du tri,
+  // sinon un `reverse()` a la place du tri passerait le test.
+  const a = formatId('F:/DEV/agent-viz/tests/unit/a.test.js', 'nom', RACINE);
+  const b = formatId('F:/DEV/agent-viz/tests/unit/b.test.js', 'nom', RACINE);
+  const c = formatId('F:/DEV/agent-viz/tests/unit/c.test.js', 'nom', RACINE);
+  // Act
+  const trie = trierIds([b, c, a]);
+  // Assert
+  assert.deepEqual(trie, [a, b, c]);
 });
 
 test('le flux node:test ne rend que les tests, pas le fichier qui les porte', () => {
   // Arrange — echantillon capture au step 1
+  // L'echantillon est volontairement DESORDONNE : si le tri disparaissait de
+  // l'adaptateur, un echantillon deja trie laisserait le test au vert.
   const evenements = [
-    { type: 'test:pass', data: { name: 'premier', file: 'F:/DEV/agent-viz/tests/unit/a.test.js', nesting: 0 } },
     { type: 'test:fail', data: { name: 'second', file: 'F:/DEV/agent-viz/tests/unit/a.test.js', nesting: 0 } },
+    { type: 'test:pass', data: { name: 'premier', file: 'F:/DEV/agent-viz/tests/unit/a.test.js', nesting: 0 } },
     { type: 'test:diagnostic', data: { message: 'pass 1', file: 'F:/DEV/agent-viz/tests/unit/a.test.js' } },
   ];
   // Act
@@ -46,9 +60,10 @@ test('le JSON de vitest rend les memes identites que le flux node:test', () => {
   const json = {
     testResults: [{
       name: 'F:/DEV/agent-viz/tests/unit/a.test.js',
+      // Desordonne pour la meme raison que l'echantillon precedent.
       assertionResults: [
-        { fullName: 'premier', status: 'passed' },
         { fullName: 'second', status: 'failed' },
+        { fullName: 'premier', status: 'passed' },
       ],
     }],
   };
