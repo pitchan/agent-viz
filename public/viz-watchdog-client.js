@@ -30,6 +30,18 @@
 // construction and are kept in their own registry, out of both sieves.
 
 import { isFresh } from './viz-alert-freshness.mjs';
+// Les deux routes du journal des pannes sont décrites une seule fois, dans le
+// client HTTP de l'Observatoire (constat C6). La pastille en garde la POLITIQUE
+// — ne rien vider sur une lecture ratée, remettre l'alerte à l'écran sur un
+// acquittement refusé — mais plus l'adresse ni la charge : c'est le contrat de
+// route, pas le traitement d'erreur, que les deux pages portaient en double.
+// La couture `_fetch` reste ici et voyage avec l'appel : le client la reçoit en
+// paramètre, il ne la garde pas.
+//
+// L'alias n'est pas cosmétique : ce module exporte lui aussi un
+// `acknowledgeAlert`, et c'est un geste différent — celui-ci retire l'alerte de
+// l'écran d'abord, puis consigne ; celui de l'API ne fait que poster.
+import { fetchAlerts, acknowledgeAlert as postAcknowledgement } from './observatory/api.js';
 
 const listeners = new Set();
 const externalAlerts = new Map();
@@ -84,12 +96,13 @@ export function getActiveAlerts() {
 export async function refreshAlerts() {
   let payload;
   try {
-    const res = await _fetch('/alerts?days=30');
-    // A read that failed is not evidence that all is well: leave the badge on
-    // what it already knew rather than blanking it.
-    if (!res || !res.ok) return;
-    payload = await res.json();
-  } catch { return; }            // server gone: the badge simply stops moving
+    payload = await fetchAlerts({ days: 30 }, _fetch);
+  } catch { return; }            // server gone, or not a 200: the badge simply stops moving
+  // A read that failed is not evidence that all is well: leave the badge on
+  // what it already knew rather than blanking it. A 200 whose body cannot be
+  // parsed comes back as `null` — the shared client's contract — and counts as
+  // a failed read, not as an empty journal.
+  if (!payload) return;
   // Both fields are read defensively, and not out of ceremony: neither
   // `for...of` nor `new Set` tolerates a non-iterable, and nobody awaits this
   // promise. A malformed 200 would therefore reject into nothing and stop the
@@ -194,13 +207,9 @@ export async function acknowledgeAlert(id, createdAt) {
   }
   let recorded = false;
   try {
-    const res = await _fetch('/alerts/ack', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, createdAt: when }),
-    });
-    recorded = !!res && !!res.ok;
-  } catch { recorded = false; }
+    await postAcknowledgement({ id, createdAt: when }, _fetch);
+    recorded = true;
+  } catch { recorded = false; }  // refus du serveur ou coupure : non consigné
   if (recorded || !onScreen) return;
   // 400 on a malformed key, 503 while the port is served but the watchdog is
   // not built yet — a real window. Nothing was written down, so the alert is

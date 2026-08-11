@@ -2,8 +2,13 @@
 // server and turn a failure into a readable error; it holds no state and
 // formats nothing.
 
-async function getJson(url) {
-  const res = await fetch(url);
+// `fetchImpl` n'est pas une commodité de test : la pastille de la page viz
+// appelle deux de ces routes avec SA propre couture (`initAlertReader`), et le
+// module ne doit pas dépendre en dur du `fetch` global pour autant (CLAUDE.md
+// § D). Seules les deux routes du journal des pannes la propagent — les autres
+// n'ont qu'un appelant, leur en donner une serait de la surface morte.
+async function getJson(url, fetchImpl = fetch) {
+  const res = await fetchImpl(url);
   const body = await res.json().catch(() => null);
   if (!res.ok) {
     // The server sends the exact cause (missing engine, unknown session): show
@@ -13,11 +18,11 @@ async function getJson(url) {
   return body;
 }
 
-async function postJson(url, body) {
+async function postJson(url, body, fetchImpl = fetch) {
   const opts = body === undefined
     ? { method: 'POST' }
     : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
-  const res = await fetch(url, opts);
+  const res = await fetchImpl(url, opts);
   const payload = await res.json().catch(() => null);
   if (!res.ok) throw new Error(payload && payload.error ? payload.error : `${res.status} sur ${url}`);
   return payload;
@@ -71,12 +76,13 @@ export const fetchPricing = () => getJson('/pricing');
 // Le journal des pannes. Meme fenetre que les conseils : la page n'a qu'une
 // seule notion de periode, et le serveur retombe seul sur son defaut hors de la
 // table 7/30/90.
-export function fetchAlerts(opts = {}) {
+export function fetchAlerts(opts = {}, fetchImpl = fetch) {
   const q = windowParams(opts).toString();
-  return getJson(`/alerts${q ? `?${q}` : ''}`);
+  return getJson(`/alerts${q ? `?${q}` : ''}`, fetchImpl);
 }
 
 // L'acquittement d'UNE alerte du journal. La route est unitaire et validante
 // (id chaine non vide, createdAt en millisecondes epoch) : le groupe s'acquitte
 // en serie cote appelant, jamais par une route de lot qui n'existe pas.
-export const acknowledgeAlert = ({ id, createdAt }) => postJson('/alerts/ack', { id, createdAt });
+export const acknowledgeAlert = ({ id, createdAt }, fetchImpl = fetch) =>
+  postJson('/alerts/ack', { id, createdAt }, fetchImpl);

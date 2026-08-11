@@ -391,3 +391,23 @@ test('un rechargement en echec laisse la pastille sur ce qu elle savait', async 
   await mod.initAlertReader({ fetchImpl: async () => ({ ok: false, status: 500 }), now: () => T });
   assert.deepEqual(ids(mod.getActiveAlerts()), ['a']);
 });
+
+test('un 200 dont le corps est illisible laisse aussi la pastille sur ce qu elle savait', async () => {
+  // Arrange — meme principe que le test precedent, sur l autre facon d echouer :
+  // le statut dit oui, le corps n est pas du JSON. Un client HTTP partage rend
+  // volontiers `null` dans ce cas ; le prendre pour un journal vide viderait la
+  // pastille, c est-a-dire ferait passer une lecture ratee pour un retour au
+  // calme. Cas non couvert avant C6, et c est celui que la mise en commun
+  // pouvait casser en silence.
+  const { mod } = await freshClient({ alerts: [evt(T - 1000, 'a')] });
+  assert.deepEqual(ids(mod.getActiveAlerts()), ['a'], 'controle positif : elle le savait');
+
+  // Act
+  await mod.initAlertReader({
+    fetchImpl: async () => ({ ok: true, json: async () => { throw new SyntaxError('Unexpected token <'); } }),
+    now: () => T,
+  });
+
+  // Assert
+  assert.deepEqual(ids(mod.getActiveAlerts()), ['a']);
+});
