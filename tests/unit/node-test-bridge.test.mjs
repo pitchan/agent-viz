@@ -234,7 +234,7 @@ test('les sous-tests sont refuses depuis le contexte aussi', async () => {
   // Act
   await journal.tests[0].fn();
   // Assert
-  assert.match(String(capturee?.message), /t\.test/);
+  assert.match(String(capturee?.message), /create-bridge\.mjs/);
 });
 
 test('une option passee a test() est refusee plutot qu ignoree', () => {
