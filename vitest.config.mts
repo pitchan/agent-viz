@@ -6,6 +6,18 @@ import { fileURLToPath } from 'node:url';
 // fichiers `.test.js` en `.test.cjs`, et ce renommage ne doit demander aucun
 // changement ici (doc/36, section 3, etape 3).
 export default defineConfig({
+  build: {
+    // Mesure 2026-08-11 (piste 1, demandee par le coordinateur) : le plugin
+    // core de Vite `vite:dynamic-import-vars` lit
+    // `environment.config.build.dynamicImportVarsOptions` meme hors d'un
+    // vrai build (verifie a la lecture de node_modules/vite/dist/node/chunks/config.js).
+    // Un seul fichier est exclu de sa transformation : celui dont le
+    // cache-buster dans la query string (`?t=${T}-${Math.random()}`) n est
+    // pas un motif que ce plugin sait resoudre.
+    dynamicImportVarsOptions: {
+      exclude: [/watchdog-client-reader\.test\.mjs$/],
+    },
+  },
   resolve: {
     // Mesure du 2026-08-11 (tache 7) : l'interception `Module._load` de
     // install.mjs suffit pour `require('node:test')` mais pas pour
