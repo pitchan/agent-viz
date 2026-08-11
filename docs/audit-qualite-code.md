@@ -368,6 +368,54 @@ au résultat de cette primitive, pas des cibles de fusion elles-mêmes.
 |---|---|---|---|---|
 | coût de maintenance seul | démontré | M | à absorber par la fusion | à corriger |
 
+> **TRAITÉ LE 2026-08-11 — et cette fiche se trompait sur un point, dans le sens
+> rassurant.** Elle affirme « les mêmes gardes à zéro » et « il n'y a pas de
+> divergence de comportement sur ce périmètre commun ». Une **sonde
+> différentielle** — la même matrice de 13 cas poussée dans les deux fonctions
+> réelles, pas deux lectures comparées — en trouve **deux**, de la même famille
+> qu'en C5 : une question de garde, invisible à l'œil.
+>
+> | cas | serveur (`\|\| 0`, `if (msgId)`) | moteur (`?? 0`, `!== null`) |
+> |---|---|---|
+> | `input_tokens: NaN` | 0 | **NaN** — empoisonne le seau pour toute la session |
+> | même `id: ""` deux fois | accumule 2× | **déduplique** |
+>
+> **ET AUCUNE DES DEUX N'EST ATTEIGNABLE**, vérifié — parce qu'un écart dans une
+> primitive ne prouve pas qu'on puisse y arriver. `JSON.parse` **refuse** le
+> littéral `NaN` ; `"id":""` apparaît **0 fois sur les 833 transcripts** de la
+> machine. Ce sont des pièges **latents**, gratuits à supprimer en unifiant. Ils
+> ne sont pas racontés comme des pannes.
+>
+> **La garde retenue : un champ qui n'est pas un nombre FINI vaut zéro.** Aucune
+> des deux d'avant ne couvrait tout — `|| 0` laissait passer `Infinity`, `?? 0`
+> laissait passer les deux, et **les deux** transformaient un nombre en chaîne en
+> `"0100"` par concaténation, faisant partir le seau entier en texte jusque dans
+> l'enveloppe SSE. `Infinity` est le seul de ces poisons qu'un JSON **valide**
+> puisse porter : `1e999` s'analyse en `Infinity`.
+>
+> **L'identifiant vide : c'est le sens du serveur qui gagne.** Dédupliquer sur
+> `''` fusionnerait des messages **distincts** dépourvus d'identifiant en un
+> seul, donc **sous-compterait** — le sens le plus difficile à voir. Même
+> doctrine que la variable d'environnement vide de C5.
+>
+> **`tokenSum` et `netTokens` n'ont pas été fusionnées** : l'arbitrage de la
+> fiche est respecté. Le « dernier message », le modèle courant et le coût à
+> l'analyse restent côté serveur — ce sont des préoccupations du pilote temps
+> réel, pas de l'accumulation.
+>
+> **LE GESTE EXISTE AUSSI DANS `public/`, ET CETTE FICHE NE LE DIT PAS.**
+> `public/viz-state.js:185` (`tokenTotal`) est **interchangeable avec `tokenSum`
+> du serveur sur toute la matrice** — 9 cas, 0 écart, y compris `NaN`, chaînes et
+> négatifs (prouvé en exécutant les deux fonctions, pas en les lisant). Et
+> `public/viz-ui.js:157-161` accumule les quatre champs en ligne, l'équivalent du
+> `sumInto` du moteur. **Hors périmètre de C3 par arbitrage de Vincent
+> (2026-08-11)** : le navigateur ne peut pas charger `netgain/dist`, donc
+> l'unifier demanderait d'exposer un module ES par HTTP — un mécanisme neuf, pas
+> un déplacement de code. Cette trouvaille rejoint C6 et C8, qui traitent déjà la
+> duplication dans `public/`.
+>
+> Commits `03ffce3`, `6d36c72`.
+
 ### C4 — Le contrat de tarification pour un modèle inconnu diverge, et le pilote temps réel ne relaie aucune information de coût incomplet
 
 **Fait brut.** `docs/audit/resultats/d7.json`, geste `tarification`,
