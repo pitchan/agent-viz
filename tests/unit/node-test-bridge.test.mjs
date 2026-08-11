@@ -173,3 +173,34 @@ test('t.after s execute apres le corps du test', async () => {
   // Assert
   assert.deepEqual(ordre, ['corps', 'nettoyage']);
 });
+
+test('un t.after qui jette n empeche pas la restauration des mocks', async () => {
+  // Arrange
+  const { journal, deps } = primitives();
+  const pont = createBridge(deps);
+  const origine = () => 'reel';
+  const cible = { lire: origine };
+  pont('sujet', t => {
+    t.mock.method(cible, 'lire', () => 'double');
+    t.after(() => { throw new Error('nettoyage casse'); });
+  });
+  // Act
+  const execution = journal.tests[0].fn();
+  // Assert
+  await assert.rejects(execution, /nettoyage casse/);
+  assert.equal(cible.lire, origine, 'la methode est rendue malgre l echec du nettoyage');
+});
+
+test('l erreur du corps prime sur celle du nettoyage', async () => {
+  // Arrange
+  const { journal, deps } = primitives();
+  const pont = createBridge(deps);
+  pont('sujet', t => {
+    t.after(() => { throw new Error('nettoyage casse'); });
+    throw new Error('echec du corps');
+  });
+  // Act
+  const execution = journal.tests[0].fn();
+  // Assert
+  await assert.rejects(execution, /echec du corps/);
+});

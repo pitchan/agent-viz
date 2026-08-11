@@ -35,24 +35,45 @@ function creerContexte(vi) {
     tick: ms => vi.advanceTimersByTime(ms),
   };
 
+  // Les trois phases sont ISOLEES : une fonction `t.after` qui jette ne doit
+  // empecher ni la restauration des mocks, ni le retour aux temporisateurs
+  // reels. Sinon l'etat fuit vers les tests suivants et la panne se manifeste
+  // ailleurs qu'a l'endroit ou elle est nee. L'erreur n'est pas avalee pour
+  // autant : elle est rendue a l'appelant.
+  const nettoyer = async () => {
+    let premiereErreur = null;
+    while (apresTest.length) {
+      try {
+        await apresTest.shift()();
+      } catch (e) {
+        premiereErreur ??= e;
+      }
+    }
+    while (restaurations.length) restaurations.pop()();
+    if (fauxTemporisateurs) vi.useRealTimers();
+    return premiereErreur;
+  };
+
   return {
     contexte: { mock: { method, timers }, after: fn => apresTest.push(fn) },
-    nettoyer: async () => {
-      while (apresTest.length) await apresTest.shift()();
-      while (restaurations.length) restaurations.pop()();
-      if (fauxTemporisateurs) vi.useRealTimers();
-    },
+    nettoyer,
   };
 }
 
 export function createBridge({ test: runTest, afterAll, beforeEach, vi }) {
   const pont = (nom, fn) => runTest(nom, async () => {
     const { contexte, nettoyer } = creerContexte(vi);
+    let erreurDuCorps = null;
     try {
       await fn(contexte);
-    } finally {
-      await nettoyer();
+    } catch (e) {
+      erreurDuCorps = e;
     }
+    const erreurDeNettoyage = await nettoyer();
+    // Le corps prime : son erreur dit ce que le test voulait prouver. Celle du
+    // nettoyage ne doit jamais la masquer.
+    if (erreurDuCorps) throw erreurDuCorps;
+    if (erreurDeNettoyage) throw erreurDeNettoyage;
   });
   pont.test = pont;
   pont.after = fn => afterAll(fn);
