@@ -5,6 +5,8 @@
 // setRenderFn() by viz-ui.js. Tests can import composeNarrator/commonPathPrefix
 // without triggering any side effect (no setInterval at import time).
 
+import { formatDuration } from './viz-duration.mjs';
+
 // ─── commonPathPrefix ─────────────────────────────────────────────────────
 // Returns the common directory prefix of the given paths (e.g. "auth/" for
 // ["auth/x.js", "auth/y.js"]). Returns null if fewer than 2 paths or if no
@@ -185,13 +187,12 @@ function computeContext(state, vis) {
   return commonPathPrefix(filePaths);
 }
 
+// Le format vit dans viz-duration.mjs (constat C8) ; le `?` reste ici : dans une
+// phrase, l'absence de durée doit s'écrire, une phrase trouée se lit comme un
+// bug d'affichage.
 function formatSessionDuration(startIso, endIso) {
   if (!startIso || !endIso) return '?';
-  const ms = new Date(endIso) - new Date(startIso);
-  if (!Number.isFinite(ms) || ms < 0) return '?';
-  if (ms < 1000) return `${ms}ms`;
-  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
-  return `${(ms / 60_000).toFixed(1)}m`;
+  return formatDuration(new Date(endIso) - new Date(startIso)) ?? '?';
 }
 
 // ─── Dirty / render driver ────────────────────────────────────────────────

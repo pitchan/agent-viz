@@ -10,6 +10,7 @@ import {
 } from './viz-state.js';
 import { markNarratorDirty } from './viz-narrator.js';
 import { toolSubject } from './viz-tool-subject.mjs';
+import { formatDuration } from './viz-duration.mjs';
 
 // ─── Feed-cursor adjust hook ──────────────────────────────────────────────
 // When the timeline ring-buffer shifts, viz-ui's _feedRenderedCount must be
@@ -338,12 +339,12 @@ export function processEvent(evt) {
   markNarratorDirty();
 }
 
+// Le format vit dans viz-duration.mjs (constat C8) ; ici on ne garde que la
+// traduction de « pas de durée » propre à la carte du graphe : `null`, que
+// `viz-canvas` et le panneau de détail savent déjà taire.
 export function calcDuration(start, end) {
   if (!start || !end) return null;
-  const ms = new Date(end) - new Date(start);
-  if (ms < 1000) return `${ms}ms`;
-  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
-  return `${(ms / 60000).toFixed(1)}m`;
+  return formatDuration(new Date(end) - new Date(start));
 }
 
 // Feed label: the shared subject rule, cut to the width the feed column can

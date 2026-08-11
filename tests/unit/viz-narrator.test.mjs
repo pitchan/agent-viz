@@ -218,6 +218,30 @@ test('composeNarrator: session done → "session done · N tools · Xm" tone don
   assert.deepEqual(result, { text: 'session done · 42 tools · 3.2m', tone: 'done' });
 });
 
+test('composeNarrator: session done sans borne de fin → la phrase garde son « ? »', () => {
+  // Arrange — constat C8 : le FORMAT est commun aux trois vues, le mot de repli
+  // ne l'est pas. Dans une phrase, l'absence de durée doit s'écrire ; une carte
+  // du graphe, elle, se contente de ne rien afficher.
+  const state = freshState();
+  state.toolsCompleted = 7;
+  state.nodes.set('s:abc', {
+    id: 's:abc', type: 'session', status: 'done',
+    parentId: null, children: [],
+    startTime: '2026-05-07T10:00:00.000Z',
+    endTime: null,
+  });
+  state.timelineEntries.push({
+    ts: '2026-05-07T10:00:00.000Z', nodeId: 's:abc',
+    type: 'session', label: 'Session', sub: '',
+  });
+
+  // Act
+  const result = composeNarrator(state, freshVis(), Date.now());
+
+  // Assert
+  assert.deepEqual(result, { text: 'session done · 7 tools · ?', tone: 'done' });
+});
+
 test('driver: markNarratorDirty calls renderFn once per microtask burst', async () => {
   let calls = 0;
   setRenderFn(() => { calls++; });

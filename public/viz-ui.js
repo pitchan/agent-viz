@@ -28,6 +28,7 @@ import {
 import {
   alertActor, alertDetailLines, notificationPayload, truncate,
 } from './viz-alert-format.mjs';
+import { formatDuration } from './viz-duration.mjs';
 
 // ─── Feed panel ───────────────────────────────────────────────────────────
 let _feedRenderedCount = 0;
@@ -450,8 +451,12 @@ function updateLiveDurations() {
   for (const n of state.nodes.values()) {
     if (n.status === 'running' && n.startTime) {
       anyRunning = true;
-      const ms = now - new Date(n.startTime);
-      n.duration = ms < 1000 ? `${ms}ms` : ms < 60000 ? `${(ms / 1000).toFixed(1)}s` : `${(ms / 60000).toFixed(1)}m`;
+      // Même format que les nœuds terminés (constat C8) : le compteur qui tourne
+      // et le chiffre figé ne peuvent pas s'écrire différemment. Une durée
+      // impossible ne remplace pas la précédente — la ligne du fil la tait
+      // (`n.duration || ''`), et c'est exactement ce qu'on veut y voir.
+      const ecrite = formatDuration(now - new Date(n.startTime));
+      if (ecrite !== null) n.duration = ecrite;
     }
   }
   if (!anyRunning) {
