@@ -10,8 +10,10 @@ import { idsDepuisJsonVitest } from '../../test-support/ids/from-vitest-json.mjs
 const RACINE = 'F:/DEV/agent-viz';
 
 test('une identite joint le chemin relatif POSIX et le nom du test', () => {
-  // Arrange / Act
-  const id = formatId('F:\\DEV\\agent-viz\\tests\\unit\\a.test.js', 'un nom', RACINE);
+  // Arrange
+  const fichier = 'F:\\DEV\\agent-viz\\tests\\unit\\a.test.js';
+  // Act
+  const id = formatId(fichier, 'un nom', RACINE);
   // Assert
   assert.equal(id, 'tests/unit/a.test.js :: un nom');
 });
