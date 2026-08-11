@@ -119,3 +119,57 @@ test('la methode remplacee est rendue quand le test se termine, meme s il jette'
   // Assert
   assert.equal(cible.lire, origine);
 });
+
+test('t.mock.timers.enable demande a l executeur de simuler les seules APIs citees', async () => {
+  // Arrange
+  const vus = [];
+  const { journal, deps } = primitives({
+    vi: { useFakeTimers: o => vus.push(o), advanceTimersByTime() {}, useRealTimers() {} },
+  });
+  const pont = createBridge(deps);
+  pont('sujet', t => { t.mock.timers.enable({ apis: ['setTimeout'] }); });
+  // Act
+  await journal.tests[0].fn();
+  // Assert
+  assert.deepEqual(vus, [{ toFake: ['setTimeout'] }]);
+});
+
+test('t.mock.timers.tick avance du delai demande', async () => {
+  // Arrange
+  const avances = [];
+  const { journal, deps } = primitives({
+    vi: { useFakeTimers() {}, advanceTimersByTime: ms => avances.push(ms), useRealTimers() {} },
+  });
+  const pont = createBridge(deps);
+  pont('sujet', t => { t.mock.timers.enable({ apis: ['setTimeout'] }); t.mock.timers.tick(5000); });
+  // Act
+  await journal.tests[0].fn();
+  // Assert
+  assert.deepEqual(avances, [5000]);
+});
+
+test('les temporisateurs sont rendus au reel a la fin du test', async () => {
+  // Arrange
+  let rendus = 0;
+  const { journal, deps } = primitives({
+    vi: { useFakeTimers() {}, advanceTimersByTime() {}, useRealTimers: () => { rendus += 1; } },
+  });
+  const pont = createBridge(deps);
+  pont('sujet', t => { t.mock.timers.enable({ apis: ['setTimeout'] }); });
+  // Act
+  await journal.tests[0].fn();
+  // Assert
+  assert.equal(rendus, 1);
+});
+
+test('t.after s execute apres le corps du test', async () => {
+  // Arrange
+  const ordre = [];
+  const { journal, deps } = primitives();
+  const pont = createBridge(deps);
+  pont('sujet', t => { t.after(() => ordre.push('nettoyage')); ordre.push('corps'); });
+  // Act
+  await journal.tests[0].fn();
+  // Assert
+  assert.deepEqual(ordre, ['corps', 'nettoyage']);
+});

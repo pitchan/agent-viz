@@ -8,8 +8,10 @@
 // fait pas : c'est la divergence mesuree le 2026-08-11 (doc/36, annexe A.2,
 // sonde no 1), et elle est invisible a la lecture. Le remplacement est donc
 // ecrit ici, pas delegue.
-function creerContexte() {
+function creerContexte(vi) {
   const restaurations = [];
+  const apresTest = [];
+  let fauxTemporisateurs = false;
 
   const method = (cible, cle, impl) => {
     const origine = cible[cle];
@@ -28,19 +30,28 @@ function creerContexte() {
     return remplacement;
   };
 
+  const timers = {
+    enable: ({ apis }) => { fauxTemporisateurs = true; vi.useFakeTimers({ toFake: apis }); },
+    tick: ms => vi.advanceTimersByTime(ms),
+  };
+
   return {
-    contexte: { mock: { method } },
-    nettoyer: () => { while (restaurations.length) restaurations.pop()(); },
+    contexte: { mock: { method, timers }, after: fn => apresTest.push(fn) },
+    nettoyer: async () => {
+      while (apresTest.length) await apresTest.shift()();
+      while (restaurations.length) restaurations.pop()();
+      if (fauxTemporisateurs) vi.useRealTimers();
+    },
   };
 }
 
-export function createBridge({ test: runTest, afterAll, beforeEach }) {
+export function createBridge({ test: runTest, afterAll, beforeEach, vi }) {
   const pont = (nom, fn) => runTest(nom, async () => {
-    const { contexte, nettoyer } = creerContexte();
+    const { contexte, nettoyer } = creerContexte(vi);
     try {
       await fn(contexte);
     } finally {
-      nettoyer();
+      await nettoyer();
     }
   });
   pont.test = pont;
