@@ -113,6 +113,18 @@ s'accordent partout, sans divergence à trancher — le même genre de
 consistance que les dix `tarif-de-modele` et les dix `code-d-evenement`
 couverts plus bas dans « Ce qui est sain », pas un défaut cousin de C5.
 
+> **CORRIGÉ AU TRAITEMENT DE C5 (2026-08-11) : `.claude.json` ÉTAIT un défaut
+> cousin de C5, et le paragraphe ci-dessus se trompe à son sujet.**
+> `valeursDistinctes: 1` mesure que le *littéral* est identique partout — il ne
+> dit rien de la façon dont le chemin est CONSTRUIT autour. Les trois sites
+> écrivaient bien `'.claude.json'`, mais deux d'entre eux le joignaient au home
+> en ignorant `CLAUDE_CONFIG_DIR`, alors que Claude Code déplace ce fichier avec
+> la variable (vérifié en exécutant la version 2.1.226 sur les deux branches).
+> **Une valeur unique n'est donc pas une preuve d'accord** : c'est la limite de
+> ce détecteur, et elle vaut pour les quatre autres candidats de la liste. Un
+> site a été corrigé (`observatory/index.js:34`), un autre escaladé
+> (`netgain/src/install/paths.ts:37`) — détail dans la fiche C5.
+
 ### C1 — Sur un crochet préfixé d'un BOM, le serveur perd l'événement en silence total
 
 **Fait brut.** `docs/audit/resultats/d3.json`, primitive `lecture-json-de-fichier`,
@@ -269,6 +281,44 @@ reste spécialisé et n'y est pas replié.
 |---|---|---|---|---|
 | intégrité de ce qui est conservé | démontré | L | à absorber par la fusion | à corriger |
 
+> **PRÉCISÉ APRÈS TRAITEMENT (2026-08-11) — la tolérance n'est pas « au BOM »,
+> elle est à TOUT LE BLANC D'UNICODE.** La cible de cette fiche dit « BOM
+> retiré » ; la primitive livrée fait `line.trim()`, qui retire toute la
+> production *WhiteSpace* + *LineTerminator* d'ECMAScript. Mesuré, chaque forme
+> refusée par `JSON.parse` seul et acceptée par la primitive : U+FEFF, U+00A0
+> (insécable), U+2009 (fine), U+2028 (séparateur de ligne), U+3000 (cadratin).
+> **Contrôle négatif qui borne la propriété : U+200B** (espace de largeur nulle)
+> n'appartient pas à *WhiteSpace* et reste **refusé** — la tolérance est
+> exactement celle d'ECMAScript, pas « tout ce qui est invisible ».
+>
+> **Arbitrage de Vincent (2026-08-11) : assumée et écrite, pas restreinte.** La
+> restreindre au seul BOM demanderait d'écrire à la main un sous-ensemble de ce
+> que `trim()` fait déjà — du code en plus, pour rendre le lecteur *moins*
+> tolérant sur des fichiers écrits par un tiers. Rejeter une ligne qu'on savait
+> lire est la perte silencieuse que C1 a coûtée. L'en-tête de
+> `netgain/src/core/jsonl.ts` porte désormais la propriété telle qu'elle est.
+>
+> **PIÈGE DE CONTRAT DÉCOUVERT AU TRAITEMENT DE C5 (2026-08-11).** `{ ok: true }`
+> promet un JSON valide, **pas un objet** : une ligne valant `null` rend
+> `{ ok:true, value:null }`, et `42` ou `"texte"` de même. Sur les 7 sites qui
+> décodent puis déréférencent, **deux levaient** — établi par exécution, pas par
+> lecture : `watchdog/journal.js` (`rec.kind`, hors du `try`) et
+> `watchdog/catch-up.js` (`processEvent` lit `evt._ts`). Les cinq autres
+> survivaient, chacun pour une raison différente (pré-garde `"usage"`, garde
+> `evt &&`, déréférencement dans un `try`). Corrigés le 2026-08-11 : voir la
+> fiche de traitement de C5 pour ce que ça coûtait réellement.
+>
+> **OBSERVATION LAISSÉE OUVERTE, ET DATÉE COMME TELLE (2026-08-11) —
+> `readAndBroadcast` n'a pas de `leftover` là où `readTailDelta` en a un.** Il lit
+> `[offset, newStat.size)` puis pousse le curseur à `newStat.size` ; si cette
+> borne tombait en milieu de ligne, le fragment serait rejeté et jamais relu —
+> une perte d'événement sur le chemin vif, indépendante de C2.
+> **PISTE NON REPRODUITE, PAS UN CONSTAT** : elle dépend de l'atomicité de
+> l'ajout d'une ligne par l'écrivain, qui n'a jamais été prouvée. Elle n'a été ni
+> instrumentée ni reproduite ici, et c'est délibéré : instrumenter une écriture
+> concurrente est un chantier à part entière, pas un à-côté de C5. Elle reste
+> ouverte, avec ce statut exact.
+
 ### C3 — L'accumulation des jetons d'usage est réimplémentée côté serveur et côté moteur
 
 **Fait brut.** `docs/audit/resultats/d7.json`, geste `agregation-de-jetons`,
@@ -418,6 +468,68 @@ lue au même endroit par les deux chemins de code.
 | Impact | Confiance | Coût | Fenêtre | Traitement |
 |---|---|---|---|---|
 | exactitude de ce que voit l'utilisateur | démontré | S | à absorber par la fusion | à corriger |
+
+> **TRAITÉ LE 2026-08-11 — et la fiche sous-estimait le constat sur deux points,
+> tous deux trouvés en exécutant, aucun visible à la lecture.**
+>
+> **Le constat lui-même, prouvé avant d'écrire une ligne.** Les quatre
+> croisements, le home neutralisé pour rendre le repli visible :
+>
+> | variable posée | moteur (`netgain doctor --list`) | serveur (`observatory/index.js`) |
+> |---|---|---|
+> | `NETGAIN_CLAUDE_DIR` | suit → 1 session | ignore → `~/.claude` |
+> | `CLAUDE_CONFIG_DIR` | ignore → 0 session | suit → dossier posé |
+>
+> `netgain/src/cli.ts:24` a bien été vérifié avant d'y toucher : texte d'aide
+> seul, aucune résolution — la fiche avait raison.
+>
+> **Variable retenue : `CLAUDE_CONFIG_DIR`, et l'argument n'est pas l'usage.**
+> C'est le nom que **Claude Code définit lui-même** — 31 occurrences dans le
+> binaire 2.1.226 installé, **0 pour `NETGAIN_CLAUDE_DIR`** (témoin négatif). Le
+> moteur observe ce produit ; il en adopte le vocabulaire au lieu d'en inventer
+> un second. L'ancienne variable est **supprimée**, pas repliée (arbitrage de
+> Vincent) : elle n'était annoncée qu'au `netgain --help`, et `netgain/README.md`
+> n'est même pas dans le champ `files` du paquet.
+>
+> **PREMIER POINT MANQUANT — la divergence n'était pas seulement dans le nom.**
+> Le moteur employait `??` (nullish) là où le serveur employait `||` (falsy).
+> Avec la variable **posée mais vide**, le moteur scannait la chaîne vide et
+> annonçait « 0 session(s) découverte(s) sous  » : une cécité totale et
+> silencieuse, qu'un utilisateur lit comme « je n'ai pas de sessions ». Deux
+> expressions jumelles mais séparées avaient donc **déjà divergé une fois** sans
+> que personne ne le voie. C'est ce que le partage rend impossible, au-delà des
+> noms. Sens retenu des deux côtés : une variable vide EST une variable non
+> posée.
+>
+> **SECOND POINT MANQUANT — `.claude.json` suit la même variable, autrement.**
+> `lib/server/observatory/index.js:34` cherchait ce fichier au home **dans tous
+> les cas**. Établi en exécutant Claude Code 2.1.226 dans un home entièrement
+> jetable, les deux branches :
+>
+> | `CLAUDE_CONFIG_DIR` | où Claude Code écrit `.claude.json` |
+> |---|---|
+> | posée | `$CLAUDE_CONFIG_DIR/.claude.json` |
+> | non posée | `~/.claude.json` — **pas** `~/.claude/.claude.json` |
+>
+> Recoupé sur la machine réelle. D'où une fonction séparée dans la primitive : le
+> raccourci évident `join(resolveClaudeDir(), '.claude.json')` se trompe dans le
+> cas par défaut. Conséquence concrète : ce défaut est ce qui faisait disparaître
+> la carte R2 du protocole de contrôle de l'instrument (USERPROFILE jetable +
+> `CLAUDE_CONFIG_DIR` réel) — un coût noté « assumé » dans la recette, alors
+> qu'il était ce défaut-ci. **Cela invalide au passage la ligne de « Constats »
+> qui range `.claude.json` parmi les cinq `chemin-litteral` de D2 « qui
+> s'accordent partout, sans divergence à trancher, pas un défaut cousin de C5 » :
+> c'en était un.**
+>
+> **ESCALADÉ, NON TRAITÉ — `netgain/src/install/paths.ts:37`.** Il résout
+> `~/.claude.json` en ignorant la variable lui aussi, et il **écrit** au lieu de
+> lire. Il arbitre déjà entre `NETGAIN_HOME` — une couture de test — et le home :
+> faire primer `CLAUDE_CONFIG_DIR` là-bas est une question de **préséance entre
+> deux variables**, donc un arbitrage qui appartient à Vincent, pas un geste
+> mécanique. L'élargir seul aurait changé la sémantique de `netgain on/off` sans
+> validation.
+>
+> Commits `1941fcc`, `3ac3a2a`, `ead8063`.
 
 ### C6 — Trois clients HTTP côté navigateur
 
