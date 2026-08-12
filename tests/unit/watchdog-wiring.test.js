@@ -33,13 +33,13 @@ process.env.TMPDIR = BAC;
 process.env.USERPROFILE = BAC;
 process.env.HOME = BAC;
 
-const { createJournal, DEFAULT_PATH } = require('../../lib/server/watchdog/journal');
-const { createWatchdogService, WATCHDOG_MODULE } = require('../../lib/server/watchdog/service');
-const { sseClients } = require('../../lib/server/sse');
-const { DIR, sessionIndex } = require('../../lib/server/session-index');
+const { createJournal, DEFAULT_PATH } = require('../../src/server/watchdog/journal');
+const { createWatchdogService, WATCHDOG_MODULE } = require('../../src/server/watchdog/service');
+const { sseClients } = require('../../src/server/sse');
+const { DIR, sessionIndex } = require('../../src/server/session-index');
 const {
   readAndBroadcast, resetFileOffset, liveHandoffOffset, unwatchSession,
-} = require('../../lib/server/event-reader');
+} = require('../../src/server/event-reader');
 
 // La redirection est verifiee, pas supposee : si elle ne prenait pas, tout ce
 // fichier travaillerait sur les vraies donnees de l'utilisateur en silence.
@@ -209,7 +209,7 @@ test('cablage: ce qui est diffuse est deja consigne', async () => {
 // initialisee — la precondition est verifiee plutot que supposee.
 
 test('event-reader: sans chien de garde, le flux d evenements passe quand meme', async () => {
-  const idx = require('../../lib/server/watchdog');
+  const idx = require('../../src/server/watchdog');
   assert.equal(idx.getWatchdogService(), null, 'precondition : l instance partagee n est pas encore initialisee');
 
   const recus = ecouterSSE();
@@ -259,7 +259,7 @@ test('event-reader: une ligne prefixee d un BOM en milieu de fichier atteint le 
 const journalPartage = tmpFile();
 
 test('event-reader: ce que le chien de garde voit part sur le flux, apres l evenement', async () => {
-  const idx = require('../../lib/server/watchdog');
+  const idx = require('../../src/server/watchdog');
   const journalPath = journalPartage;
   await idx.initWatchdog({ journalPath, now: HORLOGE, loadModule: moduleQuiLeveSurMarqueur });
 
@@ -310,7 +310,7 @@ test('event-reader: ce que le chien de garde voit part sur le flux, apres l even
 });
 
 test('event-reader: relire le meme fichier ne rediffuse pas l alerte', async () => {
-  const idx = require('../../lib/server/watchdog');
+  const idx = require('../../src/server/watchdog');
   assert.ok(idx.getWatchdogService(), 'precondition : le service est en place');
 
   const fp = fichierDeSession('rejeu', flotJusquAuDeclencheur());
@@ -326,7 +326,7 @@ test('event-reader: relire le meme fichier ne rediffuse pas l alerte', async () 
 });
 
 test('cablage: le rattrapage s arrete la ou le chemin vif prend la main', async () => {
-  const idx = require('../../lib/server/watchdog');
+  const idx = require('../../src/server/watchdog');
   const SP = 'sess-partage';   // une session a part : les compteurs du detecteur
                                // sont par session, et les autres tests ont deja
                                // fait boucler `sess-1`.
@@ -363,7 +363,7 @@ test('cablage: le rattrapage s arrete la ou le chemin vif prend la main', async 
 });
 
 test('cablage: la frontiere est l octet ou le vif a NOURRI, pas son curseur', async () => {
-  const idx = require('../../lib/server/watchdog');
+  const idx = require('../../src/server/watchdog');
   assert.ok(idx.getWatchdogService(), 'precondition : le service est en place');
   const SN = 'sess-nourri';
   // L1 : ecrite pendant que le serveur demarrait, AVANT que le service existe.
@@ -426,7 +426,7 @@ test('cablage: la frontiere s efface avec le watcher et avec la compaction', asy
 });
 
 test('event-reader: un detecteur qui leve se dit une fois, et le canevas continue', async () => {
-  const idx = require('../../lib/server/watchdog');
+  const idx = require('../../src/server/watchdog');
   assert.ok(idx.getWatchdogService(), 'precondition : le service est en place');
   // Sans garde, l enveloppe `catch {}` de la boucle (elle est la pour
   // JSON.parse) avalerait l exception : le chien de garde cesserait de produire
@@ -446,7 +446,7 @@ test('event-reader: un detecteur qui leve se dit une fois, et le canevas continu
 // ─── Le demarrage ────────────────────────────────────────────────────────────
 
 function neufIndex() {
-  const p = require.resolve('../../lib/server/watchdog/index');
+  const p = require.resolve('../../src/server/watchdog/index');
   delete require.cache[p];
   return require(p);
 }
@@ -670,7 +670,7 @@ test('demarrage: ce que le serveur oublie de fournir se dit a voix haute', async
 //
 // Le prix assume : reformater ces lignes fait rougir ces tests. C'est le but.
 const SOURCE_SERVEUR = fs.readFileSync(
-  path.join(__dirname, '..', '..', 'lib', 'server.js'), 'utf8');
+  path.join(__dirname, '..', '..', 'src', 'server', 'server.js'), 'utf8');
 
 // L'appel, et RIEN que l'appel. Un `[\s\S]*?` parti de `startWatchdog({`
 // balaierait jusqu'a la fin du fichier : n'importe quel `dir: DIR` ecrit PLUS

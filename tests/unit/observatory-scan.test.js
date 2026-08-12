@@ -8,9 +8,9 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { runIncrementalScan } = require('../../lib/server/observatory/scan');
-const { openStore } = require('../../lib/server/observatory/store');
-const { SCAN_VERSION } = require('../../lib/server/observatory/scan-version');
+const { runIncrementalScan } = require('../../src/server/observatory/scan');
+const { openStore } = require('../../src/server/observatory/store');
+const { SCAN_VERSION } = require('../../src/server/observatory/scan-version');
 
 function fakeReport(id, over = {}) {
   return {

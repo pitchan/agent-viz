@@ -13,8 +13,8 @@ const fsp = fs.promises;
 const path = require('path');
 const os = require('os');
 
-const { _internals } = require('../../lib/server/transcript');
-const { ensureTokens, clearTokensTimer } = require('../../lib/server/tokens');
+const { _internals } = require('../../src/server/transcript');
+const { ensureTokens, clearTokensTimer } = require('../../src/server/tokens');
 
 const { ensureTranscriptSlice, makeTail, ensureSubagentTails } = _internals;
 

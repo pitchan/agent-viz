@@ -5,7 +5,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { collectConfigItems } = require('../../lib/server/observatory/config-audit');
+const { collectConfigItems } = require('../../src/server/observatory/config-audit');
 
 const CLAUDE_JSON = JSON.stringify({
   mcpServers: { 'mdb-explorer': { command: 'node', args: ['x.js'] } },

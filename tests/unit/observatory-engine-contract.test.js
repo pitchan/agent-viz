@@ -8,7 +8,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('path');
 
-const { loadEngine, engineStatus, FIXTURE_CLAUDE_DIR } = require('../../lib/server/observatory/engine');
+const { loadEngine, engineStatus, FIXTURE_CLAUDE_DIR } = require('../../src/server/observatory/engine');
 
 test('loadEngine resolves the granular netgain API', async () => {
   const engine = await loadEngine();
@@ -146,7 +146,7 @@ test('the SessionReport carries per-model dollars (costByModel)', async () => {
 });
 
 test('the announced price source IS the engine table source — one voice', async () => {
-  const { PRICE_SOURCE } = require('../../lib/server/observatory/routes');
+  const { PRICE_SOURCE } = require('../../src/server/observatory/routes');
   const engine = await loadEngine();
   assert.equal(engine.priceTable().source, PRICE_SOURCE);
 });

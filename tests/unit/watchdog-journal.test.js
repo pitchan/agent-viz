@@ -17,7 +17,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { createJournal, keyOf } = require('../../lib/server/watchdog/journal');
+const { createJournal, keyOf } = require('../../src/server/watchdog/journal');
 
 const T = 1_700_000_000_000;
 const DAY = 86_400_000;

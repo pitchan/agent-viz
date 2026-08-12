@@ -18,15 +18,15 @@ const {
   DIR,
   sessionIndex,
   idFromPath,
-} = require('./server/session-index');
-const { broadcastSessionsChanged, broadcastSSE } = require('./server/sse');
-const { watchSession, liveHandoffOffset } = require('./server/event-reader');
-const { housekeep, scanAndWatch } = require('./server/housekeep');
-const { dispatch, setServer } = require('./server/routes');
-const { startPricingRefresh, applyEnginePrices, onPricingDrift } = require('./server/pricing');
-const { getObservatoryService } = require('./server/observatory');
-const { startWatchdog } = require('./server/watchdog');
-const { loadEngine } = require('./server/observatory/engine');
+} = require('./session-index');
+const { broadcastSessionsChanged, broadcastSSE } = require('./sse');
+const { watchSession, liveHandoffOffset } = require('./event-reader');
+const { housekeep, scanAndWatch } = require('./housekeep');
+const { dispatch, setServer } = require('./routes');
+const { startPricingRefresh, applyEnginePrices, onPricingDrift } = require('./pricing');
+const { getObservatoryService } = require('./observatory');
+const { startWatchdog } = require('./watchdog');
+const { loadEngine } = require('./observatory/engine');
 
 const PORT = process.env.PORT || 3333;
 

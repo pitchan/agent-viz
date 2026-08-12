@@ -239,7 +239,7 @@ function resolveScope({ scope, cwd, agent = 'claude', packageRoot } = {}) {
 // `npx --yes @vcueto/agent-viz@<version> hook --source=<agent>` pinned to the
 // currently-running version (~300-800ms cold start).
 function resolveHookCommand({ packageRoot, version, agent = 'claude' } = {}) {
-  packageRoot = packageRoot || path.resolve(__dirname, '..');
+  packageRoot = packageRoot || path.resolve(__dirname, '..', '..');
   const binPath = path.join(packageRoot, 'bin', 'agent-viz.js');
   // npx caches always live under "/_npx/" on every platform.
   const isEphemeral = packageRoot.includes(`${path.sep}_npx${path.sep}`)

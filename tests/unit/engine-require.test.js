@@ -21,7 +21,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const path = require('path');
 
-const { requireEngineModule } = require('../../lib/server/engine-require');
+const { requireEngineModule } = require('../../src/server/engine-require');
 
 test('charge un module réel du moteur et rend ses exports', () => {
   const mod = requireEngineModule('core/jsonl.js', ['decodeJsonlLine'], 'jsonl');

@@ -7,8 +7,8 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
 const { usdPerToken, usdForTokens, usdForBytes, sumUsd, BYTES_PER_TOKEN, COST_BASIS }
-  = require('../../lib/server/observatory/rules/cost');
-const { THRESHOLDS, THRESHOLD_ORIGIN } = require('../../lib/server/observatory/rules/thresholds');
+  = require('../../src/server/observatory/rules/cost');
+const { THRESHOLDS, THRESHOLD_ORIGIN } = require('../../src/server/observatory/rules/thresholds');
 
 const session = { netTokens: 1000, costUsd: 2, costComplete: true };
 

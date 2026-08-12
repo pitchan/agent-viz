@@ -7,7 +7,7 @@
     "netgain": "dist/engine/cli.js",
     "netgain-map": "dist/engine/mcp/main.js"
   },
-  "main": "lib/server.js",
+  "main": "src/server/server.js",
   "type": "commonjs",
   "engines": {
     "node": ">=24"
@@ -22,11 +22,10 @@
   },
   "files": [
     "bin/",
-    "lib/",
-    "public/",
-    "netgain/dist/",
-    "netgain/package.json",
-    "netgain/LICENSE",
+    "src/server/",
+    "src/web/",
+    "dist/engine/",
+    "docs/netgain.md",
     "index.html",
     "README.md",
     "LICENSE"

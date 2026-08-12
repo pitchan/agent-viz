@@ -18,9 +18,9 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { createJournal } = require('../../lib/server/watchdog/journal');
-const { createWatchdogService } = require('../../lib/server/watchdog/service');
-const { catchUpFromDisk } = require('../../lib/server/watchdog/catch-up');
+const { createJournal } = require('../../src/server/watchdog/journal');
+const { createWatchdogService } = require('../../src/server/watchdog/service');
+const { catchUpFromDisk } = require('../../src/server/watchdog/catch-up');
 
 const T = 1_700_000_000_000;
 const SID = 'sess-1';
@@ -425,7 +425,7 @@ test('catch-up: un dossier illisible se plaint, un dossier absent se tait', asyn
 // d ajouter au produit une porte de remise a zero qui n existe que pour eux.
 
 function neufIndex() {
-  const p = require.resolve('../../lib/server/watchdog/index');
+  const p = require.resolve('../../src/server/watchdog/index');
   delete require.cache[p];
   return require(p);
 }

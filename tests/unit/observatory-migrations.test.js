@@ -10,7 +10,7 @@ const os = require('os');
 const path = require('path');
 const { DatabaseSync } = require('node:sqlite');
 
-const { openStore } = require('../../lib/server/observatory/store');
+const { openStore } = require('../../src/server/observatory/store');
 
 // Copy of the M1 schema as shipped in v0.3.1 (before this change) — the
 // point of the test is opening a database built by the PREVIOUS version.

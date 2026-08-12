@@ -13,7 +13,7 @@ const assert = require('node:assert/strict');
 
 const {
   cwdOf, cwdOfReport, displayPath, projectResolver, nameProjects,
-} = require('../../lib/server/observatory/project-label');
+} = require('../../src/server/observatory/project-label');
 
 const session = (project, report) => ({ id: 's', project, report });
 const withCwd = (project, cwd) => session(project, { cwd });

@@ -6,7 +6,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
 const { scoreOf, isEligible, isStale, rankByBasis, CONFIDENCE_WEIGHT, IGNORED_RETURN_FACTOR }
-  = require('../../lib/server/observatory/rules/ranking');
+  = require('../../src/server/observatory/rules/ranking');
 
 const SCAN = '2026-07-15T12:00:00.000Z';
 
@@ -112,7 +112,7 @@ test('an empty input yields empty structures, never undefined', () => {
 });
 
 test('the module exposes no way to total costs across recommendations', () => {
-  const api = require('../../lib/server/observatory/rules/ranking');
+  const api = require('../../src/server/observatory/rules/ranking');
   assert.deepEqual(Object.keys(api).filter(k => /total|sum/i.test(k)), [],
     'recommendation costs overlap: a same session feeds several rules, so no total is meaningful');
 });

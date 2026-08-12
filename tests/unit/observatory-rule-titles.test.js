@@ -14,8 +14,8 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { RULES } = require('../../lib/server/observatory/rules/registry');
-const { nameProjects } = require('../../lib/server/observatory/project-label');
+const { RULES } = require('../../src/server/observatory/rules/registry');
+const { nameProjects } = require('../../src/server/observatory/project-label');
 
 const KB = 1024;
 const stat = (events, tokens) => ({ events, tokens });

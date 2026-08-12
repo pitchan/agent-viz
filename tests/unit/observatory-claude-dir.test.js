@@ -26,7 +26,7 @@ const path = require('path');
 const os = require('os');
 const Module = require('module');
 
-const CIBLE = require.resolve('../../lib/server/observatory/index.js');
+const CIBLE = require.resolve('../../src/server/observatory/index.js');
 const dossier = path.dirname(CIBLE);
 
 function resoudreAvec(env) {
@@ -130,7 +130,7 @@ test('une variable VIDE retombe sur le home', () => {
 // séparées avaient déjà divergé une fois (sur la chaîne vide) sans que personne
 // ne le voie.
 test('le serveur passe par la primitive du moteur, pas par sa propre expression', () => {
-  const { resolveClaudeDir, CLAUDE_DIR_ENV } = require('../../lib/server/claude-dir');
+  const { resolveClaudeDir, CLAUDE_DIR_ENV } = require('../../src/server/claude-dir');
   assert.strictEqual(typeof resolveClaudeDir, 'function');
   assert.strictEqual(CLAUDE_DIR_ENV, 'CLAUDE_CONFIG_DIR');
   const { resolveClaudeDir: duMoteur } = require('../../dist/engine/core/claude-dir.js');

@@ -6,8 +6,8 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { createObservatoryService } = require('../../lib/server/observatory/service');
-const { SCAN_VERSION } = require('../../lib/server/observatory/scan-version');
+const { createObservatoryService } = require('../../src/server/observatory/service');
+const { SCAN_VERSION } = require('../../src/server/observatory/scan-version');
 
 function makeService(listed) {
   return createObservatoryService({

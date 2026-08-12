@@ -7,8 +7,8 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { openStore } = require('../../lib/server/observatory/store');
-const { SCAN_VERSION } = require('../../lib/server/observatory/scan-version');
+const { openStore } = require('../../src/server/observatory/store');
+const { SCAN_VERSION } = require('../../src/server/observatory/scan-version');
 
 function tmpStore() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'obs-store-'));

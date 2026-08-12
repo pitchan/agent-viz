@@ -5,7 +5,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { createObservatoryRoutes } = require('../../lib/server/observatory/routes');
+const { createObservatoryRoutes } = require('../../src/server/observatory/routes');
 
 function mockRes() {
   return {

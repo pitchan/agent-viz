@@ -8,8 +8,8 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const r1 = require('../../lib/server/observatory/rules/r1-prefix-change');
-const { evaluateAll, RULES } = require('../../lib/server/observatory/rules/registry');
+const r1 = require('../../src/server/observatory/rules/r1-prefix-change');
+const { evaluateAll, RULES } = require('../../src/server/observatory/rules/registry');
 
 // The engine guarantees that each breakdown sums exactly to prefixChange, so
 // the default puts every unclaimed token on modelSwitch: tests that say nothing

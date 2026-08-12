@@ -5,7 +5,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { createObservatoryService } = require('../../lib/server/observatory/service');
+const { createObservatoryService } = require('../../src/server/observatory/service');
 
 test('purge refuses to wipe when the engine is missing', async () => {
   let purged = false;

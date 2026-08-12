@@ -6,7 +6,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { computeModelCosts } = require('../../lib/server/observatory/model-costs');
+const { computeModelCosts } = require('../../src/server/observatory/model-costs');
 
 const bucket = (inTok, out, cc = 0, cr = 0) =>
   ({ in: inTok, out, cacheCreate: cc, cacheRead: cr, cacheCreate1h: 0, cacheCreate5m: 0 });

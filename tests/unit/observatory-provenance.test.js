@@ -5,8 +5,8 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { buildProvenance } = require('../../lib/server/observatory/provenance');
-const { SCAN_VERSION } = require('../../lib/server/observatory/scan-version');
+const { buildProvenance } = require('../../src/server/observatory/provenance');
+const { SCAN_VERSION } = require('../../src/server/observatory/scan-version');
 
 const build = () => buildProvenance({ engineVersion: '0.13.0', priceSource: 'netgain-table-embarquee' });
 
