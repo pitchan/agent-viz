@@ -16,11 +16,20 @@ export function buildHookEntry(netgainRoot: string): JsonObject {
 }
 
 /**
+ * Queue d'APRÈS la fusion (étape 2) : la sortie de build devient `<racine>/dist/engine/`,
+ * et la racine ne porte plus forcément le mot « netgain ». Sans elle, `on` et `off`
+ * cesseraient de purger les entrées écrites depuis une AUTRE racine — la capacité même
+ * que hook-edit.test.ts:29 teste.
+ */
+const QUEUE_APRES_FUSION = '/dist/engine/cli.js';
+
+/**
  * NOTRE hook, y compris périmé (install déplacée) — jamais un hook étranger :
- * string ∧ finit par router-hook ∧ contient netgain.
+ * string ∧ finit par router-hook ∧ (contient netgain ∨ porte la queue d'après la fusion).
  */
 export function isNetgainRouterHook(command: unknown): boolean {
-  return typeof command === 'string' && command.endsWith('router-hook') && /netgain/i.test(command);
+  if (typeof command !== 'string' || !command.endsWith('router-hook')) return false;
+  return /netgain/i.test(command) || command.replace(/\\/g, '/').toLowerCase().includes(QUEUE_APRES_FUSION);
 }
 
 function isCanonicalEntry(entry: unknown, desired: JsonObject): boolean {
@@ -41,8 +50,12 @@ function groupHooks(group: unknown): unknown[] | undefined {
   return Array.isArray(inner) ? inner : undefined;
 }
 
-/** À nous : prédicat (y compris périmé) OU commande exactement canonique (racine sans « netgain » dans le chemin). */
-function isOurs(command: unknown, desired: JsonObject): boolean {
+/**
+ * À nous : prédicat (y compris périmé) OU commande exactement canonique (racine sans
+ * « netgain » dans le chemin). Exporté pour `rupture.ts` : se rabattre sur
+ * `isNetgainRouterHook` n'est PAS équivalent — celui-ci accepte en plus la canonique.
+ */
+export function isOurs(command: unknown, desired: JsonObject): boolean {
   return isNetgainRouterHook(command) || command === desired['command'];
 }
 
