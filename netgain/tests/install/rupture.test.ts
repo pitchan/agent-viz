@@ -73,6 +73,19 @@ describe('isNetgainRouterHook', () => {
     // Assert
     expect(notre).toBe(true);
   });
+
+  test('T13 — la même queue en ANTISLASHES et en MAJUSCULES est reconnue (casse Windows : 2 des 5 faux négatifs)', () => {
+    // Arrange — la commande ne contient NULLE PART le mot « netgain » : sans cela la
+    // première branche du « ou » répondrait vrai et masquerait la seconde normalisation.
+    const commande = 'node "C:\\Depots\\Agent-Viz\\DIST\\ENGINE\\CLI.JS" router-hook';
+
+    // Act
+    const notre = isNetgainRouterHook(commande);
+
+    // Assert
+    expect(/netgain/i.test(commande)).toBe(false); // la garde du masque amont, vérifiée ici même
+    expect(notre).toBe(true);
+  });
 });
 
 describe('porteQueueAvantFusion', () => {

@@ -12,6 +12,9 @@ import type { StatusInput } from './status.js';
  * commande reconstruite : cinq faux négatifs mesurés (dépôt cloné dans un dossier
  * nommé netgain, racine sous un chemin portant netgain/dist, casse Windows,
  * antislashes, entrée périmée venue d'une AUTRE racine).
+ *
+ * Les deux sont écrites DÉJÀ NORMALISÉES — barres obliques, minuscules. C'est le
+ * contrat que porte le paramètre `queueNormalisee` du prédicat.
  */
 export const QUEUE_HOOK = 'netgain/dist/cli.js';
 export const QUEUE_MCP = 'netgain/dist/mcp/main.js';
@@ -30,10 +33,15 @@ function normalise(p: string): string {
   return p.replace(/\\/g, '/').toLowerCase();
 }
 
-/** Vrai si la valeur est une chaîne portant la queue ; sur toute autre forme : false, JAMAIS de levée. */
-export function porteQueueAvantFusion(valeur: unknown, queue: string): boolean {
+/**
+ * Vrai si la valeur est une chaîne portant la queue ; sur toute autre forme : false,
+ * JAMAIS de levée. La queue arrive DÉJÀ normalisée — la normaliser ici serait un membre
+ * qu'aucun test ne peut distinguer, les deux seules constantes passées étant en barres
+ * obliques et en minuscules.
+ */
+export function porteQueueAvantFusion(valeur: unknown, queueNormalisee: string): boolean {
   if (typeof valeur !== 'string') return false;
-  return normalise(valeur).includes(`/${normalise(queue)}`);
+  return normalise(valeur).includes(`/${queueNormalisee}`);
 }
 
 /**
@@ -41,8 +49,8 @@ export function porteQueueAvantFusion(valeur: unknown, queue: string): boolean {
  * La garde fait toute la datation : avant la tâche 3 le souhaité la porte encore,
  * le prédicat est faux partout, et aucune installation saine n'est signalée.
  */
-export function estAvantFusion(enregistre: unknown, souhaite: string, queue: string): boolean {
-  return porteQueueAvantFusion(enregistre, queue) && !porteQueueAvantFusion(souhaite, queue);
+export function estAvantFusion(enregistre: unknown, souhaite: string, queueNormalisee: string): boolean {
+  return porteQueueAvantFusion(enregistre, queueNormalisee) && !porteQueueAvantFusion(souhaite, queueNormalisee);
 }
 
 /** Les commandes de crochet d'un document de settings, lecture tolérante : difforme = aucune. */
@@ -76,7 +84,7 @@ export function crochetsAvantFusion(doc: unknown, netgainRoot: string): string[]
 /** Notre entrée MCP périmée dans un conteneur `mcpServers` quelconque, sous sa forme littérale. */
 export function mcpAvantFusion(servers: unknown, netgainRoot: string, repoDir: string): string[] {
   if (typeof servers !== 'object' || servers === null || Array.isArray(servers)) return [];
-  if (!(MCP_SERVER_NAME in (servers as JsonObject))) return []; // jamais un serveur étranger
+  // jamais un serveur étranger : la clé absente donne `undefined`, que la garde suivante écarte.
   const entry = (servers as JsonObject)[MCP_SERVER_NAME];
   if (typeof entry !== 'object' || entry === null) return [];
   const args = (entry as JsonObject)['args'];

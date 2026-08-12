@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { applyHookOn } from '../../src/install/hook-edit.js';
-import { applyMcpOn } from '../../src/install/mcp-edit.js';
+import { applyMcpOn, buildMcpEntry } from '../../src/install/mcp-edit.js';
 import { computeStatus, renderStatus, type StatusInput } from '../../src/install/status.js';
 
 // Racine SANS le mot « netgain » : la commande souhaitée ne porte donc PAS la queue
@@ -8,6 +8,9 @@ import { computeStatus, renderStatus, type StatusInput } from '../../src/install
 const NETGAIN = 'F:\\ngroot';
 const REPO = 'D:\\scratch\\repo';
 const CLE_CANONIQUE = 'D:/scratch/repo';
+// La variante backslash : même chemin au sens de `samePath`, clé DIFFÉRENTE de la canonique.
+// C'est celle qu'écrivaient les versions anciennes, et `hasCanonicalMcp` compte son entrée présente.
+const CLE_VARIANTE = 'D:\\scratch\\repo';
 
 // Les deux enregistrements d'AVANT la fusion, sous leur forme littérale.
 const HOOK_PERIME = 'node C:/vieux/netgain/dist/cli.js router-hook';
@@ -94,6 +97,49 @@ describe('computeStatus face à un enregistrement d avant la fusion', () => {
     expect(status.mcp.present).toBe(true);
     expect(status.preFusion).toEqual([HOOK_PERIME, MCP_PERIME]);
     expect(status.on).toBe(false);
+  });
+
+  test('T11 — la SEULE entrée périmée vit sous une clé variante BACKSLASH : pas de ON, et ON revient une fois réparée', () => {
+    // Arrange — la clé canonique est ABSENTE de `projects` : la variante backslash est le
+    // SEUL porteur. Si la canonique portait elle aussi l entrée, une lecture bornée à la
+    // clé canonique resterait verte et ce test ne prouverait rien.
+    const sousVarianteSeule = (serveurs: unknown): StatusInput =>
+      input({
+        settingsLocal: applyHookOn(undefined, NETGAIN).value,
+        claudeJson: { projects: { [CLE_VARIANTE]: { mcpServers: serveurs } } },
+      });
+    const casse = sousVarianteSeule(serveursAvec(MCP_PERIME));
+    const repare = sousVarianteSeule({ 'netgain-map': buildMcpEntry(NETGAIN, REPO) });
+
+    // Act
+    const [avant, apres] = [casse, repare].map((entree) => computeStatus(entree));
+
+    // Assert
+    expect(avant!.mcp.present).toBe(true); // l entrée EST vue présente — c est de là que venait le faux-ON
+    expect(avant!.preFusion).toEqual([MCP_PERIME]);
+    expect(avant!.on).toBe(false);
+    expect(apres!.preFusion).toEqual([]);
+    expect(apres!.on).toBe(true);
+  });
+
+  test('T12 — un crochet ÉTRANGER portant notre queue est EXCLU des périmés : ni ligne ✗, ni bascule du verdict', () => {
+    // Arrange — étranger au sens de `isOurs` : il porte bien la queue, mais ne finit pas par
+    // « router-hook ». « netgain on » ne le réécrira donc JAMAIS : le compter parmi les périmés
+    // clouerait `on` à false sans réparation possible. Il est semé À CÔTÉ de notre canonique,
+    // et le test passe par computeStatus — là où T3, qui attaque le prédicat nu, ne va pas.
+    const etranger = { type: 'command', command: 'node C:/vieux/netgain/dist/cli.js doctor', timeout: 10 };
+    const entree = input({
+      claudeJson: applyMcpOn(undefined, NETGAIN, REPO).value,
+      settingsLocal: applyHookOn({ hooks: { UserPromptSubmit: [{ hooks: [etranger] }] } }, NETGAIN).value,
+    });
+
+    // Act
+    const status = computeStatus(entree);
+
+    // Assert
+    expect(status.preFusion).toEqual([]);
+    expect(status.on).toBe(true);
+    expect(renderStatus(status, '0.13.0')).not.toContain('✗');
   });
 
   test('T6 — renderStatus nomme l enregistrement périmé ET la commande de réparation, préfixés ✗', () => {
