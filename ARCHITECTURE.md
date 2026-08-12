@@ -80,9 +80,28 @@ bin/agent-viz.js                  le binaire
 
 Les cinq fichiers du haut vivaient auparavant dans `lib/`, un cran au-dessus de
 `lib/server/` ; l'étape 2 les a fusionnés **au même niveau**. C'était le seul
-choix qui laisse invariantes les six traversées `__dirname` de `lib/server/**`
-(§ 4) : un renommage verbatim les aurait toutes approfondies d'un cran, et
-l'arithmétique de `..` est la classe d'échec silencieuse.
+choix qui laisse invariantes les **cinq** traversées `__dirname` de
+`lib/server/**` : un renommage verbatim les aurait toutes approfondies d'un
+cran, et l'arithmétique de `..` est la classe d'échec silencieuse.
+
+**Ces cinq traversées `__dirname` n'ont rien à voir avec les six traversées DE
+FRONTIÈRE du § 4**, et le voisinage des deux chiffres a déjà produit une erreur :
+une rédaction antérieure écrivait « six traversées `__dirname` (§ 4) », où un six
+périmé se lisait comme corroboré par un six juste. Ce sont deux objets
+différents — ici, **du calcul de chemin relatif au fichier** ; là-bas, **des
+appels du serveur CommonJS vers le moteur ESM**. Le compte, mesuré sur l'état
+d'avant le déplacement :
+
+```
+git grep -n "__dirname" 7474f41 -- lib/server
+  lib/server/engine-require.js:25          lib/server/routes.js:30
+  lib/server/observatory/engine.js:20      lib/server/watchdog/service.js:18
+  lib/server/observatory/engine.js:21                              → 5 sites
+```
+
+Deux sites dans un même fichier : compter les **fichiers** en donne quatre, les
+**sites** cinq, et c'est la profondeur de chaque site qui décide — d'où le
+décompte par site.
 
 Sa table de routes est **déclarative** (`src/server/routes.js:275`) : ajouter une
 route est une ligne de données, pas une branche de plus dans un aiguilleur. C'est

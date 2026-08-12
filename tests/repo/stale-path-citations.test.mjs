@@ -128,7 +128,11 @@ const LISTE_BLANCHE = [
   // qu il a de plus utile a la prochaine etape.
   { fichier: 'ARCHITECTURE.md', fragment: 'vivaient auparavant dans `lib/`', raison: '§ 2.1 : la fusion a plat des cinq fichiers du haut' },
   { fichier: 'ARCHITECTURE.md', fragment: "`lib/server/` ; l'étape 2 les a fusionnés", raison: '§ 2.1, suite de la meme phrase' },
-  { fichier: 'ARCHITECTURE.md', fragment: '`__dirname` de `lib/server/**`', raison: '§ 2.1 : ce que la fusion a laisse invariant' },
+  { fichier: 'ARCHITECTURE.md', fragment: '`lib/server/**` : un renommage verbatim', raison: '§ 2.1 : ce que la fusion a laisse invariant' },
+  { fichier: 'ARCHITECTURE.md', fragment: '"__dirname" 7474f41 -- lib/server', raison: '§ 2.1 : la commande qui compte les 5 traversees, sur l etat d AVANT — elle doit rester rejouable' },
+  { fichier: 'ARCHITECTURE.md', fragment: 'lib/server/engine-require.js:25', raison: '§ 2.1 : sa sortie, collee' },
+  { fichier: 'ARCHITECTURE.md', fragment: 'lib/server/observatory/engine.js:20', raison: '§ 2.1 : idem' },
+  { fichier: 'ARCHITECTURE.md', fragment: 'lib/server/observatory/engine.js:21', raison: '§ 2.1 : idem — deux sites dans un meme fichier, ce qui motive le decompte par SITE' },
   { fichier: 'ARCHITECTURE.md', fragment: "s'atteignait par `../netgain/dist/`", raison: '§ 3 : pourquoi l ancien motif de controle serait MUET aujourd hui' },
   { fichier: 'ARCHITECTURE.md', fragment: '`…/netgain/dist/cli.js` ;', raison: '§ 6 : la queue d avant la fusion que `netgain status` nomme' },
   { fichier: 'ARCHITECTURE.md', fragment: "`lib/`, `public/` et", raison: '§ 8 : les trois racines mortes, nommees comme mortes' },
