@@ -25,7 +25,7 @@ import path from 'node:path';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 
-// Généré (`netgain/dist/` est rebâti depuis `netgain/src/`), tiers, ou données
+// Généré (`dist/engine/` est rebâti depuis `src/engine/`), tiers, ou données
 // de test figées : rien de tout cela ne porte une citation à maintenir.
 const IGNORED_DIRS = new Set(['node_modules', '.git', 'dist', 'fixtures', 'resultats']);
 const SOURCE_EXT = new Set(['.js', '.mjs', '.cjs', '.ts', '.mts', '.html', '.css']);

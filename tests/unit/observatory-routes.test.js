@@ -159,11 +159,11 @@ test('a missing engine answers 503 with the exact error, never an empty page', a
   const broken = {
     ...SERVICE,
     // Message tel que Node le produit quand le moteur embarque n'a pas ete construit.
-    summary: async () => { const e = new Error("Cannot find module '/app/netgain/dist/core/index.js'"); e.engineMissing = true; throw e; },
+    summary: async () => { const e = new Error("Cannot find module '/app/dist/engine/core/index.js'"); e.engineMissing = true; throw e; },
   };
   const res = await router(broken)('GET', '/analysis/summary');
   assert.equal(res.statusCode, 503);
-  assert.match(JSON.parse(res.body).error, /netgain[\\/]dist/);
+  assert.match(JSON.parse(res.body).error, /dist[\\/]engine/);
 });
 
 test('POST /analysis/purge wipes first, then starts a rebuild scan with the window', async () => {

@@ -2,7 +2,7 @@
 // C5 (docs/audit-qualite-code.md) : DEUX variables d'environnement désignaient le
 // même dossier de configuration dans un SEUL paquet npm — `CLAUDE_CONFIG_DIR`
 // ici (lib/server/observatory/index.js:24), `NETGAIN_CLAUDE_DIR` côté moteur
-// (netgain/src/doctor/index.ts:112). Poser l'une ne déplaçait que la moitié
+// (src/engine/doctor/index.ts:112). Poser l'une ne déplaçait que la moitié
 // correspondante : deux vues du même produit sur deux jeux de sessions, sans
 // qu'aucun message n'avertisse de l'écart.
 //
@@ -133,6 +133,6 @@ test('le serveur passe par la primitive du moteur, pas par sa propre expression'
   const { resolveClaudeDir, CLAUDE_DIR_ENV } = require('../../lib/server/claude-dir');
   assert.strictEqual(typeof resolveClaudeDir, 'function');
   assert.strictEqual(CLAUDE_DIR_ENV, 'CLAUDE_CONFIG_DIR');
-  const { resolveClaudeDir: duMoteur } = require('../../netgain/dist/core/claude-dir.js');
+  const { resolveClaudeDir: duMoteur } = require('../../dist/engine/core/claude-dir.js');
   assert.strictEqual(resolveClaudeDir, duMoteur);
 });

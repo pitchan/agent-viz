@@ -57,12 +57,12 @@ test('un export manquant NOMME un build périmé, et dit lequel manque', () => {
 });
 
 test('le chemin est relatif au `dist` du moteur, pas au module appelant', () => {
-  // Le pont de C2 écrivait `../../netgain/dist/core/jsonl.js`, un chemin qui ne
+  // Le pont de C2 écrivait `../../dist/engine/core/jsonl.js`, un chemin qui ne
   // vaut que depuis `lib/server/`. Le rendre relatif au `dist` évite qu'un
   // second pont placé ailleurs se trompe d'un niveau sans que rien ne le dise.
-  const attendu = path.join(__dirname, '..', '..', 'netgain', 'dist', 'core', 'jsonl.js');
+  const attendu = path.join(__dirname, '..', '..', 'dist', 'engine', 'core', 'jsonl.js');
   assert.strictEqual(
     require.resolve(attendu),
-    require.resolve(path.join(__dirname, '..', '..', 'lib', 'server', '..', '..', 'netgain', 'dist', 'core', 'jsonl.js')),
+    require.resolve(path.join(__dirname, '..', '..', 'src', 'server', '..', '..', 'dist', 'engine', 'core', 'jsonl.js')),
   );
 });

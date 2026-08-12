@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "sourceMap": true,
+    "declaration": false,
+    "outDir": "dist/engine",
+    "types": ["node"]
+  },
+  // etape 2 : "tests/**/*.ts" retire — 6 x TS1470 (import.meta) tant que la racine est CommonJS ;
+  // restauration = critere d arret de l etape 3
+  "include": ["src/engine/**/*.ts", "vitest.config.ts"]
+}

@@ -184,7 +184,7 @@ test('accumulateUsage with different msgIds cumulates normally', () => {
 
 // ---------------------------------------------------------------------------
 // C3 (docs/audit-qualite-code.md) — l'accumulation vient désormais de la
-// primitive commune du moteur (netgain/src/core/usage.ts), partagée par un pont.
+// primitive commune du moteur (src/engine/core/usage.ts), partagée par un pont.
 //
 // Ces tests existent parce que la migration a changé du comportement SANS
 // qu'aucun test d'au-dessus ne vire au rouge : le filet ne couvrait ni la
@@ -272,7 +272,7 @@ test('C3 — le serveur passe par la primitive du moteur, pas par sa propre addi
   // C'est qu'il compte au MÊME ENDROIT que le moteur : deux additions jumelles
   // mais séparées avaient déjà divergé sur les gardes sans que personne ne le
   // voie (constat établi par sonde différentielle, pas par lecture).
-  const duMoteur = require('../../netgain/dist/core/usage.js');
+  const duMoteur = require('../../dist/engine/core/usage.js');
   assert.equal(emptyUsageBucket, duMoteur.emptyUsageBucket);
   assert.deepEqual(newBucket().cacheCreate1h, 0);
 });

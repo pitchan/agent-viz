@@ -30,7 +30,7 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['tests/**/*.test.{js,cjs,mjs}', 'netgain/tests/**/*.test.ts'],
+    include: ['tests/**/*.test.{js,cjs,mjs,ts}'],
     setupFiles: ['./test-support/bridge/install.mjs'],
   },
 });

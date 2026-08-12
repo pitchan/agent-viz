@@ -52,9 +52,9 @@ test('an unsubscribed listener stops being called', async () => {
 test('a failing call records the exact error and clears loading', async () => {
   resetStore();
   await loadAdvisor(fakeApi({
-    fetchSummary: async () => { throw new Error("Cannot find module '/app/netgain/dist/core/index.js'"); },
+    fetchSummary: async () => { throw new Error("Cannot find module '/app/dist/engine/core/index.js'"); },
   }));
-  assert.match(getState().error, /netgain[\\/]dist/);
+  assert.match(getState().error, /dist[\\/]engine/);
   assert.equal(getState().loading, false);
   assert.equal(getState().summary, null);
 });
