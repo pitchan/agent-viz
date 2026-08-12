@@ -8,10 +8,10 @@
 // cote, texte fabrique a l'affichage de l'autre.
 //
 // Module pur : ni DOM, ni reseau, ni horloge implicite. Meme partage que
-// public/observatory/analysis-view.js, dont la part testable est exportee nue
+// src/web/observatory/analysis-view.js, dont la part testable est exportee nue
 // et la part DOM ne l'est pas.
 
-// Meme convention que lib/server/observatory/project-label.js : la lettre de
+// Meme convention que src/server/observatory/project-label.js : la lettre de
 // lecteur en majuscule, parce que Windows ignore la casse et que le libelle ne
 // doit pas suivre celle du terminal qui a lance la derniere session. Le module
 // serveur n'est pas reutilisable ici — il est CommonJS et prend des sessions,
@@ -22,7 +22,7 @@ export function projectLabel(cwd) {
 }
 
 // `occurrences` et `tools` sont TOUJOURS des tableaux chez le detecteur (voir
-// l'en-tete de public/viz-watchdog.mjs). Mais ces alertes-ci ne viennent pas du
+// l'en-tete de src/web/viz-watchdog.mjs). Mais ces alertes-ci ne viennent pas du
 // detecteur : elles reviennent du journal, qui de leur forme ne connait que
 // `id` et `createdAt` et laisse passer tout le reste sans le regarder. Une
 // ligne abimee mais encore analysable arrive donc ici telle quelle.
@@ -84,7 +84,7 @@ const MOTIFS = {
   'inv-ps-argument-exception': 'un argument que la commande PowerShell a refusé',
 };
 
-// La table des motifs (public/viz-invocation-patterns.mjs) grandit a chaque cas
+// La table des motifs (src/web/viz-invocation-patterns.mjs) grandit a chaque cas
 // rencontre, et elle n'a aucune raison d'attendre ce fichier-ci pour le faire.
 // Un motif encore inconnu doit donc dire ce qu'on sait vraiment — qu'il y a un
 // reglage a poser — plutot que de laisser un trou dans la phrase. Meme parti

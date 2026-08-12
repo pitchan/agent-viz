@@ -1,4 +1,4 @@
-// Tests unitaires de public/viz-invocation-patterns.mjs — la table de motifs
+// Tests unitaires de src/web/viz-invocation-patterns.mjs — la table de motifs
 // qui distingue « l'agent n'a pas su appeler » de « la commande a répondu non ».
 //
 // La table vient d'un relevé sur 370 sessions et 587 échecs réels (doc/27 du
@@ -736,7 +736,7 @@ test('classify ne retro-explore pas sur un long train de blancs', () => {
   // La forme qui declenche : `^\s*` sous le drapeau `m`, ou `\s` couvre `\n`.
   // A chaque debut de ligne le moteur avale tout le blanc qui suit puis
   // revient en arriere — exposant 2,00 mesure. `classify` tourne SYNCHRONE
-  // dans `feedWatchdog` (lib/server/event-reader.js), donc ce retour arriere
+  // dans `feedWatchdog` (src/server/event-reader.js), donc ce retour arriere
   // bloque le serveur HTTP et le flux SSE.
   //
   // Le lorem ipsum de 1 Mo du test voisin ne le declenche PAS (7,9 ms) : il

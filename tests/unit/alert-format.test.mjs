@@ -1,4 +1,4 @@
-// Unit tests for public/viz-alert-format.mjs — how an alert is worded.
+// Unit tests for src/web/viz-alert-format.mjs — how an alert is worded.
 //
 // Two consumers share this: the alerts popup and the OS notification. The
 // notification is the half no browser test can see (Playwright cannot look at

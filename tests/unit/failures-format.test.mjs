@@ -98,7 +98,7 @@ test('une premiere occurrence ne parle pas de repetition', () => {
   assert.doesNotMatch(failureLine(invocation).headline, /fois dans la session/);
 });
 
-// La table des motifs (public/viz-invocation-patterns.mjs) grandit a chaque cas
+// La table des motifs (src/web/viz-invocation-patterns.mjs) grandit a chaque cas
 // rencontre, et elle n'a pas a attendre ce fichier-ci pour le faire. Un motif
 // qu'il ne connait pas encore doit donc dire ce qu'on sait vraiment — que
 // quelque chose se regle sur le poste — plutot que de laisser un trou.
@@ -162,7 +162,7 @@ test('tout type d alerte du detecteur a sa formulation francaise', () => {
 });
 
 // Le journal ne regarde pas ce qu'il relit : de la forme d'une alerte il ne
-// connait que `id` et `createdAt` (voir l'en-tete de lib/server/watchdog/
+// connait que `id` et `createdAt` (voir l'en-tete de src/server/watchdog/
 // journal.js), et une ligne abimee mais encore analysable traverse jusqu'ici.
 // Un jet dans cette fonction ne casserait pas une ligne : `loadFailures` avale
 // l'erreur, et le bloc entier s'affiche VIDE — indiscernable de « aucune

@@ -1,5 +1,5 @@
 // C1 (audit de qualité de code, docs/audit-qualite-code.md) — le crochet
-// `lib/hook.js` n'avait AUCUN test : `runHook` n'est importé que par
+// `src/server/hook.js` n'avait AUCUN test : `runHook` n'est importé que par
 // `bin/agent-viz.js`, et les quatre fichiers de test qui citaient `hook.js` s'en
 // servaient comme nom de fichier de fixture, jamais comme module.
 //

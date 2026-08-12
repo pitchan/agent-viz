@@ -8,7 +8,7 @@
 // Idempotent : détecte les hooks déjà présents et n'ajoute que ce qui manque.
 //
 // Usage CLI standalone :
-//   node lib/install-hooks.js [--user|--project|--local] [--check|--uninstall]
+//   node src/server/install-hooks.js [--user|--project|--local] [--check|--uninstall]
 //
 // API :
 //   const { install, uninstall, audit, resolveScope, resolveHookCommand } = require('./install-hooks');
@@ -18,7 +18,7 @@ const path = require('path');
 const os = require('os');
 
 // Per-event timeout written into agent settings. Must stay > 1 s (Windows node
-// + AV cold start) and > the in-process safety net in lib/hook.js so the safety
+// + AV cold start) and > the in-process safety net in src/server/hook.js so the safety
 // fires *before* the agent kills us. Bumped from 5 s → 10 s when the safety
 // dropped to 3 s; install() now also refreshes existing standard-shape hooks
 // whose timeout drifted away from this value.

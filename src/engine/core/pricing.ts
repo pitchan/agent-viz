@@ -54,7 +54,7 @@ const ZERO_COST: Record<string, string> = {
 
 // Descriptif produit par modèle (libellé lisible, fenêtre de contexte) —
 // jamais lu par computeCost : la tarification reste dans PRICES. Valeurs
-// alignées sur le repli d'agent-viz (lib/server/pricing.js FALLBACK), qui les
+// alignées sur le repli d'agent-viz (src/server/pricing.js FALLBACK), qui les
 // portait déjà ; le test « libellés et fenêtres » garde les deux alignés.
 const MODEL_INFO: Record<string, { label: string; maxInput: number }> = {
   'claude-fable-5': { label: 'Fable 5', maxInput: 1_000_000 },
@@ -86,7 +86,7 @@ function priceAt(model: string, at: string): ModelPrices | undefined {
  * préfixes de transport et de routage régional, versions -vN[:M] et dates.
  *
  * C4 (2026-08-11) — définition UNIQUE de la normalisation du produit : le
- * serveur (`lib/server/pricing.js`) la consomme désormais par un pont au lieu
+ * serveur (`src/server/pricing.js`) la consomme désormais par un pont au lieu
  * de porter la sienne. La sonde différentielle avait montré que les deux
  * jumelles avaient divergé — l'ancienne forme d'ici ne connaissait ni les
  * routeurs régionaux ni le suffixe `-vN` seul, si bien que le moteur annonçait

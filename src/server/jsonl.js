@@ -3,9 +3,9 @@
 // docs/audit-qualite-code.md (le décodage était réimplémenté sur 7 fichiers
 // serveur, avec une tolérance au blanc incidente et inégale).
 //
-// Ce module est le SEUL de `lib/` à savoir que le décodage vit dans le moteur,
+// Ce module est le SEUL de `src/server/` à savoir que le décodage vit dans le moteur,
 // exactement comme `observatory/engine.js` est le seul à savoir où vit le moteur
-// d'analyse. Tout le reste du serveur importe d'ici, jamais de `netgain/`.
+// d'analyse. Tout le reste du serveur importe d'ici, jamais de `src/engine/`.
 //
 // Le geste de traversée lui-même — trouver le module dans le `dist`, échouer en
 // nommant un build absent ou périmé — a été extrait dans `engine-require.js` au

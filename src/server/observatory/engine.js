@@ -4,15 +4,17 @@
 // everything downstream receives the engine as a parameter, so rules and
 // orchestration stay testable without it.
 //
-// The engine is not a separate package: its source lives in `netgain/` and its
+// The engine is not a separate package: its source lives in `src/engine/` and its
 // build output ships inside this very package (see `files` in package.json), so
 // any install that has the product has the engine. A missing engine therefore
 // signals a damaged install or a skipped build, never a normal state — and it
 // stays handled: the live canvas view keeps working and the advisor page shows
 // the exact error.
 //
-// `netgain/package.json` carries `{"type":"module"}` so Node reads that subtree
-// as ESM even though this package is CommonJS. It must stay shipped.
+// `dist/engine/package.json` carries `{"type":"module"}` so Node reads that
+// subtree as ESM even though this package is CommonJS. It is no longer a
+// versioned file: the build writes it (`scripts/dist-esm-marker.mjs`), and it
+// must stay shipped.
 
 const path = require('path');
 const { pathToFileURL } = require('url');

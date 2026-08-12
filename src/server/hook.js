@@ -56,7 +56,7 @@ function runHook() {
     try {
       // BOM U+FEFF toléré : un writer Windows (.NET UTF8Encoding) préfixe la
       // charge, JSON.parse le rejette. Sans ce retrait, l'événement était perdu
-      // en silence total — même leçon que netgain/src/router/hook.ts:12-14, qui
+      // en silence total — même leçon que src/engine/router/hook.ts:12-14, qui
       // l'avait apprise de son côté sans que ce fichier en profite (constat C1
       // de docs/audit-qualite-code.md). Le BOM est compare par CODE de
       // caractere, jamais par un motif contenant le caractere lui-meme : un

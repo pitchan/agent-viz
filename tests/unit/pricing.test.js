@@ -9,7 +9,7 @@ const {
   getPrice, _FALLBACK, _setPricesForTest,
 } = require('../../src/server/pricing');
 // MODIFIÉ LE 2026-08-11 PAR C4 — `computeCost` et la normalisation ne sortent
-// plus de `lib/server/pricing.js` : elles avaient UNE jumelle dans le moteur,
+// plus de `src/server/pricing.js` : elles avaient UNE jumelle dans le moteur,
 // les deux avaient divergé, et la définition unique vit désormais en
 // TypeScript. Ces filets suivent la fonction là où elle est, par le pont.
 // Le nom aussi change : `normalizeId` → `normalizeModel`, le nom du moteur —

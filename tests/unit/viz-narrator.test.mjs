@@ -1,4 +1,4 @@
-// Unit tests for public/viz-narrator.js. Pure logic — no DOM, no fake timers.
+// Unit tests for src/web/viz-narrator.js. Pure logic — no DOM, no fake timers.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {

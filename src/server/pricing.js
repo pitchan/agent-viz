@@ -38,10 +38,10 @@ const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 // token. This is the proven offline mirror of the engine's embedded table
 // (tests/unit/pricing-engine-mirror.test.js keeps the two in lockstep) — it
 // covers the BOOT WINDOW only: `applyEnginePrices` is wired asynchronously in
-// lib/server.js, so a few messages can be priced before the engine table
+// src/server/server.js, so a few messages can be priced before the engine table
 // lands. It does NOT cover "the engine is absent": measured 2026-08-11, with
-// `netgain/dist` moved aside the server refuses to start at all — since C2,
-// `lib/server/jsonl.js` throws first. The previous wording claimed both, and
+// `dist/engine` moved aside the server refuses to start at all — since C2,
+// `src/server/jsonl.js` throws first. The previous wording claimed both, and
 // half of it was false. Numbers
 // must be kept aligned with Anthropic's public rate card. Each entry carries
 // its CURRENT rates; a model whose tariff changed over time also carries its
@@ -71,7 +71,7 @@ const FALLBACK = Object.freeze({
 // whose unknown-model branch no production path ever reached (proved by
 // mutation: a `throw` in that branch failed 2 of 788 tests, both direct unit
 // calls, no server or integration test). The single list now lives in
-// netgain/src/core/pricing.ts, and `known: true` on a $0 result is how a
+// src/engine/core/pricing.ts, and `known: true` on a $0 result is how a
 // WANTED zero is told apart from a tariff we do not know.
 
 let prices = { ...FALLBACK };

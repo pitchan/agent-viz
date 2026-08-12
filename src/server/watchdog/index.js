@@ -94,8 +94,8 @@ function setCatchingUp(v) { _catchingUp = !!v; }
 // doit se taire, et il doit se retaire meme si la lecture echoue.
 //
 // `dir` n'a PAS de valeur par defaut, et c'est voulu. Le dossier des
-// evenements est deja defini a deux endroits du produit (`lib/hook.js` et
-// `lib/server/session-index.js`, qui l'exporte sous le nom `DIR`) ; en poser
+// evenements est deja defini a deux endroits du produit (`src/server/hook.js` et
+// `src/server/session-index.js`, qui l'exporte sous le nom `DIR`) ; en poser
 // une troisieme copie ici creerait une constante qui peut diverger des deux
 // autres, et un balayage qui lit le vide ne dit rien — c'est la promesse du
 // produit qui tomberait sans symptome. Sans valeur par defaut, l'appelant ne
@@ -125,7 +125,7 @@ async function runCatchUp(dir, liveFrom) {
 // relus ; rattraper avant que l'instance existe ferait rendre 0 a `runCatchUp`,
 // et le passe ne serait jamais relu.
 //
-// Pourquoi cette sequence vit ici et pas dans `lib/server.js` : `server.js` est
+// Pourquoi cette sequence vit ici et pas dans `src/server/server.js` : `server.js` est
 // un point d'entree, il se charge en ouvrant un port et en tuant le serveur
 // d'avant. Aucun test ne peut l'appeler, donc rien de ce qu'on y ecrirait ne
 // serait essayable — or les trois pieges de cette sequence (l'ordre, le dossier
@@ -152,7 +152,7 @@ async function runCatchUp(dir, liveFrom) {
 async function startWatchdog({ dir, broadcastAlert, liveFrom, cadenceMs = 5_000, init } = {}) {
   // Meme patron que `runCatchUp` devant un dossier absent, et pour la meme
   // raison : ce que l'appelant oublie ici, RIEN d'autre ne peut le dire.
-  // `lib/server.js` est le seul appelant de production et c'est le seul fichier
+  // `src/server/server.js` est le seul appelant de production et c'est le seul fichier
   // qu'aucun test ne peut charger — il ouvre un port et tue le serveur d'avant.
   // Un `liveFrom` oublie ne casse rien de visible : il remet simplement les deux
   // chemins a lire les memes octets, et le produit se met a annoncer des
@@ -220,7 +220,7 @@ async function startWatchdog({ dir, broadcastAlert, liveFrom, cadenceMs = 5_000,
 // serait passe en lance-et-oublie — il relit ce dont `unwatchSession` vient de
 // retirer la frontiere, et le double comptage revient : trois appels distincts
 // annonces comme quatre (mesure, pas hypothese). Voir `unwatchSession` dans
-// lib/server/event-reader.js.
+// src/server/event-reader.js.
 module.exports = {
   initWatchdog, getWatchdogService, setCatchingUp, runCatchUp,
   startWatchdog,

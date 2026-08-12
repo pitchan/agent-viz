@@ -4,7 +4,7 @@ import { CLAUDE_DIR_ENV, resolveClaudeDir, resolveClaudeJsonPath } from '../../s
 
 // C5 (docs/audit-qualite-code.md) : DEUX variables d'environnement designaient le
 // meme dossier dans un SEUL paquet npm — CLAUDE_CONFIG_DIR cote produit
-// (lib/server/observatory/index.js), NETGAIN_CLAUDE_DIR cote moteur (ici). Poser
+// (src/server/observatory/index.js), NETGAIN_CLAUDE_DIR cote moteur (ici). Poser
 // l'une ne changeait que la moitie correspondante : deux vues du meme produit sur
 // deux jeux de sessions, sans qu'aucun message n'avertisse de l'ecart.
 //
@@ -76,7 +76,7 @@ describe('resolveClaudeDir', () => {
 // C:/Users/Vincent/.claude/.claude.json n'existe pas.
 //
 // Le produit, lui, cherchait ce fichier au home DANS TOUS LES CAS
-// (lib/server/observatory/index.js:34). Ce n'est pas une hypothese : c'est ce
+// (src/server/observatory/index.js:34). Ce n'est pas une hypothese : c'est ce
 // qui fait disparaitre la carte R2 du protocole de controle de Vincent, ou
 // USERPROFILE est jetable et CLAUDE_CONFIG_DIR reel — cout note comme « assume »
 // dans sa recette, alors que c'etait ce defaut-ci.

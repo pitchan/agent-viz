@@ -47,7 +47,7 @@ export const state = {
   //   { in, out, cacheCreate, cacheRead,
   //     lastIn, lastCacheCreate, lastCacheRead,
   //     lastModel, contextMax, costUsd } | null
-  // (cumulative + last-message + pricing-derived; see lib/server/tokens.js)
+  // (cumulative + last-message + pricing-derived; see src/server/tokens.js)
   // tokensSupported: false ⇒ adapter declares tokens N/A (UI shows badge).
   // null ⇒ no SSE snapshot received yet (don't show anything).
   // transcriptMissing: true ⇒ Claude session whose transcript isn't located yet.

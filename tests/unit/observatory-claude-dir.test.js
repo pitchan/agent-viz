@@ -1,7 +1,7 @@
 'use strict';
 // C5 (docs/audit-qualite-code.md) : DEUX variables d'environnement désignaient le
 // même dossier de configuration dans un SEUL paquet npm — `CLAUDE_CONFIG_DIR`
-// ici (lib/server/observatory/index.js:24), `NETGAIN_CLAUDE_DIR` côté moteur
+// ici (src/server/observatory/index.js:24), `NETGAIN_CLAUDE_DIR` côté moteur
 // (src/engine/doctor/index.ts:112). Poser l'une ne déplaçait que la moitié
 // correspondante : deux vues du même produit sur deux jeux de sessions, sans
 // qu'aucun message n'avertisse de l'écart.
@@ -12,7 +12,7 @@
 //   CLAUDE_CONFIG_DIR  posée → moteur 0 session · serveur dossier posé
 //
 // Ce fichier est le filet de la moitié SERVEUR. Il ne teste pas la primitive —
-// `netgain/tests/core/claude-dir.test.ts` s'en charge — mais le BRANCHEMENT :
+// `tests/core/claude-dir.test.ts` s'en charge — mais le BRANCHEMENT :
 // sans lui, une primitive parfaite pourrait coexister avec une ligne 24 restée
 // sur sa propre expression, et les deux moitiés redivergeraient en silence.
 //

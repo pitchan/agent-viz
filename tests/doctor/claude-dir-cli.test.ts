@@ -6,7 +6,7 @@ import { runDoctorCli } from '../../src/engine/doctor/index.js';
 import { promptLine, writeSessionTree } from '../helpers/build-transcript.js';
 
 // C5 : le point de resolution REEL du moteur, celui que l'audit designe
-// (netgain/src/doctor/index.ts:112). Le test de `resolveClaudeDir` prouve la
+// (src/engine/doctor/index.ts:112). Le test de `resolveClaudeDir` prouve la
 // primitive ; celui-ci prouve que le moteur la BRANCHE — sans lui, une primitive
 // parfaite pourrait coexister avec une ligne 112 restee sur l'ancienne variable.
 //

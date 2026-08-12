@@ -1,4 +1,4 @@
-// Unit tests for public/viz-watchdog.mjs — the toxic-pattern detector.
+// Unit tests for src/web/viz-watchdog.mjs — the toxic-pattern detector.
 //
 // Pure-module tests: no DOM, no fs, no network. We control time via a
 // fake clock and pump synthetic event sequences in.

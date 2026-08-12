@@ -15,7 +15,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-// ── Le bac a sable, pose AVANT le premier require de `lib/**` ────────────────
+// ── Le bac a sable, pose AVANT le premier require de `src/server/**` ─────────
 // C'est la seule chose qui compte dans l'ordre de ce fichier. Charger
 // `event-reader` charge `session-index`, qui cree `os.tmpdir()/agent-events`
 // des sa lecture ; et un journal sans chemin explicite vit dans
@@ -625,7 +625,7 @@ test('demarrage: un battement qui leve ne tue pas le demon, et se dit une fois',
 });
 
 test('demarrage: ce que le serveur oublie de fournir se dit a voix haute', async () => {
-  // `lib/server.js` est le seul appelant de production, et le seul fichier
+  // `src/server/server.js` est le seul appelant de production, et le seul fichier
   // qu aucun test ne peut charger. Ce qu il oublie ici, rien d autre ne peut le
   // dire — et un `liveFrom` oublie ne casse rien de visible : il remet les deux
   // chemins a lire les memes octets, et le produit annonce des boucles qui n ont
@@ -653,9 +653,9 @@ test('demarrage: ce que le serveur oublie de fournir se dit a voix haute', async
   assert.doesNotMatch(complet.dits, /sans frontiere|sans canal/);
 });
 
-// ─── Le dernier maillon : ce que `lib/server.js` passe reellement ────────────
+// ─── Le dernier maillon : ce que `src/server/server.js` passe reellement ─────
 //
-// Ces deux tests lisent `lib/server.js` comme du TEXTE, et c'est delibere. Ne
+// Ces deux tests lisent `src/server/server.js` comme du TEXTE, et c'est delibere. Ne
 // pas les « ameliorer » en `require` : ce fichier est un point d'entree, le
 // charger lie le port 3333 et tue le serveur agent-viz de la machine — sur
 // celle-ci, l'instrument de mesure du projet. L'objection « aucun test ne peut
@@ -683,7 +683,7 @@ const SOURCE_SERVEUR = fs.readFileSync(
 // ECRITE DANS l'appel — un `// TODO: passer { dir depuis la config` — ferait
 // deborder la tranche et rouvrirait exactement le faux vert qu'elle ferme ; un
 // `}` dans une chaine la tronquerait et ferait rougir du code sain. Il n'y a
-// rien de tel dans `lib/server.js` aujourd'hui, donc elle tient. Ecrire un vrai
+// rien de tel dans `src/server/server.js` aujourd'hui, donc elle tient. Ecrire un vrai
 // analyseur pour garder trois lignes serait disproportionne : c'est un
 // compromis, pas une garantie, et le voila dit.
 //
@@ -700,13 +700,13 @@ function decouperAppel(source, nom) {
 }
 
 // Calcule DANS le test, jamais au chargement du module. Au chargement, un
-// simple reformatage de `lib/server.js` — `startWatchdog(\n  {` — ferait
+// simple reformatage de `src/server/server.js` — `startWatchdog(\n  {` — ferait
 // exploser les vingt et un tests de ce fichier au lieu des deux que ce contrat
 // concerne, et aucun message ne dirait pourquoi. Un garde-fou qui brule le
 // fichier entier sur son propre faux positif est un mauvais garde-fou.
 function appelSurveille() {
   const appel = decouperAppel(SOURCE_SERVEUR, 'startWatchdog');
-  assert.ok(appel, 'appel `startWatchdog({` introuvable dans lib/server.js — reformatage ?');
+  assert.ok(appel, 'appel `startWatchdog({` introuvable dans src/server/server.js — reformatage ?');
   return appel;
 }
 

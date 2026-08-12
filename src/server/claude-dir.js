@@ -4,7 +4,7 @@
 // dossier dans un seul paquet npm : `CLAUDE_CONFIG_DIR` côté produit,
 // `NETGAIN_CLAUDE_DIR` côté moteur).
 //
-// Ce module est le SEUL de `lib/` à savoir que cette résolution vit dans le
+// Ce module est le SEUL de `src/server/` à savoir que cette résolution vit dans le
 // moteur, même doctrine que `jsonl.js` pour le décodage et que
 // `observatory/engine.js` pour le moteur d'analyse.
 //

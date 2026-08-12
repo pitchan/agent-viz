@@ -7,7 +7,7 @@
 //
 // Le module de detection est un module ESM servi au navigateur. Il est charge
 // par import() sur une URL de fichier — meme patron que
-// lib/server/observatory/engine.js. Le paquet est CommonJS : `public/` designe
+// src/server/observatory/engine.js. Le paquet est CommonJS : `src/web/` designe
 // desormais du code servi au navigateur ET charge par le serveur, ce qui evite
 // d'en tenir deux copies.
 

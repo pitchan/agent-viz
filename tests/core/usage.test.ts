@@ -2,8 +2,8 @@ import { describe, expect, test } from 'vitest';
 import { addUsage, emptyUsageBucket, isDedupableMsgId, sumUsageInto } from '../../src/engine/core/usage.js';
 
 // C3 (docs/audit-qualite-code.md) : l'accumulation des jetons d'usage etait
-// reimplementee cote serveur (lib/server/tokens.js, `accumulateUsage`) et cote
-// moteur (netgain/src/doctor/aggregators/tokens.ts, `addUsage`).
+// reimplementee cote serveur (src/server/tokens.js, `accumulateUsage`) et cote
+// moteur (src/engine/doctor/aggregators/tokens.ts, `addUsage`).
 //
 // LA FICHE SE TROMPAIT SUR UN POINT, et la sonde differentielle l'a montre en
 // EXECUTANT les deux fonctions reelles sur la meme matrice : elle affirmait

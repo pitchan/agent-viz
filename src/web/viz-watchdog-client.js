@@ -1,7 +1,7 @@
 // viz-watchdog-client.js — the browser side of the watchdog: a reader, not a
 // detector.
 //
-// Detection and memory live on the server (lib/server/watchdog/): it sees
+// Detection and memory live on the server (src/server/watchdog/): it sees
 // every event whether or not a tab is open, and it writes what it sees to a
 // journal that survives a reload, a restart and an acknowledgement. This
 // module's whole job is the LIVE case — say what is wrong right now — so it

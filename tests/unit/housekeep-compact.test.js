@@ -1,5 +1,5 @@
 'use strict';
-// Filet de CARACTÉRISATION pour lib/server/housekeep.js — préparation de C2
+// Filet de CARACTÉRISATION pour src/server/housekeep.js — préparation de C2
 // (docs/audit-qualite-code.md : le décodage JSONL est réimplémenté sur 7
 // fichiers côté serveur).
 //

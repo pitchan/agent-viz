@@ -1,5 +1,5 @@
 'use strict';
-// Adapter registry. Pattern follows lib/server/routes.js — declarative
+// Adapter registry. Pattern follows src/server/routes.js — declarative
 // dispatch table keyed by session._source. Liskov contract enforced by
 // the test suite, not by inheritance.
 
@@ -18,7 +18,7 @@ function getAdapter(agentSource) {
   if (Object.hasOwn(TRANSCRIPT_ADAPTERS, agentSource)) {
     return TRANSCRIPT_ADAPTERS[agentSource];
   }
-  console.error(`[transcript-adapters] unknown agentSource "${agentSource}" — using claude as a fallback. Add an adapter under lib/server/transcript-adapters/.`);
+  console.error(`[transcript-adapters] unknown agentSource "${agentSource}" — using claude as a fallback. Add an adapter under src/server/transcript-adapters/.`);
   return TRANSCRIPT_ADAPTERS.claude;
 }
 

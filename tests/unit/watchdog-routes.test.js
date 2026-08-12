@@ -10,9 +10,9 @@
 // vive vient d'etre retiree et consigne une alerte annoncant plus d'appels
 // qu'il n'y en a eu — dans un journal en ajout seul, donc pour de bon.
 
-// ── Le bac a sable, pose AVANT le premier require de `lib/**` ────────────────
+// ── Le bac a sable, pose AVANT le premier require de `src/server/**` ─────────
 // Meme piege, meme parade que dans watchdog-wiring.test.js, et il est ACTIF :
-// charger `lib/server/routes` charge `session-index`, qui cree
+// charger `src/server/routes` charge `session-index`, qui cree
 // `os.tmpdir()/agent-events` des sa lecture ; un journal sans chemin explicite
 // vit dans `os.homedir()/.agent-viz`. Sur cette machine ce sont le vrai dossier
 // d'evenements et la vraie memoire des pannes de l'utilisateur — un test de la
@@ -175,7 +175,7 @@ test('traduction seulement : la route ne peut atteindre aucun autre module', () 
   // `unwatchSession` vient de retirer la frontiere et le detecteur compte deux
   // fois — trois appels annonces comme quatre, une ligne fausse et DURABLE dans
   // un journal en ajout seul (mesure de la revue de la tache 7, voir le PIEGE
-  // en bas de lib/server/watchdog/index.js).
+  // en bas de src/server/watchdog/index.js).
   //
   // Les DEUX formes, et la seconde n est pas theorique : les gestionnaires sont
   // deja `async`, donc `await import('../watchdog')` y est licite et atteint

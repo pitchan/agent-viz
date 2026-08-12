@@ -1,4 +1,4 @@
-// Smoke tests for pure helpers in public/viz-state.js. No DOM access here,
+// Smoke tests for pure helpers in src/web/viz-state.js. No DOM access here,
 // so the module imports cleanly under Node ESM.
 
 import { test } from 'node:test';

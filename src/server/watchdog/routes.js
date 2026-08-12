@@ -3,7 +3,7 @@
 //
 // Traduction seulement : lire l'URL ou le corps, appeler le service,
 // serialiser la reponse. Aucune logique de detection ici — meme regle que
-// lib/server/observatory/routes.js. Le service arrive par un accesseur, jamais
+// src/server/observatory/routes.js. Le service arrive par un accesseur, jamais
 // par une valeur : la table de routage est construite au chargement du serveur,
 // le chien de garde n'existe qu'a la fin de son demarrage.
 //
@@ -16,7 +16,7 @@
 //     relit ce dont la purge de frontiere vient de retirer la borne : le
 //     detecteur compte deux fois, et le produit consigne une alerte annoncant
 //     plus d'appels qu'il n'y en a eu — dans un journal en ajout seul, donc
-//     pour de bon. Voir le PIEGE en bas de lib/server/watchdog/index.js. Sans
+//     pour de bon. Voir le PIEGE en bas de src/server/watchdog/index.js. Sans
 //     acces au module de cablage, ces routes ne peuvent pas le rejouer.
 //
 // Ces routes sont la PREMIERE frontiere HTTP du chien de garde, et le journal

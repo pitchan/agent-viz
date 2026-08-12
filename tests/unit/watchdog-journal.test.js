@@ -32,7 +32,7 @@ const lignes = fp => fs.readFileSync(fp, 'utf8').trim().split('\n').filter(Boole
 const plaintes = (spy, motif) =>
   spy.mock.calls.filter(c => String(c.arguments[0]).includes(motif)).length;
 
-// La forme reelle que produit makeAlert (public/viz-watchdog.mjs), tous champs
+// La forme reelle que produit makeAlert (src/web/viz-watchdog.mjs), tous champs
 // compris. `acknowledged: false` en fait partie, et c'est un piege a signaler :
 // une fois sur le disque ce champ est FIGE — la ligne n'est jamais reecrite,
 // donc il dira false meme apres un acquittement. C'est `readAll` qui recalcule

@@ -1,4 +1,4 @@
-// Smoke test for processEvent / EVENT_HANDLERS dispatch in public/viz-layout.js.
+// Smoke test for processEvent / EVENT_HANDLERS dispatch in src/web/viz-layout.js.
 // state and vis are module-level singletons, so we reset their relevant slices
 // before each test to keep tests independent.
 

@@ -38,7 +38,7 @@ export type JsonlLine = { ok: true; value: unknown } | { ok: false; rawLength: n
  * C'est aussi ce qui explique la « tolérance incidente et inégale » que décrit
  * C2 : les sites serveur qui survivent au BOM le doivent à un `trim()` présent
  * pour une autre raison, jamais à une intention. Ceux qui n'en ont pas sur le
- * chemin — `lib/hook.js` avant son correctif, la sonde de `session-index.js` —
+ * chemin — `src/server/hook.js` avant son correctif, la sonde de `session-index.js` —
  * perdent la ligne.
  *
  * ATTENTION AUX APPELANTS : `{ ok: true }` promet un JSON valide, PAS un objet.

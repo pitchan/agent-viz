@@ -244,7 +244,7 @@ describe('priceTable — le barème réellement appliqué, exposé', () => {
 
 // ---------------------------------------------------------------------------
 // C4 (2026-08-11) — la normalisation du serveur devient celle du moteur.
-// Trouvé par sonde différentielle : `normalizeId` de lib/server/pricing.js est
+// Trouvé par sonde différentielle : `normalizeId` de src/server/pricing.js est
 // un SUR-ENSEMBLE strict de `normalizeModel`. Sur un identifiant régional, le
 // moteur disait « inconnu / coût partiel » pendant que le serveur tarifait
 // correctement — exactement le symptôme que C4 doit fermer, déclenché par une

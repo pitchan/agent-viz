@@ -1,4 +1,4 @@
-// Unit tests for public/viz-tool-subject.mjs — the shared "what does this tool
+// Unit tests for src/web/viz-tool-subject.mjs — the shared "what does this tool
 // call act on?" rule.
 //
 // Two consumers need the same rule but not the same length: the feed shows a

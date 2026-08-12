@@ -5,11 +5,11 @@
 // silencieusement IGNORÉ côté serveur, et aucune information de complétude
 // jusqu'au pilote temps réel).
 //
-// Quatrième pont de `lib/`, après `jsonl.js` (C2), `claude-dir.js` (C5) et
+// Quatrième pont de `src/server/`, après `jsonl.js` (C2), `claude-dir.js` (C5) et
 // `usage.js` (C3). Le geste de traversée n'est écrit qu'une fois, dans
 // `engine-require.js` — c'est la quatrième fois qu'il ne coûte pas une ligne.
 //
-// Ce module est le SEUL de `lib/` à savoir que la FORMULE de coût et la
+// Ce module est le SEUL de `src/server/` à savoir que la FORMULE de coût et la
 // NORMALISATION des identifiants de modèle vivent dans le moteur. Ce qui reste
 // à `pricing.js` est ce qui n'appartient qu'au serveur : la carte de prix en
 // mémoire (remplie au démarrage depuis la table du moteur, avec un miroir de
@@ -17,8 +17,8 @@
 // `maxInput`, et la vigie LiteLLM.
 //
 // Pourquoi ce pont n'ajoute AUCUN mode de panne (vérifié en exécutant le
-// 2026-08-11) : `netgain/dist` écarté, le serveur refuse déjà de démarrer
-// depuis C2 — c'est `lib/server/jsonl.js` qui lève en premier, et le message
+// 2026-08-11) : `dist/engine` écarté, le serveur refuse déjà de démarrer
+// depuis C2 — c'est `src/server/jsonl.js` qui lève en premier, et le message
 // nomme déjà la cause. Le moteur n'est jamais « absent » quand le serveur
 // tourne.
 

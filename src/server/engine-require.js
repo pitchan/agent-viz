@@ -1,7 +1,7 @@
 'use strict';
 // Le chargeur de modules du moteur — constat C5 de docs/audit-qualite-code.md.
 //
-// C2 avait posé `lib/server/jsonl.js`, seul module de `lib/` à savoir où vit la
+// C2 avait posé `src/server/jsonl.js`, seul module de `src/server/` à savoir où vit la
 // primitive de décodage. C5 demande le même geste pour la résolution du dossier
 // de configuration, et C3 le demandera pour l'accumulation d'usage. Ce qui est
 // commun aux trois n'est ni le décodage, ni la résolution, ni l'accumulation :
@@ -17,8 +17,9 @@
 // module ES de façon SYNCHRONE tant qu'il n'a pas d'attente de haut niveau, et
 // `package.json` promet déjà `engines.node >= 24`. Vérifié en exécutant.
 //
-// `netgain/package.json` porte `{"type":"module"}`, ce qui fait lire ce
-// sous-arbre comme de l'ES alors que ce paquet-ci est en CommonJS.
+// `dist/engine/package.json` porte `{"type":"module"}`, ce qui fait lire ce
+// sous-arbre comme de l'ES alors que ce paquet-ci est en CommonJS. Ce marqueur
+// n'est plus versionné : il est écrit par le build (`scripts/dist-esm-marker.mjs`).
 
 const path = require('path');
 
@@ -27,7 +28,7 @@ const DIST = path.join(__dirname, '..', '..', 'dist', 'engine');
 /**
  * @param {string} rel   chemin DANS le `dist` du moteur, ex. `core/jsonl.js`.
  *   Relatif au `dist` et non au module appelant : un pont placé ailleurs dans
- *   `lib/` ne peut pas se tromper d'un niveau sans que rien ne le dise.
+ *   `src/server/` ne peut pas se tromper d'un niveau sans que rien ne le dise.
  * @param {string[]} noms les exports attendus. Un manque signale un build
  *   périmé, pas un build absent — deux causes qui envoient chercher à des
  *   endroits opposés.

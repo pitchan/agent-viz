@@ -3,7 +3,7 @@
 // (docs/audit-qualite-code.md : deux variables d'environnement désignaient le
 // même dossier de configuration).
 //
-// Pourquoi il existe. C2 avait posé `lib/server/jsonl.js`, seul module de `lib/`
+// Pourquoi il existe. C2 avait posé `src/server/jsonl.js`, seul module de `src/server/`
 // à savoir où vit la primitive de décodage. C5 a besoin du même geste pour la
 // résolution du dossier de configuration, et C3 en aura besoin pour la primitive
 // d'accumulation d'usage. La responsabilité commune n'est ni le décodage ni la
@@ -58,7 +58,7 @@ test('un export manquant NOMME un build périmé, et dit lequel manque', () => {
 
 test('le chemin est relatif au `dist` du moteur, pas au module appelant', () => {
   // Le pont de C2 écrivait `../../dist/engine/core/jsonl.js`, un chemin qui ne
-  // vaut que depuis `lib/server/`. Le rendre relatif au `dist` évite qu'un
+  // vaut que depuis `src/server/`. Le rendre relatif au `dist` évite qu'un
   // second pont placé ailleurs se trompe d'un niveau sans que rien ne le dise.
   const attendu = path.join(__dirname, '..', '..', 'dist', 'engine', 'core', 'jsonl.js');
   assert.strictEqual(
