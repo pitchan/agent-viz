@@ -55,7 +55,9 @@ changer, pas le même langage, et pas la même bibliothèque disponible :
 | **navigateur** | rendre, tenir l'état de page, réagir | toucher au disque, ouvrir un fichier, importer un module `node:` |
 
 Cette table est l'**invariant**. Les répertoires qui la portent aujourd'hui sont
-au § 8, et c'est la seule chose qui bouge.
+au § 8 — c'est la seule chose qui change de **sens** quand l'arbre bouge. Les
+chemins **cités** ailleurs dans ce document, eux, suivent le déplacement : voir
+l'avertissement du § 8.
 
 ---
 
@@ -195,6 +197,34 @@ echo "import fs from 'node:fs'" \
 
 Les six ont été **exécutées** le 2026-08-12 : les trois de gauche rendent vide
 (`exit 1`), les trois contrôles négatifs rendent chacun leur ligne (`exit 0`).
+
+**Ce que ces trois commandes NE regardent PAS.** Elles portent sur des
+**instructions d'import statiques**, et c'est délibéré (le § suivant dit pourquoi
+un contrôle textuel se trompe). Mais une commande dont on ignore la portée finit
+par servir de preuve de ce qu'elle ne regarde pas, donc :
+
+- **la règle n° 2 laisse échapper l'`import()` dynamique** —
+  `const m = await import('../server/usage.js')` ne porte pas de `from` ;
+- **la règle n° 3 ne voit que `import X from 'node:…'`** — `import 'node:fs'`,
+  `require('node:fs')` et `await import('node:fs')` lui échappent tous les trois.
+
+Les deux angles morts sont **sans victime aujourd'hui**, vérifié en exécutant —
+et les commandes sont écrites hors tableau, pour la raison dite juste après :
+
+```sh
+grep -rn "import(" src/web/                                              # → vide, exit 1
+echo "const m = await import('../server/usage.js')" | grep -n "import("  # → 1 ligne
+
+grep -rnE "(^|[^A-Za-z0-9_])(import|require)[[:space:]]*\(?[[:space:]]*['\"]node:" src/web/
+                                                                         # → vide, exit 1
+printf "import 'node:fs'\nrequire('node:path')\nawait import('node:os')\n" \
+  | grep -nE "(^|[^A-Za-z0-9_])(import|require)[[:space:]]*\(?[[:space:]]*['\"]node:"
+                                                                         # → 3 lignes
+```
+
+**Zéro victime n'est pas zéro risque.** Ces deux formes sont exactement ce qu'une
+règle de lint typée attrapera à l'étape 7, et c'est une des raisons pour
+lesquelles elle est prévue (§ 10).
 
 Le déplacement a d'ailleurs **changé la forme** de la deuxième : avant, le moteur
 s'atteignait par `../netgain/dist/`, un segment que `(\.\./)*(lib|netgain)/`
@@ -409,8 +439,24 @@ c'est pour ne pas avoir à le deviner qu'il porte deux messages distincts.
 
 ## 8. Adresses
 
-**C'est la seule section de ce document qu'un déplacement de fichiers réécrit.**
-Tout le reste est écrit en termes de responsabilités, qui ne bougent pas.
+**C'est la seule section dont un déplacement de fichiers change le SENS** — le
+reste est écrit en termes de responsabilités, qui ne bougent pas.
+
+**Ce n'est pas la seule qu'un déplacement RÉÉCRIT, et la première rédaction le
+prétendait.** Mesuré à l'étape 2 :
+
+```
+git diff --numstat <avant> <après> -- ARCHITECTURE.md   →  146 ajoutées, 95 retirées
+                                                            48 fragments, dans les
+                                                            ONZE sections numérotées
+```
+
+Aucune section n'a été épargnée, § 0 compris. La raison est que dix d'entre elles
+**citent** des chemins sans porter sur eux : commandes de contrôle, tables de
+fichiers, ancrages `fichier:ligne`. Une responsabilité ne bouge pas ; l'adresse
+par laquelle on la montre, si. **Rouvrir le seul § 8 à l'étape 3 laisserait le
+reste mentir** — et le mensonge serait invisible, puisque chaque phrase resterait
+grammaticalement vraie.
 
 | Unité | Répertoires, au 2026-08-12 (v0.14.0) | Fichiers |
 |---|---|---|
@@ -445,10 +491,23 @@ même dossier, et c'est ce qui explique le pont ci-dessous.
 | TypeScript | 44 `.test.ts` | l'API de vitest |
 
 **Les 74 fichiers en `node:test` passent par un pont** (`test-support/bridge/`),
-qui rend la surface `node:test` au-dessus des primitives de vitest. Les 71 qui
-préexistaient au pont n'ont pas été réécrits — pas une ligne. Le soixante-douzième
-est le test du pont lui-même, écrit avec lui, et il a la propriété amusante de
-passer par ce qu'il teste dès qu'on l'exécute sous vitest.
+qui rend la surface `node:test` au-dessus des primitives de vitest. **L'addition,
+écrite pour qu'on puisse la refaire :**
+
+```
+71  préexistaient au pont — pas une ligne réécrite
+ 1  tests/unit/node-test-bridge.test.mjs      le test du pont, écrit avec lui
+ 1  tests/unit/dist-esm-marker.test.mjs       étape 2 : le marqueur ESM du build
+ 1  tests/repo/stale-path-citations.test.mjs  étape 2 : les trois racines mortes
+――
+74
+```
+
+Le test du pont a la propriété amusante de passer par ce qu'il teste dès qu'on
+l'exécute sous vitest. Les deux derniers sont nés à l'étape 2 : le décompte du
+pont **grandit à chaque fichier `node:test` neuf**, et c'est pour ça qu'il est
+écrit en addition plutôt qu'en ordinal — un ordinal ne survit pas au fichier
+suivant.
 
 Le pont est en trois fichiers, et sa forme n'est pas un choix esthétique — elle
 est imposée par le fait qu'**une seule couture ne suffit pas** :
