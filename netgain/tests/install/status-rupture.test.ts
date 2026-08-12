@@ -122,10 +122,11 @@ describe('les quatre scopes hors portée de on/off (D7)', () => {
     // Assert
     resultats.forEach((status, i) => {
       const scope = HORS_PORTEE[i]!;
-      expect(status.on, scope.nom).toBe(true); // on:true ⇔ exit 0 (index.ts:125)
+      // l'exit 0 reel est prouve par execution au critere d'arret n 4 (tache 6), controle (e)
+      expect(status.on, scope.nom).toBe(true);
       expect(status.preFusion, scope.nom).toEqual([]);
       expect(status.notes, scope.nom).toHaveLength(1);
-      expect(status.notes[0], scope.nom).toContain('d AVANT la fusion');
+      expect(status.notes[0], scope.nom).toContain("d'AVANT la fusion");
       expect(status.notes[0], scope.nom).toContain(scope.avant);
       expect(status.notes[0], scope.nom).toContain('hors portée de on/off');
     });
@@ -143,6 +144,8 @@ describe('les quatre scopes hors portée de on/off (D7)', () => {
       const scope = HORS_PORTEE[i]!;
       expect(status.on, scope.nom).toBe(true);
       expect(status.notes, scope.nom).toHaveLength(1);
+      // Sentinelle VOLONTAIREMENT plus courte que celle de T9 : sans l'apostrophe initiale,
+      // une faute de frappe dans le libellé enrichi ne peut pas rendre ce contrôle vert.
       expect(status.notes[0], scope.nom).not.toContain('AVANT la fusion');
       expect(status.notes[0], scope.nom).toContain('hors portée de on/off');
     });

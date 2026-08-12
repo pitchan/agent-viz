@@ -66,9 +66,11 @@ const HORS_PORTEE = 'hors portée de on/off, à retirer à la main';
  */
 function noteHorsPortee(quoi: string, chemins: string[]): string {
   const chemin = chemins[0];
+  // « enregistrement » et non « crochet » : le mot doit couvrir les quatre scopes, dont deux
+  // portent un serveur MCP. L'espèce est déjà dans l'en-tête de la même phrase.
   return chemin === undefined
     ? `${quoi} — ${HORS_PORTEE}`
-    : `${quoi} : crochet d AVANT la fusion (${chemin}) — ce chemin n existe plus ; ${HORS_PORTEE}`;
+    : `${quoi} : enregistrement d'AVANT la fusion (${chemin}) — ce chemin n'existe plus ; ${HORS_PORTEE}`;
 }
 
 export function computeStatus(input: StatusInput): InstallStatus {
@@ -139,7 +141,7 @@ export function renderStatus(status: InstallStatus, version: string): string {
   );
   // ✗ et non ⚠ : ces lignes-là pèsent sur le verdict et l'exit code, et se réparent.
   for (const chemin of status.preFusion) {
-    lines.push(`  ✗ enregistrement d AVANT la fusion : ${chemin} — ce chemin n existe plus ; relancez « netgain on » pour le réparer`);
+    lines.push(`  ✗ enregistrement d'AVANT la fusion : ${chemin} — ce chemin n'existe plus ; relancez « netgain on » pour le réparer`);
   }
   for (const note of status.notes) lines.push(`  ⚠ ${note}`);
   lines.push(status.on ? 'verdict : ON' : 'verdict : OFF (ou partiel)');
