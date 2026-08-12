@@ -397,6 +397,17 @@ Ils se comptent en deux temps, et les confondre fait manquer un crochet.
 | `main` | `src/server/server.js` | déclaré pour `require('@vcueto/agent-viz')`, qu'aucun code connu n'appelle — mais le fichier lui-même est bien vivant : c'est le script que le démon lance (`src/server/lifecycle.js:12`) |
 | la page | `index.html` | le navigateur ; importe `./src/web/…` en 10 lignes |
 
+**Un test permanent tient les quatre premières lignes de cette table**, plus
+chaque entrée du champ `files` — `tests/repo/package-entrypoints.test.mjs` : elles
+doivent résoudre sur le disque. Il est né à l'étape 3 de la migration, et sa
+raison d'être est un fait mesuré : c'était la **seule** surface du produit
+qu'aucun instrument ne regardait, ni le typecheck, ni le build, ni les tests, ni
+le filet de citations — et **npm ignore en silence une entrée `files`
+inexistante**. Ce qu'il ne dit pas : que le point d'entrée *s'exécute*. Résoudre
+n'est pas tourner, et c'est pourquoi chaque étape de la migration se termine
+encore par `node bin/agent-viz.js --version`, `node dist/engine/cli.js --version`
+et `npm pack --dry-run --ignore-scripts`.
+
 **Ce que l'agent invoque tout seul** — deux crochets, sur deux binaires
 différents, et c'est la partie qu'on oublie :
 
@@ -494,10 +505,10 @@ sauf entrée nommée dans sa liste blanche. Le moteur gagne un fichier
 
 ## 9. La plomberie de test
 
-**Un seul exécuteur, un seul arbre de tests, 1 358 tests dans 118 fichiers.**
+**Un seul exécuteur, un seul arbre de tests, 1 360 tests dans 119 fichiers.**
 
 ```
-npx vitest run     → 1358 passés, 118 fichiers
+npx vitest run     → 1360 passés, 119 fichiers
 ```
 
 Les deux arbres ont fusionné à plat à l'étape 2 : `netgain/tests/` a rejoint
@@ -506,10 +517,10 @@ même dossier, et c'est ce qui explique le pont ci-dessous.
 
 | Dialecte | Fichiers | Écrits en |
 |---|---|---|
-| CommonJS + ESM | 42 `.test.js` + 32 `.test.mjs` | `node:test` |
+| CommonJS + ESM | 42 `.test.js` + 33 `.test.mjs` | `node:test` |
 | TypeScript | 44 `.test.ts` | l'API de vitest |
 
-**Les 74 fichiers en `node:test` passent par un pont** (`test-support/bridge/`),
+**Les 75 fichiers en `node:test` passent par un pont** (`test-support/bridge/`),
 qui rend la surface `node:test` au-dessus des primitives de vitest. **L'addition,
 écrite pour qu'on puisse la refaire :**
 
@@ -518,15 +529,18 @@ qui rend la surface `node:test` au-dessus des primitives de vitest. **L'addition
  1  tests/unit/node-test-bridge.test.mjs      le test du pont, écrit avec lui
  1  tests/unit/dist-esm-marker.test.mjs       étape 2 : le marqueur ESM du build
  1  tests/repo/stale-path-citations.test.mjs  étape 2 : les trois racines mortes
+ 1  tests/repo/package-entrypoints.test.mjs   étape 3 : les points d'entrée déclarés
 ――
-74
+75
 ```
 
 Le test du pont a la propriété amusante de passer par ce qu'il teste dès qu'on
-l'exécute sous vitest. Les deux derniers sont nés à l'étape 2 : le décompte du
-pont **grandit à chaque fichier `node:test` neuf**, et c'est pour ça qu'il est
-écrit en addition plutôt qu'en ordinal — un ordinal ne survit pas au fichier
-suivant.
+l'exécute sous vitest. Les trois derniers sont nés du chantier de migration : le
+décompte du pont **grandit à chaque fichier `node:test` neuf**, et c'est pour ça
+qu'il est écrit en addition plutôt qu'en ordinal — un ordinal ne survit pas au
+fichier suivant. *La ligne de l'étape 3 en est la démonstration : elle a été
+ajoutée le jour même où le fichier est né, et les quatre nombres du paragraphe
+avec elle.*
 
 Le pont est en trois fichiers, et sa forme n'est pas un choix esthétique — elle
 est imposée par le fait qu'**une seule couture ne suffit pas** :
@@ -535,7 +549,7 @@ est imposée par le fait qu'**une seule couture ne suffit pas** :
 |---|---|
 | `create-bridge.mjs` | la **fabrique pure** : reçoit ses primitives par injection, se teste seule, ne connaît ni vitest ni `node:module` |
 | `install.mjs` | couture n° 1 : détourne `Module._load` — atteint les `require('node:test')` des **42** fichiers CommonJS |
-| `node-test-alias.mjs` | couture n° 2 : cible d'un `resolve.alias` de `vitest.config.mts` — atteint les `import … from 'node:test'` des **32** fichiers ESM |
+| `node-test-alias.mjs` | couture n° 2 : cible d'un `resolve.alias` de `vitest.config.mts` — atteint les `import … from 'node:test'` des **33** fichiers ESM |
 
 La seconde ne remplace pas la première, elle s'y ajoute : la résolution ESM ne
 passe pas par le crochet CommonJS. Un pont amputé de l'une des deux laisse un
@@ -549,7 +563,7 @@ générale : il n'y a pas de `Proxy`, donc une API de `node:test` hors de cette
 liste vaudrait `undefined` sans se signaler. Étendre le filet, c'est allonger ces
 deux listes.
 
-`npm run test:node` exécute les mêmes **841** tests en `node:test` **nativement**,
+`npm run test:node` exécute les mêmes **843** tests en `node:test` **nativement**,
 sous `node --test`. Ce n'est pas une redondance : c'est la **sémantique de référence**
 à laquelle le pont est comparé. Si plus rien ne l'exerçait, elle pourrait cesser
 de passer sans que rien ne l'annonce. La publication lance les deux.
