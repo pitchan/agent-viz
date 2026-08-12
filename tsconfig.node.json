@@ -15,5 +15,5 @@
   },
   // etape 2 : "tests/**/*.ts" retire — 6 x TS1470 (import.meta) tant que la racine est CommonJS ;
   // restauration = critere d arret de l etape 3
-  "include": ["src/engine/**/*.ts", "vitest.config.ts"]
+  "include": ["src/engine/**/*.ts", "vitest.config.mts"]
 }

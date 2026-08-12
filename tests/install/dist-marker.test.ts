@@ -6,12 +6,11 @@
 // ci-dessous, `netgain status` repondrait ON sur une installation morte.
 //
 // Fichier NEUF a dessein : `paths.test.ts` est l'un des 113 fichiers existants.
-import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, describe, expect, test } from 'vitest';
-import { missingDistFiles, resolveNetgainRoot } from '../../src/engine/install/paths.js';
+import { missingDistFiles } from '../../src/engine/install/paths.js';
 
 const scratch = mkdtempSync(path.join(tmpdir(), 'netgain-dist-marker-'));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
@@ -25,17 +24,21 @@ describe('REQUIRED_DIST reclame le marqueur ESM', () => {
   });
 });
 
-describe('le build ecrit le marqueur', () => {
-  test('npm run build repose dist/engine/package.json a {"type":"module"}', () => {
-    const racine = resolveNetgainRoot();
-    const marqueur = path.join(racine, 'dist', 'engine', 'package.json');
-    // Un TEMOIN plutot qu'une suppression : le marqueur reste valide pendant
-    // tout le test, donc aucun autre fichier de test tournant en parallele ne
-    // voit un `dist/engine/` incomplet. Si le build cesse d'ecrire le marqueur,
-    // le temoin survit et ce test rougit.
-    mkdirSync(path.dirname(marqueur), { recursive: true });
-    writeFileSync(marqueur, JSON.stringify({ type: 'module', temoin: 'efface par le build' }));
-    execFileSync('npm', ['run', 'build'], { cwd: racine, shell: true });
-    expect(JSON.parse(readFileSync(marqueur, 'utf8'))).toEqual({ type: 'module' });
-  }, 180_000);
+describe('le build appelle le poseur de marqueur', () => {
+  // La propriete « apres un build, le marqueur est la » se scinde en deux
+  // moities, toutes deux deja falsifiables, et AUCUNE n'exige de construire :
+  //   1. le script `build` appelle bien le poseur de marqueur — ici ;
+  //   2. le poseur ecrit bien `{"type":"module"}` — tests/unit/dist-esm-marker.test.mjs,
+  //      contre un `dist/engine` fabrique dans os.tmpdir().
+  // Ce qu'on ne prouve plus est nomme : que npm honore le `&&`. C'est le contrat
+  // de npm, pas celui de ce depot, et le `npm run build` hors suite l'exerce.
+  // Executer un vrai build ICI reecrirait les 87 fichiers de `dist/engine/` a
+  // chaque execution de la suite — `tsc` n'est ni `incremental` ni `composite` —
+  // pendant que sept fichiers de tests lisent ce meme dist, en parallele.
+  test('le script build enchaine sur node scripts/dist-esm-marker.mjs', () => {
+    const pkg = JSON.parse(
+      readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
+    ) as { scripts: Record<string, string> };
+    expect(pkg.scripts['build']).toMatch(/&&\s*node\s+scripts\/dist-esm-marker\.mjs\s*$/);
+  });
 });
