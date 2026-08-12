@@ -7,7 +7,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { isFresh, FRESHNESS_MS } from '../../public/viz-alert-freshness.mjs';
+import { isFresh, FRESHNESS_MS } from '../../src/web/viz-alert-freshness.mjs';
 
 const T = 1_700_000_000_000;
 

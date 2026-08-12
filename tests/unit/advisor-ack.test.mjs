@@ -4,7 +4,7 @@
 // reste « a traiter ». Pas de « tout est vert » menteur (doc/32).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ackEpisodes } from '../../public/observatory/advisor-view.js';
+import { ackEpisodes } from '../../src/web/observatory/advisor-view.js';
 
 const ep = (id, acked = false) => ({ id, createdAt: 1000 + id.length, acknowledged: acked });
 

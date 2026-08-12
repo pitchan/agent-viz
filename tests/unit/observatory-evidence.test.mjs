@@ -2,7 +2,7 @@
 // here would be a recommendation without evidence — forbidden by the spec.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { evidenceLines } from '../../public/observatory/evidence.js';
+import { evidenceLines } from '../../src/web/observatory/evidence.js';
 
 test('R1 states the sessions, the rebuilt-prefix tokens and the journaled marker', () => {
   assert.deepEqual(

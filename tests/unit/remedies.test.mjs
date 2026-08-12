@@ -3,8 +3,8 @@
 // C'est ce qui distingue un motif sans remede honnete d'un oubli de developpement.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { REMEDES, remedyFor } from '../../public/observatory/remedies.js';
-import { PATTERNS } from '../../public/viz-invocation-patterns.mjs';
+import { REMEDES, remedyFor } from '../../src/web/observatory/remedies.js';
+import { PATTERNS } from '../../src/web/viz-invocation-patterns.mjs';
 
 const alertants = PATTERNS.filter(p => p.workstationSetting).map(p => p.id).sort();
 

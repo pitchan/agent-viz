@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { getState, subscribe, loadAdvisor, loadAnalysis, loadSession, changeStatus, applyScanEvent, resetStore,
-  setPeriodDays, setIncludeMachine, loadPricing } from '../../public/observatory/store.js';
+  setPeriodDays, setIncludeMachine, loadPricing } from '../../src/web/observatory/store.js';
 
 const SUMMARY = { sessions: 3, costUsd: 2, netTokens: 1000, costComplete: true,
   priceSource: 'netgain-table-embarquee' };

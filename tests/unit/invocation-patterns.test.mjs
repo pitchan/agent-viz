@@ -24,7 +24,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { classify, PATTERNS } from '../../public/viz-invocation-patterns.mjs';
+import { classify, PATTERNS } from '../../src/web/viz-invocation-patterns.mjs';
 
 // ─── Échantillons, un par motif, dans l'ordre de la table ──────────────────
 //

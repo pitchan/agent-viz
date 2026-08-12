@@ -2,7 +2,7 @@
 // observatory-confirm-button.test.mjs : pas de navigateur, pas de jsdom.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { renderFailures } from '../../public/observatory/failures-view.js';
+import { renderFailures } from '../../src/web/observatory/failures-view.js';
 
 function fauxElement(tag) {
   const classes = new Set();

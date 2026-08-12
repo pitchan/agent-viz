@@ -5,7 +5,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createWatchdog } from '../../public/viz-watchdog.mjs';
+import { createWatchdog } from '../../src/web/viz-watchdog.mjs';
 
 function makeClock(start = 1_700_000_000_000) {
   let t = start;

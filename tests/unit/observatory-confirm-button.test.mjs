@@ -2,7 +2,7 @@
 // disarms. Tested on a stub node — no DOM, no browser.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { initConfirmButton } from '../../public/observatory/confirm-button.js';
+import { initConfirmButton } from '../../src/web/observatory/confirm-button.js';
 
 function stubNode(label) {
   const classes = new Set();

@@ -1,7 +1,7 @@
 // Pure parts of the analysis page: the table row and the drill-down lines.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { sessionRow, drillDownLines } from '../../public/observatory/analysis-view.js';
+import { sessionRow, drillDownLines } from '../../src/web/observatory/analysis-view.js';
 
 test('a session row carries id, project, model, cost, tokens, duration and kind — 7 cells', () => {
   assert.deepEqual(sessionRow({

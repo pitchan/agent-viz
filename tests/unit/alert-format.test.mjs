@@ -8,7 +8,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { clockTime, alertActor, alertDetailLines, notificationPayload } from '../../public/viz-alert-format.mjs';
+import { clockTime, alertActor, alertDetailLines, notificationPayload } from '../../src/web/viz-alert-format.mjs';
 
 // Built from local-time components so the expectation holds in any timezone.
 const at = (h, m, s) => new Date(2026, 7, 7, h, m, s).getTime();

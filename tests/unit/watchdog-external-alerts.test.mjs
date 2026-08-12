@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   raiseExternalAlert, getActiveAlerts, acknowledgeAlert, onAlertsChanged,
-} from '../../public/viz-watchdog-client.js';
+} from '../../src/web/viz-watchdog-client.js';
 
 const drift = id => ({
   id, type: 'pricingDrift', sessionId: '', toolName: 'claude-test-x',

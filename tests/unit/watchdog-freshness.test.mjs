@@ -21,8 +21,8 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createWatchdog } from '../../public/viz-watchdog.mjs';
-import { isFresh } from '../../public/viz-alert-freshness.mjs';
+import { createWatchdog } from '../../src/web/viz-watchdog.mjs';
+import { isFresh } from '../../src/web/viz-alert-freshness.mjs';
 
 const T = 1_700_000_000_000; // fixed "now" for every test
 

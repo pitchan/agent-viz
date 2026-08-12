@@ -7,7 +7,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { toolSubject } from '../../public/viz-tool-subject.mjs';
+import { toolSubject } from '../../src/web/viz-tool-subject.mjs';
 
 test('Bash: returns the full command, untruncated', () => {
   const long = 'npm run build -- --workspace=netgain --silent && node scripts/verify.js --strict';

@@ -3,7 +3,7 @@
 // without a real server.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fetchSummary, fetchSessions, requestScan, requestPurge, fetchModelCosts, fetchPricing, acknowledgeAlert } from '../../public/observatory/api.js';
+import { fetchSummary, fetchSessions, requestScan, requestPurge, fetchModelCosts, fetchPricing, acknowledgeAlert } from '../../src/web/observatory/api.js';
 
 function stubFetch(body = {}) {
   const calls = [];

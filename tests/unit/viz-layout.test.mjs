@@ -4,8 +4,8 @@
 
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { state, vis } from '../../public/viz-state.js';
-import { processEvent, layoutDirtyRoots, calcDuration } from '../../public/viz-layout.js';
+import { state, vis } from '../../src/web/viz-state.js';
+import { processEvent, layoutDirtyRoots, calcDuration } from '../../src/web/viz-layout.js';
 
 function resetState() {
   state.nodes.clear();

@@ -5,8 +5,8 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { failureLine, projectLabel, failuresSummary, groupKey, groupAlerts, causeLabel, episodeLabel } from '../../public/observatory/failures-format.js';
-import { _DETECTOR_TYPES } from '../../public/viz-watchdog.mjs';
+import { failureLine, projectLabel, failuresSummary, groupKey, groupAlerts, causeLabel, episodeLabel } from '../../src/web/observatory/failures-format.js';
+import { _DETECTOR_TYPES } from '../../src/web/viz-watchdog.mjs';
 
 const base = {
   type: 'loop', toolName: 'Bash', count: 4, subject: 'npm run build',

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {
   commonPathPrefix, composeNarrator,
   markNarratorDirty, setRenderFn,
-} from '../../public/viz-narrator.js';
+} from '../../src/web/viz-narrator.js';
 
 function freshState() {
   return {
