@@ -44,15 +44,20 @@ const EXCLUS = [
   // Plans et specs DATES, du meme genre — et git-ignores.
   'docs/superpowers/',
   // Interdit absolu du plan de l etape 2 : `CLAUDE.md` est `M` dans l arbre
-  // depuis avant le chantier. Il cite trois fois `lib/server/routes.js` comme
-  // precedent du principe ouvert/ferme : DETTE ASSUMEE, inscrite au journal, a
-  // solder quand ce fichier cessera d etre une exception du `git status`.
+  // depuis avant le chantier. Il porte TROIS lignes vers l arbre mort — DEUX
+  // citations de `lib/server/routes.js` (l. 13 et 18) comme precedent du
+  // principe ouvert/ferme, et une de `lib/server/` (l. 37). DETTE ASSUMEE,
+  // inscrite au journal, a solder quand ce fichier cessera d etre une exception
+  // du `git status`.
   'CLAUDE.md',
   'tests/CLAUDE.md',
   // Ce fichier-ci : la liste blanche cite NECESSAIREMENT ce qu elle protege, et
   // l en-tete nomme les trois racines mortes pour dire pourquoi elles le sont.
-  // Se balayer soi-meme rendrait 84 faux positifs et une liste blanche qui se
-  // couvre elle-meme — une exemption invisible dans le bruit.
+  // Se balayer soi-meme rendrait une liste blanche qui se couvre ELLE-MEME —
+  // une exemption invisible dans le bruit. AUCUN volume n est ecrit ici : il
+  // grandit a chaque entree ajoutee, donc tout chiffre y serait faux au commit
+  // suivant. Pour le connaitre, la commande :
+  //   grep -cE '(^|[^A-Za-z0-9_-])(lib|public|netgain)/' <ce fichier>
   'tests/repo/stale-path-citations.test.mjs',
 ];
 
@@ -122,10 +127,14 @@ const LISTE_BLANCHE = [
   { fichier: 'docs/sources-externes.md', fragment: 'netgain/docs/calibration-observatoire-m1.md', raison: 'constat C7, idem : l adresse morte que ce fichier existe pour remplacer' },
   { fichier: 'docs/sources-externes.md', fragment: '`netgain/docs/` tant que le moteur y', raison: 'ou vivaient ces documents dans le depot PRIVE, avant le demenagement du moteur' },
 
-  // ARCHITECTURE.md — le document qui RACONTE le deplacement. Les huit lignes
+  // ARCHITECTURE.md — le document qui RACONTE le deplacement. Les DOUZE entrees
   // ci-dessous nomment l arbre d AVANT pour dire ce qui a bouge et pourquoi ;
   // les reecrire les rendrait fausses, et le document perdrait justement ce
   // qu il a de plus utile a la prochaine etape.
+  // Compte verifie par commande, jamais a l oeil — et la commande s ancre sur
+  // l indentation d une entree, sinon elle se compterait ELLE-MEME depuis ce
+  // commentaire (mesure : 13 au lieu de 12) :
+  //   grep -c "^  { fichier: 'ARCHITECTURE" tests/repo/stale-path-citations.test.mjs  -> 12
   { fichier: 'ARCHITECTURE.md', fragment: 'vivaient auparavant dans `lib/`', raison: '§ 2.1 : la fusion a plat des cinq fichiers du haut' },
   { fichier: 'ARCHITECTURE.md', fragment: "`lib/server/` ; l'étape 2 les a fusionnés", raison: '§ 2.1, suite de la meme phrase' },
   { fichier: 'ARCHITECTURE.md', fragment: '`lib/server/**` : un renommage verbatim', raison: '§ 2.1 : ce que la fusion a laisse invariant' },
