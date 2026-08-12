@@ -71,7 +71,7 @@ Trois points à savoir :
 
 La base `~/.agent-viz/observatory.db` est un **dérivé jetable** : les transcripts restent la source de vérité, et la supprimer ne perd que les statuts « j'applique / ignorer » que vous avez posés sur les recommandations — elle se reconstruit au scan suivant (au démarrage, puis toutes les heures). Le bouton « Purger la base » de la page Conseils fait ce geste sans toucher au fichier : il vide la base (après confirmation) puis relance un scan complet.
 
-L'analyse repose sur le moteur netgain, qui **fait partie d'agent-viz** : même dépôt (dossier `netgain/`), même paquet, même version, même installation. Il n'y a rien à brancher ni à installer à côté. Si le moteur venait à manquer — installation abîmée —, les deux pages affichent l'erreur exacte et **la vue temps réel continue de fonctionner normalement**.
+L'analyse repose sur le moteur netgain, qui **fait partie d'agent-viz** : même dépôt (dossier `src/engine/`), même paquet, même version, même installation. Il n'y a rien à brancher ni à installer à côté. Si le moteur venait à manquer — installation abîmée —, les deux pages affichent l'erreur exacte et **la vue temps réel continue de fonctionner normalement**.
 
 ## Multi-agent support
 
@@ -197,9 +197,15 @@ The server purges old sessions on boot and every hour.
 ## Development
 
 One repository, **one package**: `@vcueto/agent-viz`. The analysis engine is not a separate
-package — its TypeScript source lives in `netgain/` and its compiled `dist/` ships inside the
-published tarball. `netgain/package.json` exists only to mark that subtree as ESM
-(`{"type":"module"}`) inside a CommonJS package; it must stay.
+package — its TypeScript source lives in `src/engine/` and its build output, `dist/engine/`,
+ships inside the published tarball. Since the 2026-08 tree merge there is a single `src/`:
+`src/server/` (the daemon, CommonJS), `src/engine/` (the engine, TypeScript ESM) and
+`src/web/` (the browser bundle, served as-is).
+
+Two `package.json` markers exist only to make those subtrees ESM inside a CommonJS package
+(`{"type":"module"}`); they must stay while the root is CommonJS. `src/engine/package.json`
+is versioned; its build-output twin `dist/engine/package.json` is **written by the build**
+(`scripts/dist-esm-marker.mjs`), since `dist/` is generated and git-ignored.
 
 ```bash
 git clone https://github.com/pitchan/agent-viz.git
@@ -209,12 +215,12 @@ npm run build                # the engine is TypeScript; dist/ is not committed
 npm start                    # dashboard on http://localhost:3333
 ```
 
-Tests: `npm test` (single `vitest run`, covering product and engine together — the 42
-`node:test`-based files run through a bridge, `test-support/bridge/`) and `npm run test:node`
-(the same product tests, run natively under `node --test`, kept as the reference the bridge is
-checked against). After changing engine source, rebuild it (`npm run build`) — the product
-loads the compiled `dist/`. Publishing runs both test commands and the build first
-(`prepublishOnly`).
+Tests: `npm test` (a single `vitest run` over one `tests/` tree — 1358 tests in 118 files,
+product and engine together; the 74 `node:test`-based files run through a bridge,
+`test-support/bridge/`) and `npm run test:node` (the same 841 `node:test` cases, run natively
+under `node --test`, kept as the reference the bridge is checked against). After changing
+engine source, rebuild it (`npm run build`) — the product loads the compiled `dist/engine/`.
+Publishing runs both test commands and the build first (`prepublishOnly`).
 
 ## License
 

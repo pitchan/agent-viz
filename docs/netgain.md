@@ -106,16 +106,17 @@ fichier n'est jamais touché**. `netgain off` retire exactement ces deux entrée
 ## Développement
 
 Le moteur vit dans le dépôt [agent-viz](https://github.com/pitchan/agent-viz), dossier
-`netgain/`. Son outillage (TypeScript, vitest) est déclaré à la racine : il n'y a qu'un seul
-`npm install` et qu'un seul `package.json` de plein droit. Celui de `netgain/` ne porte que
+`src/engine/`. Son outillage (TypeScript, vitest) est déclaré à la racine : il n'y a qu'un seul
+`npm install` et qu'un seul `package.json` de plein droit. Celui de `src/engine/` ne porte que
 `{"type":"module"}`, pour que Node lise ce sous-dossier comme des modules ES alors que le
-produit est en CommonJS.
+produit est en CommonJS. Son jumeau `dist/engine/package.json` porte la même chose du côté du
+build, et il est **écrit par le build** — `dist/` est généré et git-ignoré.
 
 ```bash
 git clone https://github.com/pitchan/agent-viz.git
 cd agent-viz
 npm install
-npm run build            # tsc → netgain/dist/
+npm run build            # tsc → dist/engine/, puis le marqueur ESM
 npm test                 # un seul `vitest run`, moteur et produit ensemble
 ```
 
@@ -126,7 +127,7 @@ npm test                 # un seul `vitest run`, moteur et produit ensemble
 2. Sessions reprises : un éventuel double comptage entre fichiers au niveau projet n'est pas
    dédupliqué (la déduplication par identifiant de message est interne à une session).
 3. Un modèle absent de la table de tarifs voit ses jetons comptés et son coût marqué
-   « partiel » — une ligne à ajouter dans `src/core/pricing.ts` quand le tarif est publié.
+   « partiel » — une ligne à ajouter dans `src/engine/core/pricing.ts` quand le tarif est publié.
 
 ## Licence
 
