@@ -46,6 +46,15 @@ const PREFIXE = 'agent-viz-entrypoint-';
 // n emet cette ligne.
 const SEULE_LA_BRANCHE_GARDEE = '[claude] settings :';
 
+// CHOIX DELIBERE : `import()`, JAMAIS `require()`. NE PAS « CORRIGER ».
+// La tache 8 traduit `install-hooks.js` en ESM puis REJOUE sur lui les mutations
+// de garde, et c est la que ce filet doit mordre. Or un `require()` d un module
+// ESM jette ERR_REQUIRE_ASYNC_MODULE : G2 virerait au rouge sur une migration
+// CORRECTE — un faux rouge au pire moment, dont le reflexe serait de desarmer le
+// filet plutot que d en lire le signal. `import()` charge indifferemment
+// CommonJS et ESM : un rouge de G2 signifie donc « la garde a fui », jamais
+// « le mecanisme de test a vieilli ».
+//
 // Le fils importe la cible par son URL `file:`. On passe par l environnement et
 // non par argv : une chaine `C:\...` passee a `import()` se lit comme un
 // specificateur nu et rendrait ERR_MODULE_NOT_FOUND pour une raison qui n a
@@ -101,6 +110,8 @@ function environnement(maison) {
 const options = (maison) => ({ cwd: maison, encoding: 'utf8', env: environnement(maison) });
 
 const lanceCommeScript = (args, maison) => spawnSync(process.execPath, [INSTALL_HOOKS, ...args], options(maison));
+// Le chargement se fait par `import()` et pas par `require()` : choix delibere,
+// motif complet a `SOURCE_DU_FILS`. Ne pas le remplacer.
 const lanceCommeImport = (maison) => spawnSync(process.execPath, ['-e', SOURCE_DU_FILS], options(maison));
 
 test('G1 : lance comme un script, la branche de point d entree s execute et parle', () => {
@@ -142,11 +153,14 @@ test('G2 : importe, le module se tait — sortie 0, rien sur stdout ni stderr, r
     const r = lanceCommeImport(maison);
     assert.equal(r.error, undefined, `le fils n a pas demarre : ${r.error}`);
 
-    // stderr et le code de sortie D ABORD. Un chargement qui ECHOUE
-    // (ERR_REQUIRE_ASYNC_MODULE, ERR_MODULE_NOT_FOUND) parle sur stderr et sort
-    // en non-zero ; un test qui n observerait que stdout lirait « aucune
-    // sortie » et passerait — un silence de panne se lirait comme un silence de
-    // bonne conduite. C est ici que la traduction en ESM doit mordre.
+    // stderr et le code de sortie D ABORD. Un chargement qui ECHOUE parle sur
+    // stderr et sort en non-zero ; un test qui n observerait que stdout lirait
+    // « aucune sortie » et passerait — un silence de panne se lirait comme un
+    // silence de bonne conduite. C est ici que la traduction en ESM doit mordre.
+    // L echec vise est celui d un module REELLEMENT incapable de se charger
+    // (ERR_MODULE_NOT_FOUND). ERR_REQUIRE_ASYNC_MODULE, lui, ne doit JAMAIS
+    // apparaitre ici : il signalerait qu on a remplace l `import()` de
+    // `SOURCE_DU_FILS` par un `require()` — c est-a-dire desarme le filet.
     assert.equal(r.stderr, '', `stderr doit etre vide, recu : ${r.stderr}`);
     assert.equal(r.status, 0, `le fils doit sortir en 0, recu : ${r.status}`);
     assert.equal(r.stdout, '', `stdout doit etre vide, recu : ${r.stdout}`);
