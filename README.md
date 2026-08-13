@@ -213,9 +213,9 @@ npm run build                # the engine is TypeScript; dist/ is not committed
 npm start                    # dashboard on http://localhost:3333
 ```
 
-Tests: `npm test` (a single `vitest run` over one `tests/` tree — 1360 tests in 119 files,
+Tests: `npm test` (a single `vitest run` over one `tests/` tree — 1361 tests in 119 files,
 product and engine together; the 75 `node:test`-based files run through a bridge,
-`test-support/bridge/`) and `npm run test:node` (the same 838 `node:test` cases, run natively
+`test-support/bridge/`) and `npm run test:node` (the same 839 `node:test` cases, run natively
 under `node --test`, kept as the reference the bridge is checked against). After changing
 engine source, rebuild it (`npm run build`) — the product loads the compiled `dist/engine/`.
 Publishing runs both test commands and the build first (`prepublishOnly`).

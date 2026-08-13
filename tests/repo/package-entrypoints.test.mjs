@@ -98,6 +98,48 @@ test('chaque point d entree declare resout sur le disque', () => {
   );
 });
 
+// L auto-nettoyage du build. L etape 3 a supprime le marqueur ESM de
+// `dist/engine/` et son poseur : la racine etant passee en `"type": "module"`,
+// le marqueur n a plus d objet. Mais un `dist/engine/package.json` DEJA pose sur
+// le disque survit a une recompilation — `tsc` ecrase ce qu il emet, il n efface
+// pas ce qu il n emet plus. D ou l effacement en tete du script.
+//
+// Son absence a ete mesuree SILENCIEUSE : `npm run build` sort en 0 et `npm
+// pack` repart a 172 fichiers au lieu de 171, le tarball reembarquant un
+// marqueur perime. Aucune commande ne rougit. Or plus aucun test ne lisait
+// `scripts.build` depuis que la forme bon marche qui le faisait a ete effacee
+// dans le meme commit (206d1ad) : ce test est cette forme, rendue.
+//
+// PORTEE — meme discipline que le filet ci-dessus : il lit le SCRIPT, il ne
+// lance pas le build. Il dit que l effacement est declare et qu il PRECEDE la
+// compilation ; il ne dit pas que le build reussisse, ce dont `prepublishOnly`
+// repond deja. Lancer `tsc` ici couterait des secondes a chaque run pour
+// redire ce qui est verifie ailleurs.
+test('le script build efface dist/engine avant de compiler', () => {
+  // Arrange — les deux positions dans le script, en clair. `search` rend -1
+  // quand le motif manque, ce qui distingue « absent » de « mal place ».
+  const build = typeof PKG.scripts?.build === 'string' ? PKG.scripts.build : '';
+  const effacement = build.search(/rmSync\([^)]*['"]dist\/engine['"]/);
+  const compilation = build.search(/\btsc\b/);
+  const manques = [];
+
+  // Act
+  if (effacement === -1) manques.push('aucun effacement de `dist/engine`');
+  if (compilation === -1) manques.push('aucun appel a `tsc`');
+  if (effacement !== -1 && compilation !== -1 && effacement > compilation) {
+    manques.push('l effacement SUIT la compilation au lieu de la preceder');
+  }
+
+  // Assert
+  assert.deepEqual(
+    manques,
+    [],
+    'le build doit s auto-nettoyer : sans cet effacement, un marqueur ou un fichier emis par une ' +
+      'version anterieure survit dans `dist/engine/` et repart dans le tarball, sans qu aucune ' +
+      'commande ne rougisse (exit 0, `npm pack` a 172 au lieu de 171).',
+  );
+});
+
 test('package.json declare encore ses trois familles de points d entree', () => {
   // Arrange — c est l ASSIETTE du test ci-dessus, et elle vit ici plutot qu en
   // double a l interieur de lui : un `package.json` prive de `bin`, de `main` ou
