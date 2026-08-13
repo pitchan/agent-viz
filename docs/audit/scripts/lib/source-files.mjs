@@ -16,7 +16,7 @@ export const TEST_ZONES = [
   { name: 'tests-engine', roots: ['netgain/tests'] },
 ];
 
-const EXTENSIONS = new Set(['.js', '.mjs', '.ts']);
+const EXTENSIONS = new Set(['.js', '.mjs', '.cjs', '.ts']);
 const IGNORED = new Set(['node_modules', 'dist', 'fixtures', '.git', 'docs']);
 
 function walk(dir, out) {

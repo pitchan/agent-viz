@@ -340,7 +340,7 @@ joli : il déclare `FIXTURE_CLAUDE_DIR` (l. 22), un chemin vers
 `tests/fixtures/observatory/`, et l'exporte (l. 67). Du code de production
 désigne donc un répertoire que le paquet publié ne contient pas — `tests/` est
 hors de `files`. Son seul consommateur est
-`tests/unit/observatory-engine-contract.test.js`.
+`tests/unit/observatory-engine-contract.test.cjs`.
 
 ---
 

@@ -2,7 +2,7 @@
 // Anthropic model pricing — the ENGINE's embedded table (netgain priceTable)
 // prices the whole product since the 2026-08-05 unification: server.js fills
 // the in-memory map from the engine at boot. The static FALLBACK below is its
-// proven mirror (tests/unit/pricing-engine-mirror.test.js) and applies before
+// proven mirror (tests/unit/pricing-engine-mirror.test.cjs) and applies before
 // the engine loads or when it is absent. LiteLLM never writes prices anymore:
 // it is a daily drift WATCHDOG (see litellmDrift).
 //
@@ -36,7 +36,7 @@ const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
 // Static fallback — covers the Claude 5 and 4.x families. Prices in USD per
 // token. This is the proven offline mirror of the engine's embedded table
-// (tests/unit/pricing-engine-mirror.test.js keeps the two in lockstep) — it
+// (tests/unit/pricing-engine-mirror.test.cjs keeps the two in lockstep) — it
 // covers the BOOT WINDOW only: `applyEnginePrices` is wired asynchronously in
 // src/server/server.js, so a few messages can be priced before the engine table
 // lands. It does NOT cover "the engine is absent": measured 2026-08-11, with

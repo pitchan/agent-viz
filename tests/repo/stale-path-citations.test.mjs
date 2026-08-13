@@ -97,7 +97,7 @@ const LISTE_BLANCHE = [
   { fichier: 'tests/install/status-rupture.test.ts', fragment: "'node C:/vieux/netgain/dist/cli.js doctor'", raison: 'entree ETRANGERE : ni hook netgain, ni a reparer' },
 
   // DONNEES DE TEST — un chemin SIMULE, dont on asserte autre chose que le chemin.
-  { fichier: 'tests/unit/install-hooks.test.js', fragment: "'node /tmp/agent-viz/lib/hook.js --source=claude'", raison: 'jumeau cote test de la forme historique n 2 : perime EXPRES' },
+  { fichier: 'tests/unit/install-hooks.test.cjs', fragment: "'node /tmp/agent-viz/lib/hook.js --source=claude'", raison: 'jumeau cote test de la forme historique n 2 : perime EXPRES' },
   { fichier: 'tests/unit/tool-subject.test.mjs', fragment: "file_path: '/home/v/agent-viz/lib/hook.js'", raison: 'chemin simule hors de ce depot : le test asserte le SUJET, pas l adresse' },
   { fichier: 'tests/unit/watchdog-alert-content.test.mjs', fragment: '"session_id" lib/server/observatory --stats', raison: 'commande rg SIMULEE dans un evenement : le test asserte le libelle de l alerte' },
   { fichier: 'tests/unit/watchdog-alert-content.test.mjs', fragment: "file_path: '/repo/lib/hook.js'", raison: 'chemin simule hors de ce depot' },
@@ -222,5 +222,106 @@ test('chaque entree de la liste blanche protege encore quelque chose', () => {
     [],
     'une entree de liste blanche sans occurrence est une exemption qui a survecu a ce qu elle protegeait : ' +
       'la retirer, sinon elle couvrira un jour une citation neuve.',
+  );
+});
+
+// \u2500\u2500 D9 \u2014 les citations INTERNES d un ancien nom `*.test.js` \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+//
+// Angle mort distinct de D8 : `RACINE_MORTE` guette un DOSSIER mort
+// (`lib/`, `public/`, `netgain/`), pas un NOM DE FICHIER qui a change
+// d extension. Le step 1 a renomme 39 `.test.js` en `.test.cjs` : une
+// citation qui garde encore l ancien nom pointe vers un fichier qui n existe
+// plus sous cette adresse, exactement le meme defaut que D8, ici sur
+// l extension plutot que sur le dossier.
+//
+// Deux listes NEUVES, posees PAR-DESSUS `fichiersBalayes()` (reutilise tel
+// quel, jamais reimplemente : lui seul sait exclure `tests/CLAUDE.md`, que
+// les Global Constraints interdisent d editer). Ni l une ni l autre ne
+// touche `EXCLUS` ni `LISTE_BLANCHE` : y ajouter changerait ce que les deux
+// tests ci-dessus prouvent (mesure).
+const EXCLUS_TEST_JS = [
+  // 13 litt\u00e9raux FABRIQU\u00c9S ('a.test.js', 'b.test.js', 'c.test.js' \u2014 jamais
+  // touches, Global Constraints) : donnees de test pour `formatId` et le
+  // reporter node:test, pas des citations d un fichier reel. Rien a
+  // proteger fragment par fragment, le fichier entier est hors sujet.
+  'tests/unit/test-ids-format.test.mjs',
+  // Cite `watchdog-wiring.test.js` (l. 14) \u2014 EXACTE aujourd hui : ce
+  // fichier D13 reste sous ce nom jusqu au commit de bascule (tache 5), qui
+  // le renomme et redevient alors responsable de cette ligne.
+  'tests/unit/watchdog-routes.test.cjs',
+];
+
+// Ancre sur un identifiant (lettres/chiffres/tiret/underscore) immediatement
+// avant `.test.js` : matche `pricing.test.js`, pas une mention nue comme
+// \u00ab 42 `.test.js` \u00bb (ARCHITECTURE.md, table du pont \u00a7 9) \u2014 un DECOMPTE, pas
+// la citation d un fichier ; ce nombre est revu au commit de bascule
+// (tache 5, qui refait tout le tableau d un coup), pas ici.
+const CITATION_TEST_JS = /[A-Za-z0-9_-]+\.test\.js\b/;
+
+const LISTE_BLANCHE_TEST_JS = [
+  // PERMANENTE \u2014 ne pourra JAMAIS etre retiree tant que ce filet reste ce
+  // filet. Cite ses deux voisins `transcript.test.js` et
+  // `transcript-subagents.test.js` par leur nom D AVANT le step 1 ; les
+  // Global Constraints interdisent de changer le contenu des 39 `.test.cjs`
+  // (\u00ab aucun fichier de test ne change de semantique \u00bb, et corriger cette
+  // citation n est pas un `git mv`). L entree protege donc pour toujours
+  // une citation FAUSSE et gelee, pas un oubli provisoire a solder \u2014 sauf
+  // si doc/36 \u00a7 1.3 levait un jour cet interdit sur le contenu des 39.
+  {
+    fichier: 'tests/unit/transcript-adapters.test.cjs',
+    fragment: '`transcript.test.js` et `transcript-subagents.test.js`',
+    raison: 'citation interne perimee par le step 1, gelee : contenu des 39 .test.cjs hors de portee (PERMANENT)',
+  },
+];
+
+function occurrencesTestJs() {
+  const trouvees = [];
+  for (const rel of fichiersBalayes()) {
+    if (EXCLUS_TEST_JS.some(x => rel === x || rel.startsWith(x))) continue;
+    readFileSync(path.join(ROOT, rel), 'utf8').split(/\r?\n/).forEach((ligne, i) => {
+      if (CITATION_TEST_JS.test(ligne)) trouvees.push({ fichier: rel, ligne: i + 1, texte: ligne });
+    });
+  }
+  return trouvees;
+}
+
+test('aucune citation d un ancien nom .test.js hors liste blanche, et chaque exemption protege encore quelque chose', () => {
+  // Arrange
+  const toutes = occurrencesTestJs();
+
+  // Act \u2014 premiere garantie : aucune citation hors liste blanche.
+  const perimees = toutes.filter(
+    o => !LISTE_BLANCHE_TEST_JS.some(e => e.fichier === o.fichier && o.texte.includes(e.fragment)),
+  );
+
+  // Assert
+  assert.deepEqual(
+    perimees.map(o => `${o.fichier}:${o.ligne} \u2192 ${o.texte.trim()}`),
+    [],
+    'citation d un ancien nom .test.js hors liste blanche : la faire suivre le renommage (step 1), ' +
+      'ou l inscrire dans LISTE_BLANCHE_TEST_JS avec sa raison.',
+  );
+
+  // Act \u2014 seconde garantie : aucune exemption (EXCLUS_TEST_JS ou
+  // LISTE_BLANCHE_TEST_JS) n a survecu a ce qu elle protegeait.
+  const exclusOrphelins = EXCLUS_TEST_JS.filter(rel => {
+    const abs = path.join(ROOT, rel);
+    if (!existsSync(abs)) return true;
+    return !readFileSync(abs, 'utf8').split(/\r?\n/).some(l => CITATION_TEST_JS.test(l));
+  });
+  const blancheOrphelines = LISTE_BLANCHE_TEST_JS.filter(
+    e => !toutes.some(o => o.fichier === e.fichier && o.texte.includes(e.fragment)),
+  );
+
+  // Assert
+  assert.deepEqual(
+    exclusOrphelins,
+    [],
+    'une entree de EXCLUS_TEST_JS dont le fichier ne cite plus aucun .test.js : exemption devenue inutile, a retirer.',
+  );
+  assert.deepEqual(
+    blancheOrphelines.map(e => `${e.fichier} \u2192 ${e.fragment}`),
+    [],
+    'une entree de LISTE_BLANCHE_TEST_JS sans occurrence a survecu a ce qu elle protegeait : la retirer.',
   );
 });

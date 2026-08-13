@@ -1040,7 +1040,7 @@ casse en cas de divergence, `tests/unit/pricing-engine-mirror.test.js`,
 rejouable seul, sans tube :
 
 ```
-$ node --test tests/unit/pricing-engine-mirror.test.js
+$ node --test tests/unit/pricing-engine-mirror.test.cjs
 ✔ FALLBACK mirrors the engine table: rates, labels, context windows, dated periods
 ✔ switching the price source to the engine table changes no amount
 ℹ tests 2
@@ -1079,7 +1079,7 @@ voit qu'un à la fois.
 pas par héritage ») :
 
 ```
-$ node --test tests/unit/transcript-adapters.test.js
+$ node --test tests/unit/transcript-adapters.test.cjs
 ✔ every adapter honors the same contract (Liskov)
 ✔ getAdapter: null/undefined defaults to claude (pre-0.2.0 sessions)
 ✔ getAdapter: unknown string logs an error and returns claude (loud fallback)
