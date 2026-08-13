@@ -11,11 +11,12 @@
 //   node src/server/install-hooks.js [--user|--project|--local] [--check|--uninstall]
 //
 // API :
-//   const { install, uninstall, audit, resolveScope, resolveHookCommand } = require('./install-hooks');
+//   import { install, uninstall, audit, resolveScope, resolveHookCommand } from './install-hooks.js';
 
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import { fileURLToPath } from 'node:url';
 
 // Per-event timeout written into agent settings. Must stay > 1 s (Windows node
 // + AV cold start) and > the in-process safety net in src/server/hook.js so the safety
@@ -239,7 +240,7 @@ function resolveScope({ scope, cwd, agent = 'claude', packageRoot } = {}) {
 // `npx --yes @vcueto/agent-viz@<version> hook --source=<agent>` pinned to the
 // currently-running version (~300-800ms cold start).
 function resolveHookCommand({ packageRoot, version, agent = 'claude' } = {}) {
-  packageRoot = packageRoot || path.resolve(__dirname, '..', '..');
+  packageRoot = packageRoot || path.resolve(import.meta.dirname, '..', '..');
   const binPath = path.join(packageRoot, 'bin', 'agent-viz.js');
   // npx caches always live under "/_npx/" on every platform.
   const isEphemeral = packageRoot.includes(`${path.sep}_npx${path.sep}`)
@@ -250,7 +251,12 @@ function resolveHookCommand({ packageRoot, version, agent = 'claude' } = {}) {
   }
   let v = version;
   if (!v) {
-    try { v = require(path.join(packageRoot, 'package.json')).version; } catch {}
+    // BOM retire avant l analyse (constat C1, idiome de hook.js:64) : sans lui,
+    // un package.json prefixe rendrait un spec npx SANS version, en silence.
+    try {
+      const brut = fs.readFileSync(path.join(packageRoot, 'package.json'), 'utf8');
+      v = JSON.parse(brut.charCodeAt(0) === 0xFEFF ? brut.slice(1) : brut).version;
+    } catch {}
   }
   const spec = v ? `@vcueto/agent-viz@${v}` : '@vcueto/agent-viz';
   return { command: `npx --yes ${spec} hook --source=${agent}`, mode: 'npx', spec };
@@ -642,7 +648,12 @@ function installedScopes({ cwd, packageRoot } = {}) {
   return out;
 }
 
-module.exports = {
+const _internals = {
+  readSettings, writeSettings, auditSettings, addHook, removeHook,
+  hasHookForEvent, inspectEvent, refreshStaleCommand, eventsFor,
+};
+
+export {
   EVENTS,
   isAgentVizHook,
   isStandardShape,
@@ -656,10 +667,7 @@ module.exports = {
   resolveHookCommand,
   findProjectRoot,
   ensureGitignore,
-  _internals: {
-    readSettings, writeSettings, auditSettings, addHook, removeHook,
-    hasHookForEvent, inspectEvent, refreshStaleCommand, eventsFor,
-  },
+  _internals,
 };
 
 // ── CLI standalone (kept for backwards compatibility) ──
@@ -737,7 +745,7 @@ function cliMain(argv) {
   }
 }
 
-if (require.main === module) {
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
   try { cliMain(process.argv.slice(2)); }
   catch (e) { console.error('Erreur :', e.message); process.exit(2); }
 }

@@ -18,8 +18,8 @@
 // fire. Qualifying sessions are then grouped by project for display, since a
 // project is where a model choice is made.
 
-const { COST_BASIS, sumUsd } = require('./cost');
-const { THRESHOLDS } = require('./thresholds');
+import { COST_BASIS, sumUsd } from './cost.js';
+import { THRESHOLDS } from './thresholds.js';
 
 const ID = 'R1';
 const CATEGORY = 'modele';
@@ -116,4 +116,6 @@ function evaluate(ctx) {
   return recs;
 }
 
-module.exports = { id: ID, category: CATEGORY, subjectKind: 'project', evaluate };
+const subjectKind = 'project';
+
+export { ID as id, CATEGORY as category, subjectKind, evaluate };

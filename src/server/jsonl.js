@@ -12,8 +12,8 @@
 // moment où C5 en a eu besoin une deuxième fois. Ce fichier-ci ne garde que ce
 // qui lui est propre : QUEL module, et QUELS exports.
 
-const { requireEngineModule } = require('./engine-require');
+import { requireEngineModule } from './engine-require.js';
 
 const { decodeJsonlLine } = requireEngineModule('core/jsonl.js', ['decodeJsonlLine'], 'jsonl');
 
-module.exports = { decodeJsonlLine };
+export { decodeJsonlLine };

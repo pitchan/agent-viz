@@ -35,11 +35,11 @@
 // que le systeme s'autorise a vider, et le menage y purge deja les sessions.
 // Une memoire qui doit survivre d'une session a l'autre n'y a pas sa place.
 
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
 
-const { decodeJsonlLine } = require('../jsonl');
+import { decodeJsonlLine } from '../jsonl.js';
 
 const DEFAULT_PATH = path.join(os.homedir(), '.agent-viz', 'alerts.jsonl');
 
@@ -362,4 +362,4 @@ function createJournal({ filePath = DEFAULT_PATH, now = Date.now } = {}) {
   };
 }
 
-module.exports = { createJournal, DEFAULT_PATH, keyOf };
+export { createJournal, DEFAULT_PATH, keyOf };

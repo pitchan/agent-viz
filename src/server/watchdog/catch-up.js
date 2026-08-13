@@ -19,9 +19,9 @@
 // COMPTE deux fois par le detecteur. Le journal dedoublonne l'alerte, pas les
 // compteurs qui la produisent.
 
-const fsp = require('fs').promises;
-const path = require('path');
-const { decodeJsonlLine } = require('../jsonl');
+import { promises as fsp } from 'node:fs';
+import path from 'node:path';
+import { decodeJsonlLine } from '../jsonl.js';
 
 // `limiteVive` rend, pour un fichier, l'octet a partir duquel le chemin vif
 // prend la main — ou null quand aucun watcher ne le couvre, auquel cas le
@@ -118,4 +118,4 @@ async function catchUpFromDisk(service, dir, limiteVive) {
   return fed;
 }
 
-module.exports = { catchUpFromDisk };
+export { catchUpFromDisk };

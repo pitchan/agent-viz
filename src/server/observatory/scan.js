@@ -6,8 +6,8 @@
 // which ones actually changed, and analyse only those — one by one, through
 // the granular API.
 
-const { SCAN_VERSION } = require('./scan-version');
-const { toSessionRow } = require('./session-mapper');
+import { SCAN_VERSION } from './scan-version.js';
+import { toSessionRow } from './session-mapper.js';
 
 async function runIncrementalScan(deps, options) {
   const { engine, store, broadcast, now } = deps;
@@ -52,4 +52,4 @@ async function runIncrementalScan(deps, options) {
   return outcome;
 }
 
-module.exports = { runIncrementalScan };
+export { runIncrementalScan };

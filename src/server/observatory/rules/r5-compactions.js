@@ -6,8 +6,8 @@
 // preTokens is unknown is counted separately rather than silently treated as
 // free — a missing value is not a zero.
 
-const { COST_BASIS, sumUsd } = require('./cost');
-const { THRESHOLDS } = require('./thresholds');
+import { COST_BASIS, sumUsd } from './cost.js';
+import { THRESHOLDS } from './thresholds.js';
 
 const ID = 'R5';
 const CATEGORY = 'contexte';
@@ -53,4 +53,6 @@ function evaluate(ctx) {
   return recs;
 }
 
-module.exports = { id: ID, category: CATEGORY, subjectKind: 'project', evaluate };
+const subjectKind = 'project';
+
+export { ID as id, CATEGORY as category, subjectKind, evaluate };

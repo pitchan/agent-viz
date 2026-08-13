@@ -10,12 +10,12 @@
 //                      _mainPending, _closed }            (transcript.js)
 //   rec.tokens = { main, perAgent, _broadcastTimer }     (tokens.js)
 
-const fs = require('fs');
+import fs from 'node:fs';
 const fsp = fs.promises;
-const path = require('path');
-const os = require('os');
+import path from 'node:path';
+import os from 'node:os';
 
-const { decodeJsonlLine } = require('./jsonl');
+import { decodeJsonlLine } from './jsonl.js';
 
 const DIR = path.join(os.tmpdir(), 'agent-events');
 try { fs.mkdirSync(DIR, { recursive: true }); } catch {}
@@ -133,7 +133,7 @@ function latestSession() {
   return latest ? sessionFilePath(latest) : null;
 }
 
-module.exports = {
+export {
   DIR,
   PURGE_MAX_AGE_MS, PURGE_KEEP_MAX,
   EMPTY_THRESHOLD_BYTES, EMPTY_MAX_AGE_MS,

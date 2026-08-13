@@ -8,8 +8,8 @@
 // percentage of almost nothing would still fire. On the 90-day relevé that
 // floor is what does the sorting — it takes 84 sessions down to 7.
 
-const { COST_BASIS, usdForBytes } = require('./cost');
-const { THRESHOLDS } = require('./thresholds');
+import { COST_BASIS, usdForBytes } from './cost.js';
+import { THRESHOLDS } from './thresholds.js';
 
 const ID = 'R4';
 const CATEGORY = 'sous-agents';
@@ -57,4 +57,6 @@ function evaluate(ctx) {
   return recs;
 }
 
-module.exports = { id: ID, category: CATEGORY, subjectKind: 'project', evaluate };
+const subjectKind = 'project';
+
+export { ID as id, CATEGORY as category, subjectKind, evaluate };

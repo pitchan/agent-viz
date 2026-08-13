@@ -4,17 +4,17 @@
 // collaborator arrives through deps, which is what makes it testable and what
 // keeps this file about sequencing rather than plumbing.
 
-const { SCAN_VERSION } = require('./scan-version');
-const { runIncrementalScan } = require('./scan');
-const { toAnalysedSessions } = require('./session-mapper');
-const { mcpUsageBySession } = require('./mcp-usage');
-const { computeSummary } = require('./summary');
-const { computeModelCosts } = require('./model-costs');
-const { buildProvenance } = require('./provenance');
-const { cwdOfReport, displayPath, nameProjects } = require('./project-label');
-const { evaluateAll, RULES } = require('./rules/registry');
-const { applyCrossLinks } = require('./rules/cross-links');
-const { rankByBasis } = require('./rules/ranking');
+import { SCAN_VERSION } from './scan-version.js';
+import { runIncrementalScan } from './scan.js';
+import { toAnalysedSessions } from './session-mapper.js';
+import { mcpUsageBySession } from './mcp-usage.js';
+import { computeSummary } from './summary.js';
+import { computeModelCosts } from './model-costs.js';
+import { buildProvenance } from './provenance.js';
+import { cwdOfReport, displayPath, nameProjects } from './project-label.js';
+import { evaluateAll, RULES } from './rules/registry.js';
+import { applyCrossLinks } from './rules/cross-links.js';
+import { rankByBasis } from './rules/ranking.js';
 
 // Two windows, deliberately distinct. WINDOW_DAYS is what the user can pick
 // for reading and advice; scanSinceDays (90, the widest offered) is what
@@ -177,4 +177,4 @@ function createObservatoryService(deps) {
   };
 }
 
-module.exports = { createObservatoryService, WINDOW_DAYS };
+export { createObservatoryService, WINDOW_DAYS };

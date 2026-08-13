@@ -14,7 +14,7 @@
 // l'analyse — n'est pas de l'accumulation d'usage : c'est ce que le pilote
 // temps réel en fait, et ça n'a aucune raison d'aller dans le noyau.
 
-const { requireEngineModule } = require('./engine-require');
+import { requireEngineModule } from './engine-require.js';
 
 const { addUsage, emptyUsageBucket, finiteCount, isDedupableMsgId, sumUsageInto } =
   requireEngineModule(
@@ -22,4 +22,4 @@ const { addUsage, emptyUsageBucket, finiteCount, isDedupableMsgId, sumUsageInto 
     ['addUsage', 'emptyUsageBucket', 'finiteCount', 'isDedupableMsgId', 'sumUsageInto'],
     'usage');
 
-module.exports = { addUsage, emptyUsageBucket, finiteCount, isDedupableMsgId, sumUsageInto };
+export { addUsage, emptyUsageBucket, finiteCount, isDedupableMsgId, sumUsageInto };

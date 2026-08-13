@@ -24,4 +24,4 @@ function computeSummary(sessions, { lastScanAt, engine, basis = null, period = n
   };
 }
 
-module.exports = { computeSummary };
+export { computeSummary };

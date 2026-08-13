@@ -11,11 +11,11 @@
 // desormais du code servi au navigateur ET charge par le serveur, ce qui evite
 // d'en tenir deux copies.
 
-const path = require('path');
-const { pathToFileURL } = require('url');
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const WATCHDOG_MODULE = pathToFileURL(
-  path.join(__dirname, '..', '..', '..', 'src', 'web', 'viz-watchdog.mjs'),
+  path.join(import.meta.dirname, '..', '..', '..', 'src', 'web', 'viz-watchdog.mjs'),
 ).href;
 
 async function createWatchdogService({
@@ -84,4 +84,4 @@ async function createWatchdogService({
   };
 }
 
-module.exports = { createWatchdogService, WATCHDOG_MODULE };
+export { createWatchdogService, WATCHDOG_MODULE };

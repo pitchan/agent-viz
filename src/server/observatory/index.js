@@ -3,16 +3,16 @@
 // paths, the real filesystem, the real clock and the real SSE transport.
 // Everything else receives them.
 
-const fsp = require('fs').promises;
-const os = require('os');
-const path = require('path');
+import { promises as fsp } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
-const { resolveClaudeDir, resolveClaudeJsonPath } = require('../claude-dir');
-const { openStore } = require('./store');
-const { loadEngine } = require('./engine');
-const { collectConfigItems } = require('./config-audit');
-const { createObservatoryService } = require('./service');
-const { broadcastSSE } = require('../sse');
+import { resolveClaudeDir, resolveClaudeJsonPath } from '../claude-dir.js';
+import { openStore } from './store.js';
+import { loadEngine } from './engine.js';
+import { collectConfigItems } from './config-audit.js';
+import { createObservatoryService } from './service.js';
+import { broadcastSSE } from '../sse.js';
 
 const DB_PATH = path.join(os.homedir(), '.agent-viz', 'observatory.db');
 const DEFAULT_SINCE_DAYS = 30;
@@ -44,4 +44,4 @@ function getObservatoryService() {
   return _service;
 }
 
-module.exports = { getObservatoryService, DB_PATH, DEFAULT_SINCE_DAYS, SCAN_SINCE_DAYS };
+export { getObservatoryService, DB_PATH, DEFAULT_SINCE_DAYS, SCAN_SINCE_DAYS };

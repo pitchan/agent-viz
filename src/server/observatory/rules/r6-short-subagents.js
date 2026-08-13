@@ -9,9 +9,9 @@
 // session without timestamps cannot be judged and is left out entirely — it is
 // never counted as a zero-length session.
 
-const { COST_BASIS, sumUsd } = require('./cost');
-const { THRESHOLDS } = require('./thresholds');
-const { netOf } = require('../session-mapper');
+import { COST_BASIS, sumUsd } from './cost.js';
+import { THRESHOLDS } from './thresholds.js';
+import { netOf } from '../session-mapper.js';
 
 const ID = 'R6';
 const CATEGORY = 'sous-agents';
@@ -80,4 +80,6 @@ function evaluate(ctx) {
   return recs;
 }
 
-module.exports = { id: ID, category: CATEGORY, subjectKind: 'project', evaluate };
+const subjectKind = 'project';
+
+export { ID as id, CATEGORY as category, subjectKind, evaluate };

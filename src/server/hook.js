@@ -8,10 +8,11 @@
 // Defaults to 'claude' for back-compat with old hook commands installed by
 // agent-viz < 0.2.0 that didn't carry the flag.
 
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
-const http = require('http');
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import http from 'node:http';
+import { fileURLToPath } from 'node:url';
 
 const DIR = path.join(os.tmpdir(), 'agent-events');
 const PORT = parseInt(process.env.AGENT_VIZ_PORT || process.env.PORT || '3333', 10);
@@ -93,6 +94,6 @@ function runHook() {
   });
 }
 
-module.exports = { runHook, parseSource };
+export { runHook, parseSource };
 
-if (require.main === module) runHook();
+if (process.argv[1] === fileURLToPath(import.meta.url)) runHook();

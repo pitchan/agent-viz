@@ -22,7 +22,7 @@
 // nomme déjà la cause. Le moteur n'est jamais « absent » quand le serveur
 // tourne.
 
-const { requireEngineModule } = require('./engine-require');
+import { requireEngineModule } from './engine-require.js';
 
 // `pricingKindOf` est la contrepartie QUALITATIVE de `computeCost`, qui ne rend
 // qu'un montant : elle nomme les trois cas — `tarife`, `zero-voulu`,
@@ -36,4 +36,4 @@ const { computeCost, normalizeModel, pricingKindOf } = requireEngineModule(
   ['computeCost', 'normalizeModel', 'pricingKindOf'],
   'pricing');
 
-module.exports = { computeCost, normalizeModel, pricingKindOf };
+export { computeCost, normalizeModel, pricingKindOf };

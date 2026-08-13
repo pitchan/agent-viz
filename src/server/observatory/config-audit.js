@@ -10,7 +10,7 @@
 // leaves the others intact. Sources are declared in a table (CLAUDE.md § O):
 // adding "agents" or "output styles" later is one entry, not a new branch.
 
-const path = require('path');
+import path from 'node:path';
 
 async function readJson(readFile, filePath) {
   try {
@@ -100,4 +100,4 @@ async function collectConfigItems(deps, options) {
   return perSource.flat();
 }
 
-module.exports = { collectConfigItems };
+export { collectConfigItems };

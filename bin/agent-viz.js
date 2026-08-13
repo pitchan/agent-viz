@@ -11,13 +11,25 @@
 //   agent-viz hook            (internal — invoked by Claude Code via settings.json)
 //   agent-viz --help | --version
 
-const path = require('path');
-const fs = require('fs');
-const { styleText } = require('node:util');
+import path from 'node:path';
+import fs from 'node:fs';
+import os from 'node:os';
+import { styleText } from 'node:util';
+import { spawn } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 
-const PKG_ROOT = path.resolve(__dirname, '..');
+const PKG_ROOT = path.resolve(import.meta.dirname, '..');
 let PKG_VERSION = '0.0.0';
-try { PKG_VERSION = require(path.join(PKG_ROOT, 'package.json')).version || '0.0.0'; } catch {}
+// Le BOM est retire AVANT l analyse : `require()` d un .json le faisait, pas
+// `JSON.parse`. Sans ce retrait, un package.json prefixe par un writer Windows
+// ferait retomber la version sur '0.0.0' EN SILENCE — meme famille que le
+// constat C1, et meme idiome que src/server/hook.js:64 : le BOM se compare par
+// CODE de caractere, jamais par un motif qui le contient, un BOM litteral dans
+// le source etant invisible a la relecture.
+try {
+  const brut = fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8');
+  PKG_VERSION = JSON.parse(brut.charCodeAt(0) === 0xFEFF ? brut.slice(1) : brut).version || '0.0.0';
+} catch {}
 
 // Semantic color helpers. node:util.styleText auto-disables for non-TTY
 // streams and respects NO_COLOR (https://no-color.org), so call sites stay
@@ -100,7 +112,6 @@ function pickTargetFlag(flags) {
 }
 
 function openBrowser(url) {
-  const { spawn } = require('child_process');
   const isWin = process.platform === 'win32';
   const cmd = process.platform === 'darwin' ? 'open'
             : isWin ? 'cmd'
@@ -125,7 +136,7 @@ async function cmdStart(argv) {
   const shouldInstall = flags['install-hooks'] !== false;
 
   if (shouldInstall) {
-    const { install } = require(path.join(PKG_ROOT, 'src', 'server', 'install-hooks.js'));
+    const { install } = await import(pathToFileURL(path.join(PKG_ROOT, 'src', 'server', 'install-hooks.js')).href);
     try {
       const result = install({ cwd: process.cwd(), packageRoot: PKG_ROOT, version: PKG_VERSION });
       let printed = false;
@@ -150,7 +161,7 @@ async function cmdStart(argv) {
     }
   }
 
-  const { start, status } = require(path.join(PKG_ROOT, 'src', 'server', 'lifecycle.js'));
+  const { start, status } = await import(pathToFileURL(path.join(PKG_ROOT, 'src', 'server', 'lifecycle.js')).href);
   try {
     const res = await start({ port, foreground: flags.foreground });
     if (res.foreground) {
@@ -170,7 +181,7 @@ async function cmdStart(argv) {
 
 async function cmdStop(argv) {
   const flags = parseFlags(argv || [], { booleans: ['keep-hooks'] });
-  const { stop, status } = require(path.join(PKG_ROOT, 'src', 'server', 'lifecycle.js'));
+  const { stop, status } = await import(pathToFileURL(path.join(PKG_ROOT, 'src', 'server', 'lifecycle.js')).href);
   const before = await status();
   let res = null;
   if (before.running) {
@@ -186,7 +197,7 @@ async function cmdStop(argv) {
   // uninstalling an agent that was never installed is a no-op.
   const shouldUninstall = flags['keep-hooks'] !== true;
   if (shouldUninstall) {
-    const { uninstall, resolveScope } = require(path.join(PKG_ROOT, 'src', 'server', 'install-hooks.js'));
+    const { uninstall, resolveScope } = await import(pathToFileURL(path.join(PKG_ROOT, 'src', 'server', 'install-hooks.js')).href);
     try {
       const scoped = resolveScope({ cwd: process.cwd(), packageRoot: PKG_ROOT });
       const result = uninstall({ scope: scoped.scope, cwd: process.cwd(), packageRoot: PKG_ROOT });
@@ -214,8 +225,8 @@ async function cmdStop(argv) {
 }
 
 async function cmdStatus() {
-  const { status } = require(path.join(PKG_ROOT, 'src', 'server', 'lifecycle.js'));
-  const { installedScopes } = require(path.join(PKG_ROOT, 'src', 'server', 'install-hooks.js'));
+  const { status } = await import(pathToFileURL(path.join(PKG_ROOT, 'src', 'server', 'lifecycle.js')).href);
+  const { installedScopes } = await import(pathToFileURL(path.join(PKG_ROOT, 'src', 'server', 'install-hooks.js')).href);
   const s = await status();
   if (s.running) {
     console.log(`${c.ok('running')} ${c.hint('→')} http://localhost:${s.port}`);
@@ -250,7 +261,7 @@ async function cmdInstallHooks(argv) {
   });
   let scope = pickScopeFlag(flags);
   let target = pickTargetFlag(flags);
-  const { install, audit, detectAgents, findProjectRoot } = require(path.join(PKG_ROOT, 'src', 'server', 'install-hooks.js'));
+  const { install, audit, detectAgents, findProjectRoot } = await import(pathToFileURL(path.join(PKG_ROOT, 'src', 'server', 'install-hooks.js')).href);
 
   // Zero-flag invocation (no scope, no target, not --check) opens an
   // interactive prompt asking which agent + which scope. --check stays
@@ -263,7 +274,7 @@ async function cmdInstallHooks(argv) {
       console.error(c.dim('    agent-viz install-hooks --user --target=both'));
       process.exit(1);
     }
-    const { promptInstallParams } = require(path.join(PKG_ROOT, 'src', 'server', 'prompt-install.js'));
+    const { promptInstallParams } = await import(pathToFileURL(path.join(PKG_ROOT, 'src', 'server', 'prompt-install.js')).href);
     const detected = detectAgents();
     const projectRoot = findProjectRoot(process.cwd(), { packageRoot: PKG_ROOT });
     try {
@@ -334,14 +345,14 @@ async function cmdInstallHooks(argv) {
   }
 }
 
-function cmdUninstallHooks(argv) {
+async function cmdUninstallHooks(argv) {
   const flags = parseFlags(argv, {
     booleans: ['user', 'project', 'local'],
     values: ['target'],
   });
   const scope = pickScopeFlag(flags);
   const target = pickTargetFlag(flags);
-  const { uninstall } = require(path.join(PKG_ROOT, 'src', 'server', 'install-hooks.js'));
+  const { uninstall } = await import(pathToFileURL(path.join(PKG_ROOT, 'src', 'server', 'install-hooks.js')).href);
   const result = uninstall({ target, scope, cwd: process.cwd(), packageRoot: PKG_ROOT });
   let total = 0;
   for (const [agent, x] of Object.entries(result)) {
@@ -357,9 +368,9 @@ function cmdUninstallHooks(argv) {
   if (total === 0) console.log(c.dim('No agent-viz hooks found.'));
 }
 
-function cmdHook() {
+async function cmdHook() {
   // Internal: forwarded by Claude Code via settings.json.
-  const { runHook } = require(path.join(PKG_ROOT, 'src', 'server', 'hook.js'));
+  const { runHook } = await import(pathToFileURL(path.join(PKG_ROOT, 'src', 'server', 'hook.js')).href);
   runHook();
 }
 
@@ -373,7 +384,6 @@ function cmdHook() {
 function showFirstRunWelcomeIfNeeded(argv) {
   if (argv.includes('--version') || argv.includes('-v')) return;
   if (argv[0] === 'hook') return;
-  const os = require('os');
   const sentinelDir = path.join(os.homedir(), '.agent-viz');
   const sentinel = path.join(sentinelDir, '.welcomed');
   if (fs.existsSync(sentinel)) return;

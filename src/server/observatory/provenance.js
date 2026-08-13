@@ -5,7 +5,7 @@
 // source) so it cannot silently drift from what the program does. French
 // copy: the reader is the product's user, not a developer.
 
-const { SCAN_VERSION } = require('./scan-version');
+import { SCAN_VERSION } from './scan-version.js';
 
 function buildProvenance({ engineVersion, priceSource }) {
   return {
@@ -74,4 +74,4 @@ function buildProvenance({ engineVersion, priceSource }) {
   };
 }
 
-module.exports = { buildProvenance };
+export { buildProvenance };

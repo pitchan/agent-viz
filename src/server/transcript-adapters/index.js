@@ -3,8 +3,8 @@
 // dispatch table keyed by session._source. Liskov contract enforced by
 // the test suite, not by inheritance.
 
-const claude = require('./claude');
-const copilot = require('./copilot');
+import * as claude from './claude.js';
+import * as copilot from './copilot.js';
 
 const TRANSCRIPT_ADAPTERS = { claude, copilot };
 
@@ -22,4 +22,4 @@ function getAdapter(agentSource) {
   return TRANSCRIPT_ADAPTERS.claude;
 }
 
-module.exports = { TRANSCRIPT_ADAPTERS, getAdapter };
+export { TRANSCRIPT_ADAPTERS, getAdapter };

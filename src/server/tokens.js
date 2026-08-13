@@ -15,10 +15,10 @@
 //     cost in USD computed at parse time (per-message, using the model that
 //     produced that message — robust to mid-session model switches).
 
-const { broadcastSSE } = require('./sse');
-const { getPrice } = require('./pricing');
-const { computeCost, normalizeModel, pricingKindOf } = require('./pricing-engine');
-const { addUsage, emptyUsageBucket, finiteCount, isDedupableMsgId } = require('./usage');
+import { broadcastSSE } from './sse.js';
+import { getPrice } from './pricing.js';
+import { computeCost, normalizeModel, pricingKindOf } from './pricing-engine.js';
+import { addUsage, emptyUsageBucket, finiteCount, isDedupableMsgId } from './usage.js';
 
 function newBucket() {
   return {
@@ -175,7 +175,7 @@ function clearTokensTimer(rec) {
   }
 }
 
-module.exports = {
+export {
   newBucket, ensureTokens, tokenSum, accumulateUsage,
   tokensSnapshot, tokensMessage, broadcastTokens, scheduleTokensBroadcast,
   clearTokensTimer,

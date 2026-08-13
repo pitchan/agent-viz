@@ -5,29 +5,29 @@
 // a new endpoint is one line in ROUTES; security checks are co-located with
 // the route declaration so they can't be forgotten.
 
-const fs = require('fs');
+import fs from 'node:fs';
 const fsp = fs.promises;
-const path = require('path');
+import path from 'node:path';
 
-const {
+import {
   DIR,
   sessionIndex,
   sessionFilePath, validSessionId, latestSession,
-} = require('./session-index');
-const { sseClients, broadcastSessionsChanged } = require('./sse');
-const { tokensMessage } = require('./tokens');
-const { ensureFirstPrompt } = require('./transcript');
-const {
+} from './session-index.js';
+import { sseClients, broadcastSessionsChanged } from './sse.js';
+import { tokensMessage } from './tokens.js';
+import { ensureFirstPrompt } from './transcript.js';
+import {
   readAndBroadcast, watchSession, deleteSession,
-} = require('./event-reader');
-const { scanAndWatch } = require('./housekeep');
-const { createObservatoryRoutes } = require('./observatory/routes');
-const { getObservatoryService } = require('./observatory');
-const { createWatchdogRoutes } = require('./watchdog/routes');
-const { getWatchdogService } = require('./watchdog');
+} from './event-reader.js';
+import { scanAndWatch } from './housekeep.js';
+import { createObservatoryRoutes } from './observatory/routes.js';
+import { getObservatoryService } from './observatory/index.js';
+import { createWatchdogRoutes } from './watchdog/routes.js';
+import { getWatchdogService } from './watchdog/index.js';
 
 const PORT = process.env.PORT || 3333;
-const PROJECT_ROOT = path.join(__dirname, '..', '..');
+const PROJECT_ROOT = path.join(import.meta.dirname, '..', '..');
 const HTML = path.join(PROJECT_ROOT, 'index.html');
 
 // HTTP server reference for graceful shutdown — wired by server.js once the
@@ -322,4 +322,4 @@ async function dispatch(req, res) {
   return route.handler(req, res, url);
 }
 
-module.exports = { dispatch, setServer, ROUTES };
+export { dispatch, setServer, ROUTES };

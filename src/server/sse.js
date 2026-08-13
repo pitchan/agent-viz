@@ -21,4 +21,4 @@ function broadcastSessionsChanged() {
   }, 2000);
 }
 
-module.exports = { sseClients, broadcastSSE, broadcastSessionsChanged };
+export { sseClients, broadcastSSE, broadcastSessionsChanged };

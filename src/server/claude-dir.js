@@ -14,9 +14,9 @@
 // doublon de code mais un doublon de VOCABULAIRE — le corriger demande un
 // vocabulaire partagé, pas deux expressions qui se ressemblent.
 
-const { requireEngineModule } = require('./engine-require');
+import { requireEngineModule } from './engine-require.js';
 
 const { resolveClaudeDir, resolveClaudeJsonPath, CLAUDE_DIR_ENV } = requireEngineModule(
   'core/claude-dir.js', ['resolveClaudeDir', 'resolveClaudeJsonPath'], 'claude-dir');
 
-module.exports = { resolveClaudeDir, resolveClaudeJsonPath, CLAUDE_DIR_ENV };
+export { resolveClaudeDir, resolveClaudeJsonPath, CLAUDE_DIR_ENV };

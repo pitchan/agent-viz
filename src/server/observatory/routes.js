@@ -135,4 +135,4 @@ function createObservatoryRoutes(getService) {
   ];
 }
 
-module.exports = { createObservatoryRoutes, PRICE_SOURCE };
+export { createObservatoryRoutes, PRICE_SOURCE };

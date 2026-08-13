@@ -6,10 +6,10 @@
 // module stores and reads; it holds no domain knowledge about what a churn
 // cause, a ranking or a stale recommendation means.
 
-const fs = require('fs');
-const path = require('path');
-const { DatabaseSync } = require('node:sqlite');
-const { applyMigrations } = require('./migrations');
+import fs from 'node:fs';
+import path from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
+import { applyMigrations } from './migrations.js';
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS sessions (
@@ -227,4 +227,4 @@ function openStore(dbPath) {
   };
 }
 
-module.exports = { openStore };
+export { openStore };

@@ -21,4 +21,4 @@
 // éternellement les sessions déjà en base et le correctif serait sans effet.
 const SCAN_VERSION = 7;
 
-module.exports = { SCAN_VERSION };
+export { SCAN_VERSION };

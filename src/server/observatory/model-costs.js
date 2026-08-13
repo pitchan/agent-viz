@@ -8,7 +8,7 @@
 // silently, the count travels in the result — so "sum of rows = total" stays
 // true for what is displayed.
 
-const { netOf } = require('./session-mapper');
+import { netOf } from './session-mapper.js';
 
 const emptyBucket = () =>
   ({ in: 0, out: 0, cacheCreate: 0, cacheRead: 0, cacheCreate1h: 0, cacheCreate5m: 0 });
@@ -60,4 +60,4 @@ function computeModelCosts(sessions) {
   };
 }
 
-module.exports = { computeModelCosts };
+export { computeModelCosts };

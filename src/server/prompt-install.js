@@ -3,8 +3,8 @@
 // Pure dialog: takes detection + projectRoot + io streams, returns
 // { target, scope }. No filesystem I/O, no install logic.
 
-const readline = require('node:readline');
-const { styleText } = require('node:util');
+import readline from 'node:readline';
+import { styleText } from 'node:util';
 
 const TARGET_OPTIONS = [
   { value: 'claude',  label: 'Claude Code' },
@@ -139,4 +139,4 @@ async function promptInstallParams({ detected, projectRoot, io }) {
   }
 }
 
-module.exports = { promptInstallParams, pickTargetDefault };
+export { promptInstallParams, pickTargetDefault };

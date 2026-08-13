@@ -188,4 +188,4 @@ function createWatchdogRoutes(getService) {
   ];
 }
 
-module.exports = { createWatchdogRoutes };
+export { createWatchdogRoutes };

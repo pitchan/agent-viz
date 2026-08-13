@@ -11,7 +11,7 @@
 // qu'il n'y en a eu — dans un journal en ajout seul, donc pour de bon.
 
 // ── Le bac a sable, pose AVANT le premier require de `src/server/**` ─────────
-// Meme piege, meme parade que dans watchdog-wiring.test.js, et il est ACTIF :
+// Meme piege, meme parade que dans watchdog-wiring.test.mjs, et il est ACTIF :
 // charger `src/server/routes` charge `session-index`, qui cree
 // `os.tmpdir()/agent-events` des sa lecture ; un journal sans chemin explicite
 // vit dans `os.homedir()/.agent-viz`. Sur cette machine ce sont le vrai dossier
@@ -190,6 +190,23 @@ test('traduction seulement : la route ne peut atteindre aucun autre module', () 
     'la surface HTTP du chien de garde ne depend de rien, c est ce qui la borne');
   assert.doesNotMatch(source, /\bimport\s*\(/,
     'ni par require, ni par import() — les gestionnaires sont async');
+  // La TROISIEME forme, et c est la bascule en ES modules qui la rend
+  // necessaire : dans un module ES, la forme qu une dependance prend d abord
+  // est l import STATIQUE, que ni `require(` ni `import(` ne voit. Une garde
+  // qui ne peut plus rougir sur la forme la plus probable est une garde morte
+  // (regle du motif mort). L ancre `^` en mode multiligne evite `import.meta`
+  // (pas d espace apres le mot) et la forme dynamique `import(` (deja couverte).
+  assert.doesNotMatch(source, /^\s*import[\s{*'"]/m,
+    'ni par un import statique — c est la forme qu une dependance prend en ES modules');
+  // La QUATRIEME forme. `export … from './y.js'` est une dependance statique au
+  // meme titre qu un `import` : le module charge la cible et en reexporte. Une
+  // garde qui ne la voit pas rend la revendication « ne depend de rien » d une
+  // forme trop courte — c est le meme defaut d un seul cote que la troisieme
+  // forme reparait. Le motif exige `from` APRES un `*` ou une accolade fermante,
+  // ce qui laisse passer `export { createWatchdogRoutes };` (aucun `from`),
+  // `export function`, `export const` et `export default`.
+  assert.doesNotMatch(source, /^\s*export\s*(\*(\s+as\s+[A-Za-z_$][\w$]*)?|\{[^}]*\})\s*from\s*['"]/m,
+    'ni par un export-depuis — `export … from` est une dependance statique elle aussi');
 });
 
 // ── GET /alerts ──────────────────────────────────────────────────────────────

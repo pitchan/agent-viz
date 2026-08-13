@@ -7,21 +7,21 @@
 // tokens (clearTokensTimer), transcript
 // (ensureTranscriptWatcher, ensureFirstPrompt, closeTranscriptResources).
 
-const fs = require('fs');
+import fs from 'node:fs';
 const fsp = fs.promises;
-const path = require('path');
+import path from 'node:path';
 
-const {
+import {
   sessionIndex,
   idFromPath, touchIndex,
-} = require('./session-index');
-const { broadcastSSE } = require('./sse');
-const { decodeJsonlLine } = require('./jsonl');
-const { clearTokensTimer } = require('./tokens');
-const {
+} from './session-index.js';
+import { broadcastSSE } from './sse.js';
+import { decodeJsonlLine } from './jsonl.js';
+import { clearTokensTimer } from './tokens.js';
+import {
   ensureFirstPrompt, ensureTranscriptWatcher, closeTranscriptResources,
-} = require('./transcript');
-const { getWatchdogService } = require('./watchdog');
+} from './transcript.js';
+import { getWatchdogService } from './watchdog/index.js';
 
 const watchers = new Map();
 const fileOffsets = new Map();
@@ -251,7 +251,7 @@ async function deleteSession(fp) {
   catch (err) { if (err.code !== 'ENOENT') console.error(`[event-reader] unlink summary failed: ${err.message}`); }
 }
 
-module.exports = {
+export {
   readAndBroadcast,
   watchSession, unwatchSession, isWatched,
   resetFileOffset, liveHandoffOffset,

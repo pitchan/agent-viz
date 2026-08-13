@@ -3,11 +3,11 @@
 // drop fs.watch handles for sessions older than the watch window, and the
 // initial scan-and-watch sweep at boot.
 
-const fs = require('fs');
+import fs from 'node:fs';
 const fsp = fs.promises;
-const path = require('path');
+import path from 'node:path';
 
-const {
+import {
   DIR,
   PURGE_MAX_AGE_MS, PURGE_KEEP_MAX,
   EMPTY_THRESHOLD_BYTES, EMPTY_MAX_AGE_MS,
@@ -15,13 +15,13 @@ const {
   COMPACT_THRESHOLD_BYTES, COMPACT_KEEP_EVENTS,
   sessionIndex,
   idFromPath, indexSessionInitial,
-} = require('./session-index');
-const { broadcastSessionsChanged } = require('./sse');
-const {
+} from './session-index.js';
+import { broadcastSessionsChanged } from './sse.js';
+import {
   watchSession, unwatchSession, isWatched, resetFileOffset, deleteSession,
-} = require('./event-reader');
-const { ensureTranscriptWatcher } = require('./transcript');
-const { decodeJsonlLine } = require('./jsonl');
+} from './event-reader.js';
+import { ensureTranscriptWatcher } from './transcript.js';
+import { decodeJsonlLine } from './jsonl.js';
 
 // For large files: read all events, keep the last COMPACT_KEEP_EVENTS, write a
 // companion .summary.json with session metadata, then rewrite the JSONL.
@@ -154,4 +154,4 @@ async function scanAndWatch() {
   }
 }
 
-module.exports = { compactSession, housekeep, scanAndWatch };
+export { compactSession, housekeep, scanAndWatch };

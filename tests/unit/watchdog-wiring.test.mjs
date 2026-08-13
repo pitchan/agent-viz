@@ -8,14 +8,14 @@
 // demarrage — l'instance, puis le rattrapage de ce qui s'est passe serveur
 // eteint, puis seulement le battement.
 
-const test = require('node:test');
-const { after } = require('node:test');
-const assert = require('node:assert/strict');
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
+import test from 'node:test';
+import { after } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
-// ── Le bac a sable, pose AVANT le premier require de `src/server/**` ─────────
+// ── Le bac a sable, pose AVANT le premier import de `src/server/**` ─────────
 // C'est la seule chose qui compte dans l'ordre de ce fichier. Charger
 // `event-reader` charge `session-index`, qui cree `os.tmpdir()/agent-events`
 // des sa lecture ; et un journal sans chemin explicite vit dans
@@ -33,13 +33,13 @@ process.env.TMPDIR = BAC;
 process.env.USERPROFILE = BAC;
 process.env.HOME = BAC;
 
-const { createJournal, DEFAULT_PATH } = require('../../src/server/watchdog/journal');
-const { createWatchdogService, WATCHDOG_MODULE } = require('../../src/server/watchdog/service');
-const { sseClients } = require('../../src/server/sse');
-const { DIR, sessionIndex } = require('../../src/server/session-index');
+const { createJournal, DEFAULT_PATH } = await import('../../src/server/watchdog/journal.js');
+const { createWatchdogService, WATCHDOG_MODULE } = await import('../../src/server/watchdog/service.js');
+const { sseClients } = await import('../../src/server/sse.js');
+const { DIR, sessionIndex } = await import('../../src/server/session-index.js');
 const {
   readAndBroadcast, resetFileOffset, liveHandoffOffset, unwatchSession,
-} = require('../../src/server/event-reader');
+} = await import('../../src/server/event-reader.js');
 
 // La redirection est verifiee, pas supposee : si elle ne prenait pas, tout ce
 // fichier travaillerait sur les vraies donnees de l'utilisateur en silence.
@@ -209,7 +209,7 @@ test('cablage: ce qui est diffuse est deja consigne', async () => {
 // initialisee — la precondition est verifiee plutot que supposee.
 
 test('event-reader: sans chien de garde, le flux d evenements passe quand meme', async () => {
-  const idx = require('../../src/server/watchdog');
+  const idx = await import('../../src/server/watchdog/index.js');
   assert.equal(idx.getWatchdogService(), null, 'precondition : l instance partagee n est pas encore initialisee');
 
   const recus = ecouterSSE();
@@ -259,7 +259,7 @@ test('event-reader: une ligne prefixee d un BOM en milieu de fichier atteint le 
 const journalPartage = tmpFile();
 
 test('event-reader: ce que le chien de garde voit part sur le flux, apres l evenement', async () => {
-  const idx = require('../../src/server/watchdog');
+  const idx = await import('../../src/server/watchdog/index.js');
   const journalPath = journalPartage;
   await idx.initWatchdog({ journalPath, now: HORLOGE, loadModule: moduleQuiLeveSurMarqueur });
 
@@ -310,7 +310,7 @@ test('event-reader: ce que le chien de garde voit part sur le flux, apres l even
 });
 
 test('event-reader: relire le meme fichier ne rediffuse pas l alerte', async () => {
-  const idx = require('../../src/server/watchdog');
+  const idx = await import('../../src/server/watchdog/index.js');
   assert.ok(idx.getWatchdogService(), 'precondition : le service est en place');
 
   const fp = fichierDeSession('rejeu', flotJusquAuDeclencheur());
@@ -326,7 +326,7 @@ test('event-reader: relire le meme fichier ne rediffuse pas l alerte', async () 
 });
 
 test('cablage: le rattrapage s arrete la ou le chemin vif prend la main', async () => {
-  const idx = require('../../src/server/watchdog');
+  const idx = await import('../../src/server/watchdog/index.js');
   const SP = 'sess-partage';   // une session a part : les compteurs du detecteur
                                // sont par session, et les autres tests ont deja
                                // fait boucler `sess-1`.
@@ -363,7 +363,7 @@ test('cablage: le rattrapage s arrete la ou le chemin vif prend la main', async 
 });
 
 test('cablage: la frontiere est l octet ou le vif a NOURRI, pas son curseur', async () => {
-  const idx = require('../../src/server/watchdog');
+  const idx = await import('../../src/server/watchdog/index.js');
   assert.ok(idx.getWatchdogService(), 'precondition : le service est en place');
   const SN = 'sess-nourri';
   // L1 : ecrite pendant que le serveur demarrait, AVANT que le service existe.
@@ -426,7 +426,7 @@ test('cablage: la frontiere s efface avec le watcher et avec la compaction', asy
 });
 
 test('event-reader: un detecteur qui leve se dit une fois, et le canevas continue', async () => {
-  const idx = require('../../src/server/watchdog');
+  const idx = await import('../../src/server/watchdog/index.js');
   assert.ok(idx.getWatchdogService(), 'precondition : le service est en place');
   // Sans garde, l enveloppe `catch {}` de la boucle (elle est la pour
   // JSON.parse) avalerait l exception : le chien de garde cesserait de produire
@@ -445,10 +445,9 @@ test('event-reader: un detecteur qui leve se dit une fois, et le canevas continu
 
 // ─── Le demarrage ────────────────────────────────────────────────────────────
 
-function neufIndex() {
-  const p = require.resolve('../../src/server/watchdog/index');
-  delete require.cache[p];
-  return require(p);
+let serie = 0;
+async function neufIndex() {
+  return import(`../../src/server/watchdog/index.js?neuf=${++serie}`);
 }
 
 // Un faux module de detection qui casse a l'evenement : de quoi faire lever
@@ -478,7 +477,7 @@ const moduleQuiCasseAuBattement = async () => ({
 });
 
 test('demarrage: l instance d abord, le rattrapage ensuite', async () => {
-  const idx = neufIndex();
+  const idx = await neufIndex();
   const dir = tmpDir();
   fs.writeFileSync(path.join(dir, `${SID}.jsonl`), flot());
   const journalPath = tmpFile();
@@ -496,7 +495,7 @@ test('demarrage: l instance d abord, le rattrapage ensuite', async () => {
 });
 
 test('demarrage: le rattrapage ne diffuse rien', async () => {
-  const idx = neufIndex();
+  const idx = await neufIndex();
   const dir = tmpDir();
   fs.writeFileSync(path.join(dir, `${SID}.jsonl`), flot());
   const recus = [];
@@ -511,7 +510,7 @@ test('demarrage: le rattrapage ne diffuse rien', async () => {
 });
 
 test('demarrage: la ligne rapporte le nombre relu et n en conclut rien', async () => {
-  const idx = neufIndex();
+  const idx = await neufIndex();
   const dir = tmpDir();
   fs.writeFileSync(path.join(dir, `${SID}.jsonl`), flot());
   const { valeur, dits } = await enEcoutant(() => idx.startWatchdog({
@@ -527,7 +526,7 @@ test('demarrage: la ligne rapporte le nombre relu et n en conclut rien', async (
 });
 
 test('demarrage: le battement bat, et ce qu il leve part sur le flux', async () => {
-  const idx = neufIndex();
+  const idx = await neufIndex();
   const dir = tmpDir();
   // Un seul appel, jamais termine : l'outil est encore en vol. Quatre minutes
   // plus tard — dans la bande [silenceMs, abandonedMs] — `stuck` a quelque
@@ -554,7 +553,7 @@ test('demarrage: le battement bat, et ce qu il leve part sur le flux', async () 
 });
 
 test('demarrage: le minuteur ne retient jamais le processus', async () => {
-  const idx = neufIndex();
+  const idx = await neufIndex();
   const { valeur } = await enEcoutant(() => idx.startWatchdog({
     dir: tmpDir(), broadcastAlert: () => {}, liveFrom: () => null, cadenceMs: 60_000,
     init: { journalPath: tmpFile(), now: HORLOGE },
@@ -565,7 +564,7 @@ test('demarrage: le minuteur ne retient jamais le processus', async () => {
 });
 
 test('demarrage: un rattrapage qui casse n empeche pas le serveur de demarrer', async () => {
-  const idx = neufIndex();
+  const idx = await neufIndex();
   const dir = tmpDir();
   fs.writeFileSync(path.join(dir, `${SID}.jsonl`), flot());
   // `runCatchUp` propage l'exception du detecteur, deliberement : c'est a
@@ -581,7 +580,7 @@ test('demarrage: un rattrapage qui casse n empeche pas le serveur de demarrer', 
 });
 
 test('demarrage: sans service, le battement ne tue pas le processus', async () => {
-  const idx = neufIndex();
+  const idx = await neufIndex();
   const { valeur } = await enEcoutant(() => idx.startWatchdog({
     dir: tmpDir(), broadcastAlert: () => {}, liveFrom: () => null, cadenceMs: 5,
     // Module de detection introuvable : `initWatchdog` degrade et rend null.
@@ -596,7 +595,7 @@ test('demarrage: sans service, le battement ne tue pas le processus', async () =
 });
 
 test('demarrage: un battement qui leve ne tue pas le demon, et se dit une fois', async () => {
-  const idx = neufIndex();
+  const idx = await neufIndex();
   const vraiErr = console.error;
   const vraiLog = console.log;
   const dits = [];
@@ -630,14 +629,14 @@ test('demarrage: ce que le serveur oublie de fournir se dit a voix haute', async
   // dire — et un `liveFrom` oublie ne casse rien de visible : il remet les deux
   // chemins a lire les memes octets, et le produit annonce des boucles qui n ont
   // pas eu lieu. Meme patron que `runCatchUp` devant un dossier absent.
-  const sansFrontiere = await enEcoutant(() => neufIndex().startWatchdog({
+  const sansFrontiere = await enEcoutant(async () => (await neufIndex()).startWatchdog({
     dir: tmpDir(), broadcastAlert: () => {}, cadenceMs: 60_000,
     init: { journalPath: tmpFile(), now: HORLOGE },
   }));
   clearInterval(sansFrontiere.valeur);
   assert.match(sansFrontiere.dits, /sans frontiere du chemin vif/);
 
-  const sansCanal = await enEcoutant(() => neufIndex().startWatchdog({
+  const sansCanal = await enEcoutant(async () => (await neufIndex()).startWatchdog({
     dir: tmpDir(), liveFrom: () => null, cadenceMs: 60_000,
     init: { journalPath: tmpFile(), now: HORLOGE },
   }));
@@ -645,7 +644,7 @@ test('demarrage: ce que le serveur oublie de fournir se dit a voix haute', async
   assert.match(sansCanal.dits, /sans canal de diffusion/);
 
   // Controle negatif : fournis tous les deux, le demarrage n a rien a redire.
-  const complet = await enEcoutant(() => neufIndex().startWatchdog({
+  const complet = await enEcoutant(async () => (await neufIndex()).startWatchdog({
     dir: tmpDir(), liveFrom: () => null, broadcastAlert: () => {}, cadenceMs: 60_000,
     init: { journalPath: tmpFile(), now: HORLOGE },
   }));
@@ -670,7 +669,7 @@ test('demarrage: ce que le serveur oublie de fournir se dit a voix haute', async
 //
 // Le prix assume : reformater ces lignes fait rougir ces tests. C'est le but.
 const SOURCE_SERVEUR = fs.readFileSync(
-  path.join(__dirname, '..', '..', 'src', 'server', 'server.js'), 'utf8');
+  path.join(import.meta.dirname, '..', '..', 'src', 'server', 'server.js'), 'utf8');
 
 // L'appel, et RIEN que l'appel. Un `[\s\S]*?` parti de `startWatchdog({`
 // balaierait jusqu'a la fin du fichier : n'importe quel `dir: DIR` ecrit PLUS
@@ -741,7 +740,7 @@ test('serveur: l enveloppe SSE est composee ici, et le canal n est pas broadcast
 });
 
 test('index: initWatchdog(null) ne fabrique pas une promesse rejetee', async () => {
-  const idx = neufIndex();
+  const idx = await neufIndex();
   // La destructuration des parametres est HORS du `try` de `fabriquer` : un
   // `null` litteral y produit un TypeError, donc une promesse rejetee
   // memorisee — exactement le rejet non attrape que la tache 6 avait ferme

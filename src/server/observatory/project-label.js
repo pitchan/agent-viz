@@ -64,4 +64,4 @@ function nameProjects(recs, sessions, rules) {
     : rec));
 }
 
-module.exports = { cwdOf, cwdOfReport, displayPath, projectResolver, nameProjects };
+export { cwdOf, cwdOfReport, displayPath, projectResolver, nameProjects };

@@ -38,4 +38,4 @@ function sumUsd(pairs) {
   return pairs.reduce((acc, [session, tokens]) => acc + usdForTokens(session, tokens), 0);
 }
 
-module.exports = { BYTES_PER_TOKEN, COST_BASIS, usdPerToken, usdForTokens, usdForBytes, sumUsd };
+export { BYTES_PER_TOKEN, COST_BASIS, usdPerToken, usdForTokens, usdForBytes, sumUsd };

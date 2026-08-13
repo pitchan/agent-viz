@@ -11,9 +11,9 @@
 //   never reaches the priority block — that is the price of refusing to invent
 //   a saving, and it is intended.
 
-const { COST_BASIS, sumUsd } = require('./cost');
-const { THRESHOLDS } = require('./thresholds');
-const { mcpUsageBySession } = require('../mcp-usage');
+import { COST_BASIS, sumUsd } from './cost.js';
+import { THRESHOLDS } from './thresholds.js';
+import { mcpUsageBySession } from '../mcp-usage.js';
 
 const ID = 'R2';
 const CATEGORY = 'configuration';
@@ -69,4 +69,6 @@ function evaluate(ctx) {
   return recs;
 }
 
-module.exports = { id: ID, category: CATEGORY, subjectKind: 'mcpServer', evaluate };
+const subjectKind = 'mcpServer';
+
+export { ID as id, CATEGORY as category, subjectKind, evaluate };

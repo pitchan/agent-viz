@@ -27,4 +27,4 @@ function applyCrossLinks(recs) {
     qualifies(rec) && r2Projects.has(rec.subject) ? { ...rec, action: SEE_ALSO_ACTION } : rec);
 }
 
-module.exports = { applyCrossLinks, EARLY_MCP_DOMINANCE, SEE_ALSO_ACTION };
+export { applyCrossLinks, EARLY_MCP_DOMINANCE, SEE_ALSO_ACTION };

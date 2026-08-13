@@ -4,15 +4,15 @@
 // transcript plus every sub-agent transcript (<session>/subagents/agent-*.jsonl)
 // for events that adapters convert into per-bucket token usage.
 
-const fs = require('fs');
+import fs from 'node:fs';
 const fsp = fs.promises;
-const path = require('path');
+import path from 'node:path';
 
-const { sessionIndex, idFromPath } = require('./session-index');
-const { decodeJsonlLine } = require('./jsonl');
-const { ensureTokens, scheduleTokensBroadcast, tokenSum } = require('./tokens');
-const { broadcastSessionsChanged } = require('./sse');
-const { getAdapter } = require('./transcript-adapters');
+import { sessionIndex, idFromPath } from './session-index.js';
+import { decodeJsonlLine } from './jsonl.js';
+import { ensureTokens, scheduleTokensBroadcast, tokenSum } from './tokens.js';
+import { broadcastSessionsChanged } from './sse.js';
+import { getAdapter } from './transcript-adapters/index.js';
 
 // Read the first complete line of a file, however large. Streams in chunks
 // and stops at the first '\n' — bounded by the line's length, not the file
@@ -376,14 +376,16 @@ function closeTail(tail) {
   if (tail._watchTimer) clearTimeout(tail._watchTimer);
 }
 
-module.exports = {
+// Exposed for tests:
+const _internals = {
+  readFirstLine, extractPromptFromText, parseTranscriptEvent,
+  ensureTranscriptSlice, makeTail, ensureSubagentTails, readTailDelta,
+};
+
+export {
   getTranscriptPath,
   ensureFirstPrompt,
   ensureTranscriptWatcher,
   closeTranscriptResources,
-  // Exposed for tests:
-  _internals: {
-    readFirstLine, extractPromptFromText, parseTranscriptEvent,
-    ensureTranscriptSlice, makeTail, ensureSubagentTails, readTailDelta,
-  },
+  _internals,
 };

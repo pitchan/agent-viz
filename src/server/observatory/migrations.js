@@ -22,4 +22,4 @@ function applyMigrations(db) {
   }
 }
 
-module.exports = { applyMigrations };
+export { applyMigrations };

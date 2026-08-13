@@ -39,4 +39,4 @@ const THRESHOLD_ORIGIN = Object.freeze({
   R6: Object.freeze({ maxDurationMs: 'spec', minSubagentShare: 'spec' }),
 });
 
-module.exports = { THRESHOLDS, THRESHOLD_ORIGIN };
+export { THRESHOLDS, THRESHOLD_ORIGIN };

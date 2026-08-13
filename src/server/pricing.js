@@ -19,8 +19,8 @@
 // is what only the server owns: the in-memory price map, the display metadata
 // (`label`, `maxInput`) and the LiteLLM watchdog.
 
-const https = require('https');
-const { computeCost, normalizeModel } = require('./pricing-engine');
+import https from 'node:https';
+import { computeCost, normalizeModel } from './pricing-engine.js';
 
 const LITELLM_URL = 'https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json';
 const REFRESH_MS = 24 * 60 * 60 * 1000;
@@ -300,13 +300,15 @@ function applyEnginePrices(table) {
 // par `pricing-engine.js` et l'appelle par son nom du moteur,
 // `normalizeModel` — un seul nom dans le produit, comme `CLAUDE_CONFIG_DIR`
 // après C5.
-module.exports = {
+// Exposed for tests:
+const _internals = { litellmDrift, FORBIDDEN_KEYS, MAX_BODY_BYTES };
+
+export {
   getPrice,
   loadPricing, startPricingRefresh,
   applyEnginePrices,
   onPricingDrift,
-  _FALLBACK: FALLBACK,
+  FALLBACK as _FALLBACK,
   _setPricesForTest,
-  // Exposed for tests:
-  _internals: { litellmDrift, FORBIDDEN_KEYS, MAX_BODY_BYTES },
+  _internals,
 };

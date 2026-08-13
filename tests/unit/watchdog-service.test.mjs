@@ -12,15 +12,15 @@
 // voit PAS depuis `list()`, qui lit la memoire vive : il ne se voit que dans le
 // fichier. C'est pour ca que l'idempotence est mesuree ici sur le fichier.
 
-const test = require('node:test');
-const { after } = require('node:test');
-const assert = require('node:assert/strict');
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
-const { createJournal } = require('../../src/server/watchdog/journal');
-const { createWatchdogService } = require('../../src/server/watchdog/service');
-const { catchUpFromDisk } = require('../../src/server/watchdog/catch-up');
+import test from 'node:test';
+import { after } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { createJournal } from '../../src/server/watchdog/journal.js';
+import { createWatchdogService } from '../../src/server/watchdog/service.js';
+import { catchUpFromDisk } from '../../src/server/watchdog/catch-up.js';
 
 const T = 1_700_000_000_000;
 const SID = 'sess-1';
@@ -424,10 +424,9 @@ test('catch-up: un dossier illisible se plaint, un dossier absent se tait', asyn
 // test en reprend une neuve en vidant le cache de `require`, plutot que
 // d ajouter au produit une porte de remise a zero qui n existe que pour eux.
 
-function neufIndex() {
-  const p = require.resolve('../../src/server/watchdog/index');
-  delete require.cache[p];
-  return require(p);
+let serie = 0;
+async function neufIndex() {
+  return import(`../../src/server/watchdog/index.js?neuf=${++serie}`);
 }
 
 // Un faux module de detection : il ne detecte rien, il rapporte ce que
@@ -451,7 +450,7 @@ function fauxModule(vu, casse = false) {
 }
 
 test('index: une seule instance, et getWatchdogService la rend', async () => {
-  const idx = neufIndex();
+  const idx = await neufIndex();
   assert.equal(idx.getWatchdogService(), null, 'rien avant l initialisation');
   const vu = { pendant: [], sonde: null };
   const opts = {
@@ -469,7 +468,7 @@ test('index: une seule instance, et getWatchdogService la rend', async () => {
 });
 
 test('index: deux initialisations CONCURRENTES ne font qu un seul service', async () => {
-  const idx = neufIndex();
+  const idx = await neufIndex();
   const journalPath = tmpFile();
   const opts = { journalPath, now: HORLOGE };
   // Deux `await` enchaines ne prouvent rien : la garde est franchie par le
@@ -487,7 +486,7 @@ test('index: deux initialisations CONCURRENTES ne font qu un seul service', asyn
 });
 
 test('index: un module de detection introuvable degrade, il ne tue pas le serveur', async () => {
-  const idx = neufIndex();
+  const idx = await neufIndex();
   const dir = tmpDir();
   fs.writeFileSync(path.join(dir, `${SID}.jsonl`), flot());
   const { valeur, dits } = await enEcoutant(() => idx.initWatchdog({
@@ -503,7 +502,7 @@ test('index: un module de detection introuvable degrade, il ne tue pas le serveu
 });
 
 test('index: un balayage sans dossier se plaint au lieu de passer pour un dossier vide', async () => {
-  const idx = neufIndex();
+  const idx = await neufIndex();
   await idx.initWatchdog({ journalPath: tmpFile(), now: HORLOGE });
   // `runCatchUp` n a plus de dossier par defaut : l appelant doit le nommer.
   // S il l oublie, `catchUpFromDisk` rendrait 0 sans un mot — indiscernable
@@ -516,7 +515,7 @@ test('index: un balayage sans dossier se plaint au lieu de passer pour un dossie
 test('index: le drapeau est leve pendant le rattrapage et baisse apres', async () => {
   const dir = tmpDir();
   fs.writeFileSync(path.join(dir, `${SID}.jsonl`), flot());
-  const idx = neufIndex();
+  const idx = await neufIndex();
   const vu = { pendant: [], sonde: null };
   await idx.initWatchdog({ journalPath: tmpFile(), now: HORLOGE, loadModule: fauxModule(vu) });
   assert.equal(vu.sonde(), true, 'hors rattrapage, le service observe');
@@ -529,7 +528,7 @@ test('index: le drapeau est leve pendant le rattrapage et baisse apres', async (
 test('index: le drapeau retombe meme si le balayage casse', async () => {
   const dir = tmpDir();
   fs.writeFileSync(path.join(dir, `${SID}.jsonl`), flot());
-  const idx = neufIndex();
+  const idx = await neufIndex();
   const vu = { pendant: [], sonde: null };
   await idx.initWatchdog({ journalPath: tmpFile(), now: HORLOGE, loadModule: fauxModule(vu, true) });
   await assert.rejects(() => idx.runCatchUp(dir), /detecteur casse/);
@@ -541,7 +540,7 @@ test('index: sans service, le balayage ne fait rien plutot que de casser', async
   fs.writeFileSync(path.join(dir, `${SID}.jsonl`), flot());
   // Le service est asynchrone a creer ; un demarrage qui appellerait le
   // balayage trop tot ne doit pas tomber sur un `null`.
-  assert.equal(await neufIndex().runCatchUp(dir), 0);
+  assert.equal(await (await neufIndex()).runCatchUp(dir), 0);
 });
 
 test('index: un redemarrage complet ne reconsigne pas le passe', async () => {
@@ -549,7 +548,7 @@ test('index: un redemarrage complet ne reconsigne pas le passe', async () => {
   fs.writeFileSync(path.join(dir, `${SID}.jsonl`), flot());
   const journalPath = tmpFile();
 
-  const un = neufIndex();
+  const un = await neufIndex();
   await un.initWatchdog({ journalPath, now: HORLOGE });
   assert.equal(await un.runCatchUp(dir), 10);
   assert.equal(lignes(journalPath), 1);
@@ -557,7 +556,7 @@ test('index: un redemarrage complet ne reconsigne pas le passe', async () => {
   // Serveur eteint, serveur rallume, meme dossier d evenements. Le journal
   // qu `initWatchdog` fabrique doit relire son fichier avec l horloge du
   // service, sans quoi il repart la memoire vide et ecrit tout une 2e fois.
-  const deux = neufIndex();
+  const deux = await neufIndex();
   await deux.initWatchdog({ journalPath, now: HORLOGE });
   assert.equal(await deux.runCatchUp(dir), 10);
   assert.equal(lignes(journalPath), 1, 'le passe etait deja connu');

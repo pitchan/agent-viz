@@ -1,15 +1,15 @@
 'use strict';
 // PID file + start/stop/status helpers for agent-viz.
 
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
-const http = require('http');
-const { spawn } = require('child_process');
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import http from 'node:http';
+import { spawn } from 'node:child_process';
 
 const PID_FILE = path.join(os.tmpdir(), 'agent-viz.pid');
 const LOG_FILE = path.join(os.tmpdir(), 'agent-viz.log');
-const SERVER_SCRIPT = path.join(__dirname, 'server.js');
+const SERVER_SCRIPT = path.join(import.meta.dirname, 'server.js');
 
 function readPidFile() {
   try {
@@ -180,7 +180,7 @@ async function stop() {
   return { stopped: shutdownOk || !!rec, port, viaShutdown: shutdownOk };
 }
 
-module.exports = {
+export {
   PID_FILE,
   LOG_FILE,
   status,

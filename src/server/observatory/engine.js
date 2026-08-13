@@ -16,11 +16,12 @@
 // versioned file: the build writes it (`scripts/dist-esm-marker.mjs`), and it
 // must stay shipped.
 
-const path = require('path');
-const { pathToFileURL } = require('url');
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { readFileSync } from 'node:fs';
 
-const FIXTURE_CLAUDE_DIR = path.join(__dirname, '..', '..', '..', 'tests', 'fixtures', 'observatory');
-const ENGINE_DIST = path.join(__dirname, '..', '..', '..', 'dist', 'engine');
+const FIXTURE_CLAUDE_DIR = path.join(import.meta.dirname, '..', '..', '..', 'tests', 'fixtures', 'observatory');
+const ENGINE_DIST = path.join(import.meta.dirname, '..', '..', '..', 'dist', 'engine');
 
 // Absolute file URL: the only form of dynamic import that is unambiguous from a
 // CommonJS module on Windows as well as POSIX.
@@ -38,6 +39,11 @@ async function loadEngine() {
         import(engineModule('core/index.js')),
         import(engineModule('doctor/index.js')),
       ]);
+      // BOM retire avant l analyse (constat C1, idiome de hook.js:64). Ce site
+      // est le SEUL des trois sans repli : un package.json prefixe ne rendrait
+      // pas une version fausse, il ferait echouer le chargement du moteur.
+      const pkgBrut = readFileSync(path.join(import.meta.dirname, '..', '..', '..', 'package.json'), 'utf8');
+      const pkg = JSON.parse(pkgBrut.charCodeAt(0) === 0xFEFF ? pkgBrut.slice(1) : pkgBrut);
       return {
         discoverSessions: core.discoverSessions,
         parseSince: core.parseSince,
@@ -48,7 +54,7 @@ async function loadEngine() {
         // and the real-time pill can adopt the same table (unification).
         priceTable: core.priceTable,
         // One tool, one version: the engine no longer carries its own.
-        version: require('../../../package.json').version,
+        version: pkg.version,
       };
     })().then(
       engine => { _engine = engine; _error = null; _pending = null; return engine; },
@@ -64,4 +70,4 @@ function engineStatus() {
   return { ok: _engine !== null, error: _error };
 }
 
-module.exports = { loadEngine, engineStatus, FIXTURE_CLAUDE_DIR };
+export { loadEngine, engineStatus, FIXTURE_CLAUDE_DIR };

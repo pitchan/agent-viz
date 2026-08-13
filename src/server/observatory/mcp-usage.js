@@ -31,4 +31,4 @@ function mcpUsageBySession(sessions) {
   return usage;
 }
 
-module.exports = { serverNameOf, mcpUsageBySession };
+export { serverNameOf, mcpUsageBySession };

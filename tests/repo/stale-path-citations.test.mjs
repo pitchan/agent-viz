@@ -245,10 +245,6 @@ const EXCLUS_TEST_JS = [
   // reporter node:test, pas des citations d un fichier reel. Rien a
   // proteger fragment par fragment, le fichier entier est hors sujet.
   'tests/unit/test-ids-format.test.mjs',
-  // Cite `watchdog-wiring.test.js` (l. 14) \u2014 EXACTE aujourd hui : ce
-  // fichier D13 reste sous ce nom jusqu au commit de bascule (tache 5), qui
-  // le renomme et redevient alors responsable de cette ligne.
-  'tests/unit/watchdog-routes.test.cjs',
 ];
 
 // Ancre sur un identifiant (lettres/chiffres/tiret/underscore) immediatement

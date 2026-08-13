@@ -9,24 +9,24 @@
 // Everything else (request handling, session bookkeeping, transcript
 // tailing, token tracking, file reading) lives in src/server/*.js.
 
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
+import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
+import { execSync } from 'node:child_process';
 
-const {
+import {
   DIR,
   sessionIndex,
   idFromPath,
-} = require('./session-index');
-const { broadcastSessionsChanged, broadcastSSE } = require('./sse');
-const { watchSession, liveHandoffOffset } = require('./event-reader');
-const { housekeep, scanAndWatch } = require('./housekeep');
-const { dispatch, setServer } = require('./routes');
-const { startPricingRefresh, applyEnginePrices, onPricingDrift } = require('./pricing');
-const { getObservatoryService } = require('./observatory');
-const { startWatchdog } = require('./watchdog');
-const { loadEngine } = require('./observatory/engine');
+} from './session-index.js';
+import { broadcastSessionsChanged, broadcastSSE } from './sse.js';
+import { watchSession, liveHandoffOffset } from './event-reader.js';
+import { housekeep, scanAndWatch } from './housekeep.js';
+import { dispatch, setServer } from './routes.js';
+import { startPricingRefresh, applyEnginePrices, onPricingDrift } from './pricing.js';
+import { getObservatoryService } from './observatory/index.js';
+import { startWatchdog } from './watchdog/index.js';
+import { loadEngine } from './observatory/engine.js';
 
 const PORT = process.env.PORT || 3333;
 

@@ -15,8 +15,8 @@
 //     the parent transcript as `agent_progress` events, usage nested at
 //     `evt.data.message.message.usage`.
 
-const { ensureTokens, accumulateUsage, newBucket } = require('../tokens');
-const { decodeJsonlLine } = require('../jsonl');
+import { ensureTokens, accumulateUsage, newBucket } from '../tokens.js';
+import { decodeJsonlLine } from '../jsonl.js';
 
 function discoverPath(firstEvent) {
   return (firstEvent && firstEvent.transcript_path) || null;
@@ -79,8 +79,10 @@ function parseUsageLine(line, rec) {
   return true;
 }
 
-module.exports = {
-  tokensSupported: true,
+const tokensSupported = true;
+
+export {
+  tokensSupported,
   discoverPath,
   parseUsageLine,
 };

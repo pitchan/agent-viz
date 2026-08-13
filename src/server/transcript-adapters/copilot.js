@@ -6,8 +6,10 @@
 function discoverPath() { return null; }
 function parseUsageLine() { return false; }
 
-module.exports = {
-  tokensSupported: false,
+const tokensSupported = false;
+
+export {
+  tokensSupported,
   discoverPath,
   parseUsageLine,
 };

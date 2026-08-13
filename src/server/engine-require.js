@@ -21,9 +21,12 @@
 // sous-arbre comme de l'ES alors que ce paquet-ci est en CommonJS. Ce marqueur
 // n'est plus versionné : il est écrit par le build (`scripts/dist-esm-marker.mjs`).
 
-const path = require('path');
+import path from 'node:path';
+import { createRequire } from 'node:module';
 
-const DIST = path.join(__dirname, '..', '..', 'dist', 'engine');
+const require = createRequire(import.meta.url);
+
+const DIST = path.join(import.meta.dirname, '..', '..', 'dist', 'engine');
 
 /**
  * @param {string} rel   chemin DANS le `dist` du moteur, ex. `core/jsonl.js`.
@@ -63,4 +66,4 @@ function requireEngineModule(rel, noms, etiquette) {
   return module;
 }
 
-module.exports = { requireEngineModule };
+export { requireEngineModule };

@@ -50,4 +50,4 @@ function toAnalysedSession(row) {
 
 const toAnalysedSessions = rows => rows.map(toAnalysedSession);
 
-module.exports = { mainModelOf, netOf, toSessionRow, toAnalysedSession, toAnalysedSessions };
+export { mainModelOf, netOf, toSessionRow, toAnalysedSession, toAnalysedSessions };

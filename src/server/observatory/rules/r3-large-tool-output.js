@@ -16,8 +16,8 @@
 // is an observation, not an action. Narrow scope is assumed — two pieces of
 // advice that hold beat seventeen of which fifteen are inapplicable.
 
-const { COST_BASIS, usdForBytes } = require('./cost');
-const { THRESHOLDS } = require('./thresholds');
+import { COST_BASIS, usdForBytes } from './cost.js';
+import { THRESHOLDS } from './thresholds.js';
 
 const ID = 'R3';
 const CATEGORY = 'outils';
@@ -85,4 +85,6 @@ function evaluate(ctx) {
   return recs;
 }
 
-module.exports = { id: ID, category: CATEGORY, subjectKind: 'tool', evaluate };
+const subjectKind = 'tool';
+
+export { ID as id, CATEGORY as category, subjectKind, evaluate };

@@ -14,7 +14,7 @@
 //   reported as "no longer occurring" — a fact, not a claim that anything the
 //   user did caused it (effect measurement is M3).
 
-const { COST_BASIS } = require('./cost');
+import { COST_BASIS } from './cost.js';
 
 const CONFIDENCE_WEIGHT = { fait: 1, correlation: 0.6, hypothese: 0.3 };
 const IGNORED_RETURN_FACTOR = 1.5;
@@ -59,7 +59,7 @@ function rankByBasis(recs, { lastScanAt }) {
   return { groups, stale };
 }
 
-module.exports = {
+export {
   CONFIDENCE_WEIGHT, IGNORED_RETURN_FACTOR, PRIORITY_SIZE, BASIS_ORDER,
   scoreOf, isEligible, isStale, rankByBasis,
 };

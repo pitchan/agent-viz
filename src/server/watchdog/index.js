@@ -13,9 +13,9 @@
 // ne peut pas reparer l'ecart apres coup, parce que le journal a deja relu son
 // fichier quand il lui arrive. Voir `now` ci-dessous.
 
-const { createJournal } = require('./journal');
-const { createWatchdogService } = require('./service');
-const { catchUpFromDisk } = require('./catch-up');
+import { createJournal } from './journal.js';
+import { createWatchdogService } from './service.js';
+import { catchUpFromDisk } from './catch-up.js';
 
 let _service = null;
 let _pending = null;
@@ -221,7 +221,7 @@ async function startWatchdog({ dir, broadcastAlert, liveFrom, cadenceMs = 5_000,
 // retirer la frontiere, et le double comptage revient : trois appels distincts
 // annonces comme quatre (mesure, pas hypothese). Voir `unwatchSession` dans
 // src/server/event-reader.js.
-module.exports = {
+export {
   initWatchdog, getWatchdogService, setCatchingUp, runCatchUp,
   startWatchdog,
 };
