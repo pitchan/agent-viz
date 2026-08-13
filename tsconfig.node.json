@@ -16,8 +16,8 @@
     "rewriteRelativeImportExtensions": true
   },
   // Ce projet sert au TYPECHECK, pas a l emission : `npm run typecheck:engine` le lance
-  // avec --noEmit. L emission passe par tsconfig.node.build.json, qui REMPLACE cet
-  // include par ["src/engine/**/*.ts"] et FIXE rootDir: "src/engine".
+  // avec --noEmit. L emission passe par tsconfig.node.build.json, qui configure l include
+  // et le rootDir / outDir (voir tsconfig.node.build.json pour les valeurs en cours).
   // Mesure (tsc 5.9.3, bac a sable, emission reelle sur 3 includes) : le deplacement
   // des sorties n est PAS cause par tests/**/*.ts en particulier -- il est deja present
   // avec juste vitest.config.mts dans l include (src/engine seul -> dist/engine/cli.js
