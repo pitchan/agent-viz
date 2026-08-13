@@ -11,8 +11,16 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import http from 'node:http';
 import { fileURLToPath } from 'node:url';
+
+// node:http charge par process.getBuiltinModule et non par `import` : la
+// materialisation de l'espace de noms ESM de node:http coute ~25 ms par
+// processus (mesure, doc/39, depot prive — cf. docs/sources-externes.md),
+// soit l'essentiel de la regression du chemin chaud constatee au step 9 de
+// la tache 5. getBuiltinModule rend le meme objet que require('http'), sans
+// cette materialisation, et reste synchrone (API stable, presente depuis
+// Node 22.3 ; engines dit >= 24).
+const http = process.getBuiltinModule('node:http');
 
 const DIR = path.join(os.tmpdir(), 'agent-events');
 const PORT = parseInt(process.env.AGENT_VIZ_PORT || process.env.PORT || '3333', 10);
