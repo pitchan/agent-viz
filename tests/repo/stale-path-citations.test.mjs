@@ -30,7 +30,10 @@ import path from 'node:path';
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 
 const ARBRES = ['src', 'bin', 'tests', 'scripts', 'docs'];
-const MARKDOWN_RACINE = ['ARCHITECTURE.md', 'README.md'];
+// `CLAUDE.md` ajoute au solde de la dette (2026-08-13) : l exclure d EXCLUS ne
+// suffisait pas, il n a JAMAIS ete dans l assiette — preuve par controle
+// negatif, le filet reste vert avec ses trois citations mortes encore en place.
+const MARKDOWN_RACINE = ['ARCHITECTURE.md', 'README.md', 'CLAUDE.md'];
 
 const DOSSIERS_IGNORES = new Set(['node_modules', '.git', 'dist']);
 const EXTENSIONS = new Set(['.js', '.mjs', '.cjs', '.ts', '.mts', '.tsx', '.html', '.css', '.md']);
@@ -43,14 +46,11 @@ const EXCLUS = [
   'docs/audit/',
   // Plans et specs DATES, du meme genre — et git-ignores.
   'docs/superpowers/',
-  // Interdit absolu du plan de l etape 2 : `CLAUDE.md` est `M` dans l arbre
-  // depuis avant le chantier. Il porte TROIS lignes vers l arbre mort — DEUX
-  // citations de `lib/server/routes.js` (l. 13 et 18) comme precedent du
-  // principe ouvert/ferme, et une de `lib/server/` (l. 37). DETTE ASSUMEE,
-  // inscrite au journal, a solder quand ce fichier cessera d etre une exception
-  // du `git status`.
-  'CLAUDE.md',
-  'tests/CLAUDE.md',
+  // DETTE SOLDEE (2026-08-13) : `CLAUDE.md` et `tests/CLAUDE.md` figuraient ici
+  // tant que le plan de l etape 2 interdisait d y toucher — trois citations de
+  // l arbre mort dans le premier, une citation `.test.js` d avant le step 1
+  // dans le second. Les deux sont corriges et BALAYES depuis : les retirer
+  // d ici etait la condition de solde inscrite dans ce commentaire meme.
   // Ce fichier-ci : la liste blanche cite NECESSAIREMENT ce qu elle protege, et
   // l en-tete nomme les trois racines mortes pour dire pourquoi elles le sont.
   // Se balayer soi-meme rendrait une liste blanche qui se couvre ELLE-MEME —
@@ -232,10 +232,10 @@ test('chaque entree de la liste blanche protege encore quelque chose', () => {
 // l extension plutot que sur le dossier.
 //
 // Deux listes NEUVES, posees PAR-DESSUS `fichiersBalayes()` (reutilise tel
-// quel, jamais reimplemente : lui seul sait exclure `tests/CLAUDE.md`, que
-// les Global Constraints interdisent d editer). Ni l une ni l autre ne
-// touche `EXCLUS` ni `LISTE_BLANCHE` : y ajouter changerait ce que les deux
-// tests ci-dessus prouvent (mesure).
+// quel, jamais reimplemente : lui seul porte les exclusions communes — dont,
+// jusqu au solde de la dette du 2026-08-13, `tests/CLAUDE.md`). Ni l une ni
+// l autre ne touche `EXCLUS` ni `LISTE_BLANCHE` : y ajouter changerait ce que
+// les deux tests ci-dessus prouvent (mesure).
 const EXCLUS_TEST_JS = [
   // 13 litt\u00e9raux FABRIQU\u00c9S ('a.test.js', 'b.test.js', 'c.test.js' \u2014 jamais
   // touches, Global Constraints) : donnees de test pour `formatId` et le

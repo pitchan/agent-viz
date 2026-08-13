@@ -1,5 +1,7 @@
 # CLAUDE.md — agent-viz
 
+## Interdiction de faire des fallbacks sauf si c'est strictement necessaire et utile
+
 ## Règle absolue : respect des principes SOLID de manière pragmatique pas de suringenierie
 
 Toute contribution (nouveau code, refactor, correction de bug) **doit** respecter les cinq principes SOLID. Ce n'est pas négociable et passe avant les habitudes de style ou le confort de rapidité.
@@ -10,12 +12,12 @@ Quand un changement enfreint un de ces principes, soit tu refactores autour, soi
 Un module, une classe, une fonction = **une seule raison de changer**.
 - Ne mélange pas I/O réseau, parsing, et règles métier dans la même fonction.
 - Si tu décris ce que fait une fonction et que tu utilises "et" plus d'une fois, elle est probablement à scinder.
-- Concrètement dans ce repo : un fichier de `lib/server/routes.js` ne fait pas de logique métier ; un hook ne fait pas de routing ; le parsing d'événements ne fait pas d'I/O fichier.
+- Concrètement dans ce repo : un fichier de `src/server/routes.js` ne fait pas de logique métier ; un hook ne fait pas de routing ; le parsing d'événements ne fait pas d'I/O fichier.
 
 ### O — Open/Closed Principle
 Ouvert à l'extension, fermé à la modification.
 - Pour ajouter un nouveau type d'événement, une nouvelle source d'agent (Claude / Copilot / autre), un nouveau format de hook → préfère une **table déclarative** ou un **registre/dispatch** à un nouveau `if/else` qui pousse la fonction existante vers la dette.
-- Un précédent existe déjà dans le repo : `lib/server/routes.js` table déclarative — réutilise ce pattern.
+- Un précédent existe déjà dans le repo : `src/server/routes.js` table déclarative — réutilise ce pattern.
 
 ### L — Liskov Substitution Principle
 Les sous-types doivent rester substituables à leur type parent **sans surprise comportementale**.
@@ -34,10 +36,11 @@ Les modules de haut niveau ne dépendent pas des modules de bas niveau ; les deu
 
 ## Garde-fous opérationnels
 
-- **Avant d'ajouter une dépendance, un fichier, ou une couche d'abstraction**, vérifie qu'aucun pattern existant ne couvre déjà le besoin (lis `lib/server/` avant de créer un nouveau module).
+- **Avant d'ajouter une dépendance, un fichier, ou une couche d'abstraction**, vérifie qu'aucun pattern existant ne couvre déjà le besoin (lis `src/server/` avant de créer un nouveau module).
 - **Pas d'abstraction prématurée** : SOLID ≠ sur-ingénierie. Trois lignes dupliquées peuvent rester dupliquées tant qu'elles n'ont pas une vraie raison commune de changer. La règle SRP s'applique au moment où une *deuxième raison de changer* apparaît, pas avant.
 - **Pas de fallback silencieux** ni d'`error handling` défensif pour des cas qui ne peuvent pas arriver (cf. consigne globale du repo).
 - Quand un refactor SOLID dépasse le scope du ticket en cours, **ouvre une note / TODO** — n'élargis pas une PR de bugfix en chantier de redesign sans validation explicite.
+- Si un test ne passe plus, comprend pourquoi avant de corriger quoi que ce soit
 
 ## En cas de doute
 
