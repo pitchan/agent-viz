@@ -72,14 +72,14 @@ describe('resolveClaudeDir', () => {
 // les deux branches, dans un home entierement jetable :
 //   CLAUDE_CONFIG_DIR posee     -> ecrit $CLAUDE_CONFIG_DIR/.claude.json
 //   CLAUDE_CONFIG_DIR non posee -> ecrit ~/.claude.json
-// Recoupe sur la machine reelle : C:/Users/Vincent/.claude.json existe,
-// C:/Users/Vincent/.claude/.claude.json n'existe pas.
+// Recoupe sur une machine reelle : <home>/.claude.json existe,
+// <home>/.claude/.claude.json n'existe pas.
 //
 // Le produit, lui, cherchait ce fichier au home DANS TOUS LES CAS
 // (src/server/observatory/index.js:34). Ce n'est pas une hypothese : c'est ce
-// qui fait disparaitre la carte R2 du protocole de controle de Vincent, ou
+// qui fait disparaitre la carte R2 sous le protocole de controle du depot, ou
 // USERPROFILE est jetable et CLAUDE_CONFIG_DIR reel — cout note comme « assume »
-// dans sa recette, alors que c'etait ce defaut-ci.
+// dans cette recette, alors que c'etait ce defaut-ci.
 describe('resolveClaudeJsonPath', () => {
   test('sans variable, le fichier est A COTE du dossier, pas dedans', () => {
     // Le piege exact : `path.join(resolveClaudeDir(), '.claude.json')` donnerait
