@@ -120,9 +120,6 @@ const LISTE_BLANCHE = [
   // RECITS HISTORIQUES DATES — la phrase nomme l adresse d AVANT, et la reecrire
   // la rendrait FAUSSE. Ce ne sont pas des citations perimees : ce sont des
   // citations DE la perimee.
-  { fichier: 'scripts/dist-esm-marker.mjs', fragment: '`netgain/package.json`, un fichier VERSIONNE', raison: 'la phrase dit ce que le marqueur ETAIT, et pourquoi il a change de regime' },
-  { fichier: 'tests/install/dist-marker.test.ts', fragment: "Avant l'etape 2, `netgain/package.json` etait un fichier", raison: 'idem' },
-  { fichier: 'tests/unit/dist-esm-marker.test.mjs', fragment: 'Avant la fusion, `netgain/package.json` etait un fichier VERSIONNE', raison: 'idem' },
   { fichier: 'tests/repo/documentation-citations.test.mjs', fragment: 'vers `netgain/docs/`', raison: 'constat C7 : un dossier qui n a JAMAIS existe ici — le citer est tout le propos' },
   { fichier: 'docs/sources-externes.md', fragment: 'netgain/docs/calibration-observatoire-m1.md', raison: 'constat C7, idem : l adresse morte que ce fichier existe pour remplacer' },
   { fichier: 'docs/sources-externes.md', fragment: '`netgain/docs/` tant que le moteur y', raison: 'ou vivaient ces documents dans le depot PRIVE, avant le demenagement du moteur' },

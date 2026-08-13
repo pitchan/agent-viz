@@ -22,8 +22,8 @@ afterAll(() => {
 
 beforeAll(() => {
   // `on` exige dist présent (l'entrée MCP pointe dist/) — build si absent.
-  // `npm run build` et non un `tsc` nu : le marqueur ESM de `dist/engine/`
-  // n'est plus un fichier versionné mais un effet de bord du script de build.
+  // `npm run build` et non un `tsc` nu : le script nettoie `dist/engine/`
+  // avant de compiler, pour ne jamais laisser un résidu partir dans un tarball.
   if (missingDistFiles(netgainRoot).length > 0) {
     execFileSync('npm', ['run', 'build'], { cwd: netgainRoot, shell: true });
   }

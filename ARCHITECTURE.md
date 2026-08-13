@@ -122,22 +122,16 @@ src/engine/router/     l'aiguillage du crochet
 src/engine/cli.ts      le binaire `netgain`
 ```
 
-`src/engine/package.json` ne contient que `{"type": "module"}`. Ce n'est pas un
-second paquet : c'est le marqueur qui rend ce sous-arbre ESM à l'intérieur d'une
-racine CommonJS. Il doit rester tant que la racine est CommonJS.
-
-**Son jumeau, `dist/engine/package.json`, n'est plus versionné** : `dist/` est
-généré et git-ignoré, donc le marqueur du build est **écrit par le build**
-(`scripts/dist-esm-marker.mjs`). Un invariant versionné est ainsi devenu une
-dépendance d'ordre d'exécution — d'où son entrée dans `REQUIRED_DIST`, qui fait
-qu'un `dist/engine/` sans marqueur est déclaré **incomplet** au lieu de laisser
-`netgain status` répondre ON sur une installation qui ne charge pas.
+La racine du dépôt porte `{"type": "module"}` (`package.json`) : `src/engine/`
+est ES modules directement, sans marqueur de sous-arbre à maintenir. Avant
+l'étape 3, un marqueur `{"type": "module"}` versionné rendait ce sous-arbre ESM
+à l'intérieur d'une racine CommonJS, avec un jumeau écrit par le build dans
+`dist/engine/` ; les deux ont disparu avec la racine ESM.
 
 ### 2.3 Le navigateur
 
-**28 fichiers** — 20 `.js`, 6 `.mjs`, `viz.css`, et le même marqueur
-`{"type": "module"}`. ES modules, servis tels quels en HTTP depuis `src/web/`
-(`src/server/routes.js:91`).
+**28 fichiers** — 20 `.js`, 6 `.mjs`, `viz.css`. ES modules, servis tels quels
+en HTTP depuis `src/web/` (`src/server/routes.js:91`).
 
 ```
 src/web/               viz-state · viz-canvas · viz-layout · viz-ui · viz-network
@@ -456,7 +450,7 @@ Les supprimer est toujours sans danger.
 
 | Artefact | Produit par | Reconstruit par |
 |---|---|---|
-| `dist/engine/` | `npm run build` (`tsc` **puis** l'écriture du marqueur ESM) | `npm run build` |
+| `dist/engine/` | `npm run build` (nettoyage puis `tsc`) | `npm run build` |
 | `~/.agent-viz/observatory.db` | les scans | le scan suivant |
 | `${tmpdir}/agent-events/*.jsonl` | le crochet | la session suivante |
 
@@ -527,15 +521,14 @@ qui rend la surface `node:test` au-dessus des primitives de vitest. **L'addition
 ```
 71  préexistaient au pont — pas une ligne réécrite
  1  tests/unit/node-test-bridge.test.mjs      le test du pont, écrit avec lui
- 1  tests/unit/dist-esm-marker.test.mjs       étape 2 : le marqueur ESM du build
  1  tests/repo/stale-path-citations.test.mjs  étape 2 : les trois racines mortes
  1  tests/repo/package-entrypoints.test.mjs   étape 3 : les points d'entrée déclarés
 ――
-75
+74
 ```
 
 Le test du pont a la propriété amusante de passer par ce qu'il teste dès qu'on
-l'exécute sous vitest. Les trois derniers sont nés du chantier de migration : le
+l'exécute sous vitest. Les deux derniers sont nés du chantier de migration : le
 décompte du pont **grandit à chaque fichier `node:test` neuf**, et c'est pour ça
 qu'il est écrit en addition plutôt qu'en ordinal — un ordinal ne survit pas au
 fichier suivant. *La ligne de l'étape 3 en est la démonstration : elle a été

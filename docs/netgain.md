@@ -107,16 +107,15 @@ fichier n'est jamais touché**. `netgain off` retire exactement ces deux entrée
 
 Le moteur vit dans le dépôt [agent-viz](https://github.com/pitchan/agent-viz), dossier
 `src/engine/`. Son outillage (TypeScript, vitest) est déclaré à la racine : il n'y a qu'un seul
-`npm install` et qu'un seul `package.json` de plein droit. Celui de `src/engine/` ne porte que
-`{"type":"module"}`, pour que Node lise ce sous-dossier comme des modules ES alors que le
-produit est en CommonJS. Son jumeau `dist/engine/package.json` porte la même chose du côté du
-build, et il est **écrit par le build** — `dist/` est généré et git-ignoré.
+`npm install` et qu'un seul `package.json` de plein droit. La racine du dépôt porte
+`{"type":"module"}` : `src/engine/` est déjà lu comme des modules ES, sans marqueur de
+sous-dossier à maintenir ni à écrire par le build.
 
 ```bash
 git clone https://github.com/pitchan/agent-viz.git
 cd agent-viz
 npm install
-npm run build            # tsc → dist/engine/, puis le marqueur ESM
+npm run build            # tsc → dist/engine/
 npm test                 # un seul `vitest run`, moteur et produit ensemble
 ```
 

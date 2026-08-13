@@ -11,10 +11,8 @@
 // stays handled: the live canvas view keeps working and the advisor page shows
 // the exact error.
 //
-// `dist/engine/package.json` carries `{"type":"module"}` so Node reads that
-// subtree as ESM even though this package is CommonJS. It is no longer a
-// versioned file: the build writes it (`scripts/dist-esm-marker.mjs`), and it
-// must stay shipped.
+// The package root carries `{"type":"module"}`: `dist/engine/*.js` already reads
+// as ESM, with no subtree marker to write or to ship.
 
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';

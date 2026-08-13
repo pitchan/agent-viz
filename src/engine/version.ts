@@ -5,10 +5,8 @@ import { fileURLToPath } from 'node:url';
 /**
  * Source unique de la version : le package.json du PRODUIT, à la racine du dépôt.
  * Le moteur n'est plus un paquet distinct — un seul outil, une seule version.
- * `src/engine/package.json` et `dist/engine/package.json` ne portent plus que
- * `{"type":"module"}`, d'où les deux niveaux de remontée, valables depuis
- * `src/engine/` (tsx) comme depuis `dist/engine/` : les deux dossiers sont à la
- * même profondeur sous la racine du dépôt.
+ * Deux niveaux de remontée, valables depuis `src/engine/` (tsx) comme depuis
+ * `dist/engine/` : les deux dossiers sont à la même profondeur sous la racine.
  */
 export function readPackageVersion(): string {
   const pkgPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'package.json');

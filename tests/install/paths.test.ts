@@ -62,16 +62,13 @@ describe('resolveNetgainRoot', () => {
 
 describe('missingDistFiles', () => {
   test('liste les fichiers dist requis manquants, puis se vide quand ils existent', () => {
-    expect(missingDistFiles(scratch)).toEqual(['dist/engine/cli.js', 'dist/engine/mcp/main.js', 'dist/engine/package.json']);
+    expect(missingDistFiles(scratch)).toEqual(['dist/engine/cli.js', 'dist/engine/mcp/main.js']);
 
     mkdirSync(path.join(scratch, 'dist', 'engine', 'mcp'), { recursive: true });
     writeFileSync(path.join(scratch, 'dist', 'engine', 'cli.js'), '');
-    expect(missingDistFiles(scratch)).toEqual(['dist/engine/mcp/main.js', 'dist/engine/package.json']);
+    expect(missingDistFiles(scratch)).toEqual(['dist/engine/mcp/main.js']);
 
     writeFileSync(path.join(scratch, 'dist', 'engine', 'mcp', 'main.js'), '');
-    expect(missingDistFiles(scratch)).toEqual(['dist/engine/package.json']);
-
-    writeFileSync(path.join(scratch, 'dist', 'engine', 'package.json'), '{"type":"module"}');
     expect(missingDistFiles(scratch)).toEqual([]);
   });
 });

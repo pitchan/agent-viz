@@ -39,7 +39,7 @@ export function resolveInstallPaths(repoDir: string, env: NodeJS.ProcessEnv = pr
   };
 }
 
-const REQUIRED_DIST = ['dist/engine/cli.js', 'dist/engine/mcp/main.js', 'dist/engine/package.json'];
+const REQUIRED_DIST = ['dist/engine/cli.js', 'dist/engine/mcp/main.js'];
 
 export function missingDistFiles(netgainRoot: string): string[] {
   return REQUIRED_DIST.filter((rel) => !existsSync(path.join(netgainRoot, rel)));

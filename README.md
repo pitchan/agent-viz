@@ -202,10 +202,8 @@ ships inside the published tarball. Since the 2026-08 tree merge there is a sing
 `src/server/` (the daemon, CommonJS), `src/engine/` (the engine, TypeScript ESM) and
 `src/web/` (the browser bundle, served as-is).
 
-Two `package.json` markers exist only to make those subtrees ESM inside a CommonJS package
-(`{"type":"module"}`); they must stay while the root is CommonJS. `src/engine/package.json`
-is versioned; its build-output twin `dist/engine/package.json` is **written by the build**
-(`scripts/dist-esm-marker.mjs`), since `dist/` is generated and git-ignored.
+The root package is ESM (`{"type":"module"}`), so `src/engine/` needs no subtree marker of
+its own: no `package.json` twin to keep versioned, none written by the build.
 
 ```bash
 git clone https://github.com/pitchan/agent-viz.git

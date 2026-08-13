@@ -17,9 +17,8 @@
 // module ES de façon SYNCHRONE tant qu'il n'a pas d'attente de haut niveau, et
 // `package.json` promet déjà `engines.node >= 24`. Vérifié en exécutant.
 //
-// `dist/engine/package.json` porte `{"type":"module"}`, ce qui fait lire ce
-// sous-arbre comme de l'ES alors que ce paquet-ci est en CommonJS. Ce marqueur
-// n'est plus versionné : il est écrit par le build (`scripts/dist-esm-marker.mjs`).
+// La racine du dépôt porte `{"type":"module"}` : `dist/engine/*.js` se lit déjà
+// comme de l'ES, sans marqueur de sous-arbre à écrire ni à maintenir.
 
 import path from 'node:path';
 import { createRequire } from 'node:module';
