@@ -36,8 +36,8 @@
     "status": "node bin/agent-viz.js status",
     "build": "tsc -p tsconfig.node.build.json && node scripts/dist-esm-marker.mjs",
     "test": "vitest run",
-    "test:node": "node --test \"tests/**/*.test.{cjs,mjs}\"",
-    "test:ids:node": "node --test --test-reporter=./test-support/ids/node-reporter.mjs \"tests/**/*.test.{cjs,mjs}\"",
+    "test:node": "node --import ./test-support/env-guard.mjs --test \"tests/**/*.test.{cjs,mjs}\"",
+    "test:ids:node": "node --import ./test-support/env-guard.mjs --test --test-reporter=./test-support/ids/node-reporter.mjs \"tests/**/*.test.{cjs,mjs}\"",
     "typecheck:engine": "tsc --noEmit -p tsconfig.node.json",
     "prepare": "npm run build",
     "prepublishOnly": "npm run build && npm test && npm run test:node && npm pack --dry-run"
