@@ -6,7 +6,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { computeSummary } = require('../../src/server/observatory/summary');
+const { computeSummary } = require('../../src/server/observatory/summary.ts');
 
 const session = (id, over = {}) => ({
   id, project: 'F--proj', startedAt: '2026-07-01T10:00:00.000Z', endedAt: '2026-07-01T10:30:00.000Z',

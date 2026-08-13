@@ -20,9 +20,9 @@ const os = require('os');
 
 const {
   getTranscriptPath, ensureTranscriptWatcher, closeTranscriptResources, _internals,
-} = require('../../src/server/transcript');
-const { tokensSnapshot, ensureTokens, clearTokensTimer } = require('../../src/server/tokens');
-const { sessionIndex } = require('../../src/server/session-index');
+} = require('../../src/server/transcript.ts');
+const { tokensSnapshot, ensureTokens, clearTokensTimer } = require('../../src/server/tokens.ts');
+const { sessionIndex } = require('../../src/server/session-index.ts');
 
 const { readFirstLine } = _internals;
 

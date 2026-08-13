@@ -8,7 +8,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const r6 = require('../../src/server/observatory/rules/r6-short-subagents');
+const r6 = require('../../src/server/observatory/rules/r6-short-subagents.ts');
 
 function session(id, { project = 'F--proj', startedAt = '2026-07-01T10:00:00.000Z',
   endedAt = '2026-07-01T10:02:00.000Z', spawnToolUses = 2, mainNet = 1000, subNet = 900,

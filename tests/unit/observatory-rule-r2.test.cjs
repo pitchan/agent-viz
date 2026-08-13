@@ -4,7 +4,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const r2 = require('../../src/server/observatory/rules/r2-unused-mcp');
+const r2 = require('../../src/server/observatory/rules/r2-unused-mcp.ts');
 
 function session(id, { project = 'F--proj', cwd = 'F:/DEV/proj', byTool = {}, toolsAppeared = 0,
   netTokens = 100000, costUsd = 10, costComplete = true } = {}) {

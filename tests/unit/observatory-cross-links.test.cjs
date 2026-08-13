@@ -6,7 +6,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { applyCrossLinks, SEE_ALSO_ACTION } = require('../../src/server/observatory/rules/cross-links');
+const { applyCrossLinks, SEE_ALSO_ACTION } = require('../../src/server/observatory/rules/cross-links.ts');
 
 const PRUDENT = 'Cause non journalisée : aucun geste recommandé.';
 

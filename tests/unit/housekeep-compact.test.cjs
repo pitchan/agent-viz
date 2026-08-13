@@ -32,8 +32,8 @@ process.env.TMP = RACINE;
 const { test, after } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { sessionIndex, idFromPath, COMPACT_KEEP_EVENTS } = require('../../src/server/session-index.js');
-const { compactSession } = require('../../src/server/housekeep.js');
+const { sessionIndex, idFromPath, COMPACT_KEEP_EVENTS } = require('../../src/server/session-index.ts');
+const { compactSession } = require('../../src/server/housekeep.ts');
 
 const DOSSIER = path.join(RACINE, 'agent-events');
 fs.mkdirSync(DOSSIER, { recursive: true });

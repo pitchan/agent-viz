@@ -26,5 +26,5 @@
   // suffit a deplacer toutes les sorties.
   // ETAPE 4 (2026-08-14) : rootDir pose dans tsconfig.node.build.json
   // (les tests/** et vitest.config.mts d ici interdisent un rootDir src sur CE projet).
-  "include": ["src/engine/**/*.ts", "tests/**/*.ts", "vitest.config.mts"]
+  "include": ["src/server/**/*.ts", "src/engine/**/*.ts", "tests/**/*.ts", "vitest.config.mts"]
 }

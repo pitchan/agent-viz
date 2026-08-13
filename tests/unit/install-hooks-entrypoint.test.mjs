@@ -35,7 +35,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const INSTALL_HOOKS = fileURLToPath(new URL('../../src/server/install-hooks.js', import.meta.url));
+const INSTALL_HOOKS = fileURLToPath(new URL('../../src/server/install-hooks.ts', import.meta.url));
 const PREFIXE = 'agent-viz-entrypoint-';
 
 // Sous-chaine RELEVEE de la sortie reelle (`node src/server/install-hooks.js

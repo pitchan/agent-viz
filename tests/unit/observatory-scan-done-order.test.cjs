@@ -6,7 +6,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { createObservatoryService } = require('../../src/server/observatory/service');
+const { createObservatoryService } = require('../../src/server/observatory/service.ts');
 
 test("scan broadcasts 'done' only after recommendations are stored", async () => {
   const sequence = [];

@@ -8,8 +8,8 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { TRANSCRIPT_ADAPTERS, getAdapter } = require('../../src/server/transcript-adapters');
-const { ensureTokens } = require('../../src/server/tokens');
+const { TRANSCRIPT_ADAPTERS, getAdapter } = require('../../src/server/transcript-adapters/index.ts');
+const { ensureTokens } = require('../../src/server/tokens.ts');
 
 const REQUIRED_FIELDS = {
   tokensSupported: 'boolean',

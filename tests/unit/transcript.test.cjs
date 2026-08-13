@@ -9,8 +9,8 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { _internals } = require('../../src/server/transcript');
-const { ensureTokens } = require('../../src/server/tokens');
+const { _internals } = require('../../src/server/transcript.ts');
+const { ensureTokens } = require('../../src/server/tokens.ts');
 
 const { parseTranscriptEvent } = _internals;
 

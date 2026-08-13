@@ -9,9 +9,9 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const r3 = require('../../src/server/observatory/rules/r3-large-tool-output');
-const r4 = require('../../src/server/observatory/rules/r4-cross-agent-reads');
-const r5 = require('../../src/server/observatory/rules/r5-compactions');
+const r3 = require('../../src/server/observatory/rules/r3-large-tool-output.ts');
+const r4 = require('../../src/server/observatory/rules/r4-cross-agent-reads.ts');
+const r5 = require('../../src/server/observatory/rules/r5-compactions.ts');
 
 const KB = 1024;
 

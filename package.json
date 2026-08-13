@@ -7,7 +7,7 @@
     "netgain": "dist/engine/cli.js",
     "netgain-map": "dist/engine/mcp/main.js"
   },
-  "main": "src/server/server.js",
+  "main": "src/server/server.ts",
   "type": "module",
   "engines": {
     "node": ">=24"

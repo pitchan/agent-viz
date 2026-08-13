@@ -137,7 +137,7 @@ test('les 51 fichiers de src/server hors server.js se chargent REELLEMENT, zero 
   // chargerait les 51 modules contre le vrai home, en silence. Meme controle
   // que celui de ses deux voisins, mais porte par une ASSERTION du test n. 1
   // plutot que par un troisieme test — ce plan fixe K = 2.
-  const { DIR } = requireReel(path.join(RACINE_SERVEUR, 'session-index.js'));
+  const { DIR } = requireReel(path.join(RACINE_SERVEUR, 'session-index.ts'));
   assert.ok(DIR.startsWith(BAC), `dossier d evenements hors du bac a sable : ${DIR}`);
 
   // PROPRIETE 2 — l ASSIETTE est ASSERTEE avant la boucle, et son message nomme

@@ -34,7 +34,7 @@ const assert = require('node:assert/strict');
 const {
   DIR, sessionIndex, idFromPath,
   countNewlinesStreaming, indexSessionInitial,
-} = require('../../src/server/session-index.js');
+} = require('../../src/server/session-index.ts');
 
 after(() => { fs.rmSync(RACINE, { recursive: true, force: true }); });
 

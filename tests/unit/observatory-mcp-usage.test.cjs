@@ -4,7 +4,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { serverNameOf, mcpUsageBySession } = require('../../src/server/observatory/mcp-usage');
+const { serverNameOf, mcpUsageBySession } = require('../../src/server/observatory/mcp-usage.ts');
 
 const session = (id, byTool) => ({ id, report: { toolResults: { byTool } } });
 

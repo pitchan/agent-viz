@@ -36,7 +36,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { createRequire } from 'node:module';
 
-const CIBLE = '../../src/server/observatory/index.js';
+const CIBLE = '../../src/server/observatory/index.ts';
 
 async function resoudreAvec(env: Record<string, string | undefined>) {
   vi.resetModules();
@@ -46,15 +46,15 @@ async function resoudreAvec(env: Record<string, string | undefined>) {
 
   // Les CINQ voisins d'`observatory/index.js`, bouchonnés par leur spécificateur
   // résolu depuis CE fichier — c'est ainsi que `vi.doMock` les apparie.
-  vi.doMock('../../src/server/observatory/store.js', () => ({ openStore: () => ({}) }));
-  vi.doMock('../../src/server/observatory/engine.js', () => ({ loadEngine: () => {} }));
-  vi.doMock('../../src/server/observatory/config-audit.js', () => ({
+  vi.doMock('../../src/server/observatory/store.ts', () => ({ openStore: () => ({}) }));
+  vi.doMock('../../src/server/observatory/engine.ts', () => ({ loadEngine: () => {} }));
+  vi.doMock('../../src/server/observatory/config-audit.ts', () => ({
     collectConfigItems: (_io: any, chemins: any) => { vuConfig = chemins; return []; },
   }));
-  vi.doMock('../../src/server/observatory/service.js', () => ({
+  vi.doMock('../../src/server/observatory/service.ts', () => ({
     createObservatoryService: (deps: any) => { vu = deps; deps.collectConfig(); return {}; },
   }));
-  vi.doMock('../../src/server/sse.js', () => ({ broadcastSSE: () => {} }));
+  vi.doMock('../../src/server/sse.ts', () => ({ broadcastSSE: () => {} }));
 
   const anciennes: Record<string, string | undefined> = {};
   for (const [cle, valeur] of Object.entries(env)) {
@@ -71,11 +71,11 @@ async function resoudreAvec(env: Record<string, string | undefined>) {
       if (valeur === undefined) delete process.env[cle];
       else process.env[cle] = valeur;
     }
-    vi.doUnmock('../../src/server/observatory/store.js');
-    vi.doUnmock('../../src/server/observatory/engine.js');
-    vi.doUnmock('../../src/server/observatory/config-audit.js');
-    vi.doUnmock('../../src/server/observatory/service.js');
-    vi.doUnmock('../../src/server/sse.js');
+    vi.doUnmock('../../src/server/observatory/store.ts');
+    vi.doUnmock('../../src/server/observatory/engine.ts');
+    vi.doUnmock('../../src/server/observatory/config-audit.ts');
+    vi.doUnmock('../../src/server/observatory/service.ts');
+    vi.doUnmock('../../src/server/sse.ts');
     vi.resetModules();
   }
 }
@@ -152,7 +152,7 @@ test('une variable VIDE retombe sur le home', async () => {
 // interroge le vrai chargeur, celui que le produit emploie en production.
 test('le serveur passe par la primitive du moteur, pas par sa propre expression', () => {
   const requireReel = createRequire(import.meta.url);
-  const { resolveClaudeDir, CLAUDE_DIR_ENV } = requireReel('../../src/server/claude-dir.js');
+  const { resolveClaudeDir, CLAUDE_DIR_ENV } = requireReel('../../src/server/claude-dir.ts');
   assert.strictEqual(typeof resolveClaudeDir, 'function');
   assert.strictEqual(CLAUDE_DIR_ENV, 'CLAUDE_CONFIG_DIR');
   const { resolveClaudeDir: duMoteur } = requireReel('../../dist/engine/core/claude-dir.js');

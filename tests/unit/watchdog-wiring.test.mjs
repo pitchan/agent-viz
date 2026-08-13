@@ -33,13 +33,13 @@ process.env.TMPDIR = BAC;
 process.env.USERPROFILE = BAC;
 process.env.HOME = BAC;
 
-const { createJournal, DEFAULT_PATH } = await import('../../src/server/watchdog/journal.js');
-const { createWatchdogService, WATCHDOG_MODULE } = await import('../../src/server/watchdog/service.js');
-const { sseClients } = await import('../../src/server/sse.js');
-const { DIR, sessionIndex } = await import('../../src/server/session-index.js');
+const { createJournal, DEFAULT_PATH } = await import('../../src/server/watchdog/journal.ts');
+const { createWatchdogService, WATCHDOG_MODULE } = await import('../../src/server/watchdog/service.ts');
+const { sseClients } = await import('../../src/server/sse.ts');
+const { DIR, sessionIndex } = await import('../../src/server/session-index.ts');
 const {
   readAndBroadcast, resetFileOffset, liveHandoffOffset, unwatchSession,
-} = await import('../../src/server/event-reader.js');
+} = await import('../../src/server/event-reader.ts');
 
 // La redirection est verifiee, pas supposee : si elle ne prenait pas, tout ce
 // fichier travaillerait sur les vraies donnees de l'utilisateur en silence.
@@ -209,7 +209,7 @@ test('cablage: ce qui est diffuse est deja consigne', async () => {
 // initialisee — la precondition est verifiee plutot que supposee.
 
 test('event-reader: sans chien de garde, le flux d evenements passe quand meme', async () => {
-  const idx = await import('../../src/server/watchdog/index.js');
+  const idx = await import('../../src/server/watchdog/index.ts');
   assert.equal(idx.getWatchdogService(), null, 'precondition : l instance partagee n est pas encore initialisee');
 
   const recus = ecouterSSE();
@@ -259,7 +259,7 @@ test('event-reader: une ligne prefixee d un BOM en milieu de fichier atteint le 
 const journalPartage = tmpFile();
 
 test('event-reader: ce que le chien de garde voit part sur le flux, apres l evenement', async () => {
-  const idx = await import('../../src/server/watchdog/index.js');
+  const idx = await import('../../src/server/watchdog/index.ts');
   const journalPath = journalPartage;
   await idx.initWatchdog({ journalPath, now: HORLOGE, loadModule: moduleQuiLeveSurMarqueur });
 
@@ -310,7 +310,7 @@ test('event-reader: ce que le chien de garde voit part sur le flux, apres l even
 });
 
 test('event-reader: relire le meme fichier ne rediffuse pas l alerte', async () => {
-  const idx = await import('../../src/server/watchdog/index.js');
+  const idx = await import('../../src/server/watchdog/index.ts');
   assert.ok(idx.getWatchdogService(), 'precondition : le service est en place');
 
   const fp = fichierDeSession('rejeu', flotJusquAuDeclencheur());
@@ -326,7 +326,7 @@ test('event-reader: relire le meme fichier ne rediffuse pas l alerte', async () 
 });
 
 test('cablage: le rattrapage s arrete la ou le chemin vif prend la main', async () => {
-  const idx = await import('../../src/server/watchdog/index.js');
+  const idx = await import('../../src/server/watchdog/index.ts');
   const SP = 'sess-partage';   // une session a part : les compteurs du detecteur
                                // sont par session, et les autres tests ont deja
                                // fait boucler `sess-1`.
@@ -363,7 +363,7 @@ test('cablage: le rattrapage s arrete la ou le chemin vif prend la main', async 
 });
 
 test('cablage: la frontiere est l octet ou le vif a NOURRI, pas son curseur', async () => {
-  const idx = await import('../../src/server/watchdog/index.js');
+  const idx = await import('../../src/server/watchdog/index.ts');
   assert.ok(idx.getWatchdogService(), 'precondition : le service est en place');
   const SN = 'sess-nourri';
   // L1 : ecrite pendant que le serveur demarrait, AVANT que le service existe.
@@ -426,7 +426,7 @@ test('cablage: la frontiere s efface avec le watcher et avec la compaction', asy
 });
 
 test('event-reader: un detecteur qui leve se dit une fois, et le canevas continue', async () => {
-  const idx = await import('../../src/server/watchdog/index.js');
+  const idx = await import('../../src/server/watchdog/index.ts');
   assert.ok(idx.getWatchdogService(), 'precondition : le service est en place');
   // Sans garde, l enveloppe `catch {}` de la boucle (elle est la pour
   // JSON.parse) avalerait l exception : le chien de garde cesserait de produire
@@ -447,7 +447,7 @@ test('event-reader: un detecteur qui leve se dit une fois, et le canevas continu
 
 let serie = 0;
 async function neufIndex() {
-  return import(`../../src/server/watchdog/index.js?neuf=${++serie}`);
+  return import(`../../src/server/watchdog/index.ts?neuf=${++serie}`);
 }
 
 // Un faux module de detection qui casse a l'evenement : de quoi faire lever
@@ -669,7 +669,7 @@ test('demarrage: ce que le serveur oublie de fournir se dit a voix haute', async
 //
 // Le prix assume : reformater ces lignes fait rougir ces tests. C'est le but.
 const SOURCE_SERVEUR = fs.readFileSync(
-  path.join(import.meta.dirname, '..', '..', 'src', 'server', 'server.js'), 'utf8');
+  path.join(import.meta.dirname, '..', '..', 'src', 'server', 'server.ts'), 'utf8');
 
 // L'appel, et RIEN que l'appel. Un `[\s\S]*?` parti de `startWatchdog({`
 // balaierait jusqu'a la fin du fichier : n'importe quel `dir: DIR` ecrit PLUS

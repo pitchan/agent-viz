@@ -34,10 +34,10 @@ const test = require('node:test');
 const { after } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { createWatchdogRoutes } = require('../../src/server/watchdog/routes');
-const { createJournal, DEFAULT_PATH } = require('../../src/server/watchdog/journal');
-const { DIR } = require('../../src/server/session-index');
-const { ROUTES, dispatch } = require('../../src/server/routes');
+const { createWatchdogRoutes } = require('../../src/server/watchdog/routes.ts');
+const { createJournal, DEFAULT_PATH } = require('../../src/server/watchdog/journal.ts');
+const { DIR } = require('../../src/server/session-index.ts');
+const { ROUTES, dispatch } = require('../../src/server/routes.ts');
 
 after(() => fs.rmSync(BAC, { recursive: true, force: true }));
 
@@ -168,7 +168,7 @@ test('le serveur les sert vraiment : la table de routage les porte', async () =>
 
 test('traduction seulement : la route ne peut atteindre aucun autre module', () => {
   const source = fs.readFileSync(
-    path.join(__dirname, '..', '..', 'src', 'server', 'watchdog', 'routes.js'), 'utf8');
+    path.join(__dirname, '..', '..', 'src', 'server', 'watchdog', 'routes.ts'), 'utf8');
   // Ce module n'a besoin d'AUCUNE dependance, et c'est ce qui le rend incapable
   // de rejouer le balayage de demarrage : sans acces au module de cablage, il
   // ne peut pas l'appeler. Rejoue depuis une requete, ce balayage relit ce dont

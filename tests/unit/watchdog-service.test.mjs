@@ -18,9 +18,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createJournal } from '../../src/server/watchdog/journal.js';
-import { createWatchdogService } from '../../src/server/watchdog/service.js';
-import { catchUpFromDisk } from '../../src/server/watchdog/catch-up.js';
+import { createJournal } from '../../src/server/watchdog/journal.ts';
+import { createWatchdogService } from '../../src/server/watchdog/service.ts';
+import { catchUpFromDisk } from '../../src/server/watchdog/catch-up.ts';
 
 const T = 1_700_000_000_000;
 const SID = 'sess-1';
@@ -426,7 +426,7 @@ test('catch-up: un dossier illisible se plaint, un dossier absent se tait', asyn
 
 let serie = 0;
 async function neufIndex() {
-  return import(`../../src/server/watchdog/index.js?neuf=${++serie}`);
+  return import(`../../src/server/watchdog/index.ts?neuf=${++serie}`);
 }
 
 // Un faux module de detection : il ne detecte rien, il rapporte ce que

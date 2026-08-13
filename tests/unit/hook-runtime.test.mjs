@@ -17,7 +17,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const HOOK = fileURLToPath(new URL('../../src/server/hook.js', import.meta.url));
+const HOOK = fileURLToPath(new URL('../../src/server/hook.ts', import.meta.url));
 const BOM = Buffer.from([0xef, 0xbb, 0xbf]);
 
 // Lance le crochet sur une charge donnée, dans un dossier temporaire isolé.

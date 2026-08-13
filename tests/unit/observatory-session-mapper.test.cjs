@@ -5,7 +5,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
 const { mainModelOf, toSessionRow, toAnalysedSession }
-  = require('../../src/server/observatory/session-mapper');
+  = require('../../src/server/observatory/session-mapper.ts');
 
 const report = {
   sessionId: 's1', projectSlug: 'F--proj',

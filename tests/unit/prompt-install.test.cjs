@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { pickTargetDefault } = require('../../src/server/prompt-install');
+const { pickTargetDefault } = require('../../src/server/prompt-install.ts');
 
 test('pickTargetDefault: both detected → index 2 (Both)', () => {
   assert.equal(pickTargetDefault({ claude: true, copilot: true }), 2);
@@ -20,7 +20,7 @@ test('pickTargetDefault: nothing detected → index 2 (Both, lets user pre-insta
 });
 
 const { PassThrough } = require('node:stream');
-const { promptInstallParams } = require('../../src/server/prompt-install');
+const { promptInstallParams } = require('../../src/server/prompt-install.ts');
 
 function makeMockIO() {
   const input = new PassThrough();

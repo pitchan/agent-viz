@@ -82,7 +82,7 @@ const LISTE_BLANCHE = [
 
   // FORMES HISTORIQUES RECONNUES, que le produit doit continuer de reconnaitre.
   { fichier: 'src/engine/install/hook-edit.ts', fragment: '/netgain/i.test(command)', raison: 'litteral d expression reguliere, pas un chemin' },
-  { fichier: 'src/server/install-hooks.js', fragment: 'node /abs/.../agent-viz/lib/hook.js', raison: 'une des 4 formes historiques que `isAgentVizHook` doit reconnaitre' },
+  { fichier: 'src/server/install-hooks.ts', fragment: 'node /abs/.../agent-viz/lib/hook.js', raison: 'une des 4 formes historiques que `isAgentVizHook` doit reconnaitre' },
   { fichier: 'tests/install/hook-edit.test.ts', fragment: "'node C:/vieux/netgain/dist/cli.js router-hook'", raison: 'entree perimee et etrangere DELIBEREE (3 sites)' },
   { fichier: 'tests/install/hook-edit.test.ts', fragment: "'node netgain/dist/cli.js doctor'", raison: 'entree netgain sans router-hook : doit rendre false' },
   { fichier: 'tests/install/hook-edit.test.ts', fragment: "CMD = 'node \"F:/DEV/agent-viz/netgain/dist/engine/cli.js\" router-hook'", raison: 'racine SIMULEE : le test prouve la forme de la commande, pas l adresse de ce depot' },

@@ -3,7 +3,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { newBucket, accumulateUsage } = require('../../src/server/tokens');
+const { newBucket, accumulateUsage } = require('../../src/server/tokens.ts');
 
 test('accumulateUsage cumulates totals AND tracks the last message values', () => {
   const b = newBucket();
@@ -125,7 +125,7 @@ test('accumulateUsage with an unknown model names it and marks the cost incomple
 });
 
 test('tokensSnapshot exposes tokensSupported flag (default true)', () => {
-  const { ensureTokens, tokensSnapshot } = require('../../src/server/tokens');
+  const { ensureTokens, tokensSnapshot } = require('../../src/server/tokens.ts');
   const rec = { id: 'r1' };
   ensureTokens(rec);
   const snap = tokensSnapshot(rec);
@@ -133,7 +133,7 @@ test('tokensSnapshot exposes tokensSupported flag (default true)', () => {
 });
 
 test('tokensSnapshot reports tokensSupported=false when rec.tokens.unsupported is set', () => {
-  const { ensureTokens, tokensSnapshot } = require('../../src/server/tokens');
+  const { ensureTokens, tokensSnapshot } = require('../../src/server/tokens.ts');
   const rec = { id: 'r2' };
   ensureTokens(rec);
   rec.tokens.unsupported = true;
@@ -192,7 +192,7 @@ test('accumulateUsage with different msgIds cumulates normally', () => {
 // filet est un changement qu'on ne saura pas défendre au prochain passage.
 // ---------------------------------------------------------------------------
 
-const { emptyUsageBucket } = require('../../src/server/usage');
+const { emptyUsageBucket } = require('../../src/server/usage.ts');
 
 test('C3 — le seau porte les DEUX ventilations de cache, que seul le moteur suivait', () => {
   // Arrange
@@ -284,7 +284,7 @@ test('C3 — le serveur passe par la primitive du moteur, pas par sa propre addi
 // disait — mesuré, une session de deux messages dont un inconnu affichait
 // $0.50 pour un coût réel de ~$1.00, sans la moindre réserve.
 // ---------------------------------------------------------------------------
-const { tokensMessage, ensureTokens } = require('../../src/server/tokens');
+const { tokensMessage, ensureTokens } = require('../../src/server/tokens.ts');
 
 const AT = '2026-08-11T12:00:00.000Z';
 const usage = () => ({ input_tokens: 40_000, output_tokens: 8_000, cache_read_input_tokens: 200_000 });

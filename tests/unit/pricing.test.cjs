@@ -7,14 +7,14 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
   getPrice, _FALLBACK, _setPricesForTest,
-} = require('../../src/server/pricing');
+} = require('../../src/server/pricing.ts');
 // MODIFIÉ LE 2026-08-11 PAR C4 — `computeCost` et la normalisation ne sortent
 // plus de `src/server/pricing.js` : elles avaient UNE jumelle dans le moteur,
 // les deux avaient divergé, et la définition unique vit désormais en
 // TypeScript. Ces filets suivent la fonction là où elle est, par le pont.
 // Le nom aussi change : `normalizeId` → `normalizeModel`, le nom du moteur —
 // un seul nom dans le produit, comme `CLAUDE_CONFIG_DIR` après C5.
-const { computeCost, normalizeModel } = require('../../src/server/pricing-engine');
+const { computeCost, normalizeModel } = require('../../src/server/pricing-engine.ts');
 
 test('normalizeModel strips provider prefixes and date/version suffixes', () => {
   assert.equal(normalizeModel('claude-opus-4-7'), 'claude-opus-4-7');
@@ -147,7 +147,7 @@ test('computeCost reports an unknown model as unpriced, never as a zero', () => 
 // différée de 250 ms.
 
 test('litellmDrift rejects __proto__ / constructor / prototype keys and never pollutes', () => {
-  const { _internals } = require('../../src/server/pricing');
+  const { _internals } = require('../../src/server/pricing.ts');
   const Object_proto_before = Object.prototype.toString;
   const malicious = {
     'claude-opus-4-7': {
@@ -165,7 +165,7 @@ test('litellmDrift rejects __proto__ / constructor / prototype keys and never po
 });
 
 test('FORBIDDEN_KEYS contains the dangerous property names', () => {
-  const { _internals } = require('../../src/server/pricing');
+  const { _internals } = require('../../src/server/pricing.ts');
   assert.ok(_internals.FORBIDDEN_KEYS.has('__proto__'));
   assert.ok(_internals.FORBIDDEN_KEYS.has('constructor'));
   assert.ok(_internals.FORBIDDEN_KEYS.has('prototype'));
@@ -270,7 +270,7 @@ test('computeCost with a model string honors the message date', () => {
 });
 
 test('a changed upstream tariff is REPORTED as drift, never applied to the map', () => {
-  const { _internals } = require('../../src/server/pricing');
+  const { _internals } = require('../../src/server/pricing.ts');
   const entry = {
     output_cost_per_token: 6e-5, cache_creation_input_token_cost: 2.5e-5,
     cache_read_input_token_cost: 2e-6, max_input_tokens: 1_000_000,
@@ -317,7 +317,7 @@ test('un modèle hors de la liste des zéros voulus est inconnu, sans rien journ
 });
 
 test('an identical LiteLLM feed produces zero drift', () => {
-  const { _internals } = require('../../src/server/pricing');
+  const { _internals } = require('../../src/server/pricing.ts');
   const feed = {
     'claude-opus-4-8': {
       input_cost_per_token: 5e-6, output_cost_per_token: 2.5e-5,
@@ -329,7 +329,7 @@ test('an identical LiteLLM feed produces zero drift', () => {
 });
 
 test('a new canonical Claude model absent from the embedded table is reported', () => {
-  const { _internals } = require('../../src/server/pricing');
+  const { _internals } = require('../../src/server/pricing.ts');
   const feed = {
     'claude-opus-6': {
       input_cost_per_token: 7e-6, output_cost_per_token: 3.5e-5,
@@ -348,7 +348,7 @@ test('sonnet-5 at the intro rate is NOT a drift during the launch window, IS one
   // The 2026-08-05 measurement: LiteLLM stores the intro rate as "current" —
   // same billing today, a representation difference. After 2026-09-01 the
   // embedded table switches to the sticker rate; a stale feed becomes a drift.
-  const { _internals } = require('../../src/server/pricing');
+  const { _internals } = require('../../src/server/pricing.ts');
   const feed = {
     'claude-sonnet-5': {
       input_cost_per_token: 2e-6, output_cost_per_token: 1e-5,
@@ -369,7 +369,7 @@ test('a vigil pass never touches the price map: the dated period survives', () =
   // is the intro rate, so the sticker feed is a drift by construction — and
   // confirm the dated period (intro rate, valid until 2026-09-01) is still
   // exactly what getPrice returns afterwards.
-  const { _internals } = require('../../src/server/pricing');
+  const { _internals } = require('../../src/server/pricing.ts');
   const feed = {
     'claude-sonnet-5': {
       input_cost_per_token: 3e-6, output_cost_per_token: 1.5e-5,
@@ -388,7 +388,7 @@ test('historical models and regional variants never alert', () => {
   // Decision Vincent 2026-08-05: "absent from the table" alone is not "new" —
   // historical ids (claude-opus-4-1) and un-normalized regional routing
   // variants (us./global.anthropic.) are also absent, but are not news.
-  const { _internals } = require('../../src/server/pricing');
+  const { _internals } = require('../../src/server/pricing.ts');
   const at = '2026-08-15T00:00:00.000Z';
   const feed = {
     'us.anthropic.claude-opus-4-7': {
@@ -411,7 +411,7 @@ test('historical models and regional variants never alert', () => {
 });
 
 test('a version above the family max alerts as modele-nouveau', () => {
-  const { _internals } = require('../../src/server/pricing');
+  const { _internals } = require('../../src/server/pricing.ts');
   const feed = {
     'claude-haiku-5': {
       input_cost_per_token: 1e-6, output_cost_per_token: 5e-6,
@@ -430,7 +430,7 @@ test('regional premium endpoints are different SKUs, not tariff drift', () => {
   // uniform +10% premium over the base (direct-API) tariff the embedded
   // table represents. That premium is a legitimate different SKU, not a
   // drift of the canonical model — the bare key is the only one compared.
-  const { _internals } = require('../../src/server/pricing');
+  const { _internals } = require('../../src/server/pricing.ts');
   const base = {
     input_cost_per_token: 5e-6, output_cost_per_token: 2.5e-5,
     cache_creation_input_token_cost: 6.25e-6, cache_read_input_token_cost: 5e-7,
@@ -451,7 +451,7 @@ test('regional premium endpoints are different SKUs, not tariff drift', () => {
 });
 
 test('a base-rate change on the bare key still reports drift', () => {
-  const { _internals } = require('../../src/server/pricing');
+  const { _internals } = require('../../src/server/pricing.ts');
   const feed = {
     'claude-opus-4-7': {
       input_cost_per_token: 9e-6, output_cost_per_token: 2.5e-5,
@@ -466,7 +466,7 @@ test('a base-rate change on the bare key still reports drift', () => {
 });
 
 test('a new model under several regional variants alerts exactly once', () => {
-  const { _internals } = require('../../src/server/pricing');
+  const { _internals } = require('../../src/server/pricing.ts');
   const entry = {
     input_cost_per_token: 1e-6, output_cost_per_token: 5e-6,
     cache_creation_input_token_cost: 1.25e-6, cache_read_input_token_cost: 1e-7,

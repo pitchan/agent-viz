@@ -7,9 +7,9 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { dispatch } = require('../../src/server/routes');
-const { sessionIndex } = require('../../src/server/session-index');
-const { ensureTokens } = require('../../src/server/tokens');
+const { dispatch } = require('../../src/server/routes.ts');
+const { sessionIndex } = require('../../src/server/session-index.ts');
+const { ensureTokens } = require('../../src/server/tokens.ts');
 
 // Minimal http.ServerResponse stand-in — captures status + body.
 function mockRes() {
