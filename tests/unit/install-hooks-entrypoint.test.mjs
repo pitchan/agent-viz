@@ -48,12 +48,24 @@ const SEULE_LA_BRANCHE_GARDEE = '[claude] settings :';
 
 // CHOIX DELIBERE : `import()`, JAMAIS `require()`. NE PAS « CORRIGER ».
 // La tache 8 traduit `install-hooks.js` en ESM puis REJOUE sur lui les mutations
-// de garde, et c est la que ce filet doit mordre. Or un `require()` d un module
-// ESM jette ERR_REQUIRE_ASYNC_MODULE : G2 virerait au rouge sur une migration
-// CORRECTE — un faux rouge au pire moment, dont le reflexe serait de desarmer le
-// filet plutot que d en lire le signal. `import()` charge indifferemment
-// CommonJS et ESM : un rouge de G2 signifie donc « la garde a fui », jamais
-// « le mecanisme de test a vieilli ».
+// de garde : c est la que ce filet doit mordre, et le motif du choix est l
+// UNIFORMITE, pas une panne annoncee de `require()`.
+//
+// Mesure (Node v24.15.0) : `require()` d un module ES REUSSIT s il n a pas de
+// top-level await, et jette ERR_REQUIRE_ASYNC_MODULE s il en a un. Autrement
+// dit `require()` marcherait probablement ici aujourd hui — `install-hooks.js`
+// ne porte aujourd hui aucun `await` — mais son succes dependrait d une
+// propriete du fichier MIGRE que rien dans ce plan ne garantit ni ne surveille.
+// Un filet suspendu a une propriete que personne ne verifie casse un jour sans
+// que personne ne comprenne pourquoi.
+//
+// `import()`, lui, se comporte a l IDENTIQUE sur une cible CommonJS et sur une
+// cible ES module, avant comme apres la bascule, quoi que produise la migration.
+// Un rouge de G2 y signifie donc toujours « la garde a fui », jamais « le
+// mecanisme de test a vieilli ».
+//
+// TACHE 8 : avant de t appuyer sur ce commentaire, VERIFIE par execution si ta
+// traduction ESM introduit une top-level await — ne le suppose pas.
 //
 // Le fils importe la cible par son URL `file:`. On passe par l environnement et
 // non par argv : une chaine `C:\...` passee a `import()` se lit comme un
@@ -158,9 +170,11 @@ test('G2 : importe, le module se tait — sortie 0, rien sur stdout ni stderr, r
     // « aucune sortie » et passerait — un silence de panne se lirait comme un
     // silence de bonne conduite. C est ici que la traduction en ESM doit mordre.
     // L echec vise est celui d un module REELLEMENT incapable de se charger
-    // (ERR_MODULE_NOT_FOUND). ERR_REQUIRE_ASYNC_MODULE, lui, ne doit JAMAIS
-    // apparaitre ici : il signalerait qu on a remplace l `import()` de
-    // `SOURCE_DU_FILS` par un `require()` — c est-a-dire desarme le filet.
+    // (ERR_MODULE_NOT_FOUND). ERR_REQUIRE_ASYNC_MODULE ne peut PAS apparaitre
+    // tant que le chargement passe par l `import()` de `SOURCE_DU_FILS` ; s il
+    // apparaissait, ce serait le signe qu on l a remplace par un `require()`.
+    // Attention : son ABSENCE ne prouve rien en sens inverse — un `require()`
+    // sur un module ES SANS top-level await reussit (mesure, Node v24.15.0).
     assert.equal(r.stderr, '', `stderr doit etre vide, recu : ${r.stderr}`);
     assert.equal(r.status, 0, `le fils doit sortir en 0, recu : ${r.status}`);
     assert.equal(r.stdout, '', `stdout doit etre vide, recu : ${r.stdout}`);
