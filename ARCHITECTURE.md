@@ -23,8 +23,8 @@ Les deux se soignent par la même discipline :
 > `grep` qui rend 0 » vaut mieux que « `src/web/` contient 28 fichiers ».
 
 Les décomptes qui subsistent portent le commit où ils ont été relevés. Tous ceux
-de ce document ont été **re-mesurés le 2026-08-12, à l'issue de l'étape 2 de la
-migration (v0.14.0)**, par la commande citée à côté d'eux. S'ils ont vieilli, la
+de ce document ont été **re-mesurés le 2026-08-13, à l'issue de l'étape 3 de la
+migration (v0.15.0)**, par la commande citée à côté d'eux. S'ils ont vieilli, la
 commande le dira ; c'est tout ce qu'on leur demande.
 
 Deux détails de méthode, parce qu'ils ont mordu pendant la rédaction. Les
@@ -65,8 +65,10 @@ l'avertissement du § 8.
 
 ### 2.1 Le serveur
 
-**52 fichiers** dans `src/server/`, plus le binaire, CommonJS
-(`"type": "commonjs"` à la racine).
+**52 fichiers** dans `src/server/`, plus le binaire, **ES modules** — la racine
+porte `"type": "module"` **depuis l'étape 3 de la migration**. Elle a porté
+`"type": "commonjs"` jusque-là, et c'est cette ligne unique qui commandait le
+régime des deux arbres à la fois.
 
 ```
 src/server/     hook.js · install-hooks.js · lifecycle.js · prompt-install.js · server.js
@@ -130,8 +132,20 @@ l'étape 3, un marqueur `{"type": "module"}` versionné rendait ce sous-arbre ES
 
 ### 2.3 Le navigateur
 
-**28 fichiers** — 20 `.js`, 6 `.mjs`, `viz.css`. ES modules, servis tels quels
+**27 fichiers** — 20 `.js`, 6 `.mjs`, `viz.css`. ES modules, servis tels quels
 en HTTP depuis `src/web/` (`src/server/routes.js:91`).
+
+```
+find src/web -type f | wc -l          → 27      (20 js · 6 mjs · 1 css)
+```
+
+**Le 28ᵉ était le marqueur, et il a disparu à l'étape 3.** Ce répertoire portait
+lui aussi un `package.json` de deux lignes, `{ "type": "module" }`, dont le seul
+travail était de rendre ce sous-arbre ESM sous une racine CommonJS ; la bascule
+de la racine l'a rendu inutile, comme celui du moteur. Le décompte de fichiers
+baisse donc **sans qu'aucun module disparaisse** — c'est exactement la classe
+d'erreur contre laquelle le § 0 met en garde, et elle est écrite ici plutôt que
+subie.
 
 ```
 src/web/               viz-state · viz-canvas · viz-layout · viz-ui · viz-network
@@ -208,8 +222,22 @@ echo "import fs from 'node:fs'" \
   | grep -En "^[[:space:]]*import .* from ['\"]node:"                # → 1 ligne
 ```
 
-Les six ont été **exécutées** le 2026-08-12 : les trois de gauche rendent vide
-(`exit 1`), les trois contrôles négatifs rendent chacun leur ligne (`exit 0`).
+Les six ont été **rejouées le 2026-08-13**, à l'issue de l'étape 3, et voici
+leurs six sorties — la règle survit donc au changement de régime de modules, ce
+qui n'allait pas de soi : c'est l'étape qui a réécrit les 52 fichiers du serveur.
+
+```
+1a  grep -rEn … src/engine/                          → (vide)      exit 1
+1b  echo "import x from '../../server/usage.js'" …   → 1:import x… exit 0
+2a  grep -rEn … src/web/                             → (vide)      exit 1
+2b  echo "import { addUsage } from '../../dist/…" …  → 1:import {… exit 0
+3a  grep -rEn … src/web/                             → (vide)      exit 1
+3b  echo "import fs from 'node:fs'" …                → 1:import fs… exit 0
+```
+
+Les trois de gauche rendent vide (`exit 1`), les trois contrôles négatifs rendent
+chacun leur ligne (`exit 0`). **Un zéro n'a de valeur que flanqué du un qui
+prouve que la commande sait le quitter.**
 
 **Ce que ces trois commandes NE regardent PAS.** Elles portent sur des
 **instructions d'import statiques**, et c'est délibéré (le § suivant dit pourquoi
@@ -269,12 +297,22 @@ qui le comblera.
 
 ## 4. Les traversées de frontière, mesurées
 
-Le serveur et le moteur n'ont pas le même régime de modules : CommonJS d'un
-côté, ES modules de l'autre, dans un seul paquet. **Chaque appel du serveur vers
-le moteur paie donc un droit de passage**, et ce droit est écrit quelque part.
-Il l'est en **six fichiers**, par **deux mécanismes distincts**.
+**Depuis l'étape 3, les deux unités ont le même régime de modules** — ES modules
+des deux côtés. On pourrait croire que la frontière disparaît avec lui : elle ne
+disparaît pas, elle **change de nature**. Ce que le serveur atteint n'est pas
+`src/engine/`, c'est `dist/engine/` : la frontière n'est plus *CommonJS contre
+ES modules*, elle est **source contre build**. Chaque appel du serveur vers le
+moteur paie donc toujours un droit de passage, et ce droit reste écrit en
+**six fichiers**, par **deux mécanismes distincts**. Leur retrait est daté :
+c'est l'étape 6, quand le serveur importera la source compilée directement.
 
-### 4.1 Par `require` synchrone — 5 fichiers, 171 lignes
+*Ce que la bascule a changé dans ces six fichiers est plus mince qu'on ne
+l'attendrait* : la primitive charge désormais par un `require` fabriqué
+(`createRequire(import.meta.url)`) au lieu du `require` ambiant. Elle reste
+**synchrone**, ce qui est la propriété qui compte — un `import()` aurait
+contaminé d'`await` les quatre ré-exports et leurs appelants.
+
+### 4.1 Par `require` synchrone — 5 fichiers, 173 lignes
 
 ```
 grep -rln "engine-require\|requireEngineModule" src/server
@@ -287,7 +325,7 @@ contre le premier motif serait faux d'un fichier sans avoir l'air incomplet.
 
 | Fichier | Lignes | Rôle |
 |---|---|---|
-| `src/server/engine-require.js` | 66 | **la primitive** : calcule `dist/engine`, charge, et nomme deux pannes distinctes — *build manquant* et *build périmé* |
+| `src/server/engine-require.js` | 68 | **la primitive** : calcule `dist/engine`, charge, et nomme deux pannes distinctes — *build manquant* et *build périmé* |
 | `src/server/pricing-engine.js` | 39 | ré-export : `computeCost`, `normalizeModel`, `pricingKindOf` |
 | `src/server/usage.js` | 25 | ré-export : `addUsage`, `emptyUsageBucket`, `finiteCount`, `isDedupableMsgId`, `sumUsageInto` |
 | `src/server/claude-dir.js` | 22 | ré-export : `resolveClaudeDir`, `resolveClaudeJsonPath`, `CLAUDE_DIR_ENV` |
@@ -388,8 +426,20 @@ Ils se comptent en deux temps, et les confondre fait manquer un crochet.
 | `agent-viz` | `bin/agent-viz.js` | l'utilisateur |
 | `netgain` | `dist/engine/cli.js` | l'utilisateur |
 | `netgain-map` | `dist/engine/mcp/main.js` | un client MCP |
-| `main` | `src/server/server.js` | déclaré pour `require('@vcueto/agent-viz')`, qu'aucun code connu n'appelle — mais le fichier lui-même est bien vivant : c'est le script que le démon lance (`src/server/lifecycle.js:12`) |
+| `main` | `src/server/server.js` | déclaré pour `require('@vcueto/agent-viz')`, qu'aucun code connu n'appelle — mais le fichier lui-même est bien vivant : c'est le script que le démon lance (`src/server/lifecycle.js:12`). **Ce qu'il rend a changé à l'étape 3 : voir juste sous cette table.** |
 | la page | `index.html` | le navigateur ; importe `./src/web/…` en 10 lignes |
+
+**Le régime de modules de ces points d'entrée a changé à l'étape 3, et un seul
+d'entre eux le rend visible de l'extérieur.** `bin/agent-viz.js` et
+`src/server/server.js` sont des ES modules depuis que la racine porte
+`"type": "module"` ; lancés par `node`, ils se comportent à l'identique. Mais
+`main` est aussi une **surface d'appel** : un projet CommonJS qui écrivait
+`require('@vcueto/agent-viz')` ne reçoit plus l'objet `module.exports`, il reçoit
+un **espace de noms de module figé** — y affecter une propriété est un no-op
+muet en mode non strict, mesuré. C'est la **seule** exception de comportement
+observable que l'étape 3 déclare sur le produit, et elle est écrite ici parce
+qu'aucun test ne peut l'attraper : rien, dans ce dépôt, n'appelle
+`require('@vcueto/agent-viz')`.
 
 **Un test permanent tient les quatre premières lignes de cette table**, plus
 chaque entrée du champ `files` — `tests/repo/package-entrypoints.test.mjs` : elles
@@ -459,6 +509,16 @@ reconstruire.** Le serveur charge `dist/engine/`, pas la source. C'est
 exactement le mode de panne que `engine-require.js` nomme *build périmé* — et
 c'est pour ne pas avoir à le deviner qu'il porte deux messages distincts.
 
+**Le nettoyage en tête de `build` est neuf, et il a remplacé un geste inverse.**
+Jusqu'à l'étape 3, le build **écrivait** un fichier dans `dist/engine/` — le
+marqueur `{"type": "module"}` que la racine CommonJS rendait nécessaire — et il
+ne nettoyait rien. La racine devenue ESM, ce marqueur n'a plus d'objet ; mais
+`tsc` ne vide jamais son `outDir`, si bien que le résidu serait resté sur les
+postes qui l'avaient déjà construit, et serait parti dans le tarball **en
+silence, `exit=0`** (mesuré). Le `build` efface donc `dist/engine` avant de
+compiler. C'est un **changement de comportement observable**, déclaré comme tel :
+`prepare` exécute `build` chez qui installe depuis un dépôt git.
+
 ---
 
 ## 8. Adresses
@@ -482,11 +542,11 @@ par laquelle on la montre, si. **Rouvrir le seul § 8 à l'étape 3 laisserait l
 reste mentir** — et le mensonge serait invisible, puisque chaque phrase resterait
 grammaticalement vraie.
 
-| Unité | Répertoires, au 2026-08-12 (v0.14.0) | Fichiers |
+| Unité | Répertoires, au 2026-08-13 (v0.15.0) | Fichiers |
 |---|---|---|
 | serveur | `src/server/` + `bin/` | 52 + 1 |
 | moteur | `src/engine/` → `dist/engine/` | 43 |
-| navigateur | `src/web/` | 28 |
+| navigateur | `src/web/` | 27 |
 
 **Un seul arbre `src/`, depuis l'étape 2 de la migration.** `lib/`, `public/` et
 `netgain/` n'existent plus. Un test permanent le tient —
@@ -511,29 +571,50 @@ même dossier, et c'est ce qui explique le pont ci-dessous.
 
 | Dialecte | Fichiers | Écrits en |
 |---|---|---|
-| CommonJS + ESM | 42 `.test.js` + 33 `.test.mjs` | `node:test` |
+| CommonJS + ESM | 39 `.test.cjs` + 36 `.test.mjs` | `node:test` |
 | TypeScript | 44 `.test.ts` | l'API de vitest |
+
+**L'extension dit désormais le régime, et c'est l'étape 3 qui l'a rendue
+nécessaire.** Sous une racine `"type": "module"`, un `.js` **est** un module ES :
+`require()` n'y existe plus. Les 42 `.test.js` d'avant l'étape 3 ne pouvaient
+donc pas survivre à la bascule sous ce nom — et la panne aurait été **partielle**,
+donc lisible comme « ça marche presque » : un fichier qui ne requiert que des
+modules `node:` continuait de passer. **39** d'entre eux sont devenus `.test.cjs`
+par un `git mv` pur ; les **3** derniers manipulaient `require.cache`, un
+mécanisme que le régime ESM rend inerte, et ont été réécrits en même temps que
+renommés — deux en `.test.mjs`, un en `.test.ts`.
 
 **Les 75 fichiers en `node:test` passent par un pont** (`test-support/bridge/`),
 qui rend la surface `node:test` au-dessus des primitives de vitest. **L'addition,
-écrite pour qu'on puisse la refaire :**
+écrite pour qu'on puisse la refaire — et re-dérivée à l'étape 3, où l'ancienne
+version se contredisait elle-même** (elle totalisait 74 trois lignes sous un
+« 75 » mesuré) :
 
 ```
-71  préexistaient au pont — pas une ligne réécrite
- 1  tests/unit/node-test-bridge.test.mjs      le test du pont, écrit avec lui
- 1  tests/repo/stale-path-citations.test.mjs  étape 2 : les trois racines mortes
- 1  tests/repo/package-entrypoints.test.mjs   étape 3 : les points d'entrée déclarés
+70  préexistaient au pont (v0.12.8) — pas une ligne réécrite
++2  étape 1  node-test-bridge.test.mjs · test-ids-format.test.mjs
++1  étape 2  stale-path-citations.test.mjs        les trois racines mortes
++3  étape 3  package-entrypoints.test.mjs         les points d'entrée déclarés
+             install-hooks-entrypoint.test.mjs    les gardes de point d'entrée
+             server-imports-load.test.mjs         la résolution, chargée pour de vrai
+-1  étape 3  observatory-claude-dir passe à l'API vitest : il QUITTE le pont
+±0  étape 2 crée dist-esm-marker.test.mjs, étape 3 le supprime avec son sujet
 ――
-74
+75
+```
+
+```
+grep -rlE "(require\(|from )['\"]node:test['\"]" tests | wc -l   → 75
 ```
 
 Le test du pont a la propriété amusante de passer par ce qu'il teste dès qu'on
-l'exécute sous vitest. Les deux derniers sont nés du chantier de migration : le
-décompte du pont **grandit à chaque fichier `node:test` neuf**, et c'est pour ça
-qu'il est écrit en addition plutôt qu'en ordinal — un ordinal ne survit pas au
-fichier suivant. *La ligne de l'étape 3 en est la démonstration : elle a été
-ajoutée le jour même où le fichier est né, et les quatre nombres du paragraphe
-avec elle.*
+l'exécute sous vitest. Six des sept lignes non nulles sont nées du chantier de
+migration : le décompte du pont **grandit à chaque fichier `node:test` neuf, et
+baisse quand un fichier change de dialecte** — c'est pour ça qu'il est écrit en
+addition plutôt qu'en ordinal, un ordinal ne survivant pas au fichier suivant.
+*L'étape 3 en est la démonstration : elle ajoute trois fichiers, en retire un du
+pont sans le supprimer, et en supprime un autre — quatre mouvements pour un
+total inchangé. Un ordinal, ou un total recopié, n'aurait rien vu.*
 
 Le pont est en trois fichiers, et sa forme n'est pas un choix esthétique — elle
 est imposée par le fait qu'**une seule couture ne suffit pas** :
@@ -541,8 +622,8 @@ est imposée par le fait qu'**une seule couture ne suffit pas** :
 | Fichier | Rôle |
 |---|---|
 | `create-bridge.mjs` | la **fabrique pure** : reçoit ses primitives par injection, se teste seule, ne connaît ni vitest ni `node:module` |
-| `install.mjs` | couture n° 1 : détourne `Module._load` — atteint les `require('node:test')` des **42** fichiers CommonJS |
-| `node-test-alias.mjs` | couture n° 2 : cible d'un `resolve.alias` de `vitest.config.mts` — atteint les `import … from 'node:test'` des **33** fichiers ESM |
+| `install.mjs` | couture n° 1 : détourne `Module._load` — atteint les `require('node:test')` des **39** fichiers CommonJS |
+| `node-test-alias.mjs` | couture n° 2 : cible d'un `resolve.alias` de `vitest.config.mts` — atteint les `import … from 'node:test'` des **36** fichiers ESM |
 
 La seconde ne remplace pas la première, elle s'y ajoute : la résolution ESM ne
 passe pas par le crochet CommonJS. Un pont amputé de l'une des deux laisse un
@@ -556,42 +637,59 @@ générale : il n'y a pas de `Proxy`, donc une API de `node:test` hors de cette
 liste vaudrait `undefined` sans se signaler. Étendre le filet, c'est allonger ces
 deux listes.
 
-`npm run test:node` exécute les mêmes **843** tests en `node:test` **nativement**,
+`npm run test:node` exécute les mêmes **838** tests en `node:test` **nativement**,
 sous `node --test`. Ce n'est pas une redondance : c'est la **sémantique de référence**
 à laquelle le pont est comparé. Si plus rien ne l'exerçait, elle pourrait cesser
 de passer sans que rien ne l'annonce. La publication lance les deux.
+
+**Un garde d'environnement est posé au HARNAIS, pas dans les tests** —
+`test-support/env-guard.mjs`, première entrée des `setupFiles` de vitest et
+`--import` des deux scripts `node --test`. Il détourne `HOME`, `USERPROFILE`,
+`TEMP` et `TMP` vers un bac jetable et force un port mort avant qu'une seule
+ligne de test s'exécute. Sa raison est mesurée : plusieurs tests chargent des
+modules qui, sous une garde qui lâche, écriraient dans le
+`~/.claude/settings.json` **réel** de la machine et rouvriraient la base de
+l'observatoire. Le mettre au harnais plutôt que dans chaque test **empêche** la
+fuite au lieu de la **constater** — et n'a demandé la réécriture d'aucun test.
 
 ---
 
 ## 10. Ce qui va changer
 
-Les deux régimes de modules d'un même paquet sont un héritage : le produit et le
-moteur ont d'abord vécu dans deux dépôts. Leur fusion en un seul paquet est
+Les deux régimes de modules d'un même paquet étaient un héritage : le produit et
+le moteur ont d'abord vécu dans deux dépôts. Leur fusion en un seul paquet est
 faite ; **la fusion en un seul arbre l'est aussi depuis l'étape 2** — `src/server/`,
-`src/engine/`, `src/web/`. Reste la fusion en un seul **régime de modules**, puis
-en un seul **langage** : ES modules partout à l'étape 3, TypeScript partout aux
-étapes 4 et 5.
+`src/engine/`, `src/web/` — et **la fusion en un seul régime de modules l'est
+depuis l'étape 3** : ES modules partout, une seule ligne à la racine. Reste la
+fusion en un seul **langage** : TypeScript partout aux étapes 4 et 5, puis le
+retrait des ponts à l'étape 6 et la règle de frontière typée à l'étape 7.
 
 Trois choses en découlent, et elles sont annoncées ici parce que ce document en
 est la référence :
 
 1. **Les responsabilités du § 1 ne changent pas.** Seule la table du § 8 change.
    C'est la raison pour laquelle ce document est écrit ainsi.
-2. **Les six traversées du § 4 perdent leur objet.** Un régime de modules unique
-   rend l'appel direct : `import { addUsage } from '../engine/core/usage.js'`.
-   Les cinq fichiers du § 4.1 disparaissent, et le sixième cesse de calculer un
-   chemin de build — que le module survive ensuite comme point de composition est
-   une autre question. Les 11 noms écrits à la main deviennent l'affaire du
-   compilateur, **et le douzième cesse d'être un angle mort** : `CLAUDE_DIR_ENV`
-   étant une chaîne, seul un compilateur peut le vérifier.
+2. **Les six traversées du § 4 perdront leur objet — à l'étape 6, et pas avant.**
+   L'étape 3 a fait tomber la moitié CommonJS de leur raison d'être sans les
+   faire tomber elles : elles franchissent désormais la frontière *source →
+   build* (§ 4). C'est l'écart le plus instructif de l'étape, parce qu'il était
+   annoncé à l'envers ici même — *« l'interrupteur du régime de modules fait
+   disparaître les cinq ponts »*. Il ne l'a pas fait. Quand ils tomberont,
+   l'appel deviendra direct — `import { addUsage } from '../engine/core/usage.js'` —,
+   les 11 noms écrits à la main deviendront l'affaire du compilateur, **et le
+   douzième cessera d'être un angle mort** : `CLAUDE_DIR_ENV` étant une chaîne,
+   seul un compilateur peut le vérifier.
 3. **La règle du § 3 cessera d'être une simple mesure.** Deux mécanismes s'en
    chargeront, et aucun ne couvre l'autre : le compilateur, qui refusera un
    `import` d'API Node **direct** dans le navigateur en ne lui donnant pas les
    types de Node ; et une règle de lint, qui seule voit le cas **transitif** —
    un module partagé, pur aujourd'hui, qui gagnerait un `node:` demain.
 
-**Les chemins absolus du § 6 sont les seuls points où cette fusion se verra de
-l'extérieur**, et ils ne sont pas exposés de la même façon :
+**Deux points seulement exposent cette fusion à l'extérieur, et le second est
+neuf.** Le premier est celui des chemins absolus du § 6, ci-dessous. Le second
+est ce que rend `main` à un appelant CommonJS depuis l'étape 3 — un espace de
+noms figé au lieu de `module.exports` (§ 6). Les chemins absolus ne sont pas
+exposés de la même façon selon le crochet :
 
 - le crochet du **moteur** porte toujours un chemin absolu — il casse à coup sûr ;
 - le crochet **agent-viz** ne casse que s'il a été posé en mode `absolute` ; en
