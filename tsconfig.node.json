@@ -11,7 +11,9 @@
     "sourceMap": true,
     "declaration": false,
     "outDir": "dist/engine",
-    "types": ["node"]
+    "types": ["node"],
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true
   },
   // Ce projet sert au TYPECHECK, pas a l emission : `npm run typecheck:engine` le lance
   // avec --noEmit. L emission passe par tsconfig.node.build.json, qui REMPLACE cet
@@ -22,8 +24,7 @@
   // normal ; + vitest.config.mts OU + tests/**/*.ts -> dist/engine/src/engine/cli.js
   // deplace). Ce projet n a pas de rootDir : N IMPORTE QUELLE entree hors src/engine
   // suffit a deplacer toutes les sorties.
-  // ETAPE 4 : doc/36 fait de ce projet celui de src/server + src/engine, et npm run
-  // build devient `tsc -b`. Il faudra POSER un rootDir -- sortir tests/** ne suffirait
-  // PAS, vitest.config.mts etant deja hors src/engine. A trancher a l etape 4, pas ici.
+  // ETAPE 4 (2026-08-14) : rootDir pose dans tsconfig.node.build.json
+  // (les tests/** et vitest.config.mts d ici interdisent un rootDir src sur CE projet).
   "include": ["src/engine/**/*.ts", "tests/**/*.ts", "vitest.config.mts"]
 }
