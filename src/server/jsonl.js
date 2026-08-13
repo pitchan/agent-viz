@@ -1,5 +1,5 @@
 'use strict';
-// Pont CommonJS vers la primitive de décodage JSONL du moteur — constat C2 de
+// Pont ES vers la primitive de décodage JSONL du moteur — constat C2 de
 // docs/audit-qualite-code.md (le décodage était réimplémenté sur 7 fichiers
 // serveur, avec une tolérance au blanc incidente et inégale).
 //

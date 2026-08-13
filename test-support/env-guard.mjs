@@ -105,5 +105,6 @@ if (!process.env.AGENT_VIZ_BAC_HARNAIS) {
   process.env.HOME = bac;
   process.env.TEMP = bac;
   process.env.TMP = bac;
+  process.env.TMPDIR = bac;
 }
 process.env.AGENT_VIZ_PORT = '59999';

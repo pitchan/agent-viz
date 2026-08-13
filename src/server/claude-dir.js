@@ -1,5 +1,5 @@
 'use strict';
-// Pont CommonJS vers la résolution du dossier de configuration — constat C5 de
+// Pont ES vers la résolution du dossier de configuration — constat C5 de
 // docs/audit-qualite-code.md (deux variables d'environnement désignaient le même
 // dossier dans un seul paquet npm : `CLAUDE_CONFIG_DIR` côté produit,
 // `NETGAIN_CLAUDE_DIR` côté moteur).

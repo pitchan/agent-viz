@@ -13,9 +13,10 @@
 // traversent la même frontière recréerait un fourre-tout.
 //
 // Pourquoi un `require` direct et non un `import()` asynchrone, contrairement à
-// `observatory/engine.js` : depuis Node 22.12 un module CommonJS peut charger un
-// module ES de façon SYNCHRONE tant qu'il n'a pas d'attente de haut niveau, et
-// `package.json` promet déjà `engines.node >= 24`. Vérifié en exécutant.
+// `observatory/engine.js` : ce fichier est lui-même un module ES (import/export),
+// mais depuis Node 22.12 le `require` qu'il obtient via `createRequire` peut
+// charger un module ES de façon SYNCHRONE tant qu'il n'a pas d'attente de haut
+// niveau, et `package.json` promet déjà `engines.node >= 24`. Vérifié en exécutant.
 //
 // La racine du dépôt porte `{"type":"module"}` : `dist/engine/*.js` se lit déjà
 // comme de l'ES, sans marqueur de sous-arbre à écrire ni à maintenir.

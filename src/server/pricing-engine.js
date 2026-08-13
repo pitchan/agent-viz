@@ -1,5 +1,5 @@
 'use strict';
-// Pont CommonJS vers la tarification du moteur — constat C4 de
+// Pont ES vers la tarification du moteur — constat C4 de
 // docs/audit-qualite-code.md (le contrat de résultat pour un modèle inconnu
 // divergeait : `{ usd: null, known: false }` côté moteur, un message
 // silencieusement IGNORÉ côté serveur, et aucune information de complétude

@@ -1,6 +1,6 @@
 'use strict';
-// Boundary to the netgain analysis engine (ESM, loaded from CommonJS via
-// dynamic import). This is the ONLY module that knows where the engine lives —
+// Boundary to the netgain analysis engine (ESM), loaded via dynamic import.
+// This is the ONLY module that knows where the engine lives —
 // everything downstream receives the engine as a parameter, so rules and
 // orchestration stay testable without it.
 //
@@ -21,8 +21,8 @@ import { readFileSync } from 'node:fs';
 const FIXTURE_CLAUDE_DIR = path.join(import.meta.dirname, '..', '..', '..', 'tests', 'fixtures', 'observatory');
 const ENGINE_DIST = path.join(import.meta.dirname, '..', '..', '..', 'dist', 'engine');
 
-// Absolute file URL: the only form of dynamic import that is unambiguous from a
-// CommonJS module on Windows as well as POSIX.
+// Absolute file URL: the only form of dynamic import that is unambiguous on
+// Windows as well as POSIX.
 const engineModule = rel => pathToFileURL(path.join(ENGINE_DIST, rel)).href;
 
 let _engine = null;

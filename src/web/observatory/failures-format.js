@@ -14,7 +14,7 @@
 // Meme convention que src/server/observatory/project-label.js : la lettre de
 // lecteur en majuscule, parce que Windows ignore la casse et que le libelle ne
 // doit pas suivre celle du terminal qui a lance la derniere session. Le module
-// serveur n'est pas reutilisable ici — il est CommonJS et prend des sessions,
+// serveur n'est pas reutilisable ici — il prend des sessions,
 // pas un chemin nu.
 export function projectLabel(cwd) {
   if (!cwd) return 'projet inconnu';

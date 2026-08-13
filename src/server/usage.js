@@ -1,5 +1,5 @@
 'use strict';
-// Pont CommonJS vers la primitive d'accumulation d'usage du moteur — constat C3
+// Pont ES vers la primitive d'accumulation d'usage du moteur — constat C3
 // de docs/audit-qualite-code.md (l'accumulation des jetons était réimplémentée
 // côté serveur et côté moteur, avec deux jeux de gardes qui n'étaient pas
 // équivalents malgré ce que la fiche en disait).
