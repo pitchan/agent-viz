@@ -17,9 +17,9 @@ import { fileURLToPath } from 'node:url';
 // materialisation de l'espace de noms ESM de node:http coute ~25 ms par
 // processus (mesure, doc/39, depot prive — cf. docs/sources-externes.md),
 // soit l'essentiel de la regression du chemin chaud constatee au step 9 de
-// la tache 5. getBuiltinModule rend le meme objet que require('http'), sans
-// cette materialisation, et reste synchrone (API stable, presente depuis
-// Node 22.3 ; engines dit >= 24).
+// la tache 5. getBuiltinModule rend le meme objet que l ancien chargement
+// CommonJS, sans cette materialisation, et reste synchrone (API stable,
+// presente depuis Node 22.3 ; engines dit >= 24).
 const http = process.getBuiltinModule('node:http');
 
 const DIR = path.join(os.tmpdir(), 'agent-events');

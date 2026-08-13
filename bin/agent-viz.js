@@ -20,12 +20,12 @@ import { pathToFileURL } from 'node:url';
 
 const PKG_ROOT = path.resolve(import.meta.dirname, '..');
 let PKG_VERSION = '0.0.0';
-// Le BOM est retire AVANT l analyse : `require()` d un .json le faisait, pas
-// `JSON.parse`. Sans ce retrait, un package.json prefixe par un writer Windows
-// ferait retomber la version sur '0.0.0' EN SILENCE — meme famille que le
-// constat C1, et meme idiome que src/server/hook.js:64 : le BOM se compare par
-// CODE de caractere, jamais par un motif qui le contient, un BOM litteral dans
-// le source etant invisible a la relecture.
+// Le BOM est retire AVANT l analyse : l ancien chargeur CommonJS d un .json
+// le faisait, pas `JSON.parse`. Sans ce retrait, un package.json prefixe par
+// un writer Windows ferait retomber la version sur '0.0.0' EN SILENCE — meme
+// famille que le constat C1, et meme idiome que src/server/hook.js:73 : le BOM
+// se compare par CODE de caractere, jamais par un motif qui le contient, un BOM
+// litteral dans le source etant invisible a la relecture.
 try {
   const brut = fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8');
   PKG_VERSION = JSON.parse(brut.charCodeAt(0) === 0xFEFF ? brut.slice(1) : brut).version || '0.0.0';
