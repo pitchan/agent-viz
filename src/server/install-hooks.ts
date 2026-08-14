@@ -18,6 +18,83 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 
+// ── Types ──
+//
+// Vocabulaire commun à ce fichier : les settings Claude Code et le fichier de
+// hooks Copilot ne sont typés que sur ce que CE fichier lit/écrit réellement —
+// une index signature ouverte tolère le reste (un settings.json porte bien
+// d'autres clés que `hooks`).
+
+type AgentName = 'claude' | 'copilot';
+type Scope = 'user' | 'project' | 'local';
+
+interface HookCommand {
+  type: string;
+  command?: string;
+  timeout?: number;
+  [key: string]: unknown;
+}
+interface HookEntry {
+  hooks?: HookCommand[];
+  [key: string]: unknown;
+}
+interface ClaudeSettings {
+  hooks?: Record<string, HookEntry[]>;
+  [key: string]: unknown;
+}
+
+interface CopilotHookEntry {
+  type: string;
+  bash?: string;
+  powershell?: string;
+  timeoutSec?: number;
+  [key: string]: unknown;
+}
+interface CopilotHooksFile {
+  version: number;
+  hooks: Record<string, CopilotHookEntry[]>;
+}
+
+interface AgentConfigEntry {
+  events: string[];
+  userFile: () => string;
+  projectFile: (root: string) => string;
+  localFile: (root: string) => string;
+  gitignoreEntry: string;
+}
+
+interface ResolvedTarget {
+  scope: Scope;
+  file: string;
+  projectRoot: string | null;
+}
+
+interface ResolvedCommand {
+  command: string;
+  mode: 'absolute' | 'npx';
+  path?: string;
+  spec?: string;
+}
+
+// Le sac d'options partagé par toute l'API haut niveau (`auditClaude`,
+// `installClaude`, `findInstalledScopes`, `dispatch`, `install`, …) — un seul
+// type, réutilisé bien au-delà de la deuxième occurrence (précédent du dépôt),
+// parce que ce sont toutes des variations du MÊME sac.
+interface AgentOpts {
+  scope?: Scope;
+  cwd?: string;
+  packageRoot?: string;
+  version?: string;
+  agent?: AgentName;
+  target?: string;
+}
+
+// Un objet exploitable par accès de champ — même garde locale que les autres
+// fichiers du serveur : `JSON.parse` ne promet qu'un JSON valide, pas un objet.
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
 // Per-event timeout written into agent settings. Must stay > 1 s (Windows node
 // + AV cold start) and > the in-process safety net in src/server/hook.js so the safety
 // fires *before* the agent kills us. Bumped from 5 s → 10 s when the safety
@@ -35,7 +112,7 @@ const HOOK_TIMEOUT_SEC = 10;
 // tiers un nom d'evenement qu'on n'a pas mesure, c'est lui faire porter un
 // risque qu'on n'a pas evalue — chaque agent ne recoit donc que ce qu'on lui
 // a constate.
-const AGENT_CONFIG = {
+const AGENT_CONFIG: Record<AgentName, AgentConfigEntry> = {
   claude: {
     // PostToolUseFailure est le SEUL endroit ou un outil en erreur se signale :
     // PostToolUse ne se declenche que sur un succes. Sans cet abonnement, une
@@ -56,21 +133,21 @@ const AGENT_CONFIG = {
   },
 };
 
-function eventsFor(agent) {
+function eventsFor(agent: AgentName): string[] {
   return AGENT_CONFIG[agent].events;
 }
 
 // Retro-compat : l'export public `EVENTS` a toujours designe les evenements de
 // Claude Code. Il continue de le faire.
-const EVENTS = AGENT_CONFIG.claude.events;
+const EVENTS: string[] = AGENT_CONFIG.claude.events;
 
 // Match three forms used historically + currently:
 //   1. node /abs/.../agent-viz/hook.js              (legacy)
 //   2. node /abs/.../agent-viz/lib/hook.js          (path-style after refactor)
 //   3. node /abs/.../agent-viz/bin/agent-viz.js hook (absolute bin-style)
 //   4. agent-viz hook  /  npx @vcueto/agent-viz@X.Y.Z hook   (npx-style)
-function isAgentVizHook(h) {
-  if (!h || h.type !== 'command' || typeof h.command !== 'string') return false;
+function isAgentVizHook(h: unknown): boolean {
+  if (!isRecord(h) || h.type !== 'command' || typeof h.command !== 'string') return false;
   const cmd = h.command.replace(/\\/g, '/');
   if (!cmd.includes('agent-viz')) return false;
   return /\/hook\.js(["'\s]|$)/.test(cmd)
@@ -81,26 +158,27 @@ function isAgentVizHook(h) {
 // (node "<path>" hook  OR  npx ... agent-viz... hook). We only auto-update
 // stale entries that match this shape, so we never overwrite a hand-rolled
 // wrapper command the user added on purpose.
-function isStandardShape(cmd) {
+function isStandardShape(cmd: unknown): boolean {
   if (typeof cmd !== 'string') return false;
   const trimmed = cmd.trim();
   return /^node\s+["']/.test(trimmed) || /^npx\s/.test(trimmed);
 }
 
-function readSettings(file) {
+function readSettings(file: string): ClaudeSettings {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); }
-  catch (e) {
-    if (e.code === 'ENOENT') return {};
-    throw new Error(`${file} invalide : ${e.message}`);
+  catch (e: unknown) {
+    if (e instanceof Error && 'code' in e && e.code === 'ENOENT') return {};
+    const message = e instanceof Error ? e.message : String(e);
+    throw new Error(`${file} invalide : ${message}`);
   }
 }
 
-function writeSettings(file, settings) {
+function writeSettings(file: string, settings: ClaudeSettings): void {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, JSON.stringify(settings, null, 2) + '\n');
 }
 
-function hasHookForEvent(settings, event) {
+function hasHookForEvent(settings: ClaudeSettings, event: string): boolean {
   const entries = settings.hooks?.[event] || [];
   return entries.some(entry => (entry.hooks || []).some(isAgentVizHook));
 }
@@ -114,7 +192,9 @@ function hasHookForEvent(settings, event) {
 //     others:  number    — count of non-agent-viz hooks on the same event
 //                          (these will run in parallel with ours)
 //   }
-function inspectEvent(settings, event, desiredCommand, desiredTimeout = HOOK_TIMEOUT_SEC) {
+function inspectEvent(
+  settings: ClaudeSettings, event: string, desiredCommand: string | undefined, desiredTimeout: number = HOOK_TIMEOUT_SEC,
+): { present: boolean; stale: boolean; others: number } {
   const entries = settings.hooks?.[event] || [];
   let present = false;
   let stale = false;
@@ -135,7 +215,9 @@ function inspectEvent(settings, event, desiredCommand, desiredTimeout = HOOK_TIM
   return { present, stale, others };
 }
 
-function auditSettings(settings, desiredCommand) {
+function auditSettings(
+  settings: ClaudeSettings, desiredCommand: string | undefined,
+): Array<{ event: string; installed: boolean; stale: boolean; others: number }> {
   return EVENTS.map(ev => {
     const info = inspectEvent(settings, ev, desiredCommand);
     return { event: ev, installed: info.present, stale: info.stale, others: info.others };
@@ -146,7 +228,9 @@ function auditSettings(settings, desiredCommand) {
 // `event` to the desired values. Custom-wrapper commands (non-standard shape)
 // are left alone — user explicitly added them. Returns the count of entries
 // actually mutated.
-function refreshStaleCommand(settings, event, desiredCommand, desiredTimeout = HOOK_TIMEOUT_SEC) {
+function refreshStaleCommand(
+  settings: ClaudeSettings, event: string, desiredCommand: string, desiredTimeout: number = HOOK_TIMEOUT_SEC,
+): number {
   const entries = settings.hooks?.[event] || [];
   let updated = 0;
   for (const entry of entries) {
@@ -162,26 +246,35 @@ function refreshStaleCommand(settings, event, desiredCommand, desiredTimeout = H
   return updated;
 }
 
-function addHook(settings, event, command) {
-  settings.hooks ??= {};
-  settings.hooks[event] ??= [];
-  settings.hooks[event].push({
+function addHook(settings: ClaudeSettings, event: string, command: string): void {
+  // `??=` sur une propriété/un accès indexé : la LECTURE qui suit resterait
+  // `HookEntry[] | undefined` pour TypeScript (la narrowing par assignation ne
+  // traverse pas un accès indexé) — `??` + affectation rend la valeur finale
+  // directement, sans changer ce qui est réellement écrit sur `settings`.
+  const hooks = settings.hooks ?? (settings.hooks = {});
+  const list = hooks[event] ?? (hooks[event] = []);
+  list.push({
     hooks: [{ type: 'command', command, timeout: HOOK_TIMEOUT_SEC }],
   });
 }
 
-function removeHook(settings, event) {
+function removeHook(settings: ClaudeSettings, event: string): number {
   const arr = settings.hooks?.[event];
   if (!arr) return 0;
   let removed = 0;
-  const kept = [];
+  const kept: HookEntry[] = [];
   for (const entry of arr) {
     const filtered = (entry.hooks || []).filter(h => !isAgentVizHook(h));
     if (filtered.length !== (entry.hooks || []).length) removed++;
     if (filtered.length > 0) kept.push({ ...entry, hooks: filtered });
   }
-  if (kept.length === 0) delete settings.hooks[event];
-  else settings.hooks[event] = kept;
+  // `arr` vient de `settings.hooks?.[event]` et n'est pas `undefined` (garde
+  // ci-dessus) : `settings.hooks` lui-même l'est donc forcément aussi, mais
+  // l'accès indexé qui a produit `arr` ne le fait pas SAVOIR à TypeScript ici.
+  if (settings.hooks) {
+    if (kept.length === 0) delete settings.hooks[event];
+    else settings.hooks[event] = kept;
+  }
   return removed;
 }
 
@@ -193,7 +286,9 @@ function removeHook(settings, event) {
 // the agent-viz package root never counts either (auto-install ran from
 // inside the agent-viz checkout would otherwise scope hooks to the repo
 // itself, useful to nobody). Both skips fall through to user scope.
-function findProjectRoot(cwd, { packageRoot, homedir = os.homedir() } = {}) {
+function findProjectRoot(
+  cwd: string, { packageRoot, homedir = os.homedir() }: { packageRoot?: string; homedir?: string } = {},
+): string | null {
   let dir = path.resolve(cwd);
   const root = path.parse(dir).root;
   while (dir && dir !== root && dir !== path.dirname(homedir)) {
@@ -218,7 +313,7 @@ function findProjectRoot(cwd, { packageRoot, homedir = os.homedir() } = {}) {
 // default ('local' when a project was detected) only registered the hook for
 // that one project — sessions run from anywhere else silently produced no
 // events. This mirrors how agent-viz itself is installed: globally.
-function resolveScope({ scope, cwd, agent = 'claude', packageRoot } = {}) {
+function resolveScope({ scope, cwd, agent = 'claude', packageRoot }: AgentOpts = {}): ResolvedTarget {
   const cfg = AGENT_CONFIG[agent];
   cwd = cwd || process.cwd();
   if (!scope || scope === 'user') {
@@ -239,7 +334,7 @@ function resolveScope({ scope, cwd, agent = 'claude', packageRoot } = {}) {
 // `node "<abs>/bin/agent-viz.js" hook --source=<agent>` (fast). Otherwise use
 // `npx --yes @vcueto/agent-viz@<version> hook --source=<agent>` pinned to the
 // currently-running version (~300-800ms cold start).
-function resolveHookCommand({ packageRoot, version, agent = 'claude' } = {}) {
+function resolveHookCommand({ packageRoot, version, agent = 'claude' }: AgentOpts = {}): ResolvedCommand {
   packageRoot = packageRoot || path.resolve(import.meta.dirname, '..', '..');
   const binPath = path.join(packageRoot, 'bin', 'agent-viz.js');
   // npx caches always live under "/_npx/" on every platform.
@@ -255,7 +350,8 @@ function resolveHookCommand({ packageRoot, version, agent = 'claude' } = {}) {
     // un package.json prefixe rendrait un spec npx SANS version, en silence.
     try {
       const brut = fs.readFileSync(path.join(packageRoot, 'package.json'), 'utf8');
-      v = JSON.parse(brut.charCodeAt(0) === 0xFEFF ? brut.slice(1) : brut).version;
+      const pkg: unknown = JSON.parse(brut.charCodeAt(0) === 0xFEFF ? brut.slice(1) : brut);
+      if (isRecord(pkg) && typeof pkg.version === 'string') v = pkg.version;
     } catch {}
   }
   const spec = v ? `@vcueto/agent-viz@${v}` : '@vcueto/agent-viz';
@@ -265,7 +361,9 @@ function resolveHookCommand({ packageRoot, version, agent = 'claude' } = {}) {
 // Append the local-scope file to .gitignore if not already covered. No-op when
 // .gitignore doesn't exist (we don't create one). Idempotent. `extraPatterns`
 // holds historical broader patterns we accept as "already ignored".
-function ensureGitignore(projectRoot, target, extraPatterns = []) {
+function ensureGitignore(
+  projectRoot: string, target: string, extraPatterns: string[] = [],
+): { changed: boolean; reason?: string } {
   const gi = path.join(projectRoot, '.gitignore');
   if (!fs.existsSync(gi)) return { changed: false, reason: 'no .gitignore (skipped)' };
   const content = fs.readFileSync(gi, 'utf8');
@@ -278,7 +376,7 @@ function ensureGitignore(projectRoot, target, extraPatterns = []) {
 }
 
 // Per-agent broader patterns that count as "already covers our local file".
-const GITIGNORE_EXTRAS = {
+const GITIGNORE_EXTRAS: Record<AgentName, string[]> = {
   claude: ['.claude/', '.claude', '.claude/*.local.json', '*.local.json'],
   copilot: ['.github/hooks/', '.github/hooks/*.local.json'],
 };
@@ -286,50 +384,57 @@ const GITIGNORE_EXTRAS = {
 // ── Copilot helpers ──
 
 // Recognize either form of a Copilot hook entry's command (bash or powershell).
-function copilotEntryCommand(entry) {
-  return entry && (entry.bash || entry.powershell);
+function copilotEntryCommand(entry: unknown): string | undefined {
+  if (!isRecord(entry)) return undefined;
+  const bash = typeof entry.bash === 'string' ? entry.bash : undefined;
+  const powershell = typeof entry.powershell === 'string' ? entry.powershell : undefined;
+  return bash || powershell;
 }
-function isAgentVizCommand(cmd) {
+function isAgentVizCommand(cmd: unknown): boolean {
   return typeof cmd === 'string' && /agent-viz/.test(cmd) && /\bhook\b/.test(cmd);
 }
 
 // Build the JSON content for a Copilot hooks.json file. Same node command in
 // both bash and powershell keys — node is cross-platform. timeoutSec mirrors
 // Claude's `timeout` setting. See HOOK_TIMEOUT_SEC comment for the rationale.
-function buildCopilotHookFile(command) {
-  const entry = { type: 'command', bash: command, powershell: command, timeoutSec: HOOK_TIMEOUT_SEC };
-  const hooks = {};
+function buildCopilotHookFile(command: string): CopilotHooksFile {
+  const entry: CopilotHookEntry = { type: 'command', bash: command, powershell: command, timeoutSec: HOOK_TIMEOUT_SEC };
+  const hooks: Record<string, CopilotHookEntry[]> = {};
   for (const ev of eventsFor('copilot')) hooks[ev] = [entry];
   return { version: 1, hooks };
 }
 
-function readCopilotFile(file) {
+function readCopilotFile(file: string): CopilotHooksFile | null {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); }
-  catch (e) {
-    if (e.code === 'ENOENT') return null;
-    throw new Error(`${file} invalid : ${e.message}`);
+  catch (e: unknown) {
+    if (e instanceof Error && 'code' in e && e.code === 'ENOENT') return null;
+    const message = e instanceof Error ? e.message : String(e);
+    throw new Error(`${file} invalid : ${message}`);
   }
 }
 
 // True if the file shape matches what buildCopilotHookFile produced AND any
 // entry's command mentions agent-viz hook.
-function isAgentVizCopilotFile(content) {
-  if (!content || typeof content !== 'object') return false;
-  if (content.version !== 1 || !content.hooks) return false;
+function isAgentVizCopilotFile(content: unknown): content is CopilotHooksFile {
+  if (!isRecord(content)) return false;
+  if (content.version !== 1 || !isRecord(content.hooks)) return false;
+  const hooks = content.hooks as Record<string, unknown>;
   for (const ev of eventsFor('copilot')) {
-    for (const e of content.hooks[ev] || []) {
+    const entries = hooks[ev];
+    if (!Array.isArray(entries)) continue;
+    for (const e of entries) {
       if (isAgentVizCommand(copilotEntryCommand(e))) return true;
     }
   }
   return false;
 }
 
-function auditCopilot({ scope, cwd, packageRoot, version } = {}) {
+function auditCopilot({ scope, cwd, packageRoot, version }: AgentOpts = {}) {
   const target = resolveScope({ scope, cwd, agent: 'copilot', packageRoot });
   const cmd = resolveHookCommand({ packageRoot, version, agent: 'copilot' });
   const content = readCopilotFile(target.file);
   const rows = eventsFor('copilot').map(ev => {
-    const entries = (content && content.hooks && content.hooks[ev]) || [];
+    const entries = (content && content.hooks[ev]) || [];
     let installed = false, stale = false, others = 0;
     for (const e of entries) {
       const c = copilotEntryCommand(e);
@@ -346,17 +451,17 @@ function auditCopilot({ scope, cwd, packageRoot, version } = {}) {
   return { ...target, audit: rows, command: cmd };
 }
 
-function installCopilot({ scope, cwd, packageRoot, version } = {}) {
+function installCopilot({ scope, cwd, packageRoot, version }: AgentOpts = {}) {
   const target = resolveScope({ scope, cwd, agent: 'copilot', packageRoot });
   const cmd = resolveHookCommand({ packageRoot, version, agent: 'copilot' });
   const desired = buildCopilotHookFile(cmd.command);
   const existing = readCopilotFile(target.file);
 
   let action = 'noop';
-  let missing = [];
-  let updated = [];
-  let present = [];
-  const coexisting = {};
+  let missing: string[] = [];
+  let updated: string[] = [];
+  let present: string[] = [];
+  const coexisting: Record<string, number> = {};
 
   if (!existing) {
     action = 'installed';
@@ -387,7 +492,7 @@ function installCopilot({ scope, cwd, packageRoot, version } = {}) {
   fs.mkdirSync(path.dirname(target.file), { recursive: true });
   fs.writeFileSync(target.file, JSON.stringify(desired, null, 2) + '\n');
 
-  let gitignore = null;
+  let gitignore: { changed: boolean; reason?: string } | null = null;
   if (target.scope === 'local' && target.projectRoot) {
     gitignore = ensureGitignore(target.projectRoot, AGENT_CONFIG.copilot.gitignoreEntry, GITIGNORE_EXTRAS.copilot);
   }
@@ -400,8 +505,8 @@ function installCopilot({ scope, cwd, packageRoot, version } = {}) {
 
 // All scopes the agent uses, in sweep order. Used by uninstall for "no scope"
 // (clean everywhere) mode.
-function copilotSweepTargets(cwd, { packageRoot } = {}) {
-  const out = [{ scope: 'user', file: AGENT_CONFIG.copilot.userFile(), projectRoot: null }];
+function copilotSweepTargets(cwd: string | undefined, { packageRoot }: { packageRoot?: string } = {}): ResolvedTarget[] {
+  const out: ResolvedTarget[] = [{ scope: 'user', file: AGENT_CONFIG.copilot.userFile(), projectRoot: null }];
   const projectRoot = findProjectRoot(cwd || process.cwd(), { packageRoot });
   if (projectRoot) {
     out.push({ scope: 'project', file: AGENT_CONFIG.copilot.projectFile(projectRoot), projectRoot });
@@ -410,11 +515,11 @@ function copilotSweepTargets(cwd, { packageRoot } = {}) {
   return out;
 }
 
-function uninstallCopilot({ scope, cwd, packageRoot } = {}) {
+function uninstallCopilot({ scope, cwd, packageRoot }: AgentOpts = {}) {
   const targets = scope
     ? [resolveScope({ scope, cwd, agent: 'copilot', packageRoot })]
     : copilotSweepTargets(cwd, { packageRoot });
-  const results = [];
+  const results: Array<ResolvedTarget & { removed: number; exists: boolean }> = [];
   for (const t of targets) {
     if (!fs.existsSync(t.file)) {
       results.push({ ...t, removed: 0, exists: false });
@@ -433,7 +538,7 @@ function uninstallCopilot({ scope, cwd, packageRoot } = {}) {
 
 // ── High-level API ──
 
-function auditClaude({ scope, cwd, packageRoot, version } = {}) {
+function auditClaude({ scope, cwd, packageRoot, version }: AgentOpts = {}) {
   const target = resolveScope({ scope, cwd, packageRoot });
   const settings = readSettings(target.file);
   const cmd = resolveHookCommand({ packageRoot, version });
@@ -447,15 +552,15 @@ function auditClaude({ scope, cwd, packageRoot, version } = {}) {
 //   present:    events where an up-to-date agent-viz hook was already there
 //   coexisting: { event: count } — non-agent-viz hooks sharing the same events
 //                (informational; they will run in parallel, we never touch them)
-function installClaude({ scope, cwd, packageRoot, version } = {}) {
+function installClaude({ scope, cwd, packageRoot, version }: AgentOpts = {}) {
   const target = resolveScope({ scope, cwd, packageRoot });
   const settings = readSettings(target.file);
   const cmd = resolveHookCommand({ packageRoot, version });
 
-  const missing = [];
-  const updated = [];
-  const present = [];
-  const coexisting = {};
+  const missing: string[] = [];
+  const updated: string[] = [];
+  const present: string[] = [];
+  const coexisting: Record<string, number> = {};
   for (const ev of EVENTS) {
     const info = inspectEvent(settings, ev, cmd.command);
     if (info.others > 0) coexisting[ev] = info.others;
@@ -474,12 +579,12 @@ function installClaude({ scope, cwd, packageRoot, version } = {}) {
   for (const ev of missing) addHook(settings, ev, cmd.command);
   writeSettings(target.file, settings);
 
-  let gitignore = null;
+  let gitignore: { changed: boolean; reason?: string } | null = null;
   if (target.scope === 'local' && target.projectRoot) {
     gitignore = ensureGitignore(target.projectRoot, AGENT_CONFIG.claude.gitignoreEntry, GITIGNORE_EXTRAS.claude);
   }
 
-  let action;
+  let action: string;
   if (missing.length > 0 && updated.length > 0) action = 'installed+updated';
   else if (missing.length > 0) action = 'installed';
   else action = 'updated';
@@ -490,8 +595,8 @@ function installClaude({ scope, cwd, packageRoot, version } = {}) {
   return { target, action, missing, updated, present, coexisting, command: cmd, gitignore, crossScope };
 }
 
-function claudeSweepTargets(cwd, { packageRoot } = {}) {
-  const out = [{ scope: 'user', file: AGENT_CONFIG.claude.userFile(), projectRoot: null }];
+function claudeSweepTargets(cwd: string | undefined, { packageRoot }: { packageRoot?: string } = {}): ResolvedTarget[] {
+  const out: ResolvedTarget[] = [{ scope: 'user', file: AGENT_CONFIG.claude.userFile(), projectRoot: null }];
   const projectRoot = findProjectRoot(cwd || process.cwd(), { packageRoot });
   if (projectRoot) {
     out.push({ scope: 'project', file: AGENT_CONFIG.claude.projectFile(projectRoot), projectRoot });
@@ -500,11 +605,11 @@ function claudeSweepTargets(cwd, { packageRoot } = {}) {
   return out;
 }
 
-function uninstallClaude({ scope, cwd, packageRoot } = {}) {
+function uninstallClaude({ scope, cwd, packageRoot }: AgentOpts = {}) {
   const targets = scope
     ? [resolveScope({ scope, cwd, packageRoot })]
     : claudeSweepTargets(cwd, { packageRoot });
-  const results = [];
+  const results: Array<ResolvedTarget & { removed: number; exists: boolean }> = [];
   for (const t of targets) {
     if (!fs.existsSync(t.file)) {
       results.push({ ...t, removed: 0, exists: false });
@@ -529,11 +634,13 @@ function uninstallClaude({ scope, cwd, packageRoot } = {}) {
 // Adding a 3rd agent: extend the branch below alongside the AGENT_CONFIG /
 // INSTALLERS entries — keep the per-agent "file is ours" recognizer (e.g.
 // isAgentVizCopilotFile) in step with sweep-target discovery here.
-function findInstalledScopes({ cwd, packageRoot, agent = 'claude' } = {}) {
+function findInstalledScopes(
+  { cwd, packageRoot, agent = 'claude' }: AgentOpts = {},
+): Array<{ scope: Scope; file: string }> {
   const targets = agent === 'claude'
     ? claudeSweepTargets(cwd, { packageRoot })
     : copilotSweepTargets(cwd, { packageRoot });
-  const installed = [];
+  const installed: Array<{ scope: Scope; file: string }> = [];
   for (const t of targets) {
     if (!fs.existsSync(t.file)) continue;
     let hasHook = false;
@@ -560,7 +667,14 @@ function findInstalledScopes({ cwd, packageRoot, agent = 'claude' } = {}) {
 // behind if an agent got removed from PATH after install).
 // Returns { <agent>: result, ... } where each side carries the per-agent result.
 
-const INSTALLERS = {
+interface AgentInstaller {
+  install: (opts: AgentOpts) => unknown;
+  uninstall: (opts: AgentOpts) => unknown;
+  audit: (opts: AgentOpts) => unknown;
+  detect: () => boolean;
+}
+
+const INSTALLERS: Record<AgentName, AgentInstaller> = {
   claude: {
     install: installClaude,
     uninstall: uninstallClaude,
@@ -575,7 +689,7 @@ const INSTALLERS = {
   },
 };
 
-function agentDetected(agent) {
+function agentDetected(agent: string): boolean {
   const home = os.homedir();
   if (agent === 'claude') {
     return inPath('claude') || fs.existsSync(path.join(home, '.claude', 'settings.json'));
@@ -586,11 +700,11 @@ function agentDetected(agent) {
   return false;
 }
 
-function dirHasFiles(p) {
+function dirHasFiles(p: string): boolean {
   try { return fs.readdirSync(p).length > 0; } catch { return false; }
 }
 
-function inPath(name) {
+function inPath(name: string): boolean {
   const PATH = process.env.PATH || '';
   const sep = process.platform === 'win32' ? ';' : ':';
   const exts = process.platform === 'win32' ? (process.env.PATHEXT || '.EXE;.CMD;.BAT').split(';') : [''];
@@ -603,46 +717,57 @@ function inPath(name) {
   return false;
 }
 
-// Pick which agents to act on. `target` accepts a registered agent name, 'all'
-// (or legacy 'both'), or undefined → auto-detect (fallback: first registered).
-function pickAgents({ target }) {
-  const all = Object.keys(INSTALLERS);
-  if (target === 'all' || target === 'both') return all;
-  if (target && INSTALLERS[target]) return [target];
-  const detected = all.filter(a => INSTALLERS[a].detect());
-  return detected.length > 0 ? detected : [all[0]];
+// Une clef réelle du registre — vit ici, à côté de la constante qu'elle
+// protège, plutôt qu'un cast : `Object.hasOwn` seul ne rétrécit pas `target`
+// vers `AgentName` (même geste que transcript-adapters/index.ts, scellé).
+function isAgentName(v: string): v is AgentName {
+  return Object.hasOwn(INSTALLERS, v);
 }
 
-function dispatch(method, opts) {
+// Pick which agents to act on. `target` accepts a registered agent name, 'all'
+// (or legacy 'both'), or undefined → auto-detect (fallback: first registered).
+function pickAgents({ target }: { target?: string }): AgentName[] {
+  const all = Object.keys(INSTALLERS) as AgentName[];
+  if (target === 'all' || target === 'both') return all;
+  if (target && isAgentName(target)) return [target];
+  const detected = all.filter(a => INSTALLERS[a].detect());
+  // `all` porte toujours 'claude' et 'copilot' (registre fixe ci-dessus) :
+  // `all[0]` existe forcément, le `!` documente cet invariant.
+  return detected.length > 0 ? detected : [all[0]!];
+}
+
+function dispatch(method: 'install' | 'uninstall' | 'audit', opts: AgentOpts): Record<string, unknown> {
   const agents = pickAgents(opts);
-  const out = {};
+  const out: Record<string, unknown> = {};
   for (const a of agents) out[a] = INSTALLERS[a][method](opts);
   return out;
 }
 
-function install(opts = {})   { return dispatch('install', opts); }
-function audit(opts = {})     { return dispatch('audit', opts); }
-function uninstall(opts = {}) {
+function install(opts: AgentOpts = {}): Record<string, unknown>   { return dispatch('install', opts); }
+function audit(opts: AgentOpts = {}): Record<string, unknown>     { return dispatch('audit', opts); }
+function uninstall(opts: AgentOpts = {}): Record<string, unknown> {
   // Default to ALL registered agents (sweep), even if not currently detected.
-  const agents = opts.target ? pickAgents(opts) : Object.keys(INSTALLERS);
-  const out = {};
+  const agents: AgentName[] = opts.target ? pickAgents(opts) : (Object.keys(INSTALLERS) as AgentName[]);
+  const out: Record<string, unknown> = {};
   for (const a of agents) out[a] = INSTALLERS[a].uninstall(opts);
   return out;
 }
 
 // Back-compat: detectAgents() returns { claude: bool, copilot: bool, ... }
-function detectAgents(_opts = {}) {
-  const out = {};
-  for (const a of Object.keys(INSTALLERS)) out[a] = INSTALLERS[a].detect();
+function detectAgents(_opts: AgentOpts = {}): Record<string, boolean> {
+  const out: Record<string, boolean> = {};
+  for (const a of Object.keys(INSTALLERS) as AgentName[]) out[a] = INSTALLERS[a].detect();
   return out;
 }
 
 // Multi-agent: { claude: [{scope,file},...], copilot: [...] } across user +
 // project + local. Used by `agent-viz status` and the install-hooks
 // cross-scope warning.
-function installedScopes({ cwd, packageRoot } = {}) {
-  const out = {};
-  for (const a of Object.keys(INSTALLERS)) {
+function installedScopes(
+  { cwd, packageRoot }: { cwd?: string; packageRoot?: string } = {},
+): Record<string, Array<{ scope: Scope; file: string }>> {
+  const out: Record<string, Array<{ scope: Scope; file: string }>> = {};
+  for (const a of Object.keys(INSTALLERS) as AgentName[]) {
     out[a] = findInstalledScopes({ cwd, packageRoot, agent: a });
   }
   return out;
@@ -671,8 +796,36 @@ export {
 };
 
 // ── CLI standalone (kept for backwards compatibility) ──
-function parseCliArgs(argv) {
-  const out = { mode: 'install', scope: undefined };
+
+// Ce que la CLI attend de `audit()`/`uninstall()`/`install()` — les mêmes
+// registres que `dispatch` construit réellement (voir `AgentInstaller`
+// ci-dessus), nommés ici pour l'affichage plutôt que laissés `unknown` :
+// c'est la frontière propre à CE consommateur, pas une nouvelle promesse des
+// fonctions haut niveau (qui restent `Record<string, unknown>`).
+interface CliAuditResult {
+  file: string;
+  scope: Scope;
+  audit: Array<{ event: string; installed: boolean; stale: boolean; others: number }>;
+}
+interface CliUninstallResult {
+  results: Array<{ file: string; scope: Scope; removed: number; exists: boolean }>;
+}
+interface CliInstallResult {
+  target: { file: string; scope: Scope };
+  command: { command: string; mode: string };
+  action: string;
+  missing: string[];
+  updated: string[];
+  error?: string;
+}
+
+interface CliArgs {
+  mode: 'install' | 'check' | 'uninstall';
+  scope: Scope | undefined;
+}
+
+function parseCliArgs(argv: string[]): CliArgs {
+  const out: CliArgs = { mode: 'install', scope: undefined };
   for (const a of argv) {
     if (a === '--check') out.mode = 'check';
     else if (a === '--uninstall') out.mode = 'uninstall';
@@ -684,12 +837,12 @@ function parseCliArgs(argv) {
   return out;
 }
 
-function cliMain(argv) {
+function cliMain(argv: string[]): void {
   const { mode, scope } = parseCliArgs(argv);
   const cwd = process.cwd();
 
   if (mode === 'check') {
-    const result = audit({ scope, cwd });
+    const result = audit({ scope, cwd }) as Record<string, CliAuditResult>;
     let allGood = true;
     for (const [agent, a] of Object.entries(result)) {
       console.log(`[${agent}] settings : ${a.file}  (scope: ${a.scope})`);
@@ -706,7 +859,7 @@ function cliMain(argv) {
   }
 
   if (mode === 'uninstall') {
-    const result = uninstall({ scope, cwd });
+    const result = uninstall({ scope, cwd }) as Record<string, CliUninstallResult>;
     let total = 0;
     for (const [agent, x] of Object.entries(result)) {
       const results = x.results || [];
@@ -721,7 +874,7 @@ function cliMain(argv) {
   }
 
   // install
-  const result = install({ scope, cwd });
+  const result = install({ scope, cwd }) as { claude?: CliInstallResult; copilot?: CliInstallResult };
   if (result.claude) {
     const r = result.claude;
     console.log(`[claude] settings : ${r.target.file}  (scope: ${r.target.scope})`);
@@ -747,5 +900,9 @@ function cliMain(argv) {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   try { cliMain(process.argv.slice(2)); }
-  catch (e) { console.error('Erreur :', e.message); process.exit(2); }
+  catch (e: unknown) {
+    const message = e instanceof Error ? e.message : String(e);
+    console.error('Erreur :', message);
+    process.exit(2);
+  }
 }

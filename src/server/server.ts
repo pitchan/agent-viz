@@ -83,7 +83,11 @@ function startServer() {
   });
   setServer(server);
   // Bind to loopback only — never expose transcripts to the LAN.
-  server.listen(PORT, '127.0.0.1', () => {
+  // `PORT` reste `string | number` (voir sa déclaration : ni renommée ni
+  // retypée, la sensibilité du fichier l'exige) — `Number()` à la frontière de
+  // cet appel est la même coercion que `server.listen` ferait lui-même en
+  // interne pour une chaîne, sans changer PORT ni killOldServer.
+  server.listen(Number(PORT), '127.0.0.1', () => {
     console.log(`agent-viz listening on http://localhost:${PORT}`);
   });
 }

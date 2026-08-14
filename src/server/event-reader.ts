@@ -23,11 +23,18 @@ import {
 } from './transcript.ts';
 import { getWatchdogService } from './watchdog/index.ts';
 
-const watchers = new Map();
-const fileOffsets = new Map();
-const debounceTimers = new Map();
-const readInFlight = new Set();
-const readPending = new Set();
+// Un objet exploitable par accès de champ — même garde locale que
+// session-index.ts et les autres fichiers du serveur : `decodeJsonlLine` ne
+// promet qu'un JSON valide, pas un objet.
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
+const watchers = new Map<string, fs.FSWatcher>();
+const fileOffsets = new Map<string, number>();
+const debounceTimers = new Map<string, NodeJS.Timeout>();
+const readInFlight = new Set<string>();
+const readPending = new Set<string>();
 
 // Has the watchdog already failed once on this path? A pure detector that
 // throws means a broken build, not a passing condition, so one line is enough
@@ -39,20 +46,21 @@ const readPending = new Set();
 // complain and carry on.
 let watchdogFailed = false;
 
-function feedWatchdog(wd, evt) {
+function feedWatchdog(wd: NonNullable<ReturnType<typeof getWatchdogService>>, evt: Record<string, unknown>): void {
   try {
     for (const alert of wd.onEvent(evt)) broadcastSSE({ type: 'alert', alert });
-  } catch (err) {
+  } catch (err: unknown) {
     if (!watchdogFailed) {
       watchdogFailed = true;
-      console.error('[watchdog] detection failed, failures are no longer being recorded:', err.message);
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('[watchdog] detection failed, failures are no longer being recorded:', message);
     }
   }
 }
 
 // Where the live path FIRST fed the watchdog, per file. This is not the read
 // cursor, and the difference is the whole point — see liveHandoffOffset.
-const fedFrom = new Map();
+const fedFrom = new Map<string, number>();
 
 // The byte offset from which the live path owns this file, as far as the
 // watchdog is concerned.
@@ -92,13 +100,13 @@ const fedFrom = new Map();
 // sweep's business. `has` rather than a truthiness test on purpose: an offset
 // of 0 is a real answer (a watcher armed on an empty file owns all of it), and
 // `|| null` would turn it into "read everything" and bring the overlap back.
-function liveHandoffOffset(fp) {
-  if (fedFrom.has(fp)) return fedFrom.get(fp);
-  return fileOffsets.has(fp) ? fileOffsets.get(fp) : null;
+function liveHandoffOffset(fp: string): number | null {
+  if (fedFrom.has(fp)) return fedFrom.get(fp) ?? null;
+  return fileOffsets.has(fp) ? (fileOffsets.get(fp) ?? null) : null;
 }
 
 // Read new bytes from a session file and broadcast via SSE.
-async function readAndBroadcast(filePath) {
+async function readAndBroadcast(filePath: string): Promise<void> {
   if (readInFlight.has(filePath)) { readPending.add(filePath); return; }
   readInFlight.add(filePath);
   let fh;
@@ -147,7 +155,7 @@ async function readAndBroadcast(filePath) {
       const evt = verdict.value;
       try {
         // Capture source agent on first event of a session.
-        if (rec && !rec.agentSource && typeof evt._source === 'string') {
+        if (rec && !rec.agentSource && isRecord(evt) && typeof evt._source === 'string') {
           rec.agentSource = evt._source;
         }
         broadcastSSE({ type: 'event', session: sessionName, event: evt });
@@ -157,7 +165,7 @@ async function readAndBroadcast(filePath) {
         // After the event goes out, never before: what the server announces is
         // already in the journal, and an alert never precedes the event that
         // produced it.
-        if (wd) feedWatchdog(wd, evt);
+        if (wd && isRecord(evt)) feedWatchdog(wd, evt);
       } catch {}
     }
     // Warm the first-prompt cache if we haven't yet.
@@ -181,7 +189,7 @@ async function readAndBroadcast(filePath) {
   }
 }
 
-function watchSession(filePath) {
+function watchSession(filePath: string): void {
   if (watchers.has(filePath)) return;
   try {
     const stat = fs.statSync(filePath);
@@ -199,7 +207,7 @@ function watchSession(filePath) {
   watchers.set(filePath, watcher);
 }
 
-function unwatchSession(fp) {
+function unwatchSession(fp: string): void {
   const w = watchers.get(fp);
   if (w) { w.close(); watchers.delete(fp); }
   fileOffsets.delete(fp);
@@ -218,7 +226,7 @@ function unwatchSession(fp) {
   if (t) { clearTimeout(t); debounceTimers.delete(fp); }
 }
 
-function isWatched(fp) { return watchers.has(fp); }
+function isWatched(fp: string): boolean { return watchers.has(fp); }
 
 // Reset the read offset for a file — used by housekeep.compactSession after
 // rewriting a smaller version of the JSONL so we don't skip the new content.
@@ -227,28 +235,43 @@ function isWatched(fp) { return watchers.has(fp); }
 // the old byte points into a layout that no longer exists — keeping it would
 // fence the sweep off from part of the NEW file. The cursor takes over as the
 // boundary until the live path feeds again, which is exactly what it means.
-function resetFileOffset(fp, size) {
+function resetFileOffset(fp: string, size: number): void {
   fileOffsets.set(fp, size);
   fedFrom.delete(fp);
 }
 
 // Delete a session file + summary + clean everything related.
-async function deleteSession(fp) {
+async function deleteSession(fp: string): Promise<void> {
   const id = idFromPath(fp);
   const rec = sessionIndex.get(id);
   if (rec) {
     closeTranscriptResources(rec);
-    clearTokensTimer(rec);
+    // `SessionRecord` (session-index.ts, scellé) n'expose `tokens` que via son
+    // index signature ouverte ; `clearTokensTimer` attend sa forme précise
+    // (`tokens.ts`, scellé aussi). `Parameters<...>` emprunte ce type sans
+    // devoir le nommer — il n'est pas exporté, c'est la même frontière que
+    // celle documentée dans tokens.ts pour `ensureTokens`.
+    clearTokensTimer(rec as Parameters<typeof clearTokensTimer>[0]);
   }
   unwatchSession(fp);
   sessionIndex.delete(id);
   readInFlight.delete(fp);
   readPending.delete(fp);
   try { await fsp.unlink(fp); }
-  catch (err) { if (err.code !== 'ENOENT') console.error(`[event-reader] unlink ${fp} failed: ${err.message}`); }
+  catch (err: unknown) {
+    if (!(err instanceof Error && 'code' in err && err.code === 'ENOENT')) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`[event-reader] unlink ${fp} failed: ${message}`);
+    }
+  }
   // Also remove companion summary if it exists.
   try { await fsp.unlink(fp.replace('.jsonl', '.summary.json')); }
-  catch (err) { if (err.code !== 'ENOENT') console.error(`[event-reader] unlink summary failed: ${err.message}`); }
+  catch (err: unknown) {
+    if (!(err instanceof Error && 'code' in err && err.code === 'ENOENT')) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`[event-reader] unlink summary failed: ${message}`);
+    }
+  }
 }
 
 export {

@@ -6,19 +6,56 @@
 import readline from 'node:readline';
 import { styleText } from 'node:util';
 
-const TARGET_OPTIONS = [
+// Forme rendue par `detectAgents()` (install-hooks.ts, hors lot ce fichier-ci
+// mais même lot 8) : un booléen par agent connu, jamais plus.
+interface DetectedAgents {
+  claude: boolean;
+  copilot: boolean;
+}
+
+// Le flux d'entrée du dialogue. `readline.emitKeypressEvents` exige un
+// `NodeJS.ReadableStream` — c'est la base de ce type ; les propriétés TTY
+// restent optionnelles, comme en production où `process.stdin` peut ne pas
+// être un TTY (piped stdin) et où les tests décorent un simple `PassThrough`.
+type PromptInput = NodeJS.ReadableStream & {
+  isTTY?: boolean;
+  isRaw?: boolean;
+  setRawMode?(mode: boolean): unknown;
+  unref?(): unknown;
+};
+
+interface PromptOutput {
+  write(chunk: string): unknown;
+}
+
+interface PromptIo {
+  input: PromptInput;
+  output: PromptOutput;
+}
+
+interface KeypressKey {
+  name?: string;
+  ctrl?: boolean;
+}
+
+interface SelectOption<T extends string> {
+  value: T;
+  label: string;
+}
+
+const TARGET_OPTIONS: SelectOption<'claude' | 'copilot' | 'both'>[] = [
   { value: 'claude',  label: 'Claude Code' },
   { value: 'copilot', label: 'Copilot CLI' },
   { value: 'both',    label: 'Both' },
 ];
 
-const SCOPE_OPTIONS = [
+const SCOPE_OPTIONS: SelectOption<'user' | 'project' | 'local'>[] = [
   { value: 'user',    label: 'user — works in every project' },
   { value: 'project', label: 'project — committed to this repo, shared with team' },
   { value: 'local',   label: 'local — this repo only, gitignored' },
 ];
 
-function pickTargetDefault(detected) {
+function pickTargetDefault(detected: DetectedAgents): number {
   if (detected.claude && detected.copilot) return 2;
   if (detected.claude) return 0;
   if (detected.copilot) return 1;
@@ -33,8 +70,13 @@ function pickTargetDefault(detected) {
 // ONCE per session — toggling them between consecutive ask() calls caused
 // the OS to re-deliver a phantom \r on Windows TTY, which then auto-resolved
 // the next prompt to its default option.
-function ask({ question, options, initial, io }) {
-  return new Promise((resolve, reject) => {
+function ask<T extends string>({ question, options, initial, io }: {
+  question: string;
+  options: SelectOption<T>[];
+  initial: number;
+  io: PromptIo;
+}): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
     const { input, output } = io;
     let idx = initial;
     let renderedLines = 0;
@@ -50,20 +92,24 @@ function ask({ question, options, initial, io }) {
       clear();
       output.write(question + '\n');
       let lines = 1;
-      for (let i = 0; i < options.length; i++) {
+      // `forEach` plutôt qu'un accès indexé : `noUncheckedIndexedAccess`
+      // rendrait `options[i]` possiblement `undefined`, alors que la borne de
+      // la boucle le garantit toujours défini — l'itération directe porte
+      // cette garantie dans son propre type, sans assertion.
+      options.forEach((opt, i) => {
         const isSelected = i === idx;
         // `> ` cursor is kept as a fallback signal for NO_COLOR / non-TTY,
         // where styleText auto-disables and the cursor becomes the only
         // selection indicator.
         const cursor = isSelected ? '> ' : '  ';
-        const line = cursor + options[i].label;
+        const line = cursor + opt.label;
         output.write((isSelected ? styleText('blueBright', line) : line) + '\n');
         lines++;
-      }
+      });
       renderedLines = lines;
     };
 
-    const onKey = (_, key) => {
+    const onKey = (_: unknown, key: KeypressKey | undefined) => {
       if (!key) return;
       if (key.ctrl && key.name === 'c') {
         input.removeListener('keypress', onKey);
@@ -74,7 +120,13 @@ function ask({ question, options, initial, io }) {
       else if (key.name === 'down' && idx < options.length - 1) { idx++; render(); }
       else if (key.name === 'return') {
         input.removeListener('keypress', onKey);
-        resolve(options[idx].value);
+        // `idx` reste dans [0, options.length) par construction (gardes
+        // up/down ci-dessus) : la même garantie que `forEach` ci-dessus,
+        // mais ici l'accès EST indexé — un seul `!`, à la frontière exacte
+        // où l'invariant est vrai, plutôt qu'un repli silencieux qui
+        // changerait le comportement (l'original levait ici si `idx` avait
+        // pu sortir de la plage).
+        resolve(options[idx]!.value);
       }
     };
 
@@ -87,7 +139,7 @@ function ask({ question, options, initial, io }) {
 // keypress emitter, resume the stream. Returns a `close()` that restores
 // everything in reverse. Doing this ONCE per multi-question dialog (instead
 // of per ask() call) avoids the Windows TTY phantom-\r bug described above.
-function openInteractiveSession(io) {
+function openInteractiveSession(io: PromptIo): () => void {
   const { input } = io;
   const wasRaw = input.isTTY ? input.isRaw : null;
   if (input.isTTY && typeof input.setRawMode === 'function') input.setRawMode(true);
@@ -95,7 +147,10 @@ function openInteractiveSession(io) {
   if (typeof input.resume === 'function') input.resume();
 
   return function close() {
-    if (input.isTTY && typeof input.setRawMode === 'function') input.setRawMode(wasRaw);
+    // `wasRaw` n'est `null`/`undefined` QUE si `input.isTTY` était faux à sa
+    // capture ci-dessus — exactement la garde qui protège cet appel. Un seul
+    // `!` à cette frontière précise, pas un repli qui changerait le comportement.
+    if (input.isTTY && typeof input.setRawMode === 'function') input.setRawMode(wasRaw!);
     // Without pause()+unref(), stdin stays in flowing mode with internal
     // listeners attached by emitKeypressEvents, and the event loop refuses
     // to drain — install-hooks would hang on exit. unref() is the belt-and-
@@ -106,7 +161,11 @@ function openInteractiveSession(io) {
   };
 }
 
-async function promptInstallParams({ detected, projectRoot, io }) {
+async function promptInstallParams({ detected, projectRoot, io }: {
+  detected: DetectedAgents;
+  projectRoot: string | null;
+  io: PromptIo;
+}): Promise<{ target: 'claude' | 'copilot' | 'both'; scope: 'user' | 'project' | 'local' }> {
   const targetOptions = TARGET_OPTIONS.map((o) => {
     if (o.value === 'both') return o;
     return { ...o, label: `${o.label} ${detected[o.value] ? '(detected)' : '(not detected)'}` };

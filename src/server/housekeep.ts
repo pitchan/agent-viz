@@ -23,19 +23,41 @@ import {
 import { ensureTranscriptWatcher } from './transcript.ts';
 import { decodeJsonlLine } from './jsonl.ts';
 
+// Un objet exploitable par accès de champ — même garde locale que
+// session-index.ts et les adaptateurs de transcript : `decodeJsonlLine` ne
+// promet qu'un JSON valide, pas un objet.
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
+interface CompactedTool {
+  name: unknown;
+  id: unknown;
+  event: 'PreToolUse' | 'PostToolUse' | 'PostToolUseFailure';
+  ts: unknown;
+}
+
+interface SessionSummary {
+  id: string;
+  compactedAt: string;
+  totalEvents: number;
+  tools: CompactedTool[];
+  prompt: unknown;
+}
+
 // For large files: read all events, keep the last COMPACT_KEEP_EVENTS, write a
 // companion .summary.json with session metadata, then rewrite the JSONL.
-async function compactSession(fp) {
+async function compactSession(fp: string): Promise<void> {
   const id = idFromPath(fp);
   const rec = sessionIndex.get(id);
   if (!rec) return;
-  let content;
+  let content: string;
   try { content = await fsp.readFile(fp, 'utf8'); } catch { return; }
   const allLines = content.trim().split('\n');
   if (allLines.length <= COMPACT_KEEP_EVENTS) return;
 
   // Build summary from the full history before we throw away old lines.
-  const summary = { id, compactedAt: new Date().toISOString(), totalEvents: allLines.length, tools: [], prompt: rec.promptCache || null };
+  const summary: SessionSummary = { id, compactedAt: new Date().toISOString(), totalEvents: allLines.length, tools: [], prompt: rec.promptCache || null };
   for (const line of allLines) {
     // C2 : le verdict sur une ligne vient de la primitive commune du moteur, il
     // n'est plus réimplémenté ici. Conséquence assumée : une ligne préfixée d'un
@@ -45,7 +67,8 @@ async function compactSession(fp) {
     const verdict = decodeJsonlLine(line);
     if (!verdict || !verdict.ok) continue;
     const evt = verdict.value;
-    const e = evt && evt.hook_event_name;
+    if (!isRecord(evt)) continue;
+    const e = evt.hook_event_name;
     if (e === 'PreToolUse' || e === 'PostToolUse' || e === 'PostToolUseFailure') {
       summary.tools.push({ name: evt.tool_name, id: evt.tool_use_id, event: e, ts: evt._ts });
     }
@@ -64,17 +87,25 @@ async function compactSession(fp) {
     // Reset the read offset so readAndBroadcast doesn't skip the new smaller file.
     resetFileOffset(fp, stat.size);
     console.log(`[housekeep] compacted ${id}: ${allLines.length} → ${kept.length} events, summary at ${path.basename(summaryPath)}`);
-  } catch (err) {
-    console.error(`[housekeep] compact failed for ${id}:`, err.message);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[housekeep] compact failed for ${id}:`, message);
   }
 }
 
-async function housekeep() {
+interface SessionFileEntry {
+  fp: string;
+  id: string;
+  size: number;
+  mtime: number;
+}
+
+async function housekeep(): Promise<void> {
   const now = Date.now();
 
   // Stat all session files.
-  const entries = [];
-  let files;
+  const entries: SessionFileEntry[] = [];
+  let files: string[];
   try { files = (await fsp.readdir(DIR)).filter(f => f.endsWith('.jsonl')); }
   catch { files = []; }
   for (const f of files) {
@@ -90,8 +121,12 @@ async function housekeep() {
 
   let deleted = 0, unwatched = 0, compacted = 0;
 
-  for (let i = 0; i < entries.length; i++) {
-    const { fp, size, mtime } = entries[i];
+  // `entries()` plutôt qu'un accès indexé : `noUncheckedIndexedAccess`
+  // rendrait `entries[i]` possiblement `undefined`, alors que la borne de la
+  // boucle le garantit toujours défini — même geste qu'en lot 8 ailleurs
+  // (prompt-install.ts) pour la même raison.
+  for (const [i, entry] of entries.entries()) {
+    const { fp, size, mtime } = entry;
     const age = now - mtime;
 
     // Rule C: empty/aborted sessions (≤ 1 KB, older than 1 h) → delete.
@@ -139,8 +174,8 @@ async function housekeep() {
 }
 
 // Watch existing files + new files.
-async function scanAndWatch() {
-  let files;
+async function scanAndWatch(): Promise<void> {
+  let files: string[];
   try { files = (await fsp.readdir(DIR)).filter(f => f.endsWith('.jsonl')); }
   catch { return; }
   for (const f of files) {

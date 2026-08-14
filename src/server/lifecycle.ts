@@ -11,33 +11,42 @@ const PID_FILE = path.join(os.tmpdir(), 'agent-viz.pid');
 const LOG_FILE = path.join(os.tmpdir(), 'agent-viz.log');
 const SERVER_SCRIPT = path.join(import.meta.dirname, 'server.js');
 
-function readPidFile() {
+interface PidRecord {
+  pid: number;
+  port: number;
+  startedAt: string;
+}
+
+function readPidFile(): PidRecord | null {
   try {
     const raw = fs.readFileSync(PID_FILE, 'utf8');
     const [pidStr, portStr, startedAt] = raw.split('\n');
-    const pid = parseInt(pidStr, 10);
-    const port = parseInt(portStr, 10);
+    // `noUncheckedIndexedAccess` : un `split('\n')` ne garantit pas trois
+    // éléments — `?? ''` rend `parseInt('', 10)` (NaN), même issue qu'un
+    // `parseInt(undefined, 10)` non typé, donc même comportement qu'avant.
+    const pid = parseInt(pidStr ?? '', 10);
+    const port = parseInt(portStr ?? '', 10);
     if (!pid || !port) return null;
     return { pid, port, startedAt: startedAt || '' };
   } catch { return null; }
 }
 
-function writePidFile(pid, port) {
+function writePidFile(pid: number, port: number): void {
   fs.writeFileSync(PID_FILE, `${pid}\n${port}\n${new Date().toISOString()}\n`);
 }
 
-function removePidFile() {
+function removePidFile(): void {
   try { fs.unlinkSync(PID_FILE); } catch {}
 }
 
-function isPidAlive(pid) {
+function isPidAlive(pid: number): boolean {
   try { process.kill(pid, 0); return true; }
-  catch (e) { return e.code === 'EPERM'; }
+  catch (e: unknown) { return e instanceof Error && 'code' in e && e.code === 'EPERM'; }
 }
 
 // Quick HTTP GET / probe. Returns true if server responds within timeout ms.
-function probe(port, timeout = 500) {
-  return new Promise(resolve => {
+function probe(port: number, timeout: number = 500): Promise<boolean> {
+  return new Promise<boolean>(resolve => {
     const req = http.request({ hostname: '127.0.0.1', port, path: '/', method: 'GET', timeout }, res => {
       res.resume();
       res.on('end', () => resolve(true));
@@ -51,8 +60,8 @@ function probe(port, timeout = 500) {
   });
 }
 
-async function postShutdown(port, timeout = 2000) {
-  return new Promise(resolve => {
+async function postShutdown(port: number, timeout: number = 2000): Promise<boolean> {
+  return new Promise<boolean>(resolve => {
     const req = http.request({ hostname: '127.0.0.1', port, path: '/shutdown', method: 'POST', timeout }, res => {
       res.resume();
       res.on('end', () => resolve(true));
@@ -81,7 +90,7 @@ async function status() {
 }
 
 // Spawn the server detached. Returns the PID.
-async function spawnDetached(port) {
+async function spawnDetached(port: number): Promise<number> {
   // Truncate log file at each start.
   try { fs.writeFileSync(LOG_FILE, ''); } catch {}
   const out = fs.openSync(LOG_FILE, 'a');
@@ -93,27 +102,36 @@ async function spawnDetached(port) {
     env,
   });
   child.unref();
-  return child.pid;
+  // `spawn(process.execPath, …)` lance le binaire Node courant, qui existe
+  // forcément : `pid` n'est `undefined` que sur un échec synchrone de spawn
+  // (exécutable introuvable), qui ne peut pas se produire ici. Le cast reflète
+  // cet invariant plutôt que de propager `number | undefined` aux appelants.
+  return child.pid as number;
 }
 
 // Run the server attached to current process (foreground mode). Inherits stdio.
-function spawnForeground(port) {
+function spawnForeground(port: number): Promise<number> {
   const env = { ...process.env, PORT: String(port) };
   const child = spawn(process.execPath, [SERVER_SCRIPT], {
     stdio: 'inherit',
     env,
   });
   // Forward signals so Ctrl+C kills the server cleanly.
-  for (const sig of ['SIGINT', 'SIGTERM']) {
+  for (const sig of ['SIGINT', 'SIGTERM'] as const) {
     process.on(sig, () => { try { child.kill(sig); } catch {} });
   }
-  return new Promise(resolve => {
+  return new Promise<number>(resolve => {
     child.on('exit', code => resolve(code || 0));
   });
 }
 
+interface StartOptions {
+  port?: number;
+  foreground?: boolean;
+}
+
 // Idempotent start. Resolves with { alreadyRunning, pid, port }.
-async function start({ port = 3333, foreground = false } = {}) {
+async function start({ port = 3333, foreground = false }: StartOptions = {}) {
   // 1. Check existing instance via PID file.
   const existing = await status();
   if (existing.running) {

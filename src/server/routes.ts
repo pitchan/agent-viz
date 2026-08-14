@@ -8,6 +8,7 @@
 import fs from 'node:fs';
 const fsp = fs.promises;
 import path from 'node:path';
+import type { IncomingMessage, ServerResponse, Server } from 'node:http';
 
 import {
   DIR,
@@ -26,6 +27,34 @@ import { getObservatoryService } from './observatory/index.ts';
 import { createWatchdogRoutes } from './watchdog/routes.ts';
 import { getWatchdogService } from './watchdog/index.ts';
 
+// Un objet exploitable par accès de champ — même garde locale que les autres
+// fichiers du serveur : `JSON.parse` ne promet qu'un JSON valide, pas un objet.
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
+// Bridge vers la signature publique de `tokens.ts` (hors lot, scellé) : sa
+// forme privée (`TokensCarrier`) n'est pas exportée, `Parameters<...>`
+// l'emprunte sans la nommer — même geste qu'en lot 8 dans transcript.ts et
+// event-reader.ts. `rec` (Map alimentée par `tokens.ts` lui-même via
+// `ensureTokens`) porte réellement cette forme à l'exécution.
+type TokensCarrierLike = Parameters<typeof tokensMessage>[1];
+
+// La table de routage telle que ce fichier la déclare : chaque entrée locale
+// mêle handlers synchrones et asynchrones (fidèle à l'origine — pas de
+// passage en tout-async), donc `void | Promise<void>`. Les deux tables
+// importées (`createWatchdogRoutes`, `createObservatoryRoutes`) déclarent
+// leurs propres types de requête/réponse localement (interfaces minimales,
+// zéro dépendance) — `IncomingMessage`/`ServerResponse` les satisfont
+// structurellement, donc leurs tableaux s'assignent ici sans cast.
+interface Route {
+  method: string;
+  path?: string;
+  prefix?: string;
+  sameOrigin?: boolean;
+  handler: (req: IncomingMessage, res: ServerResponse, url: URL) => void | Promise<void>;
+}
+
 const PORT = process.env.PORT || 3333;
 const PROJECT_ROOT = path.join(import.meta.dirname, '..', '..');
 const HTML = path.join(PROJECT_ROOT, 'index.html');
@@ -33,14 +62,14 @@ const HTML = path.join(PROJECT_ROOT, 'index.html');
 // HTTP server reference for graceful shutdown — wired by server.js once the
 // instance has been created. Without this, /shutdown would have to live in
 // server.js itself.
-let _server = null;
-function setServer(s) { _server = s; }
+let _server: Server | null = null;
+function setServer(s: Server): void { _server = s; }
 
 // Reject cross-origin POSTs to destructive endpoints. CLI/programmatic callers
 // (lifecycle.js, curl) have no Origin header and are allowed; browsers always
 // send Origin on cross-origin requests, so a malicious site can't hit /shutdown
 // or /events?clear from a tab in another origin.
-function sameOrigin(req) {
+function sameOrigin(req: IncomingMessage): boolean {
   const origin = req.headers.origin;
   if (!origin) return true;
   return origin === `http://localhost:${PORT}` || origin === `http://127.0.0.1:${PORT}`;
@@ -49,12 +78,16 @@ function sameOrigin(req) {
 // ─── Handlers ──────────────────────────────────────────────────────────────
 
 // Instant push from hook.js — bypasses fs.watch latency.
-function notifyHandler(req, res) {
+function notifyHandler(req: IncomingMessage, res: ServerResponse): void {
   let body = '';
-  req.on('data', c => { body += c; });
+  // `'data'` sur `IncomingMessage` (aucun encodage posé) rend TOUJOURS un
+  // `Buffer` à l'exécution ; `string` reste dans l'union par fidélité au type
+  // d'événement du flux.
+  req.on('data', (c: Buffer | string) => { body += typeof c === 'string' ? c : c.toString('utf8'); });
   req.on('end', async () => {
     try {
-      const { session } = JSON.parse(body);
+      const parsed: unknown = JSON.parse(body);
+      const session = isRecord(parsed) ? parsed.session : undefined;
       // Validate before path.join — a crafted id could otherwise trigger a
       // read of an arbitrary .jsonl on disk and broadcast its contents.
       if (session && validSessionId(session)) {
@@ -69,7 +102,7 @@ function notifyHandler(req, res) {
   });
 }
 
-function shutdownHandler(_req, res) {
+function shutdownHandler(_req: IncomingMessage, res: ServerResponse): void {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
   res.end('bye');
   setTimeout(() => {
@@ -78,13 +111,13 @@ function shutdownHandler(_req, res) {
   }, 100);
 }
 
-const STATIC_MIME = {
+const STATIC_MIME: Record<string, string> = {
   '.js': 'application/javascript; charset=utf-8',
   '.mjs': 'application/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
 };
 
-async function staticHandler(_req, res, url) {
+async function staticHandler(_req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
   // No directory traversal: strip ".." segments before resolving.
   const safe = url.pathname.replace(/\.\.+/g, '');
   const p = path.join(PROJECT_ROOT, safe);
@@ -103,7 +136,7 @@ async function staticHandler(_req, res, url) {
   }
 }
 
-async function indexHandler(_req, res) {
+async function indexHandler(_req: IncomingMessage, res: ServerResponse): Promise<void> {
   try {
     const html = await fsp.readFile(HTML);
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
@@ -114,7 +147,7 @@ async function indexHandler(_req, res) {
   }
 }
 
-function streamHandler(req, res) {
+function streamHandler(req: IncomingMessage, res: ServerResponse): void {
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
@@ -124,7 +157,7 @@ function streamHandler(req, res) {
   sseClients.add(res);
   // Replay current token snapshots so a fresh client sees state immediately.
   for (const [sid, rec] of sessionIndex) {
-    const msg = tokensMessage(sid, rec);
+    const msg = tokensMessage(sid, rec as TokensCarrierLike);
     if (msg) {
       try { res.write(`data: ${JSON.stringify(msg)}\n\n`); } catch {}
     }
@@ -132,7 +165,7 @@ function streamHandler(req, res) {
   req.on('close', () => sseClients.delete(res));
 }
 
-async function eventsGetHandler(_req, res, url) {
+async function eventsGetHandler(_req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
   const sessionParam = url.searchParams.get('session');
   if (sessionParam && !validSessionId(sessionParam)) {
     res.writeHead(400, { 'Content-Type': 'text/plain' });
@@ -174,7 +207,7 @@ async function eventsGetHandler(_req, res, url) {
   res.end(data);
 }
 
-async function eventsClearHandler(_req, res, url) {
+async function eventsClearHandler(_req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
   const sid = url.searchParams.get('clear');
   try {
     if (sid && sid !== '1') {
@@ -186,7 +219,7 @@ async function eventsClearHandler(_req, res, url) {
       }
       await deleteSession(sessionFilePath(sid));
     } else {
-      let files;
+      let files: string[];
       try { files = (await fsp.readdir(DIR)).filter(f => f.endsWith('.jsonl')); }
       catch { files = []; }
       for (const f of files) await deleteSession(path.join(DIR, f));
@@ -197,7 +230,7 @@ async function eventsClearHandler(_req, res, url) {
   res.end('cleared');
 }
 
-async function summaryHandler(_req, res, url) {
+async function summaryHandler(_req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
   const sid = url.searchParams.get('session');
   if (!sid) { res.writeHead(400); res.end('missing session'); return; }
   if (!validSessionId(sid)) { res.writeHead(400); res.end('invalid session id'); return; }
@@ -216,17 +249,17 @@ async function summaryHandler(_req, res, url) {
 // pushes the live/active session; a session picked from the overlay fetches
 // this so the budget pill reflects it immediately. Returns JSON `null` when the
 // session has no token state yet.
-function tokensHandler(_req, res, url) {
+function tokensHandler(_req: IncomingMessage, res: ServerResponse, url: URL): void {
   const sid = url.searchParams.get('session');
   if (!sid) { res.writeHead(400); res.end('missing session'); return; }
   if (!validSessionId(sid)) { res.writeHead(400); res.end('invalid session id'); return; }
   const rec = sessionIndex.get(sid);
-  const msg = rec ? tokensMessage(sid, rec) : null;
+  const msg = rec ? tokensMessage(sid, rec as TokensCarrierLike) : null;
   res.writeHead(200, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(msg));
 }
 
-async function sessionsHandler(_req, res, url) {
+async function sessionsHandler(_req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
   // Optional forced rescan — rebuild index from disk. Useful if the user
   // deleted files outside the app or suspects drift.
   if (url.searchParams.has('rescan')) {
@@ -235,12 +268,12 @@ async function sessionsHandler(_req, res, url) {
   }
   // Warm any not-yet-attempted prompt caches in parallel (fire-and-forget
   // after the response so the client gets a fast reply).
-  const missing = [];
+  const missing: string[] = [];
   for (const rec of sessionIndex.values()) {
     if (rec.promptCache === undefined) missing.push(rec.id);
   }
   // Check which sessions have a .summary.json (compacted).
-  const summarySet = new Set();
+  const summarySet = new Set<string>();
   try {
     const allFiles = await fsp.readdir(DIR);
     for (const f of allFiles) {
@@ -272,7 +305,7 @@ async function sessionsHandler(_req, res, url) {
 }
 
 // ─── Route table ──────────────────────────────────────────────────────────
-const ROUTES = [
+const ROUTES: Route[] = [
   { method: 'POST', path: '/notify',     handler: notifyHandler },
   { method: 'POST', path: '/shutdown',   handler: shutdownHandler, sameOrigin: true },
   { method: 'GET',  prefix: '/src/web/', handler: staticHandler },
@@ -294,7 +327,7 @@ const ROUTES = [
   ...createObservatoryRoutes(getObservatoryService),
 ];
 
-function pathMatches(route, pathname) {
+function pathMatches(route: Route, pathname: string): boolean {
   if (route.path !== undefined) return route.path === pathname;
   if (route.prefix !== undefined) return pathname.startsWith(route.prefix);
   return false;
@@ -302,8 +335,12 @@ function pathMatches(route, pathname) {
 
 // Find route, run guards, dispatch. 404 for unknown path, 405 for known path
 // without a matching method or with a failed sameOrigin guard.
-async function dispatch(req, res) {
-  const url = new URL(req.url, 'http://localhost');
+async function dispatch(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  // `req.url` est `string | undefined` dans le type Node — toujours défini en
+  // pratique pour une vraie requête entrante (posé par le serveur HTTP avant
+  // que `dispatch` ne soit appelé) ; le repli documente l'invariant sans
+  // changer d'issue pour aucune requête réelle.
+  const url = new URL(req.url ?? '', 'http://localhost');
   const pathHits = ROUTES.filter(r => pathMatches(r, url.pathname));
   if (pathHits.length === 0) {
     res.writeHead(404); res.end('Not found'); return;

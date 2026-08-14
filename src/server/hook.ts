@@ -29,14 +29,14 @@ const PORT = parseInt(process.env.AGENT_VIZ_PORT || process.env.PORT || '3333', 
 // d'agent affichent toute sortie stderr non vide comme une « erreur de hook »
 // même quand le processus sort en 0. Un échec d'écriture disque est avalé — on
 // ne peut de toute façon rien en faire ici.
-function logHookError(message) {
+function logHookError(message: string): void {
   try {
     fs.mkdirSync(DIR, { recursive: true });
     fs.appendFileSync(path.join(DIR, '_hook-errors.log'), `${new Date().toISOString()} ${message}\n`);
   } catch {}
 }
 
-function parseSource(argv) {
+function parseSource(argv: string[]): 'claude' | 'copilot' {
   for (const a of argv) {
     if (a.startsWith('--source=')) {
       const v = a.slice('--source='.length);
@@ -46,7 +46,7 @@ function parseSource(argv) {
   return 'claude';
 }
 
-function runHook() {
+function runHook(): void {
   try { fs.mkdirSync(DIR, { recursive: true }); } catch {}
 
   const source = parseSource(process.argv.slice(2));
@@ -70,7 +70,7 @@ function runHook() {
       // de docs/audit-qualite-code.md). Le BOM est compare par CODE de
       // caractere, jamais par un motif contenant le caractere lui-meme : un
       // BOM litteral dans le source serait invisible a la relecture.
-      const evt = JSON.parse(input.charCodeAt(0) === 0xFEFF ? input.slice(1) : input);
+      const evt: Record<string, unknown> = JSON.parse(input.charCodeAt(0) === 0xFEFF ? input.slice(1) : input);
       evt._ts = new Date().toISOString();
       evt._source = source;
       const sid = evt.session_id;
@@ -90,13 +90,14 @@ function runHook() {
       req.on('error', () => {});
       req.on('timeout', () => req.destroy());
       req.end(body);
-    } catch (err) {
+    } catch (err: unknown) {
       // Ce catch etait VIDE, et le journal d'erreur vivait lui-meme dans le
       // try, apres l'analyse : un echec de JSON.parse ne laissait donc AUCUNE
       // trace, nulle part. Perte de capture totale et silencieuse dans un
       // produit dont la capture est la raison d'etre (constat C1). On sort
       // toujours en 0 — on ne bloque jamais l'agent — mais plus jamais muet.
-      logHookError(`payload rejected: ${(err && err.message) || err} source=${source}`);
+      const message = err instanceof Error ? err.message : String(err);
+      logHookError(`payload rejected: ${message} source=${source}`);
     }
     process.exit(0);
   });
