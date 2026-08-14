@@ -21,6 +21,11 @@
 
 import https from 'node:https';
 import { computeCost, normalizeModel } from './pricing-engine.ts';
+// Ruling R8 (doc/36 §4.1) : `import type` seul — effacé à l'émission. Ce
+// fichier n'est pas l'un des cinq ponts (il consomme `pricing-engine.ts`, qui
+// l'est), mais la forme de la table transmise par le moteur à
+// `applyEnginePrices` n'existe que côté TypeScript.
+import type { ModelPrices, PricePeriod, PriceTable } from '../engine/core/pricing.ts';
 
 const LITELLM_URL = 'https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json';
 const REFRESH_MS = 24 * 60 * 60 * 1000;
@@ -34,6 +39,15 @@ const MAX_BODY_BYTES = 5 * 1024 * 1024;
 // claude-(opus|sonnet|haiku)-X-Y.
 const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
+/** Une entrée de la carte de prix en mémoire — les quatre tarifs (hérités du
+ *  moteur, `ModelPrices`) plus les métadonnées d'affichage que SEUL le
+ *  serveur porte (C4), et l'historique optionnel des barèmes antérieurs. */
+interface PriceEntry extends ModelPrices {
+  maxInput: number;
+  label: string;
+  history?: readonly PricePeriod[];
+}
+
 // Static fallback — covers the Claude 5 and 4.x families. Prices in USD per
 // token. This is the proven offline mirror of the engine's embedded table
 // (tests/unit/pricing-engine-mirror.test.cjs keeps the two in lockstep) — it
@@ -46,7 +60,7 @@ const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 // must be kept aligned with Anthropic's public rate card. Each entry carries
 // its CURRENT rates; a model whose tariff changed over time also carries its
 // dated periods in its own `history` field (see claude-sonnet-5 below).
-const FALLBACK = Object.freeze({
+const FALLBACK: Readonly<Record<string, PriceEntry>> = Object.freeze({
   'claude-fable-5':    { input: 1e-5, output: 5e-5,   cacheCreate: 1.25e-5, cacheRead: 1e-6, maxInput: 1_000_000, label: 'Fable 5' },
   'claude-mythos-5':   { input: 1e-5, output: 5e-5,   cacheCreate: 1.25e-5, cacheRead: 1e-6, maxInput: 1_000_000, label: 'Mythos 5' },
   'claude-opus-5':     { input: 5e-6, output: 2.5e-5, cacheCreate: 6.25e-6, cacheRead: 5e-7, maxInput: 1_000_000, label: 'Opus 5' },
@@ -74,17 +88,17 @@ const FALLBACK = Object.freeze({
 // src/engine/core/pricing.ts, and `known: true` on a $0 result is how a
 // WANTED zero is told apart from a tariff we do not know.
 
-let prices = { ...FALLBACK };
+let prices: Record<string, PriceEntry> = { ...FALLBACK };
 let lastFetched = 0;
-let refreshTimer = null;
+let refreshTimer: NodeJS.Timeout | null = null;
 
 // `at` (optional, ISO UTC timestamp) selects the tariff in effect at that
 // instant; omitted means "now". Dated periods travel WITH the entry (engine
 // table or FALLBACK mirror); only the rates go back in time — label and
 // maxInput stay from the current entry.
-function getPrice(id, at) {
+function getPrice(id: string | null | undefined, at?: string): PriceEntry | null {
   if (!id) return null;
-  const current = prices[id] || (() => {
+  const current: PriceEntry | null = prices[id] || (() => {
     const norm = normalizeModel(id);
     return (norm && prices[norm]) || null;
   })();
@@ -112,30 +126,39 @@ function getPrice(id, at) {
 // Derive a human label ("Opus 4.7", "Fable 5") from a canonical id when
 // LiteLLM doesn't already provide one (it doesn't expose a "label" field).
 // Claude 5 ids carry a single version digit (claude-fable-5), 4.x carry two.
-function deriveLabel(id) {
+function deriveLabel(id: string): string {
   const m = id.match(/^claude-(opus|sonnet|haiku|fable|mythos)-(\d+)(?:-(\d+))?/);
   if (m) {
-    const family = `${m[1][0].toUpperCase()}${m[1].slice(1)}`;
+    const familyRaw = m[1] ?? '';
+    const family = familyRaw.charAt(0).toUpperCase() + familyRaw.slice(1);
     return m[3] !== undefined ? `${family} ${m[2]}.${m[3]}` : `${family} ${m[2]}`;
   }
   return id;
+}
+
+/** Famille et couple [majeur, mineur] (mineur absent = 0) — `null` hors forme. */
+interface FamilyVersion {
+  family: string;
+  version: readonly [number, number];
 }
 
 // Parses a canonical id into its family and [major, minor] version tuple
 // (minor absent = 0). Pure — no dependency on the live price map. Returns
 // null for anything that doesn't match the strict "claude-<family>-N[-M]"
 // shape (kept out of the new-model decision below rather than guessed at).
-function familyVersionOf(canonical) {
+function familyVersionOf(canonical: string): FamilyVersion | null {
   const m = /^claude-(opus|sonnet|haiku|fable|mythos)-(\d+)(?:-(\d+))?$/.exec(canonical);
   if (!m) return null;
-  return { family: m[1], version: [Number(m[2]), m[3] === undefined ? 0 : Number(m[3])] };
+  const family = m[1];
+  if (family === undefined) return null;
+  return { family, version: [Number(m[2]), m[3] === undefined ? 0 : Number(m[3])] };
 }
 
 // Highest [major, minor] tuple currently on file for a family, read from the
 // live price map (FALLBACK or the engine table, whichever is loaded) at call
 // time — so the "new model" bar rises automatically as the table grows.
-function familyMaxVersion(family) {
-  let max = null;
+function familyMaxVersion(family: string): readonly [number, number] | null {
+  let max: readonly [number, number] | null = null;
   for (const key of Object.keys(prices)) {
     const fv = familyVersionOf(key);
     if (!fv || fv.family !== family) continue;
@@ -144,6 +167,16 @@ function familyMaxVersion(family) {
     }
   }
   return max;
+}
+
+/** Un écart entre le barème embarqué et le flux LiteLLM — deux natures :
+ *  un modèle canonique jamais vu (`modele-nouveau`, `embedded` alors `null`),
+ *  ou un tarif différent sur un modèle déjà connu (`tarif-different`). */
+interface Drift {
+  model: string;
+  kind: 'modele-nouveau' | 'tarif-different';
+  litellm: ModelPrices;
+  embedded: ModelPrices | null;
 }
 
 // LiteLLM is a WATCHDOG (vigie), not a price source: the daily fetch compares
@@ -173,22 +206,23 @@ function familyMaxVersion(family) {
 // "new model" detection above (a new version can appear regional-first) but
 // are deduplicated by canonical id — 3 variants of one new model is one
 // alert, not three.
-function litellmDrift(json, at) {
-  const drifts = [];
-  const reportedNewModels = new Set();
+function litellmDrift(json: Record<string, unknown>, at?: string): Drift[] {
+  const drifts: Drift[] = [];
+  const reportedNewModels = new Set<string>();
   for (const [k, v] of Object.entries(json)) {
     if (!v || typeof v !== 'object') continue;
-    if (typeof v.input_cost_per_token !== 'number') continue;
-    if (typeof v.output_cost_per_token !== 'number') continue;
-    if (typeof v.cache_creation_input_token_cost !== 'number') continue;
-    if (typeof v.cache_read_input_token_cost !== 'number') continue;
-    if (typeof v.max_input_tokens !== 'number') continue;
+    const rec = v as Record<string, unknown>;
+    if (typeof rec.input_cost_per_token !== 'number') continue;
+    if (typeof rec.output_cost_per_token !== 'number') continue;
+    if (typeof rec.cache_creation_input_token_cost !== 'number') continue;
+    if (typeof rec.cache_read_input_token_cost !== 'number') continue;
+    if (typeof rec.max_input_tokens !== 'number') continue;
     if (!/(^|\.|\/)claude-(opus|sonnet|haiku|fable|mythos)-/.test(k)) continue;
     const canonical = normalizeModel(k);
     if (!canonical || FORBIDDEN_KEYS.has(canonical)) continue;
-    const upstream = {
-      input: v.input_cost_per_token, output: v.output_cost_per_token,
-      cacheCreate: v.cache_creation_input_token_cost, cacheRead: v.cache_read_input_token_cost,
+    const upstream: ModelPrices = {
+      input: rec.input_cost_per_token, output: rec.output_cost_per_token,
+      cacheCreate: rec.cache_creation_input_token_cost, cacheRead: rec.cache_read_input_token_cost,
     };
     const local = getPrice(canonical, at);
     if (!local) {
@@ -204,7 +238,7 @@ function litellmDrift(json, at) {
       continue;
     }
     if (k !== canonical) continue; // regional/transport variant — different SKU, not compared
-    const differs = ['input', 'output', 'cacheCreate', 'cacheRead']
+    const differs = (['input', 'output', 'cacheCreate', 'cacheRead'] as const)
       .some(f => Math.abs(local[f] - upstream[f]) > Math.abs(local[f]) * 1e-9);
     if (differs) {
       drifts.push({
@@ -216,10 +250,16 @@ function litellmDrift(json, at) {
   return drifts;
 }
 
+/** Enveloppe portée à l'abonné, une seule fois par cycle de rafraîchissement. */
+interface DriftReport {
+  checkedAt: string;
+  drifts: Drift[];
+}
+
 // Drift consumer registration — server.js plugs the SSE broadcast in here, so
 // this module keeps zero I/O of its own.
-let _onDrift = null;
-function onPricingDrift(fn) { _onDrift = fn; }
+let _onDrift: ((report: DriftReport) => void) | null = null;
+function onPricingDrift(fn: (report: DriftReport) => void): void { _onDrift = fn; }
 
 // One-shot fetch with no retries — the in-memory map keeps the previous
 // value (or FALLBACK) if this fails. Resolves to a boolean for callers who
@@ -229,15 +269,15 @@ function onPricingDrift(fn) { _onDrift = fn; }
 // avoids the quadratic string concat that `body += chunk` would produce on
 // large payloads. A hard MAX_BODY_BYTES cap aborts the stream if the server
 // tries to feed us an unbounded response.
-function loadPricing() {
+function loadPricing(): Promise<boolean> {
   return new Promise(resolve => {
     const req = https.get(LITELLM_URL, { timeout: 10_000 }, res => {
       if (res.statusCode !== 200) { res.resume(); return resolve(false); }
-      const chunks = [];
+      const chunks: string[] = [];
       let received = 0;
       let aborted = false;
       res.setEncoding('utf8');
-      res.on('data', c => {
+      res.on('data', (c: string) => {
         if (aborted) return;
         received += c.length;
         if (received > MAX_BODY_BYTES) {
@@ -266,18 +306,18 @@ function loadPricing() {
 // Fire-and-forget kickoff used at server boot. Schedules a 24h refresh on
 // first success. Idempotent — the timer guard short-circuits BEFORE the
 // initial fetch so a second call doesn't trigger a duplicate HTTPS round-trip.
-function startPricingRefresh() {
+function startPricingRefresh(): void {
   if (refreshTimer) return;
   loadPricing().then(ok => {
     if (ok) console.log('[pricing] vigie: LiteLLM feed compared against the embedded table');
     else console.log('[pricing] vigie: LiteLLM unreachable — silence (offline is a normal state)');
   });
-  refreshTimer = setInterval(() => loadPricing().catch(err => console.error('[pricing] refresh failed:', err.message)), REFRESH_MS);
+  refreshTimer = setInterval(() => loadPricing().catch((err: unknown) => console.error('[pricing] refresh failed:', err instanceof Error ? err.message : String(err))), REFRESH_MS);
   refreshTimer.unref();
 }
 
 // Test hook — lets unit tests stub the price map without going through https.
-function _setPricesForTest(map) {
+function _setPricesForTest(map: Record<string, PriceEntry>): void {
   prices = { ...FALLBACK, ...map };
 }
 
@@ -285,8 +325,8 @@ function _setPricesForTest(map) {
 // table — the ONE tariff authority of the product, real-time pill included.
 // Called at boot by server.js once the engine resolves; a missing engine is
 // normal and leaves the FALLBACK mirror in place. Dated periods included.
-function applyEnginePrices(table) {
-  const next = Object.create(null);
+function applyEnginePrices(table: PriceTable): void {
+  const next: Record<string, PriceEntry> = Object.create(null);
   Object.assign(next, FALLBACK);
   for (const e of table.entries) {
     if (!e.model || FORBIDDEN_KEYS.has(e.model)) continue;

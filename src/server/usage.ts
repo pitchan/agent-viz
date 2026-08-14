@@ -16,10 +16,23 @@
 
 import { requireEngineModule } from './engine-require.ts';
 
-const { addUsage, emptyUsageBucket, finiteCount, isDedupableMsgId, sumUsageInto } =
-  requireEngineModule(
-    'core/usage.js',
-    ['addUsage', 'emptyUsageBucket', 'finiteCount', 'isDedupableMsgId', 'sumUsageInto'],
-    'usage');
+// Ruling R8 (doc/36 §4.1) : `import type` seul — effacé à l'émission, aucune
+// arête d'exécution nouvelle. Le chargement réel reste `requireEngineModule`
+// ci-dessous, INCHANGÉ (même chemin, même liste de noms, même étiquette).
+import type * as EngineUsage from '../engine/core/usage.ts';
+
+const mod = requireEngineModule(
+  'core/usage.js',
+  ['addUsage', 'emptyUsageBucket', 'finiteCount', 'isDedupableMsgId', 'sumUsageInto'],
+  'usage');
+
+// Chaque nom recouvre son type réel du moteur — `mod.xxx` est `unknown`
+// (retour de `requireEngineModule`), jamais `any` ; le cast vise le type
+// IMPORTÉ, pas `any`.
+const addUsage = mod.addUsage as typeof EngineUsage.addUsage;
+const emptyUsageBucket = mod.emptyUsageBucket as typeof EngineUsage.emptyUsageBucket;
+const finiteCount = mod.finiteCount as typeof EngineUsage.finiteCount;
+const isDedupableMsgId = mod.isDedupableMsgId as typeof EngineUsage.isDedupableMsgId;
+const sumUsageInto = mod.sumUsageInto as typeof EngineUsage.sumUsageInto;
 
 export { addUsage, emptyUsageBucket, finiteCount, isDedupableMsgId, sumUsageInto };

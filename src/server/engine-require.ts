@@ -29,29 +29,38 @@ const require = createRequire(import.meta.url);
 const DIST = path.join(import.meta.dirname, '..', '..', 'dist', 'engine');
 
 /**
- * @param {string} rel   chemin DANS le `dist` du moteur, ex. `core/jsonl.js`.
+ * @param rel   chemin DANS le `dist` du moteur, ex. `core/jsonl.js`.
  *   Relatif au `dist` et non au module appelant : un pont placé ailleurs dans
  *   `src/server/` ne peut pas se tromper d'un niveau sans que rien ne le dise.
- * @param {string[]} noms les exports attendus. Un manque signale un build
+ * @param noms les exports attendus. Un manque signale un build
  *   périmé, pas un build absent — deux causes qui envoient chercher à des
  *   endroits opposés.
- * @param {string} etiquette le préfixe des messages, ex. `jsonl`.
+ * @param etiquette le préfixe des messages, ex. `jsonl`.
+ *
+ * Retour : `Record<string, unknown>`, jamais `any` — `require()` d'un chemin
+ * calculé rend `any` implicite (aucune déclaration de module ne couvre un
+ * chemin dynamique), canalisé ici plutôt que laissé fuir. Chaque appelant
+ * (les 4 ponts) sait, lui, quels types réels se cachent derrière chaque nom et
+ * les recouvre par `import type … from '../engine/<module>.ts'` + `as typeof`
+ * (Ruling R8) — ce fichier-ci n'a pas cette connaissance, et n'en a pas besoin :
+ * son seul travail est de charger et de vérifier la présence des noms.
  */
-function requireEngineModule(rel, noms, etiquette) {
+function requireEngineModule(rel: string, noms: string[], etiquette: string): Record<string, unknown> {
   const chemin = path.join(DIST, rel);
-  let module;
+  let module: Record<string, unknown>;
   try {
     module = require(chemin);
-  } catch (err) {
+  } catch (err: unknown) {
     // Casser bruyamment, jamais silencieusement — c'est la règle que C1 a
     // rappelée au prix d'une perte de capture. Un message cryptique de module
     // introuvable enverrait chercher un paquet npm manquant ; la cause réelle
     // est un build absent.
+    const cause = err instanceof Error ? err.message : String(err);
     throw new Error(
       `[${etiquette}] le module « ${rel} » du moteur est introuvable. Ce dossier ` +
       'est produit par `npm run build`, que le script `prepare` lance ' +
       'automatiquement à l’installation — un dépôt cloné puis jamais installé ' +
-      `n’en a pas. Lancez \`npm run build\`. Cause d’origine : ${err.message}`,
+      `n’en a pas. Lancez \`npm run build\`. Cause d’origine : ${cause}`,
     );
   }
 

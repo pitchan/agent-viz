@@ -16,6 +16,7 @@ import path from 'node:path';
 import os from 'node:os';
 
 import { decodeJsonlLine } from './jsonl.ts';
+import type { JsonlLine } from './jsonl.ts';
 
 const DIR = path.join(os.tmpdir(), 'agent-events');
 try { fs.mkdirSync(DIR, { recursive: true }); } catch {}
@@ -35,28 +36,54 @@ const WATCH_WINDOW_MS = 2 * 3600_000;
 const COMPACT_THRESHOLD_BYTES = parseInt(process.env.VIZ_COMPACT_KB || '500', 10) * 1024;
 const COMPACT_KEEP_EVENTS = 100;
 
-// id → record
-const sessionIndex = new Map();
+// Le disque canonique d'une session — les champs que CE fichier possède et
+// écrit. `[key: string]: unknown` reste ouvert aux tranches nommées que
+// `transcript.ts` (`rec.transcript`) et `tokens.ts` (`rec.tokens`) posent sur
+// le même enregistrement, documentées ci-dessus mais opaques ici : ce module
+// n'en lit ni n'en écrit aucun champ, c'est la doctrine SRP du fichier.
+export interface SessionRecord {
+  id: string;
+  promptCache: unknown;
+  promptWindow: number;
+  eventCount: number;
+  size: number;
+  mtime: number;
+  agentSource?: string;
+  [key: string]: unknown;
+}
 
-function sessionFilePath(sid) {
+// id → record
+const sessionIndex = new Map<string, SessionRecord>();
+
+function sessionFilePath(sid: string): string {
   return path.join(DIR, sid + '.jsonl');
 }
 
-function idFromPath(fp) { return path.basename(fp, '.jsonl'); }
+function idFromPath(fp: string): string { return path.basename(fp, '.jsonl'); }
 
 // Session IDs come from Claude Code (UUID) or fall back to "unknown" in hook.js.
 // We restrict to safe filename chars to prevent path traversal via crafted ?session=
 // or ?clear= values being concatenated into path.join(DIR, sid + '.jsonl').
-function validSessionId(sid) {
+function validSessionId(sid: unknown): sid is string {
   return typeof sid === 'string' && /^[a-zA-Z0-9_-]{1,64}$/.test(sid);
 }
 
+// Un objet exploitable par accès de champ — voir le même garde-fou dans les
+// ponts du moteur : `decodeJsonlLine` ne promet qu'un JSON valide, pas un
+// objet, et `null`/`42`/`"texte"` en sont aussi.
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
 // Stream-count newlines without loading the whole file into a string.
-function countNewlinesStreaming(fp) {
+function countNewlinesStreaming(fp: string): Promise<number> {
   return new Promise((resolve) => {
     let count = 0;
     const stream = fs.createReadStream(fp);
-    stream.on('data', buf => {
+    // Pas d'encodage posé sur le flux : le runtime ne livre que des `Buffer`,
+    // jamais des `string` — le type de l'écouteur `data`, lui, couvre les deux.
+    stream.on('data', (chunk: string | Buffer) => {
+      const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
       for (let i = 0; i < buf.length; i++) if (buf[i] === 0x0a) count++;
     });
     stream.on('end', () => resolve(count));
@@ -64,7 +91,7 @@ function countNewlinesStreaming(fp) {
   });
 }
 
-async function indexSessionInitial(fp) {
+async function indexSessionInitial(fp: string): Promise<void> {
   const id = idFromPath(fp);
   if (sessionIndex.has(id)) return;
   try {
@@ -74,18 +101,20 @@ async function indexSessionInitial(fp) {
     // Stays undefined when the field is missing — every hook installed by
     // agent-viz >= 0.2.0 stamps _source, so absence means a stale file or a
     // foreign producer. Don't silently coerce to 'claude'.
-    let agentSource;
+    let agentSource: string | undefined;
     try {
       const fh = await fsp.open(fp, 'r');
       const buf = Buffer.alloc(Math.min(4096, stat.size));
       await fh.read(buf, 0, buf.length, 0);
       await fh.close();
-      const firstLine = buf.toString('utf8').split('\n')[0];
+      // `split('\n')` rend toujours au moins un élément — l'index 0 existe en
+      // pratique ; le repli sur '' ne sert que `noUncheckedIndexedAccess`.
+      const firstLine = buf.toString('utf8').split('\n')[0] ?? '';
       // C2 : verdict rendu par la primitive commune, plus par un JSON.parse
       // local. Elle ne lève pas — un échec se lit, il ne s'attrape pas. Effet
       // voulu : une première ligne préfixée d'un BOM est désormais décodée, là
       // où la sonde perdait `_source` sans que rien ne soit réparable.
-      const verdict = decodeJsonlLine(firstLine);
+      const verdict: JsonlLine | null = decodeJsonlLine(firstLine);
       if (verdict && !verdict.ok) {
         // On garde la trace, comme avant — mais en nommant la cause la plus
         // probable, que la sonde ne peut pas distinguer d'un fichier corrompu :
@@ -95,11 +124,12 @@ async function indexSessionInitial(fp) {
           `(${verdict.rawLength} caractères ; au-delà de ${buf.length} octets lus, elle arrive tronquée)`,
         );
       }
-      const evt = verdict && verdict.ok ? verdict.value : null;
-      if (evt && typeof evt._source === 'string') agentSource = evt._source;
-    } catch (err) {
+      const evt: unknown = verdict && verdict.ok ? verdict.value : null;
+      if (isRecord(evt) && typeof evt._source === 'string') agentSource = evt._source;
+    } catch (err: unknown) {
       // Ne couvre plus que l'accès disque : le décodage, lui, ne lève pas.
-      console.error(`[session-index] ${id.slice(0, 8)}: sonde agentSource — lecture impossible : ${err.message}`);
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`[session-index] ${id.slice(0, 8)}: sonde agentSource — lecture impossible : ${message}`);
     }
     sessionIndex.set(id, {
       id,
@@ -113,7 +143,7 @@ async function indexSessionInitial(fp) {
   } catch {}
 }
 
-function touchIndex(fp, sizeDelta, newlineDelta) {
+function touchIndex(fp: string, sizeDelta: number, newlineDelta: number): void {
   const id = idFromPath(fp);
   let rec = sessionIndex.get(id);
   if (!rec) {
@@ -125,8 +155,8 @@ function touchIndex(fp, sizeDelta, newlineDelta) {
   rec.mtime = Date.now();
 }
 
-function latestSession() {
-  let latest = null, latestMtime = 0;
+function latestSession(): string | null {
+  let latest: string | null = null, latestMtime = 0;
   for (const rec of sessionIndex.values()) {
     if (rec.mtime > latestMtime) { latestMtime = rec.mtime; latest = rec.id; }
   }

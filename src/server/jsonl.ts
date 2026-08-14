@@ -14,6 +14,13 @@
 
 import { requireEngineModule } from './engine-require.ts';
 
-const { decodeJsonlLine } = requireEngineModule('core/jsonl.js', ['decodeJsonlLine'], 'jsonl');
+// Ruling R8 : `import type` seul. Le chargement réel reste `requireEngineModule`
+// ci-dessous, INCHANGÉ (même chemin, même liste de noms).
+import type * as EngineJsonl from '../engine/core/jsonl.ts';
+
+const mod = requireEngineModule('core/jsonl.js', ['decodeJsonlLine'], 'jsonl');
+
+const decodeJsonlLine = mod.decodeJsonlLine as typeof EngineJsonl.decodeJsonlLine;
 
 export { decodeJsonlLine };
+export type { JsonlLine } from '../engine/core/jsonl.ts';

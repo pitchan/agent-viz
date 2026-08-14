@@ -24,6 +24,10 @@
 
 import { requireEngineModule } from './engine-require.ts';
 
+// Ruling R8 : `import type` seul. Le chargement réel reste `requireEngineModule`
+// ci-dessous, INCHANGÉ (même chemin, même liste de noms).
+import type * as EnginePricing from '../engine/core/pricing.ts';
+
 // `pricingKindOf` est la contrepartie QUALITATIVE de `computeCost`, qui ne rend
 // qu'un montant : elle nomme les trois cas — `tarife`, `zero-voulu`,
 // `inconnu`. Le serveur en a besoin parce que les trois appellent trois
@@ -31,9 +35,14 @@ import { requireEngineModule } from './engine-require.ts';
 // impossible : un modèle tarifé qui n'a produit aucun jeton coûte 0 $ lui
 // aussi. C'est exactement la confusion qui faisait traiter `<synthetic>`
 // — 80 occurrences sur 833 transcriptions — comme un modèle inconnu.
-const { computeCost, normalizeModel, pricingKindOf } = requireEngineModule(
+const mod = requireEngineModule(
   'core/pricing.js',
   ['computeCost', 'normalizeModel', 'pricingKindOf'],
   'pricing');
 
+const computeCost = mod.computeCost as typeof EnginePricing.computeCost;
+const normalizeModel = mod.normalizeModel as typeof EnginePricing.normalizeModel;
+const pricingKindOf = mod.pricingKindOf as typeof EnginePricing.pricingKindOf;
+
 export { computeCost, normalizeModel, pricingKindOf };
+export type { CostResult, PricingKind } from '../engine/core/pricing.ts';
