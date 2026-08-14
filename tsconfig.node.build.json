@@ -2,7 +2,8 @@
   "extends": "./tsconfig.node.json",
   "compilerOptions": {
     "rootDir": "src",
-    "outDir": "dist"
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/tsconfig.node.build.tsbuildinfo"
   },
-  "include": ["src/engine/**/*.ts"]
+  "include": ["src/engine/**/*.ts", "src/server/**/*.ts"]
 }

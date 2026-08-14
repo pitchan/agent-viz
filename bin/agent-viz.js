@@ -136,7 +136,7 @@ async function cmdStart(argv) {
   const shouldInstall = flags['install-hooks'] !== false;
 
   if (shouldInstall) {
-    const { install } = await import(pathToFileURL(path.join(PKG_ROOT, 'src', 'server', 'install-hooks.js')).href);
+    const { install } = await import(pathToFileURL(path.join(PKG_ROOT, 'dist', 'server', 'install-hooks.js')).href);
     try {
       const result = install({ cwd: process.cwd(), packageRoot: PKG_ROOT, version: PKG_VERSION });
       let printed = false;
@@ -161,7 +161,7 @@ async function cmdStart(argv) {
     }
   }
 
-  const { start, status } = await import(pathToFileURL(path.join(PKG_ROOT, 'src', 'server', 'lifecycle.js')).href);
+  const { start, status } = await import(pathToFileURL(path.join(PKG_ROOT, 'dist', 'server', 'lifecycle.js')).href);
   try {
     const res = await start({ port, foreground: flags.foreground });
     if (res.foreground) {
@@ -181,7 +181,7 @@ async function cmdStart(argv) {
 
 async function cmdStop(argv) {
   const flags = parseFlags(argv || [], { booleans: ['keep-hooks'] });
-  const { stop, status } = await import(pathToFileURL(path.join(PKG_ROOT, 'src', 'server', 'lifecycle.js')).href);
+  const { stop, status } = await import(pathToFileURL(path.join(PKG_ROOT, 'dist', 'server', 'lifecycle.js')).href);
   const before = await status();
   let res = null;
   if (before.running) {
@@ -197,7 +197,7 @@ async function cmdStop(argv) {
   // uninstalling an agent that was never installed is a no-op.
   const shouldUninstall = flags['keep-hooks'] !== true;
   if (shouldUninstall) {
-    const { uninstall, resolveScope } = await import(pathToFileURL(path.join(PKG_ROOT, 'src', 'server', 'install-hooks.js')).href);
+    const { uninstall, resolveScope } = await import(pathToFileURL(path.join(PKG_ROOT, 'dist', 'server', 'install-hooks.js')).href);
     try {
       const scoped = resolveScope({ cwd: process.cwd(), packageRoot: PKG_ROOT });
       const result = uninstall({ scope: scoped.scope, cwd: process.cwd(), packageRoot: PKG_ROOT });
@@ -225,8 +225,8 @@ async function cmdStop(argv) {
 }
 
 async function cmdStatus() {
-  const { status } = await import(pathToFileURL(path.join(PKG_ROOT, 'src', 'server', 'lifecycle.js')).href);
-  const { installedScopes } = await import(pathToFileURL(path.join(PKG_ROOT, 'src', 'server', 'install-hooks.js')).href);
+  const { status } = await import(pathToFileURL(path.join(PKG_ROOT, 'dist', 'server', 'lifecycle.js')).href);
+  const { installedScopes } = await import(pathToFileURL(path.join(PKG_ROOT, 'dist', 'server', 'install-hooks.js')).href);
   const s = await status();
   if (s.running) {
     console.log(`${c.ok('running')} ${c.hint('→')} http://localhost:${s.port}`);
@@ -261,7 +261,7 @@ async function cmdInstallHooks(argv) {
   });
   let scope = pickScopeFlag(flags);
   let target = pickTargetFlag(flags);
-  const { install, audit, detectAgents, findProjectRoot } = await import(pathToFileURL(path.join(PKG_ROOT, 'src', 'server', 'install-hooks.js')).href);
+  const { install, audit, detectAgents, findProjectRoot } = await import(pathToFileURL(path.join(PKG_ROOT, 'dist', 'server', 'install-hooks.js')).href);
 
   // Zero-flag invocation (no scope, no target, not --check) opens an
   // interactive prompt asking which agent + which scope. --check stays
@@ -274,7 +274,7 @@ async function cmdInstallHooks(argv) {
       console.error(c.dim('    agent-viz install-hooks --user --target=both'));
       process.exit(1);
     }
-    const { promptInstallParams } = await import(pathToFileURL(path.join(PKG_ROOT, 'src', 'server', 'prompt-install.js')).href);
+    const { promptInstallParams } = await import(pathToFileURL(path.join(PKG_ROOT, 'dist', 'server', 'prompt-install.js')).href);
     const detected = detectAgents();
     const projectRoot = findProjectRoot(process.cwd(), { packageRoot: PKG_ROOT });
     try {
@@ -352,7 +352,7 @@ async function cmdUninstallHooks(argv) {
   });
   const scope = pickScopeFlag(flags);
   const target = pickTargetFlag(flags);
-  const { uninstall } = await import(pathToFileURL(path.join(PKG_ROOT, 'src', 'server', 'install-hooks.js')).href);
+  const { uninstall } = await import(pathToFileURL(path.join(PKG_ROOT, 'dist', 'server', 'install-hooks.js')).href);
   const result = uninstall({ target, scope, cwd: process.cwd(), packageRoot: PKG_ROOT });
   let total = 0;
   for (const [agent, x] of Object.entries(result)) {
@@ -370,7 +370,7 @@ async function cmdUninstallHooks(argv) {
 
 async function cmdHook() {
   // Internal: forwarded by Claude Code via settings.json.
-  const { runHook } = await import(pathToFileURL(path.join(PKG_ROOT, 'src', 'server', 'hook.js')).href);
+  const { runHook } = await import(pathToFileURL(path.join(PKG_ROOT, 'dist', 'server', 'hook.js')).href);
   runHook();
 }
 

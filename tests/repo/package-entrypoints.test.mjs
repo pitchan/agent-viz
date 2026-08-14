@@ -118,8 +118,18 @@ test('chaque point d entree declare resout sur le disque', () => {
 test('le script build efface dist/engine avant de compiler', () => {
   // Arrange — les deux positions dans le script, en clair. `search` rend -1
   // quand le motif manque, ce qui distingue « absent » de « mal place ».
+  //
+  // SPECIFICATEUR (etape 4, tache 9) : le script d avant appelait
+  // `rmSync('dist/engine', ...)` directement — la cible suivait l appel dans
+  // le texte. Celui d apres partage l effacement de `dist/engine` ET
+  // `dist/server` dans un seul `rmSync`, via `['dist/engine','dist/server']
+  // .forEach(d=>...rmSync(d,...))` : la cible PRECEDE desormais l appel. Le
+  // motif reconnait les deux ordres — l exigence qu il verifie ne bouge pas :
+  // `rmSync` doit toujours porter sur `dist/engine`, quelque part avant `tsc`.
   const build = typeof PKG.scripts?.build === 'string' ? PKG.scripts.build : '';
-  const effacement = build.search(/rmSync\([^)]*['"]dist\/engine['"]/);
+  const effacement = build.search(
+    /rmSync\([^)]*['"]dist\/engine['"]|\[[^\]]*['"]dist\/engine['"][^\]]*\][^;]*rmSync\(/,
+  );
   const compilation = build.search(/\btsc\b/);
   const manques = [];
 

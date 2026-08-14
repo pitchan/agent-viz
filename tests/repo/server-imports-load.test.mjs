@@ -113,25 +113,45 @@ function pointDEntree() {
   return path.join(ROOT, pkg.main);
 }
 
+// SPECIFICATEUR (etape 4, tache 9) : `main` designe desormais l EMISSION
+// (`dist/server/server.js`), plus la SOURCE (`src/server/server.ts`) — la
+// comparaison directe entre `entree` et les fichiers de `RACINE_SERVEUR` ne
+// peut donc plus mordre, `dist/server` et `src/server` etant deux arbres
+// distincts. `tsconfig.node.build.json` fixe `rootDir: src` / `outDir: dist` :
+// les deux arbres partagent la MEME arborescence relative (meme geste que
+// `PROJECT_ROOT` dans `routes.ts`), donc la source correspondant a `entree`
+// se retrouve en substituant `dist` par `src` sur son premier segment et
+// `.js` par `.ts` sur son nom — sans quoi ce fichier resterait la SOURCE, pas
+// le point d entree, et c est TOUJOURS lui qui doit rester exclu de la
+// boucle : lui seul lie le port reel.
+function sourceDeLEntree(entree) {
+  const segments = path.relative(ROOT, entree).split(path.sep);
+  if (segments[0] !== 'dist') return entree; // deja sous src/ : rien a remapper
+  segments[0] = 'src';
+  return path.join(ROOT, segments.join(path.sep).replace(/\.js$/, '.ts'));
+}
+
 test('les 51 fichiers de src/server hors server.js se chargent REELLEMENT, zero echec', () => {
   // Arrange
   const tous = enumererServeur(RACINE_SERVEUR);
   const entree = pointDEntree();
+  const entreeSource = sourceDeLEntree(entree);
 
-  // L exclusion de `server.js` est accrochee au champ `main` — pratique, et
-  // DANGEREUX si on s arrete la : le jour ou `main` bouge (l etape 4 le pointera
-  // sur `dist/`), le filtre ci-dessous ne retirerait plus rien et `server.js`
-  // se ferait charger par la boucle. Or le charger LIE UN PORT REEL et CREE
+  // L exclusion de `server.ts` est accrochee a la SOURCE du point d entree
+  // (voir `sourceDeLEntree`) — pratique, et DANGEREUX si on s arrete la : le
+  // jour ou l emission cesserait de preserver l arborescence source/dist, le
+  // filtre ci-dessous ne retirerait plus rien et `server.ts` se ferait
+  // charger par la boucle. Or le charger LIE UN PORT REEL et CREE
   // `~/.agent-viz/observatory.db` (en-tete de ce fichier). Cette assertion fait
   // ROUGIR ce test le jour ou l ancrage cesse de mordre, au lieu de le laisser
   // charger le point d entree en silence.
-  assert.ok(path.resolve(entree).startsWith(path.resolve(RACINE_SERVEUR) + path.sep),
-    `le point d entree resolu (${path.relative(ROOT, entree)}) ne tombe plus sous src/server : `
-    + 'l exclusion de server.js dans la boucle ci-dessous ne mord donc plus, et cette boucle '
+  assert.ok(path.resolve(entreeSource).startsWith(path.resolve(RACINE_SERVEUR) + path.sep),
+    `la source du point d entree (${path.relative(ROOT, entreeSource)}) ne tombe plus sous src/server : `
+    + 'l exclusion de server.ts dans la boucle ci-dessous ne mord donc plus, et cette boucle '
     + 'chargerait le point d entree — ce qui lie un port reel et cree la base de mesure. '
     + 'Reancrer l exclusion avant de rejouer ce test.');
 
-  const cibles = tous.filter(f => path.resolve(f) !== path.resolve(entree));
+  const cibles = tous.filter(f => path.resolve(f) !== path.resolve(entreeSource));
 
   // Le bac a sable est VERIFIE, pas suppose : s il ne prenait pas, ce fichier
   // chargerait les 51 modules contre le vrai home, en silence. Meme controle
