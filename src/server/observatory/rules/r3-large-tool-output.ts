@@ -18,6 +18,7 @@
 
 import { COST_BASIS, usdForBytes } from './cost.ts';
 import { THRESHOLDS } from './thresholds.ts';
+import type { EvaluationContext, R3Recommendation } from './types.ts';
 
 const ID = 'R3';
 const CATEGORY = 'outils';
@@ -35,17 +36,25 @@ const AGENT_TOOL_FAMILIES = new Set([
 ]);
 const MCP_PREFIX = 'mcp__';
 
-const isShellCommandFamily = family =>
+const isShellCommandFamily = (family: string): boolean =>
   !AGENT_TOOL_FAMILIES.has(family) && !family.startsWith(MCP_PREFIX);
 
-function evaluate(ctx) {
+interface FamilyAgg {
+  count: number;
+  bytes: number;
+  sessions: string[];
+  usd: number;
+  costComplete: boolean;
+}
+
+function evaluate(ctx: EvaluationContext): R3Recommendation[] {
   // Denominator: the whole period's tool output. The excluded families were
   // still paid for — they are simply not something the user can act on — so
   // they stay in the share's denominator.
   const periodBytes = ctx.sessions.reduce((acc, s) => acc + s.report.toolResults.totalBytes, 0);
   if (!periodBytes) return [];
 
-  const byFamily = new Map();
+  const byFamily = new Map<string, FamilyAgg>();
   for (const session of ctx.sessions) {
     for (const candidate of session.report.toolResults.candidateFilters) {
       if (!isShellCommandFamily(candidate.family)) continue;
@@ -60,7 +69,7 @@ function evaluate(ctx) {
     }
   }
 
-  const recs = [];
+  const recs: R3Recommendation[] = [];
   for (const [family, agg] of byFamily) {
     const share = agg.bytes / periodBytes;
     if (share < THRESHOLDS.R3.minShareOfToolBytes || agg.count < THRESHOLDS.R3.minCount) continue;

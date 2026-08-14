@@ -10,12 +10,22 @@
 
 import { COST_BASIS, usdForBytes } from './cost.ts';
 import { THRESHOLDS } from './thresholds.ts';
+import type { EvaluationContext, R4Recommendation } from './types.ts';
 
 const ID = 'R4';
 const CATEGORY = 'sous-agents';
 
-function evaluate(ctx) {
-  const byProject = new Map();
+interface ProjectAgg {
+  bytes: number;
+  count: number;
+  totalBytes: number;
+  sessions: string[];
+  usd: number;
+  costComplete: boolean;
+}
+
+function evaluate(ctx: EvaluationContext): R4Recommendation[] {
+  const byProject = new Map<string, ProjectAgg>();
   for (const session of ctx.sessions) {
     const dup = session.report.reads.cases.crossAgentDuplicate;
     if (dup.bytes === 0) continue;
@@ -30,7 +40,7 @@ function evaluate(ctx) {
     byProject.set(session.project, agg);
   }
 
-  const recs = [];
+  const recs: R4Recommendation[] = [];
   for (const [project, agg] of byProject) {
     if (agg.bytes < THRESHOLDS.R4.minBytes) continue;
     const share = agg.totalBytes ? agg.bytes / agg.totalBytes : 0;

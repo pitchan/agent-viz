@@ -11,6 +11,8 @@
 // recommendation carries COST_BASIS.APPROX_BYTES, and the ranking never mixes
 // the two bases in one ordered list.
 
+import type { Session } from './types.ts';
+
 const BYTES_PER_TOKEN = 4;
 
 const COST_BASIS = Object.freeze({
@@ -18,23 +20,23 @@ const COST_BASIS = Object.freeze({
   APPROX_BYTES: 'octets-approx-4o-par-jeton',
 });
 
-function usdPerToken(session) {
+function usdPerToken(session: Pick<Session, 'netTokens' | 'costUsd'>): number {
   if (!session.netTokens) return 0;
   return session.costUsd / session.netTokens;
 }
 
-function usdForTokens(session, tokens) {
+function usdForTokens(session: Pick<Session, 'netTokens' | 'costUsd'>, tokens: number): number {
   return usdPerToken(session) * tokens;
 }
 
-function usdForBytes(session, bytes) {
+function usdForBytes(session: Pick<Session, 'netTokens' | 'costUsd'>, bytes: number): number {
   return usdForTokens(session, bytes / BYTES_PER_TOKEN);
 }
 
 // pairs: [[session, tokens], ...]. Each session is priced at its OWN rate: a
 // $/token rate is only meaningful inside one session's model mix, so there is
 // deliberately no "total tokens × global rate" shortcut here.
-function sumUsd(pairs) {
+function sumUsd(pairs: ReadonlyArray<readonly [Pick<Session, 'netTokens' | 'costUsd'>, number]>): number {
   return pairs.reduce((acc, [session, tokens]) => acc + usdForTokens(session, tokens), 0);
 }
 

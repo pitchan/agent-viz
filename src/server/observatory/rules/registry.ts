@@ -11,16 +11,18 @@ import * as r3 from './r3-large-tool-output.ts';
 import * as r4 from './r4-cross-agent-reads.ts';
 import * as r5 from './r5-compactions.ts';
 import * as r6 from './r6-short-subagents.ts';
+import type { EvaluationContext, Recommendation, Rule } from './types.ts';
 
-const RULES = [r1, r2, r3, r4, r5, r6];
+const RULES: Rule[] = [r1, r2, r3, r4, r5, r6];
 
-function evaluateAll(ctx, rules = RULES) {
-  const recs = [];
+function evaluateAll(ctx: EvaluationContext, rules: Rule[] = RULES): Recommendation[] {
+  const recs: Recommendation[] = [];
   for (const rule of rules) {
     try {
       recs.push(...rule.evaluate(ctx));
     } catch (err) {
-      console.error(`[rules] ${rule.id} failed: ${err.message}`);
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`[rules] ${rule.id} failed: ${message}`);
     }
   }
   return recs;

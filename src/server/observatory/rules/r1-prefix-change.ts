@@ -20,12 +20,15 @@
 
 import { COST_BASIS, sumUsd } from './cost.ts';
 import { THRESHOLDS } from './thresholds.ts';
+import type {
+  ChurnStat, EvaluationContext, PrefixDepth, PrefixMarker, R1Evidence, R1Recommendation, Session,
+} from './types.ts';
 
 const ID = 'R1';
 const CATEGORY = 'modele';
 
-const MARKERS = ['modelSwitch', 'toolsAppeared', 'noMarker'];
-const DEPTHS = ['facade', 'd10to50', 'd50to90', 'tail'];
+const MARKERS: readonly PrefixMarker[] = ['modelSwitch', 'toolsAppeared', 'noMarker'];
+const DEPTHS: readonly PrefixDepth[] = ['facade', 'd10to50', 'd50to90', 'tail'];
 
 // One action per journaled marker, declarative so that a new marker in the
 // engine is an entry here rather than a branch in the emission logic. Only
@@ -49,16 +52,29 @@ const ACTION_BY_MARKER = Object.freeze({
   noMarker: null,
 });
 
-const prefixTokensOf = report => report.context.churnCauses.prefixChange.tokens;
+const prefixTokensOf = (report: Session['report']): number => report.context.churnCauses.prefixChange.tokens;
+
+type Breakdown = Session['report']['context']['prefixBreakdown'];
 
 /** Somme d'une découpe du prefixBreakdown sur les sessions retenues. */
-const sumBreakdown = (sessions, part, keys) => Object.fromEntries(keys.map(
-  key => [key, sessions.reduce((acc, s) => acc + s.report.context.prefixBreakdown[part][key].tokens, 0)]));
+function sumBreakdown<K extends string>(
+  sessions: Session[], part: keyof Breakdown, keys: readonly K[],
+): Record<K, number> {
+  return Object.fromEntries(keys.map(key => {
+    const total = sessions.reduce((acc, s) => {
+      const section = s.report.context.prefixBreakdown[part] as Record<K, ChurnStat>;
+      return acc + section[key].tokens;
+    }, 0);
+    return [key, total] as const;
+  })) as Record<K, number>;
+}
 
 /** Clé la plus lourde ; à égalité, la première de `keys` — l'ordre est le départage. */
-const dominantOf = (totals, keys) => keys.reduce((best, key) => (totals[key] > totals[best] ? key : best));
+function dominantOf<K extends string>(totals: Record<K, number>, keys: readonly K[]): K {
+  return keys.reduce((best, key) => (totals[key] > totals[best] ? key : best));
+}
 
-function qualifies(session) {
+function qualifies(session: Session): boolean {
   const causes = session.report.context.churnCauses;
   const prefix = causes.prefixChange.tokens;
   if (prefix === 0) return false;
@@ -67,8 +83,8 @@ function qualifies(session) {
   return prefix / session.netTokens >= THRESHOLDS.R1.minShareOfNet;
 }
 
-function evaluate(ctx) {
-  const byProject = new Map();
+function evaluate(ctx: EvaluationContext): R1Recommendation[] {
+  const byProject = new Map<string, Session[]>();
   for (const session of ctx.sessions) {
     if (!qualifies(session)) continue;
     const list = byProject.get(session.project) ?? [];
@@ -76,14 +92,14 @@ function evaluate(ctx) {
     byProject.set(session.project, list);
   }
 
-  const recs = [];
+  const recs: R1Recommendation[] = [];
   for (const [project, sessions] of byProject) {
     const tokens = sessions.reduce((acc, s) => acc + prefixTokensOf(s.report), 0);
     // Reported share covers the sessions that qualified: a quiet session
     // elsewhere in the project must not dilute a real problem.
     const net = sessions.reduce((acc, s) => acc + s.netTokens, 0);
     const markerTokens = sumBreakdown(sessions, 'markers', MARKERS);
-    const noMarkerDetailTokens = sumBreakdown(sessions, 'noMarkerDetail', ['earlyMcp', 'other']);
+    const noMarkerDetailTokens = sumBreakdown(sessions, 'noMarkerDetail', ['earlyMcp', 'other'] as const);
     const depthTokens = sumBreakdown(sessions, 'depth', DEPTHS);
     // Decided on the aggregate, because the recommendation is per project: a
     // single session reading as a model switch must not speak for the rest.
@@ -95,7 +111,7 @@ function evaluate(ctx) {
       title: 'Cache perdu en cours de session : des jetons déjà servis sont refacturés',
       category: CATEGORY,
       confidence: 'fait',
-      estimatedCostUsd: sumUsd(sessions.map(s => [s, prefixTokensOf(s.report)])),
+      estimatedCostUsd: sumUsd(sessions.map((s): [Session, number] => [s, prefixTokensOf(s.report)])),
       costBasis: COST_BASIS.MEASURED_TOKENS,
       evidence: {
         sessions: sessions.map(s => s.id),

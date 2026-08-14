@@ -8,17 +8,27 @@
 
 import { COST_BASIS, sumUsd } from './cost.ts';
 import { THRESHOLDS } from './thresholds.ts';
+import type { EvaluationContext, R5Recommendation, Session } from './types.ts';
 
 const ID = 'R5';
 const CATEGORY = 'contexte';
 
-function evaluate(ctx) {
-  const byProject = new Map();
+interface ProjectAgg {
+  compactions: number;
+  unknown: number;
+  tokens: number;
+  sessions: string[];
+  pairs: Array<[Session, number]>;
+  costComplete: boolean;
+}
+
+function evaluate(ctx: EvaluationContext): R5Recommendation[] {
+  const byProject = new Map<string, ProjectAgg>();
   for (const session of ctx.sessions) {
     const compactions = session.report.context.compactions;
     if (compactions.length < THRESHOLDS.R5.minCompactions) continue;
     const known = compactions.filter(c => typeof c.preTokens === 'number');
-    const tokens = known.reduce((acc, c) => acc + c.preTokens, 0);
+    const tokens = known.reduce((acc, c) => acc + (c.preTokens ?? 0), 0);
     const agg = byProject.get(session.project)
       ?? { compactions: 0, unknown: 0, tokens: 0, sessions: [], pairs: [], costComplete: true };
     agg.compactions += compactions.length;
@@ -30,7 +40,7 @@ function evaluate(ctx) {
     byProject.set(session.project, agg);
   }
 
-  const recs = [];
+  const recs: R5Recommendation[] = [];
   for (const [project, agg] of byProject) {
     recs.push({
       ruleId: ID,

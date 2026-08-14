@@ -14,23 +14,24 @@
 import { COST_BASIS, sumUsd } from './cost.ts';
 import { THRESHOLDS } from './thresholds.ts';
 import { mcpUsageBySession } from '../mcp-usage.ts';
+import type { ConfigItem, EvaluationContext, R2Recommendation, Session } from './types.ts';
 
 const ID = 'R2';
 const CATEGORY = 'configuration';
 
 // Config keys use POSIX separators even on Windows, session cwd does not.
-const normalizePath = p => (typeof p === 'string' ? p.replace(/\\/g, '/').toLowerCase() : null);
+const normalizePath = (p: unknown): string | null => (typeof p === 'string' ? p.replace(/\\/g, '/').toLowerCase() : null);
 
-function isLoadedIn(item, session) {
+function isLoadedIn(item: ConfigItem, session: Session): boolean {
   if (item.scope === 'user') return true;
   if (!item.scope.startsWith('project:')) return false;
   return normalizePath(item.scope.slice('project:'.length)) === normalizePath(session.report.cwd);
 }
 
-function evaluate(ctx) {
+function evaluate(ctx: EvaluationContext): R2Recommendation[] {
   if (ctx.sessions.length === 0) return [];
   const usage = mcpUsageBySession(ctx.sessions);
-  const recs = [];
+  const recs: R2Recommendation[] = [];
 
   for (const item of ctx.configItems) {
     if (item.kind !== 'mcp') continue;

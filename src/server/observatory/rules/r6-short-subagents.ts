@@ -12,6 +12,7 @@
 import { COST_BASIS, sumUsd } from './cost.ts';
 import { THRESHOLDS } from './thresholds.ts';
 import { netOf } from '../session-mapper.ts';
+import type { EvaluationContext, R6Recommendation, Session } from './types.ts';
 
 const ID = 'R6';
 const CATEGORY = 'sous-agents';
@@ -19,25 +20,35 @@ const CATEGORY = 'sous-agents';
 // tokens.perAgent contains subagent buckets only — the main agent has its own
 // tokens.main bucket. Pinned by the engine contract test, so there is nothing
 // to filter out here.
-function subagentNetTokens(report) {
-  return Object.values(report.tokens.perAgent).reduce((acc, bucket) => acc + netOf(bucket), 0);
+function subagentNetTokens(report: Session['report']): number {
+  return Object.values(report.tokens.perAgent).reduce((acc: number, bucket) => acc + netOf(bucket), 0);
 }
 
-function durationMs(session) {
+function durationMs(session: Session): number | null {
   if (session.startedAt === null || session.endedAt === null) return null;
   const ms = Date.parse(session.endedAt) - Date.parse(session.startedAt);
   return Number.isNaN(ms) ? null : ms;
 }
 
 // Median, not mean: one outlier session must not move the reported figure.
-function medianOf(values) {
+function medianOf(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  const midValue = sorted[mid] ?? 0;
+  return sorted.length % 2 ? midValue : ((sorted[mid - 1] ?? 0) + midValue) / 2;
 }
 
-function evaluate(ctx) {
-  const byProject = new Map();
+interface ProjectAgg {
+  sessions: string[];
+  pairs: Array<[Session, number]>;
+  subTokens: number;
+  spawns: number;
+  durationsMs: number[];
+  costComplete: boolean;
+}
+
+function evaluate(ctx: EvaluationContext): R6Recommendation[] {
+  const byProject = new Map<string, ProjectAgg>();
   for (const session of ctx.sessions) {
     if (session.report.subagents.spawnToolUses === 0) continue;
     const ms = durationMs(session);
@@ -57,7 +68,7 @@ function evaluate(ctx) {
     byProject.set(session.project, agg);
   }
 
-  const recs = [];
+  const recs: R6Recommendation[] = [];
   for (const [project, agg] of byProject) {
     recs.push({
       ruleId: ID,

@@ -7,6 +7,8 @@
 // Correlation only (×6.3 over 1,700 sessions): the wording carries the
 // "étude" label and never claims causation.
 
+import type { Recommendation } from './types.ts';
+
 const EARLY_MCP_DOMINANCE = 0.5; // spec M1.1 §4 P3: strictly more than 50 % of noMarker tokens
 
 const SEE_ALSO_ACTION =
@@ -14,13 +16,13 @@ const SEE_ALSO_ACTION =
   + 'en début de session à serveurs MCP, cause probable (étude : corrélation ×6,3 sur 1 700 sessions, '
   + 'jamais une preuve causale).';
 
-const qualifies = rec =>
+const qualifies = (rec: Recommendation): boolean =>
   rec.ruleId === 'R1'
   && rec.evidence.dominantMarker === 'noMarker'
   && rec.evidence.markerTokens.noMarker > 0
   && rec.evidence.noMarkerDetailTokens.earlyMcp / rec.evidence.markerTokens.noMarker > EARLY_MCP_DOMINANCE;
 
-function applyCrossLinks(recs) {
+function applyCrossLinks(recs: Recommendation[]): Recommendation[] {
   const r2Projects = new Set(
     recs.filter(r => r.ruleId === 'R2').flatMap(r => r.evidence.projects ?? []));
   return recs.map(rec =>
