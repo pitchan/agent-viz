@@ -7,7 +7,24 @@
 
 import { SCAN_VERSION } from './scan-version.ts';
 
-function buildProvenance({ engineVersion, priceSource }) {
+interface ProvenanceSection {
+  titre: string;
+  corps: string;
+}
+
+interface Provenance {
+  scanVersion: number;
+  engineVersion: string;
+  priceSource: string;
+  sections: ProvenanceSection[];
+}
+
+interface ProvenanceOptions {
+  engineVersion: string;
+  priceSource: string;
+}
+
+function buildProvenance({ engineVersion, priceSource }: ProvenanceOptions): Provenance {
   return {
     scanVersion: SCAN_VERSION,
     engineVersion,

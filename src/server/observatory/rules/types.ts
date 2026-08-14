@@ -15,6 +15,23 @@ export type ChurnStat = { events: number; tokens: number };
 export type PrefixMarker = 'modelSwitch' | 'toolsAppeared' | 'noMarker';
 export type PrefixDepth = 'facade' | 'd10to50' | 'd50to90' | 'tail';
 
+// Forme de session posée par l'agrégateur du moteur (session-kind.ts) —
+// interactive/headless/unknown. Stockée : une ligne écrite avant la migration
+// M1.1 n'a pas la colonne et rend null, jamais une valeur devinée.
+export type SessionKind = 'interactive' | 'headless' | 'unknown';
+
+// Les six champs bruts d'usage (core/usage.ts côté moteur) — promu ici parce
+// que la lot 5 des feuilles de l'observatoire en a besoin à plus de deux
+// endroits (perAgent, perModel, total).
+export interface TokenBucket {
+  in: number;
+  out: number;
+  cacheCreate: number;
+  cacheRead: number;
+  cacheCreate1h: number;
+  cacheCreate5m: number;
+}
+
 export interface SessionReport {
   // Le moteur le rend null quand aucune ligne du transcript ne porte
   // meta.cwd (src/engine/doctor/report/types.ts:14, scan-session.ts l.32,
@@ -44,9 +61,22 @@ export interface SessionReport {
     totalBytes: number;
     candidateFilters: Array<{ family: string; count: number; bytes: number }>;
   };
-  subagents: { sidecarCount: number; spawnToolUses: number; byType: Record<string, unknown> };
+  // byType : mineur différé signalé au plan — la vraie forme rendue par
+  // l'agrégateur de sous-agents est un compte, jamais une valeur opaque.
+  subagents: { sidecarCount: number; spawnToolUses: number; byType: Record<string, number> };
   tokens: {
-    perAgent: Record<string, { in: number; out: number; cacheCreate: number; cacheRead: number }>;
+    perAgent: Record<string, TokenBucket>;
+    // Ajouts consommés par le lot 5 (model-costs.ts, session-mapper.ts) :
+    // perModel/total/unknownModels sortent de la MÊME accumulation que
+    // perAgent et sont donc toujours présents. costByModel est l'exception —
+    // champ de SCAN_VERSION 6 (scan-version.ts) : un rapport stocké avant
+    // cette version ne l'a pas, et model-costs.ts exclut ces sessions des
+    // lignes ET des totaux plutôt que de leur prêter une forme qu'elles n'ont
+    // pas (compté dans excludedPendingRescan).
+    perModel: Record<string, TokenBucket>;
+    total: TokenBucket;
+    unknownModels: string[];
+    costByModel?: Record<string, { usd: number | null; pricing: string }>;
   };
 }
 
@@ -55,6 +85,8 @@ export interface Session {
   project: string;
   startedAt: string | null;
   endedAt: string | null;
+  // null : ligne stockée avant la migration M1.1 (store.ts), jamais devinée.
+  sessionKind: SessionKind | null;
   netTokens: number;
   costUsd: number;
   costComplete: boolean;
