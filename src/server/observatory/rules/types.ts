@@ -16,7 +16,10 @@ export type PrefixMarker = 'modelSwitch' | 'toolsAppeared' | 'noMarker';
 export type PrefixDepth = 'facade' | 'd10to50' | 'd50to90' | 'tail';
 
 export interface SessionReport {
-  cwd: string;
+  // Le moteur le rend null quand aucune ligne du transcript ne porte
+  // meta.cwd (src/engine/doctor/report/types.ts:14, scan-session.ts l.32,
+  // 47, 125) — cas réel, pas une garde de confort.
+  cwd: string | null;
   context: {
     churnCauses: {
       growth: ChurnStat;
