@@ -17,9 +17,25 @@ import { createJournal } from './journal.ts';
 import { createWatchdogService } from './service.ts';
 import { catchUpFromDisk } from './catch-up.ts';
 
-let _service = null;
-let _pending = null;
+type Service = Awaited<ReturnType<typeof createWatchdogService>>;
+// La forme de l'alerte, derivee de la signature du journal (via le service)
+// plutot que redeclaree — 3e occurrence du meme domaine (journal.ts,
+// service.ts, ici).
+type Alert = Parameters<ReturnType<typeof createJournal>['append']>[0];
+// Tout ce que `createWatchdogService` accepte, moins `journal` que ce module
+// construit lui-meme depuis `journalPath`.
+type ServiceOpts = Parameters<typeof createWatchdogService>[0];
+interface WatchdogOpts extends Omit<ServiceOpts, 'journal'> {
+  journalPath?: string;
+}
+
+let _service: Service | null = null;
+let _pending: Promise<Service | null> | null = null;
 let _catchingUp = false;
+
+function messageDe(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
 
 // Ce qui est memorise est la PROMESSE, pas la valeur resolue. Une garde posee
 // sur la valeur (`if (_service) return _service`) ne tient pas : entre le test
@@ -36,7 +52,7 @@ let _catchingUp = false;
 // produit un TypeError — donc une promesse rejetee, memorisee, que personne
 // n'attrape. C'est exactement le rejet non attrape que ce module ferme par
 // ailleurs pour le module de detection absent, rouvert par la porte d'a cote.
-function initWatchdog(opts) {
+function initWatchdog(opts: WatchdogOpts | null | undefined): Promise<Service | null> {
   if (!_pending) _pending = fabriquer(opts || {});
   return _pending;
 }
@@ -58,7 +74,7 @@ function initWatchdog(opts) {
 // vide, et le rattrapage suivant reconsigne tout ce qu'il avait deja consigne.
 // Le doublon ne se voit meme pas depuis `list()`, qui lit la memoire vive — il
 // ne se voit que dans le fichier.
-async function fabriquer({ journalPath, now = Date.now, ...rest }) {
+async function fabriquer({ journalPath, now = Date.now, ...rest }: WatchdogOpts): Promise<Service | null> {
   try {
     _service = await createWatchdogService({
       // `rest` d'abord : ce qui suit fait autorite. `isCatchingUp` en
@@ -82,13 +98,13 @@ async function fabriquer({ journalPath, now = Date.now, ...rest }) {
     // tentative, donc pas de seconde plainte. Un fichier absent du paquet ne
     // reapparaitra pas, et `initWatchdog` n'est appele qu'une fois au
     // demarrage.
-    console.error('[watchdog] detection indisponible, les pannes ne seront pas surveillees :', err.message);
+    console.error('[watchdog] detection indisponible, les pannes ne seront pas surveillees :', messageDe(err));
     return null;
   }
 }
 
-function getWatchdogService() { return _service; }
-function setCatchingUp(v) { _catchingUp = !!v; }
+function getWatchdogService(): Service | null { return _service; }
+function setCatchingUp(v: unknown): void { _catchingUp = !!v; }
 
 // Le balayage de demarrage, drapeau compris : pendant qu'il tourne, `stuck`
 // doit se taire, et il doit se retaire meme si la lecture echoue.
@@ -107,7 +123,7 @@ function setCatchingUp(v) { _catchingUp = !!v; }
 // s'arrete la. Ici on ne fait que le porter — le connaitre autrement
 // qu'injecte voudrait dire dependre du lecteur d'evenements, qui depend deja de
 // ce module.
-async function runCatchUp(dir, liveFrom) {
+async function runCatchUp(dir?: string, liveFrom?: (chemin: string) => number | null): Promise<number> {
   if (!dir) {
     console.error('[watchdog] rattrapage demande sans dossier d evenements : rien n a ete relu.');
     return 0;
@@ -116,6 +132,14 @@ async function runCatchUp(dir, liveFrom) {
   setCatchingUp(true);
   try { return await catchUpFromDisk(_service, dir, liveFrom); }
   finally { setCatchingUp(false); }
+}
+
+interface StartWatchdogOpts {
+  dir?: string;
+  broadcastAlert?: (alert: Alert) => unknown;
+  liveFrom?: (chemin: string) => number | null;
+  cadenceMs?: number;
+  init?: WatchdogOpts;
 }
 
 // La sequence de demarrage du chien de garde, dans l'ordre qui est sa
@@ -149,7 +173,9 @@ async function runCatchUp(dir, liveFrom) {
 // Rend le minuteur, pour que l'appelant puisse l'arreter. Le serveur ne s'en
 // sert pas — il tourne jusqu'a l'extinction — mais un appelant qui lance une
 // sequence doit pouvoir la rendre.
-async function startWatchdog({ dir, broadcastAlert, liveFrom, cadenceMs = 5_000, init } = {}) {
+async function startWatchdog(
+  { dir, broadcastAlert, liveFrom, cadenceMs = 5_000, init }: StartWatchdogOpts = {},
+): Promise<NodeJS.Timeout> {
   // Meme patron que `runCatchUp` devant un dossier absent, et pour la meme
   // raison : ce que l'appelant oublie ici, RIEN d'autre ne peut le dire.
   // `src/server/server.js` est le seul appelant de production et c'est le seul fichier
@@ -177,7 +203,7 @@ async function startWatchdog({ dir, broadcastAlert, liveFrom, cadenceMs = 5_000,
     // passe — le chien de garde est un supplement, il ne doit pas emporter le
     // serveur avec lui. Le battement, lui, est lance quand meme : les pannes A
     // VENIR restent surveillees.
-    console.error('[watchdog] rattrapage interrompu, le passe n a pas ete relu :', err.message);
+    console.error('[watchdog] rattrapage interrompu, le passe n a pas ete relu :', messageDe(err));
   }
   // On rapporte le nombre relu, et on n'en conclut RIEN. `runCatchUp` rend 0
   // dans quatre situations differentes — pas de service, pas de dossier nomme,
@@ -201,11 +227,15 @@ async function startWatchdog({ dir, broadcastAlert, liveFrom, cadenceMs = 5_000,
     const wd = getWatchdogService();
     if (!wd) return;
     try {
-      for (const alert of wd.tick()) broadcastAlert(alert);
+      // `broadcastAlert` non fourni est deja dit plus haut (« sans canal de
+      // diffusion ») ; l'appel non garde ici est voulu, pas oublie — s'il
+      // manque au moment ou une alerte tombe reellement, l'exception qui en
+      // resulte est CETTE meme garde qui l'attrape, deux lignes plus bas.
+      for (const alert of wd.tick()) broadcastAlert!(alert);
     } catch (err) {
       if (!battementCasse) {
         battementCasse = true;
-        console.error('[watchdog] battement en echec, les pannes qui durent ne seront plus signalees :', err.message);
+        console.error('[watchdog] battement en echec, les pannes qui durent ne seront plus signalees :', messageDe(err));
       }
     }
   }, cadenceMs);

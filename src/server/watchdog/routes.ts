@@ -8,7 +8,9 @@
 // le chien de garde n'existe qu'a la fin de son demarrage.
 //
 // Ce module n'a AUCUNE dependance, et c'en est une propriete, pas un hasard —
-// un test le verifie sur le texte. Deux raisons, et la seconde est mesuree :
+// un test le verifie sur le texte, y compris `import type` : c'est pourquoi
+// tous les types ci-dessous sont locaux, aucun n'est importe. Deux raisons, et
+// la seconde est mesuree :
 //
 //  1. une traduction qui a besoin d'une dependance n'est plus une traduction ;
 //  2. le balayage de demarrage du chien de garde n'est sur qu'AU demarrage,
@@ -24,15 +26,40 @@
 // `readAll` n'a aucune garde sur sa fenetre. Les deux valeurs qui traversent
 // ici sont donc validees ici — voir `fenetreDe`, `enClef` et `enHorodatage`.
 
+// La forme du service telle que CES routes la voient, et rien de plus — pas
+// d'import de service.ts (voir l'en-tete : zero dependance, verifie sur le
+// texte). `sinceDays` est TOUJOURS fourni ici (voir `fenetreDe`), jamais
+// `undefined` : la garde vit dans cette route, pas dans le service.
+interface ServiceLike {
+  list(opts: { sinceDays: number }): unknown;
+  activeIds(): unknown;
+  ack(id: string, createdAt: number): boolean;
+}
+
+interface ResponseLike {
+  writeHead(code: number, headers: Record<string, string>): unknown;
+  end(body: string): unknown;
+}
+
+interface RequestLike {
+  on(event: 'data', handler: (chunk: Buffer | string) => void): unknown;
+  on(event: 'end', handler: () => void): unknown;
+  on(event: 'error', handler: () => void): unknown;
+}
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
+function sendJson(res: ResponseLike, code: number, payload: unknown): void {
+  res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
+  res.end(JSON.stringify(payload));
+}
+
 // La table 7/30/90 est celle du tiroir Conseils : la page n'a qu'une seule
 // notion de periode.
 const FENETRES = new Set([7, 30, 90]);
 const FENETRE_DEFAUT = 30;
-
-function sendJson(res, code, payload) {
-  res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
-  res.end(JSON.stringify(payload));
-}
 
 // La fenetre demandee, ou le defaut. Le test d'appartenance a la table est ce
 // qui rend cette fonction sure : elle ne peut rendre que 7, 30 ou 90, quoi
@@ -45,7 +72,7 @@ function sendJson(res, code, payload) {
 // Une valeur hors table retombe sur le defaut plutot que d'etre refusee : le
 // tiroir doit s'ouvrir. Une periode que l'utilisateur n'a pas choisie se voit
 // (le panneau affiche laquelle) ; une liste vide, non.
-function fenetreDe(url) {
+function fenetreDe(url: URL): number {
   const n = Number(url.searchParams.get('days'));
   return FENETRES.has(n) ? n : FENETRE_DEFAUT;
 }
@@ -66,9 +93,9 @@ function fenetreDe(url) {
 // liste de valeurs pour que la derive rougisse.
 //
 // Rend null quand ce n'est pas un horodatage.
-function enHorodatage(v) {
+function enHorodatage(v: unknown): number | null {
   const n = typeof v === 'string' && v.trim() !== '' ? Number(v) : v;
-  return Number.isFinite(n) ? n : null;
+  return typeof n === 'number' && Number.isFinite(n) ? n : null;
 }
 
 // La clef d'une alerte est une chaine non vide. Ici la garde est
@@ -85,7 +112,7 @@ function enHorodatage(v) {
 // le journal, qui ecrit son `createdAt` normalise et non la valeur brute.
 //
 // Rend null quand ce n'est pas une clef.
-function enClef(v) {
+function enClef(v: unknown): string | null {
   if (typeof v !== 'string') return null;
   const clef = v.trim();
   return clef === '' ? null : clef;
@@ -103,9 +130,9 @@ function enClef(v) {
 // abimee est encore une chaine non vide, elle traverse la garde et s'ecrit au
 // journal — une ligne qui n'acquitte aucune alerte, et qui y reste 90 jours.
 // Le decoupage n'est pas notre affaire, il suit les segments du reseau.
-function lireCorps(req) {
+function lireCorps(req: RequestLike): Promise<string | null> {
   return new Promise((resolve) => {
-    const morceaux = [];
+    const morceaux: Buffer[] = [];
     // `Buffer.from` pour le cas ou un appelant aurait pose un encodage sur le
     // flux, auquel cas les morceaux arrivent deja en texte.
     req.on('data', (c) => { morceaux.push(Buffer.isBuffer(c) ? c : Buffer.from(c)); });
@@ -114,7 +141,7 @@ function lireCorps(req) {
   });
 }
 
-function createWatchdogRoutes(getService) {
+function createWatchdogRoutes(getService: () => ServiceLike | null) {
   return [
     {
       method: 'GET',
@@ -122,7 +149,7 @@ function createWatchdogRoutes(getService) {
       // Un service pas encore pret n'est pas une panne du produit : le tiroir
       // s'ouvre sur une liste vide, jamais sur un message d'erreur. C'est une
       // LECTURE — ne rien avoir a montrer est un etat legitime.
-      handler: async (_req, res, url) => {
+      handler: async (_req: RequestLike, res: ResponseLike, url: URL) => {
         const service = getService();
         if (!service) { sendJson(res, 200, { alerts: [], activeIds: [] }); return; }
         // Deux questions, deux reponses. `list` rend la memoire — ce qui a ete
@@ -144,17 +171,17 @@ function createWatchdogRoutes(getService) {
       // alertes de l'utilisateur. Lire le journal ne change rien ; l'acquitter
       // si — d'ou le garde sur cette route et sur elle seule.
       sameOrigin: true,
-      handler: async (req, res) => {
+      handler: async (req: RequestLike, res: ResponseLike) => {
         const brut = await lireCorps(req);
-        let charge;
-        // `JSON.parse(null)` rend null au lieu de lever : le `?? {}` ci-dessous
-        // le rattrape avec le corps `null` litteral et les corps qui ne sont
-        // pas des objets.
-        try { charge = JSON.parse(brut); }
+        let charge: unknown;
+        // `JSON.parse(null)` rend null au lieu de lever (coercion `ToString`
+        // du runtime : `null` -> `"null"`) : le corps coupe suit le meme
+        // chemin qu'un corps JSON valide qui ne serait pas un objet, ci-dessous.
+        try { charge = JSON.parse(brut === null ? 'null' : brut); }
         catch { sendJson(res, 400, { error: 'corps JSON invalide' }); return; }
-        const { id, createdAt } = charge ?? {};
-        const clef = enClef(id);
-        const quand = enHorodatage(createdAt);
+        const objet = isRecord(charge) ? charge : {};
+        const clef = enClef(objet.id);
+        const quand = enHorodatage(objet.createdAt);
         if (clef === null || quand === null) {
           sendJson(res, 400, {
             error: 'id (chaine non vide) et createdAt (millisecondes epoch) requis',

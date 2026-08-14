@@ -66,14 +66,48 @@ const RETENTION_DAYS = 90;
 // fichier, disque plein cinq minutes) doit pouvoir se resorber toute seule.
 const RETRY_EVERY = 20;
 
+// Une alerte n'a AUCUNE liste blanche de champs — mesure de la tache 5, fixee
+// par test ('un champ ajoute par un nouveau detecteur survit au disque').
+// Le journal ecrit l'objet entier et le relit entier ; seuls `id` et
+// `createdAt` sont engages ici, parce que c'est tout ce que CE fichier lit —
+// le reste traverse via l'index `unknown`. Les proprietes nommees restent
+// necessaires (et pas seulement l'index) : `readAll` etale une alerte
+// (`{ ...a, acknowledged, ackAt }`), et seul un champ nomme survit a cet
+// etalement — un `Record<string, unknown>` sans proprietes nommees y perd
+// son index, verifie par execution.
+interface AlertRecord {
+  id: unknown;
+  createdAt: unknown;
+  [key: string]: unknown;
+}
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
+function isFiniteNumber(v: unknown): v is number {
+  return typeof v === 'number' && Number.isFinite(v);
+}
+
+// La garde COMPLETE sur la forme d'une alerte, en un seul predicat plutot
+// qu'un cast au point d'usage (`ingest`) : `isRecord` + les deux moities de
+// la cle, exactement ce que `estClef` verifie par ailleurs, mais rendu comme
+// `v is AlertRecord` pour que le typeur narrow l'OBJET ENTIER, pas seulement
+// l'un de ses champs.
+function isAlertRecord(v: unknown): v is AlertRecord {
+  return isRecord(v) && v.id != null && isFiniteNumber(v.createdAt);
+}
+
 // Un separateur est indispensable : colles bout a bout, ('a1', 2) et ('a', 12)
 // donnent la meme chaine 'a12'. NUL est choisi parce qu'il ne peut apparaitre
 // ni dans un id ni dans un nombre — la cle est donc sans ambiguite quelle que
 // soit la ponctuation des ids, qui en portent deja (loop:s1:Bash).
-const keyOf = (id, createdAt) => `${id}\u0000${createdAt}`;
+const keyOf = (id: unknown, createdAt: unknown): string => `${id}\u0000${createdAt}`;
 
 // Sans les deux moities de la cle, il n'y a pas de fait consignable.
-const estClef = (id, createdAt) => id != null && Number.isFinite(createdAt);
+// Narrowing sur `createdAt` seulement : c'est la seule des deux moities dont
+// la forme numerique importe en aval (keyOf accepte `unknown` pour les deux).
+const estClef = (id: unknown, createdAt: unknown): createdAt is number => id != null && isFiniteNumber(createdAt);
 
 // Applique le contrat des horodatages (voir l'en-tete) : millisecondes epoch,
 // nombre ou chaine de chiffres. Rend null quand ce n'en est pas un.
@@ -82,24 +116,31 @@ const estClef = (id, createdAt) => id != null && Number.isFinite(createdAt);
 // blanc, parce que `Number('')`, `Number('   ')` et `Number(null)` valent tous
 // 0 : sans ca, une valeur absente ou un `?createdAt=%20` deviendraient un
 // horodatage a l'epoque Unix au lieu d'un refus franc.
-const enHorodatage = (v) => {
+const enHorodatage = (v: unknown): number | null => {
   const n = typeof v === 'string' && v.trim() !== '' ? Number(v) : v;
-  return Number.isFinite(n) ? n : null;
+  return isFiniteNumber(n) ? n : null;
 };
 
-function createJournal({ filePath = DEFAULT_PATH, now = Date.now } = {}) {
-  const seen = new Set();   // cles (id, createdAt) deja consignees
-  const acks = new Map();   // cle -> horodatage d'acquittement
-  const alerts = [];        // dans l'ordre d'ecriture
+function createJournal({ filePath = DEFAULT_PATH, now = Date.now }: { filePath?: string; now?: () => number } = {}) {
+  const seen = new Set<string>();          // cles (id, createdAt) deja consignees
+  // `at` n'est PAS engage par `estClef` (seuls id/createdAt le sont) : le
+  // journal ne valide jamais sa forme, meme a l'ecriture (`appendAck` peut y
+  // mettre le repli de l'horloge serveur). `unknown` dit cette absence de
+  // garantie plutot que de la simuler par un cast.
+  const acks = new Map<string, unknown>();  // cle -> horodatage d'acquittement
+  const alerts: AlertRecord[] = [];        // dans l'ordre d'ecriture
   let refus = 0;            // ecritures restant a sauter apres un refus disque
   let plainte = false;      // la panne d'ecriture en cours a-t-elle ete dite ?
 
-  function ingest(rec) {
-    if (rec.kind === 'alert' && rec.alert && estClef(rec.alert.id, rec.alert.createdAt)) {
-      const k = keyOf(rec.alert.id, rec.alert.createdAt);
-      if (seen.has(k)) return;
-      seen.add(k);
-      alerts.push(rec.alert);
+  function ingest(rec: Record<string, unknown>): void {
+    if (rec.kind === 'alert') {
+      const alert = rec.alert;
+      if (isAlertRecord(alert)) {
+        const k = keyOf(alert.id, alert.createdAt);
+        if (seen.has(k)) return;
+        seen.add(k);
+        alerts.push(alert);
+      }
     } else if (rec.kind === 'ack' && estClef(rec.id, rec.createdAt)) {
       acks.set(keyOf(rec.id, rec.createdAt), rec.at);
     }
@@ -108,18 +149,18 @@ function createJournal({ filePath = DEFAULT_PATH, now = Date.now } = {}) {
   // Fichier temporaire puis renommage, jamais de reecriture en place : si le
   // processus meurt au milieu, l'ancien journal est encore entier. Un journal
   // a moitie ecrit serait pire qu'un journal trop long.
-  function compacter(lignes) {
+  function compacter(lignes: string[]): void {
     const tmpPath = `${filePath}.compact`;
     try {
       fs.writeFileSync(tmpPath, lignes.length ? lignes.join('\n') + '\n' : '');
       fs.renameSync(tmpPath, filePath);
     } catch (err) {
       try { fs.unlinkSync(tmpPath); } catch { /* rien a nettoyer */ }
-      console.error('[watchdog] compaction du journal impossible, il continue de grandir :', err.message);
+      console.error('[watchdog] compaction du journal impossible, il continue de grandir :', err instanceof Error ? err.message : err);
     }
   }
 
-  function load() {
+  function load(): void {
     let text;
     try {
       text = fs.readFileSync(filePath, 'utf8');
@@ -131,13 +172,13 @@ function createJournal({ filePath = DEFAULT_PATH, now = Date.now } = {}) {
       // rendrait alors `true` sur tout l'historique : tout rediffuse d'un
       // coup, un doublon par alerte dans le fichier. L'idempotence au
       // redemarrage tomberait sans un mot.
-      if (err.code !== 'ENOENT') {
-        console.error('[watchdog] journal illisible, la memoire des pannes repart vide :', err.message);
+      if (!(err instanceof Error && 'code' in err && err.code === 'ENOENT')) {
+        console.error('[watchdog] journal illisible, la memoire des pannes repart vide :', err instanceof Error ? err.message : err);
       }
       return;
     }
     const plancher = now() - RETENTION_DAYS * JOUR_MS;
-    const gardees = [];
+    const gardees: string[] = [];
     let perimees = 0;
     for (const line of text.split('\n')) {
       // Une ligne illisible est sautee, jamais fatale : un fichier tronque par
@@ -154,7 +195,7 @@ function createJournal({ filePath = DEFAULT_PATH, now = Date.now } = {}) {
       // l'enregistrement re-serialise, ce BOM est recopie tel quel dans le
       // fichier compacte ; la primitive le retolere au chargement suivant, si
       // bien que la ligne reste lisible d'une compaction a l'autre.
-      const verdict = decodeJsonlLine(line);
+      const verdict: { ok: true; value: unknown } | { ok: false; rawLength: number } | null = decodeJsonlLine(line);
       if (!verdict || !verdict.ok) continue;
       const rec = verdict.value;
       // `null` est du JSON VALIDE : la primitive rend { ok:true, value:null } et
@@ -170,9 +211,9 @@ function createJournal({ filePath = DEFAULT_PATH, now = Date.now } = {}) {
       // Ce qui n'est pas un objet n'est pas un enregistrement : `42` et
       // `"texte"` ne levaient pas mais passaient avec un `ts` indefini, donc
       // etaient comptes PERIMES — du bruit devenait un motif de reecriture.
-      if (typeof rec !== 'object' || rec === null || Array.isArray(rec)) continue;
-      const ts = rec.kind === 'alert' && rec.alert ? rec.alert.createdAt : rec.createdAt;
-      if (!(ts >= plancher)) { perimees += 1; continue; }
+      if (!isRecord(rec)) continue;
+      const ts = rec.kind === 'alert' && isRecord(rec.alert) ? rec.alert.createdAt : rec.createdAt;
+      if (!(isFiniteNumber(ts) && ts >= plancher)) { perimees += 1; continue; }
       gardees.push(line);
       ingest(rec);
     }
@@ -211,7 +252,7 @@ function createJournal({ filePath = DEFAULT_PATH, now = Date.now } = {}) {
     if (perimees > 0 && gardees.length > 0) compacter(gardees);
   }
 
-  function write(record) {
+  function write(record: Record<string, unknown>): void {
     // On saute les ecritures pendant le delai plutot que de retenter a chaque
     // fois ; passe le delai, on retente une fois.
     if (refus > 0) { refus -= 1; return; }
@@ -225,7 +266,7 @@ function createJournal({ filePath = DEFAULT_PATH, now = Date.now } = {}) {
       // fois par panne, et la detection comme la diffusion continuent.
       if (!plainte) {
         plainte = true;
-        console.error('[watchdog] journal indisponible, les pannes ne sont plus consignees :', err.message);
+        console.error('[watchdog] journal indisponible, les pannes ne sont plus consignees :', err instanceof Error ? err.message : err);
       }
     }
   }
@@ -237,7 +278,7 @@ function createJournal({ filePath = DEFAULT_PATH, now = Date.now } = {}) {
     // diffuser que ce qui vient d'etre consigne — y compris quand le disque a
     // refuse : ne pas ecrire l'alerte n'est pas une raison de la taire, le
     // fait reste en memoire et n'y sera compte qu'une fois.
-    append(alert) {
+    append(alert: AlertRecord): boolean {
       // Sans cle, le fait ne peut etre ni deduplique ni relu : l'ecrire le
       // rendrait invisible a `readAll` tout en le faisant rediffuser a chaque
       // rattrapage, pour toujours. On refuse, et on le dit — c'est un defaut
@@ -275,9 +316,9 @@ function createJournal({ filePath = DEFAULT_PATH, now = Date.now } = {}) {
     // Seule une cle inutilisable est un refus — celle-la, meme un disque en
     // pleine forme ne la retrouverait pas, et l'appelant doit pouvoir ne rien
     // conclure d'un acquittement qui n'a pas eu lieu.
-    appendAck(id, createdAt, at) {
+    appendAck(id: unknown, createdAt: unknown, at: unknown): boolean {
       const quand = enHorodatage(createdAt);
-      if (!estClef(id, quand)) {
+      if (!(id != null && quand !== null)) {
         console.error('[watchdog] acquittement sans (id, createdAt), non consigne :', id);
         return false;
       }
@@ -300,7 +341,7 @@ function createJournal({ filePath = DEFAULT_PATH, now = Date.now } = {}) {
       // journal. L'absence du champ vaut donc « c'est l'appelant qui l'a
       // fourni ». `readAll` l'ignore : c'est la trace qui compte.
       let vu = enHorodatage(at);
-      const ligne = { kind: 'ack', id, createdAt: quand, at: vu };
+      const ligne: Record<string, unknown> = { kind: 'ack', id, createdAt: quand, at: vu };
       if (vu === null) {
         console.error('[watchdog] acquittement sans horodatage utilisable, horloge du serveur retenue :', id);
         vu = now();
@@ -335,17 +376,21 @@ function createJournal({ filePath = DEFAULT_PATH, now = Date.now } = {}) {
     // memoire du journal pour toute la duree du processus, et le fichier, lui,
     // continuerait de dire vrai — un desaccord entre le disque et la RAM que
     // rien ne signalerait. Qu'il copie d'abord.
-    readAll({ sinceDays = 30, now: maintenant = now() } = {}) {
+    readAll({ sinceDays = 30, now: maintenant = now() }: { sinceDays?: number; now?: number } = {}) {
       const plancher = maintenant - sinceDays * JOUR_MS;
       return alerts
-        .filter(a => a.createdAt >= plancher)
+        .filter(a => isFiniteNumber(a.createdAt) && a.createdAt >= plancher)
         .map((a) => {
           // L'ordre de l'etalement compte : le `acknowledged` du disque est
           // fige a false, celui-ci est recalcule et doit gagner.
           const ackAt = acks.get(keyOf(a.id, a.createdAt));
           return { ...a, acknowledged: ackAt !== undefined, ackAt: ackAt ?? null };
         })
-        .sort((x, y) => y.createdAt - x.createdAt);
+        // `isFiniteNumber` plutot qu'un cast : le filtre au-dessus garantit
+        // deja un `createdAt` fini a ce stade, mais l'objet etale
+        // (`{...a, ...}`) reste `unknown` sur ce champ pour le typeur ; le
+        // repli 0 est un filet defensif honnete, jamais atteint en pratique.
+        .sort((x, y) => (isFiniteNumber(y.createdAt) ? y.createdAt : 0) - (isFiniteNumber(x.createdAt) ? x.createdAt : 0));
     },
     // COUTURE DE TEST, assumee comme telle : aucun appelant de production ne
     // s'en sert, et c'est voulu. Elle existe parce que la retention a deux
@@ -358,7 +403,7 @@ function createJournal({ filePath = DEFAULT_PATH, now = Date.now } = {}) {
     //
     // Une copie, pour que l'appelant puisse la garder ou la trier sans que la
     // memoire du journal en souffre.
-    seenKeys() { return new Set(seen); },
+    seenKeys(): Set<string> { return new Set(seen); },
   };
 }
 

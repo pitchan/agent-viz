@@ -23,6 +23,21 @@ import { promises as fsp } from 'node:fs';
 import path from 'node:path';
 import { decodeJsonlLine } from '../jsonl.ts';
 
+// Ce que ce module attend du service : lui pousser un evenement decode. Le
+// service reel (`service.ts`) en offre davantage ; ce fichier n'engage que ce
+// qu'il appelle.
+interface EventSink {
+  onEvent(evt: Record<string, unknown>): unknown;
+}
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
+function isNodeErrnoException(err: unknown): err is NodeJS.ErrnoException {
+  return err instanceof Error;
+}
+
 // `limiteVive` rend, pour un fichier, l'octet a partir duquel le chemin vif
 // prend la main — ou null quand aucun watcher ne le couvre, auquel cas le
 // fichier entier est l'affaire du balayage. Elle est INJECTEE, et pas
@@ -34,7 +49,11 @@ import { decodeJsonlLine } from '../jsonl.ts';
 // Sans elle — appelant qui l'oublie, ou fichier sans watcher — on lit tout,
 // comme avant. C'est le comportement le plus sur : relire de trop ne perd
 // jamais un fait, et le journal dedoublonne l'alerte.
-async function catchUpFromDisk(service, dir, limiteVive) {
+async function catchUpFromDisk(
+  service: EventSink,
+  dir: string,
+  limiteVive?: (chemin: string) => number | null,
+): Promise<number> {
   let names;
   try {
     names = await fsp.readdir(dir);
@@ -47,8 +66,8 @@ async function catchUpFromDisk(service, dir, limiteVive) {
     // rattrapage ne ferait pas son travail, et rien dans le produit ne le
     // dirait. C'est la promesse du chien de garde — une panne survenue serveur
     // eteint se retrouve au journal — qui tomberait sans symptome.
-    if (err.code !== 'ENOENT') {
-      console.error('[watchdog] dossier d evenements illisible, rien n a ete rattrape :', err.message);
+    if (!(isNodeErrnoException(err) && err.code === 'ENOENT')) {
+      console.error('[watchdog] dossier d evenements illisible, rien n a ete rattrape :', err instanceof Error ? err.message : err);
     }
     return 0;
   }
@@ -73,8 +92,8 @@ async function catchUpFromDisk(service, dir, limiteVive) {
       // lecture. Tout le reste veut dire qu'un flux d'evenements EXISTE et
       // qu'on ne l'a pas lu — donc que les pannes qu'il contient ne seront pas
       // consignees. Le fichier suivant est lu quand meme.
-      if (err.code !== 'ENOENT') {
-        console.error(`[watchdog] flux d evenements illisible, ${name} n a pas ete rattrape :`, err.message);
+      if (!(isNodeErrnoException(err) && err.code === 'ENOENT')) {
+        console.error(`[watchdog] flux d evenements illisible, ${name} n a pas ete rattrape :`, err instanceof Error ? err.message : err);
       }
       continue;
     }
@@ -100,7 +119,7 @@ async function catchUpFromDisk(service, dir, limiteVive) {
       // depend de l'atomicite de l'ajout d'une ligne par l'ecrivain, qui n'a pas
       // ete prouvee. C'est un silence, pas un oubli : il n'y avait aucune trace
       // avant cette migration, aucune n'est perdue.
-      const verdict = decodeJsonlLine(line);
+      const verdict: { ok: true; value: unknown } | { ok: false; rawLength: number } | null = decodeJsonlLine(line);
       if (!verdict || !verdict.ok) continue;
       const evt = verdict.value;
       // Ce qui n'est pas un objet n'est pas un evenement. `null` est du JSON
@@ -110,7 +129,7 @@ async function catchUpFromDisk(service, dir, limiteVive) {
       // demarrage, donc le serveur tenait ; mais la boucle s'arretait, et TOUT
       // ce qui suivait — le reste du fichier ET les fichiers d'apres — n'etait
       // jamais relu. Une ligne de bruit faisait perdre le passe entier.
-      if (typeof evt !== 'object' || evt === null || Array.isArray(evt)) continue;
+      if (!isRecord(evt)) continue;
       service.onEvent(evt);
       fed++;
     }

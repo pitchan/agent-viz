@@ -13,6 +13,15 @@
 
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import type { createJournal } from './journal.ts';
+
+// Le journal reel, importe en TYPE seulement : sa forme vit dans journal.ts,
+// pas de duplication ici (2e occurrence du meme domaine).
+type Journal = ReturnType<typeof createJournal>;
+// L'alerte telle que le journal l'accepte et la rend — derivee de sa
+// signature, jamais redeclaree : c'est la meme forme sans liste blanche de
+// champs que journal.ts porte deja.
+type Alert = Parameters<Journal['append']>[0];
 
 const WATCHDOG_MODULE = pathToFileURL(
   path.join(import.meta.dirname, '..', '..', '..', 'src', 'web', 'viz-watchdog.mjs'),
@@ -23,6 +32,11 @@ async function createWatchdogService({
   now = () => Date.now(),
   isCatchingUp = () => false,
   loadModule = () => import(WATCHDOG_MODULE),
+}: {
+  journal: Journal;
+  now?: () => number;
+  isCatchingUp?: () => boolean;
+  loadModule?: () => Promise<{ createWatchdog: (opts: unknown) => WatchdogInstance }>;
 }) {
   const { createWatchdog } = await loadModule();
 
@@ -36,11 +50,11 @@ async function createWatchdogService({
   // Consigner d'abord, rendre ensuite : ce que l'appelant diffusera est deja
   // dans le journal. Et `append` rend false sur un fait deja connu, ce qui
   // rend le rejeu silencieux sans que le detecteur ait a le savoir.
-  const record = alerts => alerts.filter(a => journal.append(a));
+  const record = (alerts: Alert[]): Alert[] => alerts.filter(a => journal.append(a));
 
   return {
-    onEvent(evt) { return record(watchdog.processEvent(evt).newAlerts); },
-    tick() { return record(watchdog.tick().newAlerts); },
+    onEvent(evt: Record<string, unknown>): Alert[] { return record(watchdog.processEvent(evt).newAlerts); },
+    tick(): Alert[] { return record(watchdog.tick().newAlerts); },
     // Consigner d'abord, agir ensuite — la meme regle que `record`, et pour la
     // meme raison. Le journal REFUSE un acquittement dont la cle est hors
     // contrat, et un parametre de route sait en produire un. Eteindre quand
@@ -53,7 +67,7 @@ async function createWatchdogService({
     // pas — et la jeter ferait repondre 200 a la route sur un acquittement que
     // le journal vient de refuser. L'utilisateur verrait son geste pris en
     // compte, et l'alerte reviendrait non acquittee au redemarrage suivant.
-    ack(id, createdAt) {
+    ack(id: unknown, createdAt: unknown): boolean {
       const retenu = journal.appendAck(id, createdAt, now());
       if (retenu) watchdog.acknowledge(id);
       return retenu;
@@ -68,7 +82,7 @@ async function createWatchdogService({
     // existe. C'est pourquoi celui qui construit les deux doit leur donner la
     // meme horloge — voir `initWatchdog` dans index.js, qui est le seul endroit
     // du produit ou les deux se rencontrent.
-    list(opts = {}) { return journal.readAll({ ...opts, now: now() }); },
+    list(opts: { sinceDays?: number } = {}) { return journal.readAll({ ...opts, now: now() }); },
     // Ce que `list` ne peut PAS dire. Le journal est la memoire : il rend ce
     // qui a ete consigne, sans aucune notion de vivacite. Or une alerte
     // `standing` decrit un ETAT et non un moment, donc elle n'a pas de
@@ -80,8 +94,22 @@ async function createWatchdogService({
     // qui la donne, avec son `acknowledged` recalcule depuis le journal — qui
     // fait autorite. Rendre ici une seconde copie de la meme alerte, portant un
     // `acknowledged` fige a false, ferait deux verites pour un seul fait.
-    activeIds() { return watchdog.getActiveAlerts().map(a => a.id); },
+    activeIds(): unknown[] { return watchdog.getActiveAlerts().map((a: Alert) => a.id); },
   };
+}
+
+// Le detecteur est un module ESM externe (`src/web/viz-watchdog.mjs`, hors
+// lot, jamais type par ce projet) charge par un `import()` sur un chemin
+// CALCULE : TypeScript ne peut pas resoudre ses exports statiquement, et rend
+// `any` implicite — admis (doc/36 § Etape 4, meme regle que les six fichiers
+// de traversee du moteur). Cette interface locale n'engage donc que la forme
+// que CE fichier appelle sur l'instance rendue, rien de plus ; elle ne pretend
+// pas decrire tout `viz-watchdog.mjs`.
+interface WatchdogInstance {
+  processEvent(evt: Record<string, unknown>): { newAlerts: Alert[] };
+  tick(): { newAlerts: Alert[] };
+  acknowledge(id: unknown): unknown;
+  getActiveAlerts(): Alert[];
 }
 
 export { createWatchdogService, WATCHDOG_MODULE };
