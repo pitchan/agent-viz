@@ -404,7 +404,18 @@ function buildCopilotHookFile(command: string): CopilotHooksFile {
   return { version: 1, hooks };
 }
 
-function readCopilotFile(file: string): CopilotHooksFile | null {
+// Retour `unknown`, PAS `CopilotHooksFile | null` : `JSON.parse` d'un fichier
+// disque ne garantit RIEN sur sa forme — un `agent-viz.json` JSON-valide sans
+// clé `hooks` est un contenu réel possible, pas une impossibilité que le type
+// pourrait légitimement écarter. Prétendre `CopilotHooksFile` ici (revue du
+// 2026-08-14, constat 1) avait fait disparaître la garde `content.hooks &&`
+// dans `auditCopilot` sur la foi d'un type qui mentait : `.hooks` non
+// optionnel semblait rendre le test redondant, alors que rien sur le disque
+// ne le garantissait. Chaque appelant doit donc valider lui-même — via
+// `isAgentVizCopilotFile` (qui vérifie `isRecord(content.hooks)` avant de
+// rendre `true`) ou, pour une lecture simplement défensive comme
+// `auditCopilot`, via le même garde explicite.
+function readCopilotFile(file: string): unknown {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); }
   catch (e: unknown) {
     if (e instanceof Error && 'code' in e && e.code === 'ENOENT') return null;
@@ -433,8 +444,15 @@ function auditCopilot({ scope, cwd, packageRoot, version }: AgentOpts = {}) {
   const target = resolveScope({ scope, cwd, agent: 'copilot', packageRoot });
   const cmd = resolveHookCommand({ packageRoot, version, agent: 'copilot' });
   const content = readCopilotFile(target.file);
+  // Restaure le garde à trois niveaux de l'original (`content && content.hooks
+  // && content.hooks[ev]`) — `content` est `unknown` (voir `readCopilotFile`) :
+  // un fichier JSON-valide sans `hooks` rend `hooksMap` `undefined` ici, comme
+  // avant, plutôt qu'un `TypeError` à l'indexation.
+  const hooksMap = isRecord(content) && isRecord(content.hooks)
+    ? content.hooks as Record<string, CopilotHookEntry[]>
+    : undefined;
   const rows = eventsFor('copilot').map(ev => {
-    const entries = (content && content.hooks[ev]) || [];
+    const entries = (hooksMap && hooksMap[ev]) || [];
     let installed = false, stale = false, others = 0;
     for (const e of entries) {
       const c = copilotEntryCommand(e);

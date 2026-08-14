@@ -166,11 +166,17 @@ function extractPromptFromText(content: string): string | null {
     // rend bien `{"type":"user","message":{`. Une trace sur cet échec-là se
     // déclencherait à chaque lecture : du bruit de routine, pas un signal.
     // `isRecord(o)` remplace le filet qu'offrait `o.type` en levant sur une
-    // ligne `null` — même issue (cette ligne est ignorée), gardée explicite.
-    // Le `try` qui suit reste un vrai filet pour autre chose : `cleanUserText`
-    // lève si un bloc `text` n'a pas de champ `text` (frontière castée
-    // ci-dessous, pas filtrée, pour ne rien changer à quel bloc l'emporte
-    // quand plusieurs se disputent la même ligne).
+    // ligne `null` — même issue pour `o` seul (cette ligne est ignorée), gardée
+    // explicite. Aucun frère en jeu à ce niveau : une ligne ne porte qu'un `o`.
+    //
+    // Le `try` qui suit reste un vrai filet pour deux choses, TOUTES DEUX
+    // reproduites par CAST plutôt que par garde ci-dessous, jamais filtrées :
+    // `block.type` lève si un bloc du tableau `c` est `null`/`undefined`, et
+    // `cleanUserText(block.text)` lève si un bloc `text` n'a pas de champ
+    // `text`. Un garde (`isRecord(block)`) SAUTERAIT le bloc cassé au lieu de
+    // laisser l'exception remonter — ce qui changerait qui gagne : l'original
+    // abandonne la ligne ENTIÈRE dès le premier bloc cassé, frères valides
+    // compris, revue du 2026-08-14 (constat 2).
     const verdict = decodeJsonlLine(line);
     if (!verdict || !verdict.ok) continue;
     const o = verdict.value;
@@ -186,8 +192,12 @@ function extractPromptFromText(content: string): string | null {
         if (Array.isArray(c)) {
           const blocks: unknown[] = c;
           for (const block of blocks) {
-            if (isRecord(block) && block.type === 'text') {
-              const text = cleanUserText(block.text as string);
+            // Cast, jamais `isRecord` : un bloc `null`/`undefined` doit lever
+            // ICI, comme `block.type` de l'original — voir le commentaire
+            // au-dessus du `try`.
+            const b = block as { type?: unknown; text?: unknown };
+            if (b.type === 'text') {
+              const text = cleanUserText(b.text as string);
               if (text && text.length > 5 && !text.startsWith('{') && !isNoise(text)) return text.slice(0, 120);
             }
           }
