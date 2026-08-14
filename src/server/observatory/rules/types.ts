@@ -37,6 +37,12 @@ export interface SessionReport {
   // meta.cwd (src/engine/doctor/report/types.ts:14, scan-session.ts l.32,
   // 47, 125) — cas réel, pas une garde de confort.
   cwd: string | null;
+  // Ajout consommé par le lot 6 (summary.ts) : le compte d'erreurs de parsing
+  // de LA session, toujours présent sur un rapport frais du moteur
+  // (src/engine/doctor/report/types.ts, champ top-level, jamais sous context) —
+  // la surface « anomalies » du panneau résumé en a besoin par session, pas
+  // seulement agrégé.
+  parseErrors: number;
   context: {
     churnCauses: {
       growth: ChurnStat;

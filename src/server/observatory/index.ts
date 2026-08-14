@@ -18,14 +18,14 @@ const DB_PATH = path.join(os.homedir(), '.agent-viz', 'observatory.db');
 const DEFAULT_SINCE_DAYS = 30;
 const SCAN_SINCE_DAYS = 90; // widest offered window — persistence always covers it
 
-let _service = null;
+let _service: ReturnType<typeof createObservatoryService> | null = null;
 
-function getObservatoryService() {
+function getObservatoryService(): ReturnType<typeof createObservatoryService> {
   if (_service) return _service;
   // C5 : la MÊME résolution que celle du moteur, pas une expression jumelle.
   // Les deux s'étaient déjà écartées une fois — sur la variable posée mais vide —
   // sans que rien ne le signale.
-  const claudeDir = resolveClaudeDir();
+  const claudeDir: string = resolveClaudeDir();
   _service = createObservatoryService({
     store: openStore(DB_PATH),
     loadEngine,

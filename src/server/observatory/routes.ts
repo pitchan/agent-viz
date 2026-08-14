@@ -6,37 +6,57 @@
 // The service arrives as a getter so requiring this module never opens the
 // SQLite file: the other route tests must not touch the user's home.
 
+import type { IncomingMessage, ServerResponse } from 'node:http';
+// import type only: erased at emission, so this module still never actually
+// requires service.ts (and therefore never opens the SQLite file) at runtime
+// — only its shape is borrowed to type the injected getService/handlers.
+import type { createObservatoryService } from './service.ts';
+
+type Service = ReturnType<typeof createObservatoryService>;
+
 const PRICE_SOURCE = 'netgain-table-embarquee';
 const VALID_STATUSES = new Set(['new', 'accepted', 'ignored']);
 
-function sendJson(res, code, payload) {
+function sendJson(res: ServerResponse, code: number, payload: unknown): void {
   res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
   res.end(JSON.stringify(payload));
 }
 
 // A missing engine is a 503 carrying the exact cause; anything else is a
 // genuine 500. Either way the live canvas view keeps working.
-function sendError(res, err) {
-  if (err.engineMissing) {
+function sendError(res: ServerResponse, err: unknown): void {
+  if (err instanceof Error && 'engineMissing' in err && err.engineMissing) {
     sendJson(res, 503, {
       error: err.message,
       hint: 'Moteur d’analyse indisponible — le suivi temps réel reste actif.',
     });
     return;
   }
-  console.error('[observatory] route failed:', err.message);
-  sendJson(res, 500, { error: err.message });
+  const message = err instanceof Error ? err.message : String(err);
+  console.error('[observatory] route failed:', message);
+  sendJson(res, 500, { error: message });
 }
 
 // URL translation only — validation (the 7/30/90 table) lives in the service.
-const daysOf = url => {
+const daysOf = (url: URL): number | undefined => {
   const n = Number(url.searchParams.get('days'));
   return Number.isInteger(n) && n > 0 ? n : undefined;
 };
-const includeMachineOf = url => url.searchParams.get('includeMachine') === '1';
+const includeMachineOf = (url: URL): boolean => url.searchParams.get('includeMachine') === '1';
 
-function createObservatoryRoutes(getService) {
-  const bind = handler => async (req, res, url) => {
+type RouteHandler = (req: IncomingMessage, res: ServerResponse, url: URL) => Promise<void>;
+type BoundHandler = (req: IncomingMessage, res: ServerResponse, url: URL, service: Service) => Promise<void>;
+
+interface Route {
+  method: string;
+  path?: string;
+  prefix?: string;
+  sameOrigin?: boolean;
+  handler: RouteHandler;
+}
+
+function createObservatoryRoutes(getService: () => Service): Route[] {
+  const bind = (handler: BoundHandler): RouteHandler => async (req, res, url) => {
     try {
       await handler(req, res, url, getService());
     } catch (err) {
@@ -91,7 +111,7 @@ function createObservatoryRoutes(getService) {
       handler: bind(async (_req, res, url, service) => {
         const days = daysOf(url);
         service.scan(days === undefined ? {} : { days })
-          .catch(err => console.error('[observatory] scan failed:', err.message));
+          .catch((err: unknown) => console.error('[observatory] scan failed:', err instanceof Error ? err.message : String(err)));
         sendJson(res, 202, { started: true });
       }),
     },
@@ -104,7 +124,7 @@ function createObservatoryRoutes(getService) {
         const days = daysOf(url);
         await service.purge();
         service.scan(days === undefined ? {} : { days })
-          .catch(err => console.error('[observatory] scan failed:', err.message));
+          .catch((err: unknown) => console.error('[observatory] scan failed:', err instanceof Error ? err.message : String(err)));
         sendJson(res, 202, { purged: true, started: true });
       }),
     },
@@ -121,7 +141,7 @@ function createObservatoryRoutes(getService) {
       handler: bind(async (_req, res, url, service) => {
         const id = Number(url.pathname.slice('/recommendations/'.length));
         const status = url.searchParams.get('status');
-        if (!Number.isInteger(id) || !VALID_STATUSES.has(status)) {
+        if (!Number.isInteger(id) || status === null || !VALID_STATUSES.has(status)) {
           sendJson(res, 400, { error: 'identifiant ou statut invalide' });
           return;
         }
