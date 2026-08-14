@@ -12,12 +12,12 @@ Quand un changement enfreint un de ces principes, soit tu refactores autour, soi
 Un module, une classe, une fonction = **une seule raison de changer**.
 - Ne mélange pas I/O réseau, parsing, et règles métier dans la même fonction.
 - Si tu décris ce que fait une fonction et que tu utilises "et" plus d'une fois, elle est probablement à scinder.
-- Concrètement dans ce repo : un fichier de `src/server/routes.js` ne fait pas de logique métier ; un hook ne fait pas de routing ; le parsing d'événements ne fait pas d'I/O fichier.
+- Concrètement dans ce repo : un fichier de `src/server/routes.ts` ne fait pas de logique métier ; un hook ne fait pas de routing ; le parsing d'événements ne fait pas d'I/O fichier.
 
 ### O — Open/Closed Principle
 Ouvert à l'extension, fermé à la modification.
 - Pour ajouter un nouveau type d'événement, une nouvelle source d'agent (Claude / Copilot / autre), un nouveau format de hook → préfère une **table déclarative** ou un **registre/dispatch** à un nouveau `if/else` qui pousse la fonction existante vers la dette.
-- Un précédent existe déjà dans le repo : `src/server/routes.js` table déclarative — réutilise ce pattern.
+- Un précédent existe déjà dans le repo : `src/server/routes.ts` table déclarative — réutilise ce pattern.
 
 ### L — Liskov Substitution Principle
 Les sous-types doivent rester substituables à leur type parent **sans surprise comportementale**.

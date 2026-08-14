@@ -105,7 +105,7 @@ Deux sites dans un même fichier : compter les **fichiers** en donne quatre, les
 **sites** cinq, et c'est la profondeur de chaque site qui décide — d'où le
 décompte par site.
 
-Sa table de routes est **déclarative** (`src/server/routes.js:275`) : ajouter une
+Sa table de routes est **déclarative** (`src/server/routes.ts:308`) : ajouter une
 route est une ligne de données, pas une branche de plus dans un aiguilleur. C'est
 le précédent que [CLAUDE.md](./CLAUDE.md) cite pour le principe ouvert/fermé.
 
@@ -133,7 +133,7 @@ l'étape 3, un marqueur `{"type": "module"}` versionné rendait ce sous-arbre ES
 ### 2.3 Le navigateur
 
 **27 fichiers** — 20 `.js`, 6 `.mjs`, `viz.css`. ES modules, servis tels quels
-en HTTP depuis `src/web/` (`src/server/routes.js:91`).
+en HTTP depuis `src/web/` (`src/server/routes.ts:311`).
 
 ```
 find src/web -type f | wc -l          → 27      (20 js · 6 mjs · 1 css)
@@ -325,11 +325,11 @@ contre le premier motif serait faux d'un fichier sans avoir l'air incomplet.
 
 | Fichier | Lignes | Rôle |
 |---|---|---|
-| `src/server/engine-require.js` | 68 | **la primitive** : calcule `dist/engine`, charge, et nomme deux pannes distinctes — *build manquant* et *build périmé* |
-| `src/server/pricing-engine.js` | 39 | ré-export : `computeCost`, `normalizeModel`, `pricingKindOf` |
-| `src/server/usage.js` | 25 | ré-export : `addUsage`, `emptyUsageBucket`, `finiteCount`, `isDedupableMsgId`, `sumUsageInto` |
-| `src/server/claude-dir.js` | 22 | ré-export : `resolveClaudeDir`, `resolveClaudeJsonPath`, `CLAUDE_DIR_ENV` |
-| `src/server/jsonl.js` | 19 | ré-export : `decodeJsonlLine` |
+| `src/server/engine-require.ts` | 72 | **la primitive** : calcule `dist/engine`, charge, et nomme deux pannes distinctes — *build manquant* et *build périmé* |
+| `src/server/pricing-engine.ts` | 43 | ré-export : `computeCost`, `normalizeModel`, `pricingKindOf` |
+| `src/server/usage.ts` | 33 | ré-export : `addUsage`, `emptyUsageBucket`, `finiteCount`, `isDedupableMsgId`, `sumUsageInto` |
+| `src/server/claude-dir.ts` | 30 | ré-export : `resolveClaudeDir`, `resolveClaudeJsonPath`, `CLAUDE_DIR_ENV` |
+| `src/server/jsonl.ts` | 21 | ré-export : `decodeJsonlLine` |
 
 Les quatre modules de ré-export sortent 12 noms du moteur, mais n'en déclarent
 que **11** au contrôle de la primitive. C'est une approximation manuelle d'un
@@ -393,7 +393,7 @@ Claude Code / Copilot CLI
                     └─ la page se met à jour                  (viz-network.js:87)
 ```
 
-Chaud, éphémère, purgé toutes les heures (`src/server/server.js:112`). Le crochet
+Chaud, éphémère, purgé toutes les heures (`src/server/server.ts:116`). Le crochet
 **n'attend jamais** le démon : un démon éteint ne ralentit pas la session de
 l'utilisateur.
 
@@ -408,7 +408,7 @@ l'utilisateur.
                     └─ les trois pages d'analyse     (src/web/observatory/)
 ```
 
-Froid, rejoué au démarrage puis toutes les heures (`src/server/server.js:113` — la
+Froid, rejoué au démarrage puis toutes les heures (`src/server/server.ts:117` — la
 ligne voisine de celle du flux A, même cadence, deux objets différents). **Les
 transcripts sont la source de vérité ; la base est un dérivé jetable.** La
 supprimer ne perd que les statuts posés à la main sur les recommandations.
@@ -426,12 +426,12 @@ Ils se comptent en deux temps, et les confondre fait manquer un crochet.
 | `agent-viz` | `bin/agent-viz.js` | l'utilisateur |
 | `netgain` | `dist/engine/cli.js` | l'utilisateur |
 | `netgain-map` | `dist/engine/mcp/main.js` | un client MCP |
-| `main` | `src/server/server.js` | déclaré pour `require('@vcueto/agent-viz')`, qu'aucun code connu n'appelle — mais le fichier lui-même est bien vivant : c'est le script que le démon lance (`src/server/lifecycle.js:12`). **Ce qu'il rend a changé à l'étape 3 : voir juste sous cette table.** |
+| `main` | `dist/server/server.js` | déclaré pour `require('@vcueto/agent-viz')`, qu'aucun code connu n'appelle — mais le fichier lui-même est bien vivant : c'est l'émission du script que le démon lance (`src/server/lifecycle.ts:12`). **Ce qu'il rend a changé à l'étape 3 : voir juste sous cette table.** |
 | la page | `index.html` | le navigateur ; importe `./src/web/…` en 10 lignes |
 
 **Le régime de modules de ces points d'entrée a changé à l'étape 3, et un seul
 d'entre eux le rend visible de l'extérieur.** `bin/agent-viz.js` et
-`src/server/server.js` sont des ES modules depuis que la racine porte
+`dist/server/server.js` sont des ES modules depuis que la racine porte
 `"type": "module"` ; lancés par `node`, ils se comportent à l'identique. Mais
 `main` est aussi une **surface d'appel** : un projet CommonJS qui écrivait
 `require('@vcueto/agent-viz')` ne reçoit plus l'objet `module.exports`, il reçoit
@@ -462,7 +462,7 @@ différents, et c'est la partie qu'on oublie :
 
 Le crochet agent-viz a **deux modes**, et la différence compte : si la racine du
 paquet est un cache `npx` éphémère, la commande écrite ne contient **aucun
-chemin** (`src/server/install-hooks.js:241-256`). L'installation globale ou
+chemin** (`src/server/install-hooks.ts:333-358`). L'installation globale ou
 locale produit la forme absolue ; `npx` produit la forme portable.
 
 **`bin/agent-viz.js` n'ayant pas bougé à l'étape 2, le crochet agent-viz en mode
@@ -478,9 +478,9 @@ n'y paraît.
 
 | Qui écrit | Où | Chemin absolu ? |
 |---|---|---|
-| `src/server/install-hooks.js` | **six** destinations possibles selon l'agent et la portée : `~/.claude/settings.json`, `<dépôt>/.claude/settings{,.local}.json`, `~/.copilot/hooks/agent-viz.json`, `<dépôt>/.github/hooks/agent-viz{,.local}.json` | **seulement en mode `absolute`** |
+| `src/server/install-hooks.ts` | **six** destinations possibles selon l'agent et la portée : `~/.claude/settings.json`, `<dépôt>/.claude/settings{,.local}.json`, `~/.copilot/hooks/agent-viz.json`, `<dépôt>/.github/hooks/agent-viz{,.local}.json` | **seulement en mode `absolute`** |
 | `src/engine/install/` | `~/.claude.json` (le serveur MCP) et `<dépôt>/.claude/settings.local.json` (le crochet routeur) | **toujours** |
-| `src/server/install-hooks.js` | ajoute une ligne au **`.gitignore` du dépôt de l'utilisateur**, quand il écrit un fichier de portée locale — jamais n'en crée un (l. 262-272) | sans objet |
+| `src/server/install-hooks.ts` | ajoute une ligne au **`.gitignore` du dépôt de l'utilisateur**, quand il écrit un fichier de portée locale — jamais n'en crée un (l. 361-376) | sans objet |
 
 La troisième ligne est la plus intrusive des trois : c'est la seule qui touche un
 fichier **versionné** de l'utilisateur.
