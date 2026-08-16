@@ -65,13 +65,13 @@ l'avertissement du § 8.
 
 ### 2.1 Le serveur
 
-**52 fichiers** dans `src/server/`, plus le binaire, **ES modules** — la racine
+**54 fichiers** dans `src/server/`, plus le binaire, **ES modules** — la racine
 porte `"type": "module"` **depuis l'étape 3 de la migration**. Elle a porté
 `"type": "commonjs"` jusque-là, et c'est cette ligne unique qui commandait le
 régime des deux arbres à la fois.
 
 ```
-src/server/     hook.js · install-hooks.js · lifecycle.js · prompt-install.js · server.js
+src/server/     hook.ts · install-hooks.ts · lifecycle.ts · prompt-install.ts · server.ts
 src/server/               HTTP, SSE, table de routes, tarification d'affichage
 src/server/observatory/   orchestration des scans, base, provenance
 src/server/observatory/rules/     les règles de conseil, une par fichier
@@ -154,7 +154,7 @@ src/web/observatory/   les trois vues d'analyse : conseils, sessions, tarifs
 ```
 
 **L'URL suit le disque** : la racine statique est `src/web/` et le préfixe servi
-est `/src/web/` (`routes.js:91` et l'entrée `prefix` de `ROUTES`). Une table de
+est `/src/web/` (`routes.ts:311` et l'entrée `prefix` de `ROUTES`). Une table de
 correspondance URL→disque aurait été un mécanisme neuf ; l'étape 5 rebasculera
 cette URL vers `dist/web/`.
 
@@ -323,7 +323,7 @@ chercher le seul nom de fichier rend les quatre **consommateurs** et manque la
 **primitive**, qui ne se nomme pas elle-même. Un inventaire de frontière écrit
 contre le premier motif serait faux d'un fichier sans avoir l'air incomplet.
 
-| Fichier | Lignes | Rôle |
+| Fichier | Lignes non vides | Rôle |
 |---|---|---|
 | `src/server/engine-require.ts` | 72 | **la primitive** : calcule `dist/engine`, charge, et nomme deux pannes distinctes — *build manquant* et *build périmé* |
 | `src/server/pricing-engine.ts` | 43 | ré-export : `computeCost`, `normalizeModel`, `pricingKindOf` |
@@ -336,9 +336,9 @@ que **11** au contrôle de la primitive. C'est une approximation manuelle d'un
 contrôle de types : si le moteur renomme une de ces 11 fonctions, c'est cette
 liste écrite en dur qui lève, et non le compilateur.
 
-**Le douzième nom est le trou, et il est structurel.** `claude-dir.js:19-20`
+**Le douzième nom est le trou, et il est structurel.** `claude-dir.ts:35`
 ré-exporte `CLAUDE_DIR_ENV` sans le faire vérifier, et il ne *peut* pas le faire
-vérifier : `engine-require.js:55` ne sait contrôler que des fonctions —
+vérifier : `engine-require.ts:67` ne sait contrôler que des fonctions —
 `noms.filter(nom => typeof module[nom] !== 'function')`. Or `CLAUDE_DIR_ENV` est
 une **chaîne** (`src/engine/core/claude-dir.ts:9`). L'inscrire dans la liste
 ferait lever le contrôle en permanence ; l'en laisser dehors le rend invisible.
@@ -348,8 +348,8 @@ supprimer.
 
 ### 4.2 Par `import()` dynamique — 1 fichier
 
-`src/server/observatory/engine.js` calcule lui aussi le chemin de `dist/engine`
-(l. 23) et charge le moteur par `import()` (l. 38-39), **sans passer par la
+`src/server/observatory/engine.ts` calcule lui aussi le chemin de `dist/engine`
+(l. 47) et charge le moteur par `import()` (l. 66-67), **sans passer par la
 primitive**. Ce n'est pas un ré-export : c'est l'adaptateur qui injecte le moteur
 dans l'observatoire, et tout ce qui est en aval le reçoit en paramètre — ce qui
 rend les règles testables sans le moteur.
@@ -361,15 +361,15 @@ tout.
 
 **Les deux mécanismes n'ont pas non plus la même robustesse**, et l'écart va dans
 le sens qu'on n'attend pas. La primitive vérifie ses noms (11 sur 12, § 4.1) et
-nomme un build périmé. `observatory/engine.js`, lui, `import()` puis lit **cinq**
-exports **directement, sans aucun contrôle** — `core.discoverSessions` (l. 42),
-`core.parseSince` (43), `doctor.scanSession` (44), `doctor.netTokens` (45),
-`core.priceTable` (49) : un export disparu ne s'y annonce pas, il devient
+nomme un build périmé. `observatory/engine.ts`, lui, `import()` puis lit **cinq**
+exports **directement, sans aucun contrôle** — `core.discoverSessions` (l. 75),
+`core.parseSince` (76), `doctor.scanSession` (77), `doctor.netTokens` (78),
+`core.priceTable` (82) : un export disparu ne s'y annonce pas, il devient
 `undefined` et échoue plus loin.
 
 Un dernier détail sur ce fichier, parce qu'il est vrai et qu'il n'est pas
-joli : il déclare `FIXTURE_CLAUDE_DIR` (l. 22), un chemin vers
-`tests/fixtures/observatory/`, et l'exporte (l. 67). Du code de production
+joli : il déclare `FIXTURE_CLAUDE_DIR` (l. 46), un chemin vers
+`tests/fixtures/observatory/`, et l'exporte (l. 104). Du code de production
 désigne donc un répertoire que le paquet publié ne contient pas — `tests/` est
 hors de `files`. Son seul consommateur est
 `tests/unit/observatory-engine-contract.test.cjs`.
@@ -386,10 +386,10 @@ la principale façon de se tromper sur ce produit.
 ```
 Claude Code / Copilot CLI
    └─ le crochet lance `agent-viz hook`
-        ├─ écrit  ${tmpdir}/agent-events/<session>.jsonl     (dossier : hook.js:16
-        │                                                     écriture : hook.js:73)
+        ├─ écrit  ${tmpdir}/agent-events/<session>.jsonl     (dossier : hook.ts:25
+        │                                                     écriture : hook.ts:82)
         └─ POST /notify au démon, sans attendre la réponse
-              └─ le démon diffuse en SSE sur /stream          (routes.js:281)
+              └─ le démon diffuse en SSE sur /stream          (routes.ts:314)
                     └─ la page se met à jour                  (viz-network.js:87)
 ```
 
@@ -403,7 +403,7 @@ l'utilisateur.
 ~/.claude/projects/<projet>/<session>.jsonl        (la source de vérité)
    └─ le moteur découvre, décode, agrège, tarife    (src/engine/core/discovery.ts:32)
         └─ le serveur range le résultat dans
-           ~/.agent-viz/observatory.db               (observatory/index.js:17)
+           ~/.agent-viz/observatory.db               (observatory/index.ts:17)
               └─ servi en JSON par HTTP
                     └─ les trois pages d'analyse     (src/web/observatory/)
 ```
@@ -485,8 +485,8 @@ n'y paraît.
 La troisième ligne est la plus intrusive des trois : c'est la seule qui touche un
 fichier **versionné** de l'utilisateur.
 
-`install-hooks.js` reconnaît **quatre formes** de sa propre ligne
-(l. 66-70) : deux historiques — les deux formes `hook.js` d'avant les
+`install-hooks.ts` reconnaît **quatre formes** de sa propre ligne
+(l. 144-148) : deux historiques — les deux formes `hook.js` d'avant les
 déplacements — et **deux formes courantes**, une par mode. C'est la trace de
 déplacements passés : le produit a déjà cassé ses propres installations, et il a
 appris à les recoudre plutôt qu'à les dupliquer.
@@ -506,7 +506,7 @@ Les supprimer est toujours sans danger.
 
 Corollaire pour qui développe : **après avoir modifié le moteur, il faut
 reconstruire.** Le serveur charge `dist/engine/`, pas la source. C'est
-exactement le mode de panne que `engine-require.js` nomme *build périmé* — et
+exactement le mode de panne que `engine-require.ts` nomme *build périmé* — et
 c'est pour ne pas avoir à le deviner qu'il porte deux messages distincts.
 
 **Le nettoyage en tête de `build` est neuf, et il a remplacé un geste inverse.**
@@ -544,7 +544,7 @@ grammaticalement vraie.
 
 | Unité | Répertoires, au 2026-08-13 (v0.15.0) | Fichiers |
 |---|---|---|
-| serveur | `src/server/` + `bin/` | 52 + 1 |
+| serveur | `src/server/` + `bin/` | 54 + 1 |
 | moteur | `src/engine/` → `dist/engine/` | 43 |
 | navigateur | `src/web/` | 27 |
 
