@@ -52,7 +52,7 @@
 // `agent-viz start` de l utilisateur.
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { readdirSync, statSync, readFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { readdirSync, statSync, readFileSync, mkdtempSync, rmSync, existsSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -150,6 +150,19 @@ test('les 51 fichiers de src/server hors server.js se chargent REELLEMENT, zero 
     + 'l exclusion de server.ts dans la boucle ci-dessous ne mord donc plus, et cette boucle '
     + 'chargerait le point d entree — ce qui lie un port reel et cree la base de mesure. '
     + 'Reancrer l exclusion avant de rejouer ce test.');
+
+  // La derivation ci-dessus (`sourceDeLEntree`) est un CALCUL, pas une lecture :
+  // rien ne garantit qu elle designe un fichier qui existe reellement sur le
+  // disque. Si l emission cesse un jour d etre nom-preservante, `entreeSource`
+  // pointerait un chemin absent, le filtre juste en dessous ne retirerait rien
+  // de `tous`, et la boucle chargerait `server.ts` pour de vrai — l accident
+  // exact que ce chantier a deja paye en reel (port lie, base de mesure creee).
+  assert.ok(existsSync(entreeSource),
+    `la source deduite du point d entree (${path.relative(ROOT, entreeSource)}) n existe pas sur le `
+    + 'disque : la derivation dist -> src ne resout plus vers un fichier reel, donc le filtre '
+    + 'ci-dessous ne retirerait plus rien et server.ts se ferait charger reellement par la boucle '
+    + '— ce qui lie un port reel et cree la base de mesure. Reancrer la derivation dist -> src avant '
+    + 'de rejouer ce test.');
 
   const cibles = tous.filter(f => path.resolve(f) !== path.resolve(entreeSource));
 
