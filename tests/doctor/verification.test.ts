@@ -144,3 +144,30 @@ test('PowerShell est un porteur de commande au meme titre que Bash', () => {
   // Assert
   assert.equal(stats.verifications, 1);
 });
+
+test('un lancement en arriere-plan accuse le depart, il ne rend aucun verdict', () => {
+  // Arrange — le tool_result est vert, mais c'est l'accusé de lancement : le
+  // compter fabriquerait un `ok: true` sans preuve (doc/41, D4).
+  const agg = new VerificationAggregator();
+  agg.addAssistant(assistant({ timestamp: T(1),
+    toolUses: [{ id: 'v1', name: 'Bash', input: { command: 'npm test', run_in_background: true } }] }) as never, 'main');
+  agg.addToolResult(toolResult({ toolUseId: 'v1', timestamp: T(2) }) as never);
+  // Act
+  const stats = agg.result();
+  // Assert
+  assert.equal(stats.verifications, 0);
+  assert.equal(stats.lastVerification, null);
+});
+
+test('les affectations d environnement ne sont pas stockees avec la commande', () => {
+  // Arrange
+  const agg = new VerificationAggregator();
+  agg.addAssistant(bash('v1', 'NPM_TOKEN=abc npm test', T(1)) as never, 'main');
+  agg.addToolResult(toolResult({ toolUseId: 'v1', timestamp: T(2) }) as never);
+  // Act
+  const stats = agg.result();
+  // Assert
+  assert.equal(stats.verifications, 1, 'le classifieur voit toujours la commande entiere');
+  assert.equal(stats.lastVerification?.command, 'npm test');
+  assert.equal(JSON.stringify(stats).includes('abc'), false, 'le secret n apparait nulle part');
+});

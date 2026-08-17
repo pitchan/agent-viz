@@ -12,6 +12,14 @@
 // jamais classé au hasard. Limite v1 assumée : un fichier modifié par commande
 // shell (sed, redirection) est invisible — seuls Edit/Write/MultiEdit/
 // NotebookEdit comptent comme éditions.
+//
+// Seconde limite, déclarée au même titre : `ok` reflète le code de retour du
+// shell, pas le verdict de l'outil — un tube sans pipefail
+// (`npm test 2>&1 | tail -20` rend le code de `tail`) ou un `|| true` peut
+// rendre un vert optimiste ; déclaré, pas corrigé (doc/41). Ce qui NE relève
+// pas de la déclaration mais du refus : un lancement en arrière-plan, dont le
+// résultat est un accusé de départ et non un verdict — celui-là n'est pas
+// enregistré du tout (doc/41, D4 : une fausse preuve se paie).
 
 import type { NormalizedEvent } from '../../core/events.js';
 import { addUsage, emptyUsageBucket, isDedupableMsgId } from '../../core/usage.js';
@@ -53,6 +61,12 @@ const EDIT_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit']);
 const COMMAND_MAX = 200;
 const FILES_CAP = 20;
 
+// `command` entre dans le rapport PERSISTÉ : un `NPM_TOKEN=abc npm test` y
+// entrerait verbatim. Les affectations d'environnement en tête sont retirées
+// avant stockage. La CLASSIFICATION, elle, reçoit toujours la commande entière
+// — le classifieur tolère déjà ce préfixe, seul le stockage est nettoyé.
+const LEADING_ENV = /^(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)+/;
+
 interface PendingVerification { kind: VerificationKind; command: string; at: string | undefined }
 interface PendingEdit { path: string; at: string | undefined }
 
@@ -70,10 +84,14 @@ export class VerificationAggregator {
       const input = typeof tu.input === 'object' && tu.input !== null
         ? (tu.input as Record<string, unknown>) : {};
       if (COMMAND_TOOLS.has(tu.name)) {
+        // Un lancement en arrière-plan rend un ACCUSÉ DE DÉPART, jamais un
+        // rouge/vert : l'enregistrer fabriquerait un `ok: true` sans preuve.
+        if (input['run_in_background'] === true) continue;
         const command = typeof input['command'] === 'string' ? input['command'] : null;
         const kind = command === null ? null : classifyVerification(command);
         if (command !== null && kind !== null) {
-          this.pendingVerifs.set(tu.id, { kind, command: command.slice(0, COMMAND_MAX), at: evt.timestamp });
+          const stored = command.replace(LEADING_ENV, '').slice(0, COMMAND_MAX);
+          this.pendingVerifs.set(tu.id, { kind, command: stored, at: evt.timestamp });
         }
       } else if (EDIT_TOOLS.has(tu.name)) {
         const path = typeof input['file_path'] === 'string' ? input['file_path']
