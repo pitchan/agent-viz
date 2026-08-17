@@ -73,7 +73,9 @@ const EVIDENCE_BY_RULE = {
   R7: e => {
     const lines = [
       `${e.sessionsNoVerification} session${e.sessionsNoVerification > 1 ? 's' : ''} modifiant des fichiers sans aucune vérification lancée`,
-      `${e.sessionsWithTail} session${e.sessionsWithTail > 1 ? 's' : ''} close${e.sessionsWithTail > 1 ? 's' : ''} avec des modifications postérieures à la dernière vérification`,
+      // « close » est tombé (revue doc/41) : la règle ne teste jamais la fin de
+      // session — une session encore vivante peut être là. Le fait dit reste vrai.
+      `${e.sessionsWithTail} session${e.sessionsWithTail > 1 ? 's' : ''} avec des modifications postérieures à la dernière vérification`,
       `${e.filesUnverifiedBySession} fichiers laissés sans preuve dans la session (cumul par session)`,
       `${formatTokens(e.tokensAfterLastVerification)} jetons émis après la dernière vérification — travail à risque, pas gaspillage prouvé`,
     ];

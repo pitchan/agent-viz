@@ -174,6 +174,21 @@ test('R7 met la queue non verifiee en francais, sans accuser de gaspillage', () 
     'aucune session ecartee : pas de ligne de re-analyse, pas de zero decoratif');
 });
 
+// F1 (revue doc/41) : « close » affirmait une cloture que le capteur ne mesure
+// pas — la regle ne teste jamais la fin de session, une session encore vivante
+// dont les dernieres editions ne sont pas verifiees entre dans sessionsWithTail.
+test('R7 ne declare jamais la session close — la cloture n est pas mesuree', () => {
+  // Arrange
+  const rec = recR7(0);
+  // Act
+  const lines = evidenceLines(rec);
+  // Assert
+  assert.ok(!lines.some(l => l.includes('close')),
+    `la carte affirme une cloture non mesuree : ${JSON.stringify(lines)}`);
+  assert.ok(lines.includes('2 sessions avec des modifications postérieures à la dernière vérification'),
+    `le fait lui-meme doit rester dit : ${JSON.stringify(lines)}`);
+});
+
 // Precedent R5 : un inconnu se dit, il ne se fond jamais dans un zero. Ces
 // sessions sont indecidables par construction (stockees avant la re-analyse),
 // donc la ligne ne les declare pas « concernees ».
