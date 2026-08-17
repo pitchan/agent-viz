@@ -119,7 +119,7 @@ test('le tout-venant du shell rend null', () => {
 
 test('une entree qui n est pas une chaine rend null', () => {
   // Arrange — la sonde (doc/41) lit du JSON de transcript non type.
-  const notCommands = [undefined, null, 42, { command: 'npm test' }] as unknown as string[];
+  const notCommands = [undefined, null, 42, { command: 'npm test' }];
   // Act
   const kinds = notCommands.map(classifyVerification);
   // Assert

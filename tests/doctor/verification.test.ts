@@ -1,7 +1,21 @@
 // La queue non vérifiée par session (doc/41) : fusion inter-agents par
 // horodatage, dédup d'usage par message.id, une édition en erreur n'a rien
 // modifié, un événement sans horodatage est compté — jamais classé au hasard.
-import { test } from 'node:test';
+//
+// POURQUOI CE FICHIER EST UN `.test.ts` À L'API VITEST, ET NON UN `.test.mjs`.
+// Son voisin `verification-commands.test.mjs` a pu passer sous les DEUX
+// exécuteurs ; celui-ci ne le peut pas, et la raison n'est pas dans le test.
+// `src/engine/**` désigne ses voisins par des spécificateurs en `.js`
+// (111 occurrences, aucune en `.ts` — l'inverse exact de `src/server/**`) :
+// `aggregators/verification.ts` importe `../../core/usage.js`, qui n'existe
+// pas sur le disque. Seul le résolveur de vitest recolle `.js` sur `.ts` ;
+// `node --test` rend ERR_MODULE_NOT_FOUND (mesuré le 2026-08-17 sur node
+// v24.15.0, et reproduit hors dépôt sur deux fichiers nus). Le tronc du
+// moteur n'est donc chargeable depuis ses SOURCES que par vitest — le serveur,
+// lui, passe par `requireEngineModule` et lit le `dist/`.
+// Conséquence assumée : l'extension dit le régime (ARCHITECTURE.md § 9), et
+// le régime possible ici est vitest. Ce fichier n'est plus un hybride.
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { VerificationAggregator } from '../../src/engine/doctor/aggregators/verification.ts';
 
