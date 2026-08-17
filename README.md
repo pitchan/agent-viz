@@ -213,15 +213,15 @@ npm run build                # the engine is TypeScript; dist/ is not committed
 npm start                    # dashboard on http://localhost:3333
 ```
 
-Tests: `npm test` (a single `vitest run` over one `tests/` tree — 1361 tests in 119 files,
-product and engine together; the 75 `node:test`-based files run through a bridge,
-`test-support/bridge/`) and `npm run test:node` (the same 839 `node:test` cases, run natively
+Tests: `npm test` (a single `vitest run` over one `tests/` tree — 1395 tests in 123 files,
+product and engine together; the 78 `node:test`-based files run through a bridge,
+`test-support/bridge/`) and `npm run test:node` (the same 862 `node:test` cases, run natively
 under `node --test`, kept as the reference the bridge is checked against). After changing
 engine source, rebuild it (`npm run build`) — the product loads the compiled `dist/engine/`.
 Publishing runs both test commands and the build first (`prepublishOnly`).
 
-Test files are named after the module system they use: `.test.cjs` (39, CommonJS),
-`.test.mjs` (36, ESM) and `.test.ts` (44, vitest API). Since the root package is ESM, a
+Test files are named after the module system they use: `.test.cjs` (40, CommonJS),
+`.test.mjs` (38, ESM) and `.test.ts` (45, vitest API). Since the root package is ESM, a
 `.js` test file *is* an ES module — the extension is what tells the runtime, so it has to be
 right. Both runners load `test-support/env-guard.mjs` first: it redirects `HOME`,
 `USERPROFILE`, `TEMP` and `TMP` to a throwaway sandbox and forces a dead port, so a test can

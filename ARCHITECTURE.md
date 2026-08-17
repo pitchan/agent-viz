@@ -65,7 +65,7 @@ l'avertissement du § 8.
 
 ### 2.1 Le serveur
 
-**54 fichiers** dans `src/server/`, plus le binaire, **ES modules** — la racine
+**55 fichiers** dans `src/server/`, plus le binaire, **ES modules** — la racine
 porte `"type": "module"` **depuis l'étape 3 de la migration**. Elle a porté
 `"type": "commonjs"` jusque-là, et c'est cette ligne unique qui commandait le
 régime des deux arbres à la fois.
@@ -111,7 +111,7 @@ le précédent que [CLAUDE.md](./CLAUDE.md) cite pour le principe ouvert/fermé.
 
 ### 2.2 Le moteur
 
-**43 fichiers** TypeScript `strict`, ES modules, compilés par `tsc` vers
+**45 fichiers** TypeScript `strict`, ES modules, compilés par `tsc` vers
 `dist/engine/`.
 
 ```
@@ -559,10 +559,10 @@ sauf entrée nommée dans sa liste blanche. Le moteur gagne un fichier
 
 ## 9. La plomberie de test
 
-**Un seul exécuteur, un seul arbre de tests, 1 361 tests dans 119 fichiers.**
+**Un seul exécuteur, un seul arbre de tests, 1 395 tests dans 123 fichiers.**
 
 ```
-npx vitest run     → 1361 passés, 119 fichiers
+npx vitest run     → 1395 passés, 123 fichiers
 ```
 
 Les deux arbres ont fusionné à plat à l'étape 2 : `netgain/tests/` a rejoint
@@ -571,8 +571,8 @@ même dossier, et c'est ce qui explique le pont ci-dessous.
 
 | Dialecte | Fichiers | Écrits en |
 |---|---|---|
-| CommonJS + ESM | 39 `.test.cjs` + 36 `.test.mjs` | `node:test` |
-| TypeScript | 44 `.test.ts` | l'API de vitest |
+| CommonJS + ESM | 40 `.test.cjs` + 38 `.test.mjs` | `node:test` |
+| TypeScript | 45 `.test.ts` | l'API de vitest |
 
 **L'extension dit désormais le régime, et c'est l'étape 3 qui l'a rendue
 nécessaire.** Sous une racine `"type": "module"`, un `.js` **est** un module ES :
@@ -584,11 +584,13 @@ par un `git mv` pur ; les **3** derniers manipulaient `require.cache`, un
 mécanisme que le régime ESM rend inerte, et ont été réécrits en même temps que
 renommés — deux en `.test.mjs`, un en `.test.ts`.
 
-**Les 75 fichiers en `node:test` passent par un pont** (`test-support/bridge/`),
+**Les 78 fichiers en `node:test` passent par un pont** (`test-support/bridge/`),
 qui rend la surface `node:test` au-dessus des primitives de vitest. **L'addition,
 écrite pour qu'on puisse la refaire — et re-dérivée à l'étape 3, où l'ancienne
 version se contredisait elle-même** (elle totalisait 74 trois lignes sous un
-« 75 » mesuré) :
+« 75 » mesuré) **puis au volet 1, où elle s'était de nouveau tue d'une ligne**
+(elle totalisait 75 sous un **76** mesuré à la fusion de l'étape 4 : la ligne
+manquante est ci-dessous, relevée après coup et non réécrite) :
 
 ```
 70  préexistaient au pont (v0.12.8) — pas une ligne réécrite
@@ -599,12 +601,18 @@ version se contredisait elle-même** (elle totalisait 74 trois lignes sous un
              server-imports-load.test.mjs         la résolution, chargée pour de vrai
 -1  étape 3  observatory-claude-dir passe à l'API vitest : il QUITTE le pont
 ±0  étape 2 crée dist-esm-marker.test.mjs, étape 3 le supprime avec son sujet
++1  étape 4  test-file-extensions.test.mjs        l'extension d'un test est un contrat
+             (ligne omise en son temps — c'est elle qui laissait l'addition à 75)
++2  volet 1  observatory-rules-r7.test.cjs        la 7e règle de conseil
+             verification-commands.test.mjs       le classifieur, sous les DEUX exécuteurs
+±0  volet 1  verification.test.ts naît hors du pont : il tient à l'API vitest, faute
+             de pouvoir charger les SOURCES du moteur sous `node --test` (§ ci-dessous)
 ――
-75
+78
 ```
 
 ```
-grep -rlE "(require\(|from )['\"]node:test['\"]" tests | wc -l   → 75
+grep -rlE "(require\(|from )['\"]node:test['\"]" tests | wc -l   → 78
 ```
 
 Le test du pont a la propriété amusante de passer par ce qu'il teste dès qu'on
@@ -622,8 +630,8 @@ est imposée par le fait qu'**une seule couture ne suffit pas** :
 | Fichier | Rôle |
 |---|---|
 | `create-bridge.mjs` | la **fabrique pure** : reçoit ses primitives par injection, se teste seule, ne connaît ni vitest ni `node:module` |
-| `install.mjs` | couture n° 1 : détourne `Module._load` — atteint les `require('node:test')` des **39** fichiers CommonJS |
-| `node-test-alias.mjs` | couture n° 2 : cible d'un `resolve.alias` de `vitest.config.mts` — atteint les `import … from 'node:test'` des **36** fichiers ESM |
+| `install.mjs` | couture n° 1 : détourne `Module._load` — atteint les `require('node:test')` des **40** fichiers CommonJS |
+| `node-test-alias.mjs` | couture n° 2 : cible d'un `resolve.alias` de `vitest.config.mts` — atteint les `import … from 'node:test'` des **38** fichiers ESM |
 
 La seconde ne remplace pas la première, elle s'y ajoute : la résolution ESM ne
 passe pas par le crochet CommonJS. Un pont amputé de l'une des deux laisse un
@@ -637,10 +645,29 @@ générale : il n'y a pas de `Proxy`, donc une API de `node:test` hors de cette
 liste vaudrait `undefined` sans se signaler. Étendre le filet, c'est allonger ces
 deux listes.
 
-`npm run test:node` exécute les mêmes **839** tests en `node:test` **nativement**,
+`npm run test:node` exécute les mêmes **862** tests en `node:test` **nativement**,
 sous `node --test`. Ce n'est pas une redondance : c'est la **sémantique de référence**
 à laquelle le pont est comparé. Si plus rien ne l'exerçait, elle pourrait cesser
 de passer sans que rien ne l'annonce. La publication lance les deux.
+
+**Ce que la sémantique de référence NE PEUT PAS atteindre, et pourquoi ce n'est
+pas un oubli.** Un test qui charge une **source** de `src/engine/` ne peut pas
+être écrit en `node:test` : il ne tournerait que sous le pont. La raison est dans
+les spécificateurs, pas dans le test. `src/engine/**` nomme ses voisins en `.js`
+(**111** occurrences, **0** en `.ts` — l'exact inverse de `src/server/**`, qui
+est à 147 `.ts` et 0 `.js`, `allowImportingTsExtensions` aidant). Or
+`src/engine/core/usage.js` **n'existe pas sur le disque** : seul le résolveur de
+vitest recolle un spécificateur `.js` sur le `.ts` voisin. `node --test` rend
+`ERR_MODULE_NOT_FOUND` — mesuré le 2026-08-17 sous node v24.15.0, et reproduit
+hors dépôt sur deux fichiers nus, pour écarter toute cause locale. Le serveur,
+lui, ne charge jamais ces sources : il passe par `requireEngineModule`, qui lit
+le `dist/`. **Conséquence de rangement, pas de confort :** un test d'agrégateur
+du moteur est un `.test.ts` à l'API de vitest (`tests/doctor/verification.test.ts`),
+un test d'une fonction pure sans import peut être un `.test.mjs` et vaut alors
+sous les deux exécuteurs (`tests/doctor/verification-commands.test.mjs`).
+L'inverse — un `.test.ts` qui importe `node:test` — est un **hybride** : il se
+lit comme couvert par les deux et n'est lu que par un. Le dépôt n'en compte
+aucun (`grep -rlE "(require\(|from )['\"]node:test['\"]" tests --include="*.test.ts" | wc -l` → 0).
 
 **Un garde d'environnement est posé au HARNAIS, pas dans les tests** —
 `test-support/env-guard.mjs`, première entrée des `setupFiles` de vitest et
