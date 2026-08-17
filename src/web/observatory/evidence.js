@@ -68,6 +68,22 @@ const EVIDENCE_BY_RULE = {
     `sessions de ${e.medianDurationSeconds} s (médiane)`,
     `${formatTokens(e.subagentTokens)} jetons de sous-agents`,
   ],
+  // R7 (doc/41) : des faits « dans la session » — une vérification lancée hors
+  // session (CI, terminal humain) est invisible, la formulation le dit.
+  R7: e => {
+    const lines = [
+      `${e.sessionsNoVerification} session${e.sessionsNoVerification > 1 ? 's' : ''} modifiant des fichiers sans aucune vérification lancée`,
+      `${e.sessionsWithTail} session${e.sessionsWithTail > 1 ? 's' : ''} close${e.sessionsWithTail > 1 ? 's' : ''} avec des modifications postérieures à la dernière vérification`,
+      `${e.filesUnverifiedBySession} fichiers laissés sans preuve dans la session (cumul par session)`,
+      `${formatTokens(e.tokensAfterLastVerification)} jetons émis après la dernière vérification — travail à risque, pas gaspillage prouvé`,
+    ];
+    // Une session d'avant la ré-analyse v8 est dite, jamais fondue dans un zéro (précédent R5).
+    if (e.excludedPendingRescan > 0) {
+      const n = e.excludedPendingRescan;
+      lines.push(`${n} session${n > 1 ? 's' : ''} en attente de ré-analyse (non prise${n > 1 ? 's' : ''} en compte ici)`);
+    }
+    return lines;
+  },
 };
 
 export function evidenceLines(rec) {

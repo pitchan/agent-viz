@@ -144,3 +144,45 @@ test('les trois marqueurs R1 gardent leur statut epistemique — contractuel (do
       `${marker} : la formulation contractuelle a disparu — la causalite n'est permise que pour modelSwitch`);
   }
 });
+
+// Fixture autonome : la forme d'evidence R7 (doc/41) que consomme evidenceLines.
+const recR7 = excludedPendingRescan => ({
+  ruleId: 'R7',
+  evidence: {
+    sessions: ['s1', 's2', 's3'],
+    sessionsNoVerification: 1,
+    sessionsWithTail: 2,
+    filesUnverifiedBySession: 7,
+    tokensAfterLastVerification: 184000,
+    excludedPendingRescan,
+    costComplete: true,
+  },
+});
+
+test('R7 met la queue non verifiee en francais, sans accuser de gaspillage', () => {
+  // Arrange
+  const rec = recR7(0);
+  // Act
+  const lines = evidenceLines(rec);
+  // Assert
+  assert.equal(lines[0], '3 sessions concernées');
+  assert.ok(lines.some(l => l.includes('sans aucune vérification')));
+  assert.ok(lines.some(l => l.includes('postérieures à la dernière vérification')));
+  assert.ok(lines.some(l => l.includes('7 fichiers')));
+  assert.ok(lines.some(l => l.includes('travail à risque, pas gaspillage prouvé')));
+  assert.ok(!lines.some(l => l.includes('ré-analyse')),
+    'aucune session ecartee : pas de ligne de re-analyse, pas de zero decoratif');
+});
+
+// Precedent R5 : un inconnu se dit, il ne se fond jamais dans un zero. Ces
+// sessions sont indecidables par construction (stockees avant la re-analyse),
+// donc la ligne ne les declare pas « concernees ».
+test('R7 dit les sessions en attente de re-analyse au lieu de les taire', () => {
+  // Arrange
+  const rec = recR7(2);
+  // Act
+  const lines = evidenceLines(rec);
+  // Assert
+  assert.ok(lines.some(l => l.includes('2 sessions en attente de ré-analyse')),
+    `la ligne de re-analyse manque : ${JSON.stringify(lines)}`);
+});
