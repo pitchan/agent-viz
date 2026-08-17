@@ -185,3 +185,111 @@ test('les affectations d environnement ne sont pas stockees avec la commande', (
   assert.equal(stats.lastVerification?.command, 'npm test');
   assert.equal(JSON.stringify(stats).includes('abc'), false, 'le secret n apparait nulle part');
 });
+
+// Non-regression de l elargissement : la forme ancree retirait deja une
+// affectation a valeur VIDE. L expression elargie doit continuer de le faire.
+test('une affectation a valeur vide est retiree comme les autres', () => {
+  // Arrange
+  const agg = new VerificationAggregator();
+  agg.addAssistant(bash('v1', 'FOO= npm test', T(1)) as never, 'main');
+  agg.addToolResult(toolResult({ toolUseId: 'v1', timestamp: T(2) }) as never);
+  // Act
+  const stats = agg.result();
+  // Assert
+  assert.equal(stats.lastVerification?.command, 'npm test');
+});
+
+// Revue finale de branche (ruling 20) : le nettoyage etait ancre en TETE de
+// chaine. Les deux formes ci-dessous echappaient donc a la redaction et
+// entraient verbatim dans le rapport PERSISTE.
+test('une affectation au MILIEU d un compose est retiree elle aussi', () => {
+  // Arrange
+  const agg = new VerificationAggregator();
+  agg.addAssistant(bash('v1', 'cd repo && NPM_TOKEN=xxx npm test', T(1)) as never, 'main');
+  agg.addToolResult(toolResult({ toolUseId: 'v1', timestamp: T(2) }) as never);
+  // Act
+  const stats = agg.result();
+  // Assert
+  assert.equal(stats.verifications, 1, 'le classifieur voit toujours la commande entiere');
+  assert.equal(stats.lastVerification?.command, 'cd repo && npm test');
+  assert.equal(JSON.stringify(stats).includes('xxx'), false, 'le secret n apparait nulle part');
+});
+
+test('une valeur entre guillemets est retiree entiere, espaces compris', () => {
+  // Arrange
+  const agg = new VerificationAggregator();
+  agg.addAssistant(bash('v1', 'TOKEN="a b" npm test', T(1)) as never, 'main');
+  agg.addToolResult(toolResult({ toolUseId: 'v1', timestamp: T(2) }) as never);
+  // Act
+  const stats = agg.result();
+  // Assert
+  assert.equal(stats.verifications, 1, 'le classifieur voit toujours la commande entiere');
+  assert.equal(stats.lastVerification?.command, 'npm test');
+  assert.equal(JSON.stringify(stats).includes('a b'), false, 'le secret n apparait nulle part');
+});
+
+// FILES_CAP : la liste de noms est plafonnee a 20, et le TOTAL dit la coupe —
+// sans quoi un lecteur croirait le projet a 20 fichiers laisses sans preuve.
+test('la liste des fichiers est plafonnee a 20, triee, et le total dit la coupe', () => {
+  // Arrange — 25 fichiers distincts, tous edites apres la derniere verification.
+  const agg = new VerificationAggregator();
+  agg.addAssistant(bash('v1', 'npm test', T(1)) as never, 'main');
+  agg.addToolResult(toolResult({ toolUseId: 'v1', timestamp: T(2) }) as never);
+  const chemins: string[] = [];
+  for (let i = 1; i <= 25; i += 1) {
+    const chemin = `F:/proj/f${String(i).padStart(2, '0')}.ts`;
+    chemins.push(chemin);
+    agg.addAssistant(edit(`e${i}`, chemin, T(10)) as never, 'main');
+    agg.addToolResult(toolResult({ toolUseId: `e${i}`, timestamp: T(10) }) as never);
+  }
+  // Act
+  const stats = agg.result();
+  // Assert
+  assert.equal(stats.editsAfterLastVerification, 25);
+  assert.equal(stats.filesAfterLastVerificationTotal, 25, 'le total compte les 25, jamais les 20 affiches');
+  assert.equal(stats.filesAfterLastVerification.length, 20);
+  assert.deepEqual(stats.filesAfterLastVerification, [...chemins].sort().slice(0, 20),
+    'la liste plafonnee est celle des 20 PREMIERS d un tri stable, pas un echantillon d ordre de lecture');
+});
+
+test('la premiere verification, la premiere edition et les fichiers distincts sont rendus', () => {
+  // Arrange — 2 verifications, 2 editions de fichiers distincts.
+  const agg = new VerificationAggregator();
+  agg.addAssistant(edit('e1', 'F:/proj/a.ts', T(1)) as never, 'main');
+  agg.addToolResult(toolResult({ toolUseId: 'e1', timestamp: T(1) }) as never);
+  agg.addAssistant(bash('v1', 'npm run build', T(2)) as never, 'main');
+  agg.addToolResult(toolResult({ toolUseId: 'v1', timestamp: T(3) }) as never);
+  agg.addAssistant(edit('e2', 'F:/proj/b.ts', T(4)) as never, 'main');
+  agg.addToolResult(toolResult({ toolUseId: 'e2', timestamp: T(4) }) as never);
+  agg.addAssistant(bash('v2', 'npm test', T(5)) as never, 'main');
+  agg.addToolResult(toolResult({ toolUseId: 'v2', timestamp: T(6) }) as never);
+  // Act
+  const stats = agg.result();
+  // Assert
+  assert.equal(stats.verifications, 2);
+  assert.equal(stats.firstVerification?.kind, 'build', 'la PREMIERE, pas la derniere');
+  assert.equal(stats.firstVerification?.at, T(3), 'datee du resultat, comme lastVerification');
+  assert.equal(stats.firstVerification?.command, 'npm run build');
+  assert.equal(stats.lastVerification?.kind, 'test');
+  assert.equal(stats.firstEditAt, T(1));
+  assert.equal(stats.editsTotal, 2);
+  assert.equal(stats.editedFiles, 2, 'deux fichiers DISTINCTS, jamais le compte d editions');
+});
+
+// La frontiere est STRICTE (`e.t > last.t`) : a la milliseconde exacte du
+// resultat, l edition est dite COUVERTE. Sens conservateur assume — le produit
+// sous-declare la queue plutot que d accuser une session sur une egalite.
+test('une edition a la milliseconde exacte du dernier resultat est couverte', () => {
+  // Arrange
+  const agg = new VerificationAggregator();
+  agg.addAssistant(bash('v1', 'npm test', T(1)) as never, 'main');
+  agg.addToolResult(toolResult({ toolUseId: 'v1', timestamp: T(5) }) as never);
+  agg.addAssistant(edit('e1', 'F:/proj/a.ts', T(5)) as never, 'main');
+  agg.addToolResult(toolResult({ toolUseId: 'e1', timestamp: T(5) }) as never);
+  // Act
+  const stats = agg.result();
+  // Assert
+  assert.equal(stats.editsTotal, 1);
+  assert.equal(stats.editsAfterLastVerification, 0, 'egalite stricte : couverte, jamais en queue');
+  assert.deepEqual(stats.filesAfterLastVerification, []);
+});

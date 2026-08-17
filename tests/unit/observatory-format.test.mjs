@@ -126,6 +126,21 @@ test('costLabel leads with measured bytes for byte-based rules when partial', ()
   assert.ok(label.includes('au moins 1,50 $'));
 });
 
+// R7 (doc/41) chiffre en jetons mesurés comme R1/R5/R6 : sans entrée dans la
+// table des quantités de tête, sa carte perdait sa quantité mesurée dès qu'un
+// modèle sans tarif rendait les dollars partiels — le chiffre qui porte le
+// constat disparaissait au moment précis où les dollars ne valaient plus rien.
+test('costLabel leads with the measured tokens at risk for R7 when partial', () => {
+  const rec = {
+    ruleId: 'R7', estimatedCostUsd: 12.5, costBasis: 'jetons-mesures',
+    evidence: { costComplete: false, tokensAfterLastVerification: 18_276_640 },
+  };
+  const label = costLabel(rec);
+  assert.ok(label.startsWith(`${formatTokens(18_276_640)} jetons mesurés`),
+    `la quantite de tete R7 manque : ${label}`);
+  assert.ok(label.includes('au moins 12,50 $'));
+});
+
 test('costLabel keeps the current partial wording when the rule carries no quantity', () => {
   const rec = {
     ruleId: 'R2', estimatedCostUsd: 3, costBasis: 'jetons-mesures',

@@ -51,6 +51,7 @@ const LEAD_QUANTITY_BY_RULE = {
   R1: e => `${formatTokens(e.prefixChangeTokens)} jetons mesurés`,
   R5: e => `${formatTokens(e.reprocessedTokens)} jetons mesurés`,
   R6: e => `${formatTokens(e.subagentTokens)} jetons mesurés`,
+  R7: e => `${formatTokens(e.tokensAfterLastVerification)} jetons mesurés`,
   R3: e => `${formatBytes(e.bytes)} mesurés`,
   R4: e => `${formatBytes(e.duplicateBytes)} mesurés`,
 };

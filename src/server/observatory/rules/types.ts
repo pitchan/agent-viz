@@ -87,7 +87,8 @@ export interface SessionReport {
   // Fait de SCAN_VERSION 8 (doc/41) : un rapport stocké avant ce bump ne le
   // porte pas — R7 écarte alors la session plutôt que de lui prêter une forme
   // (précédent : costByModel, v6). Vue restreinte de VerificationStats
-  // (moteur) : seuls les champs que les règles lisent sont déclarés ici.
+  // (moteur) : les champs que les règles lisent ou liront (volets 2-3, doc/41)
+  // sont déclarés ici.
   verification?: {
     verifications: number;
     verificationsFailed: number;

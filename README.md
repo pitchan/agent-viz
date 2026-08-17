@@ -67,7 +67,7 @@ Trois points à savoir :
 
 - **Deux blocs, jamais un classement commun.** Certaines règles chiffrent de vrais jetons, d'autres partent d'octets convertis (≈ 4 octets par jeton). Les deux n'ont pas la même précision : la page les présente séparément et n'affiche **aucun total**, parce qu'une même session alimente plusieurs règles et serait comptée deux fois.
 - **Une seule source de prix.** La table de tarifs embarquée dans le moteur tarife tout le produit — vue temps réel comprise — et chaque page nomme sa provenance. Elle porte les tarifs datés : un message est facturé au prix en vigueur le jour où il a été envoyé. Une table publique en ligne sert uniquement de vigie : elle est comparée chaque jour à la table embarquée et signale une dérive, sans jamais fixer un prix. Une session dont le modèle n'a pas de tarif connu est marquée « partiel », jamais arrondie à zéro en silence.
-- **Métadonnées uniquement.** Aucun contenu de prompt, de fichier, de sortie d'outil ni de commande n'est conservé — seulement des compteurs, des tailles et des noms d'outils.
+- **Des métadonnées, et trois exceptions nommées.** L'essentiel de ce qui est conservé, ce sont des compteurs, des tailles et des noms d'outils : aucun contenu de fichier ni de sortie d'outil n'entre dans la base. Trois choses y entrent quand même, et il vaut mieux le savoir : les **chemins** des fichiers modifiés après la dernière vérification (20 au plus par session) ; le **texte de deux commandes** de vérification par session, la première et la dernière — 200 caractères au plus, et les affectations du type `NPM_TOKEN=…` retirées avant écriture ; et un **extrait des questions** que vous avez posées, quand elles ressemblent à une question de navigation dans le code. Tout cela reste chez vous : la base est un fichier local, elle n'est envoyée nulle part.
 
 La base `~/.agent-viz/observatory.db` est un **dérivé jetable** : les transcripts restent la source de vérité, et la supprimer ne perd que les statuts « j'applique / ignorer » que vous avez posés sur les recommandations — elle se reconstruit au scan suivant (au démarrage, puis toutes les heures). Le bouton « Purger la base » de la page Conseils fait ce geste sans toucher au fichier : il vide la base (après confirmation) puis relance un scan complet.
 
@@ -213,9 +213,9 @@ npm run build                # the engine is TypeScript; dist/ is not committed
 npm start                    # dashboard on http://localhost:3333
 ```
 
-Tests: `npm test` (a single `vitest run` over one `tests/` tree — 1395 tests in 123 files,
+Tests: `npm test` (a single `vitest run` over one `tests/` tree — 1404 tests in 123 files,
 product and engine together; the 78 `node:test`-based files run through a bridge,
-`test-support/bridge/`) and `npm run test:node` (the same 862 `node:test` cases, run natively
+`test-support/bridge/`) and `npm run test:node` (the same 865 `node:test` cases, run natively
 under `node --test`, kept as the reference the bridge is checked against). After changing
 engine source, rebuild it (`npm run build`) — the product loads the compiled `dist/engine/`.
 Publishing runs both test commands and the build first (`prepublishOnly`).

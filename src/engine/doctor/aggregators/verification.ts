@@ -13,6 +13,19 @@
 // shell (sed, redirection) est invisible — seuls Edit/Write/MultiEdit/
 // NotebookEdit comptent comme éditions.
 //
+// Ce qui est STOCKÉ d'une commande, et ce qui ne l'est pas : le texte de la
+// première et de la dernière vérification, tronqué à 200 caractères — une
+// adresse de preuve, pas un contenu — et débarrassé de ses affectations
+// `NOM=valeur`, où qu'elles soient dans la chaîne. Le classement, lui, reçoit
+// toujours la commande entière.
+//
+// Fenêtre de recouvrement en parallèle : une édition faite par un sous-agent
+// PENDANT un long test est datée AVANT le résultat de ce test, donc dite
+// couverte alors qu'elle ne l'est pas. Le biais va dans le sens conservateur —
+// le produit SOUS-déclare la queue plutôt que d'accuser à tort — et la
+// frontière est stricte pour la même raison : à la milliseconde exacte du
+// résultat, l'édition est comptée couverte.
+//
 // Seconde limite, déclarée au même titre : `ok` reflète le code de retour du
 // shell, pas le verdict de l'outil — un tube sans pipefail
 // (`npm test 2>&1 | tail -20` rend le code de `tail`) ou un `|| true` peut
@@ -62,10 +75,27 @@ const COMMAND_MAX = 200;
 const FILES_CAP = 20;
 
 // `command` entre dans le rapport PERSISTÉ : un `NPM_TOKEN=abc npm test` y
-// entrerait verbatim. Les affectations d'environnement en tête sont retirées
-// avant stockage. La CLASSIFICATION, elle, reçoit toujours la commande entière
-// — le classifieur tolère déjà ce préfixe, seul le stockage est nettoyé.
-const LEADING_ENV = /^(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)+/;
+// entrerait verbatim. Les affectations d'environnement sont donc retirées avant
+// stockage — PARTOUT dans la chaîne, et pas seulement en tête : l'ancrage en `^`
+// laissait passer `cd repo && NPM_TOKEN=xxx npm test` (composé) et coupait
+// `TOKEN="a b" npm test` au premier espace, laissant `b" npm test`. L'alternance
+// reconnaît donc aussi les valeurs entre guillemets, doubles ou simples.
+// La CLASSIFICATION, elle, reçoit toujours la commande entière — le classifieur
+// tolère déjà ces préfixes, seul le stockage est nettoyé.
+//
+// Deux conséquences assumées, pour qu'elles ne se relisent pas comme des
+// défauts. `\S*` et non `\S+` : `FOO=` (valeur vide) était déjà retiré par la
+// forme ancrée, et le passer à `\S+` aurait été une régression. Et un drapeau
+// long à valeur (`--reporter=json`) est retiré lui aussi, ne laissant que
+// `--` : c'est le prix du filet large, et il va dans le bon sens — un
+// `--token=…` est exactement ce qu'on ne veut pas persister. Ce qui est stocké
+// est une ADRESSE de preuve, jamais une commande à rejouer.
+const ENV_ASSIGNMENT = /\w+=(?:"[^"]*"|'[^']*'|\S*)/g;
+
+/** Le texte gardé pour le rapport : expurgé, réduit à une ligne, puis tronqué. */
+function storableCommand(command: string): string {
+  return command.replace(ENV_ASSIGNMENT, '').replace(/\s+/g, ' ').trim().slice(0, COMMAND_MAX);
+}
 
 interface PendingVerification { kind: VerificationKind; command: string; at: string | undefined }
 interface PendingEdit { path: string; at: string | undefined }
@@ -90,8 +120,7 @@ export class VerificationAggregator {
         const command = typeof input['command'] === 'string' ? input['command'] : null;
         const kind = command === null ? null : classifyVerification(command);
         if (command !== null && kind !== null) {
-          const stored = command.replace(LEADING_ENV, '').slice(0, COMMAND_MAX);
-          this.pendingVerifs.set(tu.id, { kind, command: stored, at: evt.timestamp });
+          this.pendingVerifs.set(tu.id, { kind, command: storableCommand(command), at: evt.timestamp });
         }
       } else if (EDIT_TOOLS.has(tu.name)) {
         const path = typeof input['file_path'] === 'string' ? input['file_path']

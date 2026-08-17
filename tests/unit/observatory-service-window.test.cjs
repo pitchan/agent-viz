@@ -14,7 +14,7 @@ const daysAgo = n => new Date(NOW.getTime() - n * 24 * 3600 * 1000).toISOString(
 // A stored row whose report makes R1 fire (prefixChange dominant, 40 % of net):
 // with at least one recommendation emitted, the period-stamp assertions below
 // are real, never vacuously true on an empty list. The quiet-zero fields keep
-// the other five rules silent instead of throwing.
+// the other six rules silent instead of throwing.
 const stat = (events, tokens) => ({ events, tokens });
 const R1_REPORT = {
   context: {

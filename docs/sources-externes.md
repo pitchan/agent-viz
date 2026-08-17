@@ -5,14 +5,14 @@ citaient un relevé de calibration par un chemin relatif, `netgain/docs/calibrat
 qui n'a jamais existé dans ce dépôt — ni au commit audité, ni à aucun commit avant ou après.
 Un lecteur suivait l'adresse et ne trouvait rien.
 
-Le document, lui, existe : il vit dans le **dépôt privé de pilotage de la thèse**, avec neuf
+Le document, lui, existe : il vit dans le **dépôt privé de pilotage de la thèse**, avec dix
 autres que ce code cite aussi. Ces documents **restent privés** — ce n'est pas un oubli mais
 une décision du **2026-08-06**, prise quand le moteur `netgain` a déménagé de ce dépôt privé
 vers celui-ci : le code est venu, les relevés et les plans sont restés. Ils portent des noms de
 projets réels, des volumes de jetons et des coûts en dollars qui sont la matière de la
 soutenance.
 
-Ce fichier est donc l'**adresse** de ces dix documents. Il ne recopie aucun de leurs contenus :
+Ce fichier est donc l'**adresse** de ces onze documents. Il ne recopie aucun de leurs contenus :
 pour chacun, la dernière colonne dit ce qui, **dans ce dépôt**, porte déjà la substance qu'un
 lecteur peut vérifier.
 
@@ -26,7 +26,7 @@ lecteur peut vérifier.
    ci-dessous les traduit tous. C'était déjà la forme majoritaire dans le code (41 des 51
    citations, mesurées le 2026-08-11) : la règle nomme l'usage établi, elle ne l'invente pas.
 
-## Les dix documents
+## Les onze documents
 
 `doc/NN` désigne le document numéro NN du dépôt privé ; les trois derniers vivaient dans
 `netgain/docs/` tant que le moteur y était hébergé, et sont aujourd'hui sous
@@ -41,6 +41,7 @@ lecteur peut vérifier.
 | `doc/32` | Refonte de la page Conseils — validé le 2026-08-09, amendé le même jour | L'accordéon par cause, la commande consignée, les remèdes : la forme de la page et ce qu'elle promet | `src/web/observatory/` (`advisor-view.js`, `failures-view.js`, `failures-format.js`, `remedies.js`) et leurs tests |
 | `doc/34` | Design de l'audit de qualité de code — 2026-08-10 | Les rangs P0–P3, le budget de faux positifs assumé, la règle « un détecteur se contrôle avant d'être cru » | `docs/audit-qualite-code.md` (verdict, annexe méthode) et `docs/audit/scripts/` |
 | `doc/35` | Plan de l'audit, en 11 tâches — 2026-08-10 | La convention de comptage des lignes et des jetons du périmètre audité | `docs/audit/scripts/lib/tokens.mjs`, `docs/audit/scripts/lib/source-files.mjs` |
+| `doc/41` | Design « dette de trajectoire » (volet 1) et sa sonde de calibration — relevé du 2026-08-17 : 96 sessions, 4 projets éditants | Les deux seuils de R7 (`minEditsAfterLastVerification` = 1, `minSessions` = 3), la distribution de la queue d'éditions et la raison du relèvement de `minSessions` de 2 à 3 | `src/server/observatory/rules/thresholds.ts` — l'en-tête recopie la mesure et le raisonnement, comme pour R1 ; `tests/unit/observatory-rules-cost.test.cjs` épingle les deux valeurs |
 | `calibration-observatoire-m1` | Calibration des seuils de l'Observatoire — relevé du 2026-07-27 : 1 695 sessions, 14 projets, 90 jours | Les cinq seuils marqués `'calibration'`, la distribution observée pour chacun, et la raison en une phrase de la valeur retenue | `src/server/observatory/rules/thresholds.ts:4-22` — la distribution et le raisonnement y sont recopiés, y compris le relèvement de R1 de 0,05 à 0,20 ; les cinq valeurs sont épinglées par `tests/unit/observatory-rules-cost.test.cjs` |
 | `plan J7` | Plan « J7 » étape 1 — ventilation causale de la re-création de cache | L'écart mesuré réponse-à-réponse, et l'approximation assumée qui en découle | `src/engine/doctor/aggregators/context.ts` — la classification et son approximation sont commentées sur place |
 | `plan J8` | Plan « J8 » étape 1 — chiffrer le gisement des relectures `Read` | Les cinq cas de lecture (`firstRead`, `identicalReread`, `modifiedReread`, `crossAgentDuplicate`, `error`) | `src/engine/doctor/aggregators/reads.ts:6-11` — les cinq cas sont listés et définis dans l'en-tête |
@@ -65,4 +66,6 @@ donnée n'aurait de toute façon pas été rejouable en publiant le document.
   aucun test ne peut vérifier qu'un numéro existe dans un dépôt qui n'est pas là. Si un numéro
   disparaît du dépôt privé, ce tableau vieillit sans bruit. Il est daté pour cette raison.
 
-*Tableau établi le 2026-08-11, au traitement de C7 — 51 citations relevées dans 27 fichiers.*
+*Tableau établi le 2026-08-11, au traitement de C7 — 51 citations relevées dans 27 fichiers.
+Ligne `doc/41` ajoutée le 2026-08-17, à la revue finale du volet 1 : `thresholds.ts` citait déjà
+ce document pour la provenance de la calibration de R7, sans que la table le traduise.*

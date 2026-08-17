@@ -559,10 +559,10 @@ sauf entrée nommée dans sa liste blanche. Le moteur gagne un fichier
 
 ## 9. La plomberie de test
 
-**Un seul exécuteur, un seul arbre de tests, 1 395 tests dans 123 fichiers.**
+**Un seul exécuteur, un seul arbre de tests, 1 404 tests dans 123 fichiers.**
 
 ```
-npx vitest run     → 1395 passés, 123 fichiers
+npx vitest run     → 1404 passés, 123 fichiers
 ```
 
 Les deux arbres ont fusionné à plat à l'étape 2 : `netgain/tests/` a rejoint
@@ -645,7 +645,7 @@ générale : il n'y a pas de `Proxy`, donc une API de `node:test` hors de cette
 liste vaudrait `undefined` sans se signaler. Étendre le filet, c'est allonger ces
 deux listes.
 
-`npm run test:node` exécute les mêmes **862** tests en `node:test` **nativement**,
+`npm run test:node` exécute les mêmes **865** tests en `node:test` **nativement**,
 sous `node --test`. Ce n'est pas une redondance : c'est la **sémantique de référence**
 à laquelle le pont est comparé. Si plus rien ne l'exerçait, elle pourrait cesser
 de passer sans que rien ne l'annonce. La publication lance les deux.

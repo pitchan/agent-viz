@@ -189,6 +189,45 @@ test('R7 ne declare jamais la session close — la cloture n est pas mesuree', (
     `le fait lui-meme doit rester dit : ${JSON.stringify(lines)}`);
 });
 
+// Revue finale de branche : « jetons emis apres la derniere verification » ment
+// pour la population MAJORITAIRE. Une session sans aucune verification n'a pas
+// de « derniere verification » : `tokensAfterLastVerification` y vaut TOUTE la
+// session, et ces sessions sont 87 % des editantes (sonde doc/41). La phrase dit
+// donc ce qui est mesure, et nomme le cas limite au lieu de le taire.
+test('R7 ne date pas les jetons d une derniere verification qui n existe pas toujours', () => {
+  // Arrange
+  const rec = recR7(0);
+  // Act
+  const lines = evidenceLines(rec);
+  // Assert
+  const ligne = lines.find(l => l.includes('jetons'));
+  assert.ok(ligne, `aucune ligne de jetons : ${JSON.stringify(lines)}`);
+  assert.ok(ligne.includes('jetons émis sans preuve dans la session'),
+    `la ligne ne dit pas ce qui est mesure : ${ligne}`);
+  assert.ok(ligne.includes("toute la session quand aucune vérification n'a été lancée"),
+    `le cas limite majoritaire n est pas nomme : ${ligne}`);
+  assert.ok(ligne.includes('travail à risque, pas gaspillage prouvé'),
+    `la reserve contractuelle a disparu : ${ligne}`);
+  assert.ok(!lines.some(l => l.includes('jetons émis après la dernière vérification')),
+    `la formulation fausse survit : ${JSON.stringify(lines)}`);
+});
+
+// L accord se code, il ne se parie pas sur l atteignabilite du 1.
+test('R7 accorde « fichier » au singulier quand il n y en a qu un', () => {
+  // Arrange
+  const rec = { ruleId: 'R7', evidence: { ...recR7(0).evidence, filesUnverifiedBySession: 1 } };
+  // Act
+  const lines = evidenceLines(rec);
+  // Assert
+  assert.ok(lines.some(l => l.includes('1 fichier laissé sans preuve')),
+    `le singulier n est pas accorde : ${JSON.stringify(lines)}`);
+  assert.ok(!lines.some(l => l.includes('1 fichiers')),
+    `pluriel fautif : ${JSON.stringify(lines)}`);
+  // Contrôle positif : le pluriel reste bien accordé au-delà de 1.
+  assert.ok(evidenceLines(recR7(0)).some(l => l.includes('7 fichiers laissés sans preuve')),
+    'le pluriel a ete casse en corrigeant le singulier');
+});
+
 // Precedent R5 : un inconnu se dit, il ne se fond jamais dans un zero. Ces
 // sessions sont indecidables par construction (stockees avant la re-analyse),
 // donc la ligne ne les declare pas « concernees ».

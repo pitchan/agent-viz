@@ -76,8 +76,15 @@ const EVIDENCE_BY_RULE = {
       // « close » est tombé (revue doc/41) : la règle ne teste jamais la fin de
       // session — une session encore vivante peut être là. Le fait dit reste vrai.
       `${e.sessionsWithTail} session${e.sessionsWithTail > 1 ? 's' : ''} avec des modifications postérieures à la dernière vérification`,
-      `${e.filesUnverifiedBySession} fichiers laissés sans preuve dans la session (cumul par session)`,
-      `${formatTokens(e.tokensAfterLastVerification)} jetons émis après la dernière vérification — travail à risque, pas gaspillage prouvé`,
+      `${e.filesUnverifiedBySession} fichier${e.filesUnverifiedBySession > 1 ? 's' : ''} laissé${e.filesUnverifiedBySession > 1 ? 's' : ''} sans preuve dans la session (cumul par session)`,
+      // « après la dernière vérification » mentait pour la population
+      // MAJORITAIRE (revue finale) : une session sans aucune vérification n'a
+      // pas de « dernière », et le compteur y vaut TOUTE la session — 87 % des
+      // sessions éditantes du relevé de calibration (doc/41). La phrase dit donc
+      // ce qui est mesuré, et nomme le cas limite au lieu de le taire.
+      `${formatTokens(e.tokensAfterLastVerification)} jetons émis sans preuve dans la session`
+      + " (toute la session quand aucune vérification n'a été lancée)"
+      + ' — travail à risque, pas gaspillage prouvé',
     ];
     // Une session d'avant la ré-analyse v8 est dite, jamais fondue dans un zéro (précédent R5).
     if (e.excludedPendingRescan > 0) {
