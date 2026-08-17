@@ -11,6 +11,7 @@ import { SubagentsAggregator } from './aggregators/subagents.js';
 import { netTokens, TokensAggregator } from './aggregators/tokens.js';
 import { ToolResultsAggregator } from './aggregators/tool-results.js';
 import { TurnsAggregator } from './aggregators/turns.js';
+import { VerificationAggregator } from './aggregators/verification.js';
 import type { SessionReport } from './report/types.js';
 
 /**
@@ -25,6 +26,7 @@ export async function scanSession(ref: SessionRef, maxPrompts: number): Promise<
   const context = new ContextAggregator();
   const prompts = new PromptsAggregator(maxPrompts);
   const turns = new TurnsAggregator();
+  const verification = new VerificationAggregator();
   const spawnSeen = new Set<string>();
   let events = 0;
   let parseErrors = 0;
@@ -53,6 +55,7 @@ export async function scanSession(ref: SessionRef, maxPrompts: number): Promise<
             tokens.addAssistant(evt, agentKey);
             context.addAssistant(evt, agentKey);
             turns.addAssistant(evt, agentKey);
+            verification.addAssistant(evt, agentKey);
             for (const tu of evt.toolUses) {
               toolResults.registerToolUse(tu);
               reads.registerToolUse(tu);
@@ -68,6 +71,7 @@ export async function scanSession(ref: SessionRef, maxPrompts: number): Promise<
           case 'tool_result':
             toolResults.addToolResult(evt);
             reads.addToolResult(evt, agentKey);
+            verification.addToolResult(evt);
             if (agentKey === 'main') clock.add(evt.timestamp);
             break;
           case 'user_prompt':
@@ -136,6 +140,7 @@ export async function scanSession(ref: SessionRef, maxPrompts: number): Promise<
     context: context.result(),
     prompts: prompts.result(),
     turns: turns.result(),
+    verification: verification.result(),
     events,
     parseErrors,
     otherEventTypes,

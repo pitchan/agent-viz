@@ -6,6 +6,7 @@ import type { SubagentStats } from '../aggregators/subagents.js';
 import type { TokensResult } from '../aggregators/tokens.js';
 import type { ToolResultStats } from '../aggregators/tool-results.js';
 import type { TurnsStats } from '../aggregators/turns.js';
+import type { VerificationStats } from '../aggregators/verification.js';
 
 /** Le contrat de sortie --json : des FAITS mesurés, jamais un gain projeté. */
 export interface SessionReport {
@@ -30,6 +31,8 @@ export interface SessionReport {
   prompts: PromptsStats;
   /** Découpage « gain vécu » : la dépense rattachée à chaque question, classée par le détecteur du router. */
   turns: TurnsStats;
+  /** Queue non vérifiée (doc/41) : dernière vérification de la session et ce qui l'a suivie. */
+  verification: VerificationStats;
   events: number;
   parseErrors: number;
   otherEventTypes: Record<string, number>;
