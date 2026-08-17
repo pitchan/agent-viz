@@ -219,8 +219,16 @@ export interface R7Evidence {
   sessions: string[];
   sessionsNoVerification: number;
   sessionsWithTail: number;
-  filesUnverified: number;
+  // Somme, PAR SESSION, des fichiers distincts laissés sans preuve — un même
+  // fichier peut compter dans plusieurs sessions. L'union exacte n'est pas
+  // calculable ici : la liste de noms du moteur est plafonnée (FILES_CAP), donc
+  // le nom porte l'unité plutôt qu'un dédoublonnage qui serait faux.
+  filesUnverifiedBySession: number;
   tokensAfterLastVerification: number;
+  // Sessions du projet stockées avant SCAN_VERSION 8 : écartées du calcul —
+  // jamais devinées, et jamais en silence (précédent : excludedPendingRescan
+  // de model-costs.ts, v6).
+  excludedPendingRescan: number;
   costComplete: boolean;
 }
 export interface R7Recommendation {

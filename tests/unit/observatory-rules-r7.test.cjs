@@ -45,9 +45,35 @@ test('R7 vise la session editant sans aucune verification et la queue au-dessus 
   assert.deepEqual(recs[0].evidence.sessions, ['s1', 's2', 's3']);
   assert.equal(recs[0].evidence.sessionsNoVerification, 1);
   assert.equal(recs[0].evidence.sessionsWithTail, 2);
-  assert.equal(recs[0].evidence.filesUnverified, 5);
+  assert.equal(recs[0].evidence.filesUnverifiedBySession, 5);
   assert.equal(recs[0].evidence.tokensAfterLastVerification, 100000);
+  assert.equal(recs[0].evidence.excludedPendingRescan, 0);
   assert.equal(recs[0].estimatedCostUsd, 10, 'au taux de session 0.0001 $/jeton');
+});
+
+test('R7 compte les sessions ecartees faute du champ v8 dans la reco qu elle emet', () => {
+  // Arrange — la session ecartee vient EN PREMIER : l agregat du projet doit
+  // naitre du point d ecartement sans entrer dans les sessions concernees.
+  const sessions = [
+    session('vieille', undefined),
+    session('s1', stats({ verifications: 0, lastVerification: null,
+      editsAfterLastVerification: 3, filesAfterLastVerificationTotal: 2, tokensAfterLastVerification: 50000 })),
+    session('s2', stats({ editsAfterLastVerification: 1,
+      filesAfterLastVerificationTotal: 1, tokensAfterLastVerification: 25000 })),
+    session('s3', stats({ editsAfterLastVerification: 2,
+      filesAfterLastVerificationTotal: 2, tokensAfterLastVerification: 25000 })),
+  ];
+  // Act
+  const recs = r7.evaluate(ctx(sessions));
+  // Assert
+  assert.equal(recs.length, 1);
+  assert.equal(recs[0].evidence.excludedPendingRescan, 1);
+  assert.deepEqual(recs[0].evidence.sessions, ['s1', 's2', 's3']);
+  assert.equal(recs[0].evidence.sessionsNoVerification, 1);
+  assert.equal(recs[0].evidence.sessionsWithTail, 2);
+  assert.equal(recs[0].evidence.filesUnverifiedBySession, 5);
+  assert.equal(recs[0].evidence.tokensAfterLastVerification, 100000);
+  assert.equal(recs[0].estimatedCostUsd, 10, 'la session ecartee ne pese pas dans le cout');
 });
 
 test('R7 reste muette sous le plancher de sessions par projet', () => {
@@ -74,8 +100,9 @@ test('R7 ignore les sessions sans edition et les queues sous le seuil', () => {
 });
 
 test('R7 ecarte une session stockee avant SCAN_VERSION 8, jamais devinee', () => {
-  // Arrange
-  const sessions = [session('s1', undefined), session('s2', undefined), session('s3', undefined)];
+  // Arrange — seules des sessions pre-v8 : le compteur d exclusion ne vit que
+  // dans une reco emise, il ne fabrique donc aucune carte a lui seul.
+  const sessions = [session('s1', undefined), session('s2', undefined)];
   // Act + Assert
   assert.deepEqual(r7.evaluate(ctx(sessions)), []);
 });
