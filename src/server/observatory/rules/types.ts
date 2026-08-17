@@ -6,7 +6,7 @@
 // locally: only one file needs it, so it stays out of here).
 //
 // Promoted to its own file because the need crosses more than two files of
-// this lot: all six rules, the registry, and cross-links all share it
+// this lot: all seven rules, the registry, and cross-links all share it
 // (precedent: doc/40-plan-etape4-langage task brief, "un fichier types.ts ne
 // naît que si le besoin dépasse deux consommateurs").
 
@@ -83,6 +83,19 @@ export interface SessionReport {
     total: TokenBucket;
     unknownModels: string[];
     costByModel?: Record<string, { usd: number | null; pricing: string }>;
+  };
+  // Fait de SCAN_VERSION 8 (doc/41) : un rapport stocké avant ce bump ne le
+  // porte pas — R7 écarte alors la session plutôt que de lui prêter une forme
+  // (précédent : costByModel, v6). Vue restreinte de VerificationStats
+  // (moteur) : seuls les champs que les règles lisent sont déclarés ici.
+  verification?: {
+    verifications: number;
+    verificationsFailed: number;
+    lastVerification: { at: string; kind: string; ok: boolean; command: string } | null;
+    editsTotal: number;
+    editsAfterLastVerification: number;
+    filesAfterLastVerificationTotal: number;
+    tokensAfterLastVerification: number;
   };
 }
 
@@ -202,9 +215,24 @@ export interface R6Recommendation {
   evidence: R6Evidence; action: string;
 }
 
+export interface R7Evidence {
+  sessions: string[];
+  sessionsNoVerification: number;
+  sessionsWithTail: number;
+  filesUnverified: number;
+  tokensAfterLastVerification: number;
+  costComplete: boolean;
+}
+export interface R7Recommendation {
+  ruleId: 'R7'; subject: string; title: string; category: string;
+  confidence: 'fait'; estimatedCostUsd: number; costBasis: string;
+  evidence: R7Evidence; action: string;
+}
+
 export type Recommendation =
   | R1Recommendation | R2Recommendation | R3Recommendation
-  | R4Recommendation | R5Recommendation | R6Recommendation;
+  | R4Recommendation | R5Recommendation | R6Recommendation
+  | R7Recommendation;
 
 export interface Rule {
   id: string;

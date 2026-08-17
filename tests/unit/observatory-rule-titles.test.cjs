@@ -20,8 +20,8 @@ const { nameProjects } = require('../../src/server/observatory/project-label.ts'
 const KB = 1024;
 const stat = (events, tokens) => ({ events, tokens });
 
-// Une session qui déclenche R1, R4, R5 et R6 à la fois — chaque règle lit une
-// partie différente du rapport, elles ne s'excluent pas. Les valeurs sont
+// Une session qui déclenche R1, R4, R5, R6 et R7 à la fois — chaque règle lit
+// une partie différente du rapport, elles ne s'excluent pas. Les valeurs sont
 // cohérentes entre elles : le churn de préfixe (40 000) domine bien celui des
 // compactions (1 000), et main + sous-agent = les jetons nets annoncés.
 const ALL_FIRING_SESSION = {
@@ -57,6 +57,17 @@ const ALL_FIRING_SESSION = {
     },
     toolResults: { byTool: {}, totalBytes: 0, candidateFilters: [] },
     subagents: { sidecarCount: 1, spawnToolUses: 2, byType: {} },
+    // R7 : la session édite, vérifie, puis laisse une queue de 2 éditions
+    // après sa dernière preuve — le champ de SCAN_VERSION 8 (doc/41).
+    verification: {
+      verifications: 1,
+      verificationsFailed: 0,
+      lastVerification: { at: '2026-07-01T10:01:00.000Z', kind: 'test', ok: true, command: 'npm test' },
+      editsTotal: 4,
+      editsAfterLastVerification: 2,
+      filesAfterLastVerificationTotal: 2,
+      tokensAfterLastVerification: 30000,
+    },
     tokens: {
       main: { in: 60000, out: 0, cacheCreate: 0, cacheRead: 5000 },
       perAgent: { 'agent-aaa': { in: 40000, out: 0, cacheCreate: 0, cacheRead: 3000 } },
@@ -67,7 +78,12 @@ const ALL_FIRING_SESSION = {
   },
 };
 
-const ctx = { sessions: [ALL_FIRING_SESSION], configItems: [] };
+// R7 ne parle qu'au-dessus d'un plancher de sessions par projet (seuil calibré,
+// doc/41) : la fixture en fournit trois, d'identités distinctes et de rapport
+// identique. Les autres règles agrègent déjà par projet et tirent tout autant.
+const SESSIONS = ['s1', 's2', 's3'].map(id => ({ ...ALL_FIRING_SESSION, id }));
+
+const ctx = { sessions: SESSIONS, configItems: [] };
 const projectRules = () => RULES.filter(r => r.subjectKind === 'project');
 
 test('chaque règle déclare la nature de son sujet — contrat identique pour toutes', () => {
@@ -78,7 +94,7 @@ test('chaque règle déclare la nature de son sujet — contrat identique pour t
 });
 
 test('la fixture fait bien tirer toutes les règles à sujet projet', () => {
-  assert.ok(projectRules().length >= 4, 'R1, R4, R5 et R6 ont un projet pour sujet');
+  assert.ok(projectRules().length >= 5, 'R1, R4, R5, R6 et R7 ont un projet pour sujet');
   for (const rule of projectRules()) {
     assert.ok(rule.evaluate(ctx).length > 0,
       `${rule.id} ne produit rien : l'invariant ci-dessous la sauterait en silence`);
@@ -97,7 +113,7 @@ test('aucune règle à sujet projet ne nomme le projet dans son titre', () => {
 
 test('c’est nameProjects qui pose le projet, une seule fois, avec le vrai chemin', () => {
   const recs = projectRules().flatMap(rule => rule.evaluate(ctx));
-  for (const named of nameProjects(recs, [ALL_FIRING_SESSION], RULES)) {
+  for (const named of nameProjects(recs, SESSIONS, RULES)) {
     assert.match(named.title, /— projet F:\\DEV\\x$/);
     // Une seule occurrence : un suffixe resté dans une règle produirait un titre
     // à double mention, exactement le défaut que ce fichier verrouille.

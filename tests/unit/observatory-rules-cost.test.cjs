@@ -58,10 +58,11 @@ test('the thresholds fixed by the spec are exactly the spec values', () => {
   assert.equal(THRESHOLDS.R6.minSubagentShare, 0.3);
 });
 
-// The five calibrated values are pinned here, not just declared as
+// The seven calibrated values are pinned here, not just declared as
 // 'calibration'. They are the outcome of a measurement on 90 days of real
-// history (relevé of 2026-07-27, docs/sources-externes.md): changing one silently
-// would change which advice a user is given, with no trace of why.
+// history (relevé of 2026-07-27, docs/sources-externes.md; sonde doc/41 of
+// 2026-08-17 for R7): changing one silently would change which advice a user is
+// given, with no trace of why.
 test('the calibrated thresholds are exactly the values the measurement retained', () => {
   assert.equal(THRESHOLDS.R1.minShareOfNet, 0.20,
     'raised from the 0.05 first proposed: 0.05 flagged 9 projects out of 14');
@@ -69,4 +70,8 @@ test('the calibrated thresholds are exactly the values the measurement retained'
   assert.equal(THRESHOLDS.R3.minCount, 5);
   assert.equal(THRESHOLDS.R4.minShareOfReadBytes, 0.05);
   assert.equal(THRESHOLDS.R4.minBytes, 100 * 1024);
+  assert.equal(THRESHOLDS.R7.minEditsAfterLastVerification, 1,
+    'sonde doc/41 du 2026-08-17 - p50 de queue = 4, une queue de 1 pese 13 pourcent des cas');
+  assert.equal(THRESHOLDS.R7.minSessions, 3,
+    'sonde doc/41 du 2026-08-17 - a 2 la regle marque 3 projets sur 4, a 3 elle en marque 2/4 et couvre 94,6 pourcent des jetons a risque');
 });

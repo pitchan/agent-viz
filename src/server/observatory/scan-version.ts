@@ -19,6 +19,9 @@
 // absents des rapports déjà stockés. Le mtime du transcript principal ne bouge
 // pas quand ces fichiers apparaissent : sans ce bump, needsScan sauterait
 // éternellement les sessions déjà en base et le correctif serait sans effet.
-const SCAN_VERSION = 7;
+// v8 : queue non vérifiée (agent-viz ≥ 0.17.0, doc/41) — les rapports v7 ne
+// portent pas le champ verification ; sans ce bump, needsScan sauterait les
+// sessions déjà en base et R7 resterait muette à jamais.
+const SCAN_VERSION = 8;
 
 export { SCAN_VERSION };
