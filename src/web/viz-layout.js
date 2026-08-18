@@ -282,11 +282,6 @@ function onPostToolUse(evt, sid, ts) {
 }
 
 function onPostToolUseFailure(evt, sid, ts) {
-  // Le registre AVANT le `if (n)`, et c'est tout l'objet du correctif : un
-  // echec dont le noeud manque — PreToolUse non recu, noeud deja ramasse —
-  // n'etait jusqu'ici compte ni trace nulle part. Le registre ne connait pas
-  // les noeuds, donc la question ne se pose plus.
-  recordError(evt);
   const tid = evt.tool_use_id || '';
   const n = state.nodes.get(`t:${tid}`);
   if (n) {
@@ -295,6 +290,17 @@ function onPostToolUseFailure(evt, sid, ts) {
     setRunning(n.id, false);
   }
   settleAgentFromAgentToolResponse(evt, ts, 'error');
+  // HORS du `if (n)`, et c'est tout l'objet du correctif : un echec dont le
+  // noeud manque — PreToolUse non recu, noeud deja ramasse — n'etait jusqu'ici
+  // compte ni trace nulle part.
+  //
+  // Mais EN DERNIER, et ce n'est pas indifferent : `recordError` previent ses
+  // abonnes de facon synchrone, et l'abonne repeint le flux, dont les couleurs
+  // se lisent sur le STATUT des noeuds. Enregistrer d'abord faisait repeindre
+  // avant la mutation ci-dessus, et la ligne gardait la couleur de son type.
+  // Le defaut ne se voyait que sur la DERNIERE erreur d'une session — chaque
+  // erreur repeignait les precedentes — donc jamais sur un cas a une erreur.
+  recordError(evt);
 }
 
 function onNotification(evt, sid, ts) {

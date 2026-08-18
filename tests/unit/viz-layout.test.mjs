@@ -6,7 +6,7 @@ import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { state, vis } from '../../src/web/viz-state.js';
 import { processEvent, layoutDirtyRoots, calcDuration } from '../../src/web/viz-layout.js';
-import { getErrors, resetErrors } from '../../src/web/viz-errors.mjs';
+import { getErrors, resetErrors, onErrorsChanged } from '../../src/web/viz-errors.mjs';
 
 function resetState() {
   state.nodes.clear();
@@ -109,6 +109,38 @@ test('un échec dont le noeud existe marque le noeud ET entre au registre', () =
   assert.equal(recs.length, 1);
   assert.equal(recs[0].nodeId, 't:tu-1');
   assert.match(recs[0].message, /exceeds maximum/);
+});
+
+test('quand le registre prévient, le noeud porte DÉJÀ le statut error', () => {
+  // Défaut trouvé sur données RÉELLES, invisible sur un cas à une seule erreur :
+  // l'abonné du registre repeint le flux, et la couleur d'une ligne se décide
+  // au statut de son noeud. Enregistrer AVANT de marquer le noeud faisait
+  // repeindre trop tôt — la ligne gardait la couleur de son type. L'erreur
+  // suivante rattrapait la précédente en la repeignant, si bien que seule la
+  // DERNIÈRE restait fausse : sur une session à une erreur, tout semblait juste.
+  // Arrange
+  const sid = 'abc12345-0000-0000-0000-000000000000';
+  processEvent({
+    hook_event_name: 'PreToolUse', session_id: sid, tool_name: 'Read',
+    tool_input: { file_path: 'C:\\dev\\note.md' }, tool_use_id: 'tu-ordre',
+    _ts: '2025-01-01T00:00:00.000Z',
+  });
+  let statutVuParLAbonne = null;
+  const desabonner = onErrorsChanged(() => {
+    const n = state.nodes.get('t:tu-ordre');
+    statutVuParLAbonne = n ? n.status : '(aucun noeud)';
+  });
+
+  // Act
+  processEvent({
+    hook_event_name: 'PostToolUseFailure', session_id: sid, tool_name: 'Read',
+    tool_input: { file_path: 'C:\\dev\\note.md' }, tool_use_id: 'tu-ordre',
+    error: 'boum', _ts: '2025-01-01T00:00:01.000Z',
+  });
+  desabonner();
+
+  // Assert
+  assert.equal(statutVuParLAbonne, 'error');
 });
 
 test('un échec SANS noeud correspondant entre quand même au registre', () => {
