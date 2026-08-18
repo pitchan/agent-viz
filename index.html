@@ -30,7 +30,7 @@
       <div class="stat"><span class="stat-dot" style="background:var(--tool)"></span><span id="stat-tools" class="stat-val">0</span> tools</div>
       <div class="stat"><span class="stat-dot" style="background:var(--agent)"></span><span id="stat-agents" class="stat-val">0</span> agents</div>
       <div class="stat"><span class="stat-dot" style="background:var(--notification)"></span><span id="stat-running" class="stat-val">0</span> active</div>
-      <div class="stat"><span class="stat-dot" style="background:var(--error)"></span><span id="stat-errors" class="stat-val">0</span> errors</div>
+      <button type="button" class="stat stat-button" id="errors-pill"><span class="stat-dot" style="background:var(--error)"></span><span id="stat-errors" class="stat-val">0</span> <span id="stat-errors-label">errors</span></button>
       <div class="stat budget-pill" id="budget-pill" hidden title="">
         <span id="budget-model" class="budget-model"></span>
         <span class="budget-sep">·</span>
@@ -144,6 +144,17 @@
         <button id="alerts-close">&times;</button>
       </div>
       <div id="alerts-list"></div>
+    </div>
+
+    <!-- Tool errors popup — the way in to a failed call. The graph only draws
+         the last ten finished tools and the feed only keeps sixty rows in the
+         DOM, so an error found here may have no node left to jump to. -->
+    <div id="errors-popup" class="glass-panel">
+      <div id="errors-header">
+        <span id="errors-title">Errors</span>
+        <button id="errors-close">&times;</button>
+      </div>
+      <div id="errors-list"></div>
     </div>
   </div>
 </div>

@@ -6,6 +6,7 @@ import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { state, vis } from '../../src/web/viz-state.js';
 import { processEvent, layoutDirtyRoots, calcDuration } from '../../src/web/viz-layout.js';
+import { getErrors, resetErrors } from '../../src/web/viz-errors.mjs';
 
 function resetState() {
   state.nodes.clear();
@@ -21,6 +22,7 @@ function resetState() {
   vis.drawSkillNodes.length = 0;
   vis.drawMcpNodes.length = 0;
   layoutDirtyRoots.clear();
+  resetErrors();
 }
 
 beforeEach(resetState);
@@ -76,4 +78,55 @@ test('une date illisible ne met plus « NaNm » sur la carte', () => {
 
   // Assert
   assert.equal(rendu, null);
+});
+
+// ─── L'échec d'un outil entre au registre, noeud ou pas ─────────────────────
+// `onPostToolUseFailure` faisait tout son travail sous un `if (n)`. Un échec
+// dont le noeud manque — `PreToolUse` non reçu, noeud déjà ramassé — n'était
+// alors compté ni tracé nulle part. Le registre capte à l'événement ; ces deux
+// tests interdisent le retour en arrière.
+
+test('un échec dont le noeud existe marque le noeud ET entre au registre', () => {
+  // Arrange
+  const sid = 'abc12345-0000-0000-0000-000000000000';
+  processEvent({
+    hook_event_name: 'PreToolUse', session_id: sid, tool_name: 'Read',
+    tool_input: { file_path: 'C:\\dev\\note.md' }, tool_use_id: 'tu-1',
+    _ts: '2025-01-01T00:00:00.000Z',
+  });
+
+  // Act
+  processEvent({
+    hook_event_name: 'PostToolUseFailure', session_id: sid, tool_name: 'Read',
+    tool_input: { file_path: 'C:\\dev\\note.md' }, tool_use_id: 'tu-1',
+    error: 'File content exceeds maximum allowed tokens',
+    _ts: '2025-01-01T00:00:01.000Z',
+  });
+
+  // Assert
+  assert.equal(state.nodes.get('t:tu-1').status, 'error');
+  const recs = getErrors();
+  assert.equal(recs.length, 1);
+  assert.equal(recs[0].nodeId, 't:tu-1');
+  assert.match(recs[0].message, /exceeds maximum/);
+});
+
+test('un échec SANS noeud correspondant entre quand même au registre', () => {
+  // Arrange — aucun PreToolUse : c'est le cas orphelin, invisible avant.
+  const sid = 'abc12345-0000-0000-0000-000000000000';
+
+  // Act
+  processEvent({
+    hook_event_name: 'PostToolUseFailure', session_id: sid, tool_name: 'Bash',
+    tool_input: { command: 'npm run build' }, tool_use_id: 'jamais-ouvert',
+    error: 'Exit code 1',
+    _ts: '2025-01-01T00:00:02.000Z',
+  });
+
+  // Assert
+  assert.equal(state.nodes.get('t:jamais-ouvert'), undefined, 'aucun noeud, comme attendu');
+  const recs = getErrors();
+  assert.equal(recs.length, 1, 'et pourtant l échec est consigné');
+  assert.equal(recs[0].toolName, 'Bash');
+  assert.equal(recs[0].subject, 'npm run build');
 });

@@ -11,6 +11,7 @@ import {
 import { markNarratorDirty } from './viz-narrator.js';
 import { toolSubject } from './viz-tool-subject.mjs';
 import { formatDuration } from './viz-duration.mjs';
+import { recordError } from './viz-errors.mjs';
 
 // ─── Feed-cursor adjust hook ──────────────────────────────────────────────
 // When the timeline ring-buffer shifts, viz-ui's _feedRenderedCount must be
@@ -281,6 +282,11 @@ function onPostToolUse(evt, sid, ts) {
 }
 
 function onPostToolUseFailure(evt, sid, ts) {
+  // Le registre AVANT le `if (n)`, et c'est tout l'objet du correctif : un
+  // echec dont le noeud manque — PreToolUse non recu, noeud deja ramasse —
+  // n'etait jusqu'ici compte ni trace nulle part. Le registre ne connait pas
+  // les noeuds, donc la question ne se pose plus.
+  recordError(evt);
   const tid = evt.tool_use_id || '';
   const n = state.nodes.get(`t:${tid}`);
   if (n) {

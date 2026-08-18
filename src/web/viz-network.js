@@ -15,6 +15,7 @@ import {
 } from './viz-narrator.js';
 import { raiseExternalAlert, applyServerAlert, refreshAlerts } from './viz-watchdog-client.js';
 import { connectionPresentation } from './viz-topbar-status.mjs';
+import { resetErrors } from './viz-errors.mjs';
 
 // Nothing here tells the watchdog whether we can still hear the agent. That
 // question belonged to a detector running in the tab; detection now runs on
@@ -327,6 +328,10 @@ export function clearState() {
   state.tokens.transcriptMissing = false;
   updateBudget();
   state.forkedAgentParents.clear();
+  // Le registre des erreurs suit la session, comme le reste de l'etat. Sans ce
+  // vidage, le rejeu du journal au changement de session compterait deux fois,
+  // et le volet melangerait deux sessions — or le bandeau n'en montre qu'une.
+  resetErrors();
   vis.nodes.clear(); vis.particles = [];
   _feedResetHook();
   resetLayout();

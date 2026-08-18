@@ -28,18 +28,29 @@ import {
 import {
   alertActor, alertDetailLines, notificationPayload, truncate,
 } from './viz-alert-format.mjs';
-import { watchdogPresentation } from './viz-topbar-status.mjs';
+import { watchdogPresentation, errorsPresentation } from './viz-topbar-status.mjs';
+import { errorRow, errorsPanelTitle } from './viz-error-format.mjs';
+import { getErrors, onErrorsChanged } from './viz-errors.mjs';
 import { formatDuration } from './viz-duration.mjs';
 
 // ─── Feed panel ───────────────────────────────────────────────────────────
 let _feedRenderedCount = 0;
 let _feedNeedsFullRebuild = true;
 
+// Feed rows are appended once and never re-rendered, so anything that changes
+// an EXISTING row — a call that just failed and must turn red — has to ask for
+// a rebuild rather than wait for one to happen by chance.
+function markFeedFullRebuild() { _feedNeedsFullRebuild = true; }
+
 function feedItemHTML(e) {
   const n = state.nodes.get(e.nodeId);
   const dur = n && n.duration ? n.duration : '';
   const isRunning = n && n.status === 'running';
-  const color = getTypeColor(e.type);
+  // Status wins over type. A failed Read used to carry the same amber dot as
+  // twenty successful ones — measured in the browser: twenty-one identical
+  // dots, not one of them red. The error colour was already in getTypeColor,
+  // simply never reached, because no timeline entry is ever of type 'error'.
+  const color = (n && n.status === 'error') ? COLORS.error : getTypeColor(e.type);
   const isActive = state.selected === e.nodeId;
   return `<div class="feed-item${isActive ? ' active' : ''}${isRunning ? ' running' : ''}" data-node="${e.nodeId}">
     <div class="feed-dot" style="background:${color};box-shadow:0 0 6px ${hexAlpha(color, 0.4)}"></div>
@@ -82,10 +93,15 @@ function getTypeColor(type) {
   return map[type] || COLORS.tool;
 }
 
-document.getElementById('feed-list').addEventListener('click', e => {
-  const item = e.target.closest('.feed-item');
-  if (!item) return;
-  const nodeId = item.dataset.node;
+// Select a node, open its detail, and bring the camera to it. Shared by the
+// feed and the errors popup: both are lists that lead to the same place, and a
+// second copy of the camera arithmetic would drift from this one.
+//
+// A node that no longer exists is not an error here — the GC drops finished
+// tools after ten minutes, and an errors-popup row outlives its node on
+// purpose. Nothing is selected in that case, and the caller's row stays
+// readable on its own.
+export function focusNode(nodeId) {
   state.selected = nodeId;
   const n = state.nodes.get(nodeId);
   if (n) {
@@ -96,8 +112,20 @@ document.getElementById('feed-list').addEventListener('click', e => {
       vis.camera.targetY = -vn.targetY + canvasMod.H / 2 / vis.camera.targetZoom;
     }
   }
+  // La selection change une ligne DEJA rendue, et le flux ne fait qu'ajouter :
+  // sans forcer, le surlignage n'apparaissait qu'a la prochaine reconstruction
+  // fortuite. C'est un clic d'utilisateur, pas un evenement de flux — repeindre
+  // soixante lignes est sans effet mesurable, et le geste se voit arriver.
+  markFeedFullRebuild();
   renderFeed();
   markDirty();
+  return Boolean(n);
+}
+
+document.getElementById('feed-list').addEventListener('click', e => {
+  const item = e.target.closest('.feed-item');
+  if (!item) return;
+  focusNode(item.dataset.node);
 });
 
 // ─── Detail popup ─────────────────────────────────────────────────────────
@@ -343,10 +371,9 @@ export function renderNarrator() {
 
 // ─── Stats ────────────────────────────────────────────────────────────────
 export function updateStats() {
-  let running = 0, agents = 0, errors = 0;
+  let running = 0, agents = 0;
   for (const n of state.nodes.values()) {
     if (n.type === 'agent') agents++;
-    if (n.status === 'error') errors++;
     if (n.status === 'running') running++;
   }
   document.getElementById('stat-tools').textContent = state.toolsCompleted;
@@ -356,9 +383,14 @@ export function updateStats() {
   runEl.textContent = running;
   runEl.classList.toggle('has-running', running > 0);
 
-  const errEl = document.getElementById('stat-errors');
-  errEl.textContent = errors;
-  errEl.classList.toggle('has-errors', errors > 0);
+  // The error count is NOT derived from the nodes any more. Deriving it made
+  // the chip lie twice: the GC drops a finished tool node after ten minutes
+  // (the count fell back to zero on its own) while agent nodes are never
+  // dropped (those errors stayed forever) — one number, two lifetimes. The
+  // registry counts what actually happened in this session. Keeping the old
+  // scan alongside it would put two different totals one click apart, which is
+  // the mistake the C4 note above already commemorates for cost.
+  renderErrorsPill();
 }
 
 // ─── Fit view ─────────────────────────────────────────────────────────────
@@ -424,6 +456,7 @@ document.addEventListener('keydown', e => {
     document.getElementById('detail-popup').classList.remove('visible');
     document.getElementById('sessions-overlay').classList.remove('visible');
     document.getElementById('alerts-popup').classList.remove('visible');
+    document.getElementById('errors-popup').classList.remove('visible');
     renderFeed();
     markDirty();
   }
@@ -556,6 +589,106 @@ document.getElementById('alerts-list').addEventListener('click', (e) => {
   acknowledgeAlert(btn.dataset.id, Number(btn.dataset.created));
   renderWatchdogPill();
 });
+
+// ─── Errors chip + errors popup ───────────────────────────────────────────
+// The third topbar witness, and the one that stayed mute the longest: it read
+// "1 errors" with no way in, while the failure's own message was already in
+// the page, one unmarked click away. It follows the watchdog bell's shape —
+// a counting button that opens a list — with one difference that matters: an
+// alert is acknowledged, an error is only read. There is no Ack here.
+//
+// Rows come from the registry, not from the graph, so a row survives the node
+// it points at. When the node is gone the row stays and simply stops promising
+// a jump.
+
+const _errorsEls = { pill: null, count: null, label: null, popup: null, list: null, title: null };
+function _errorsDOM() {
+  if (!_errorsEls.pill) {
+    _errorsEls.pill = document.getElementById('errors-pill');
+    _errorsEls.count = document.getElementById('stat-errors');
+    _errorsEls.label = document.getElementById('stat-errors-label');
+    _errorsEls.popup = document.getElementById('errors-popup');
+    _errorsEls.list = document.getElementById('errors-list');
+    _errorsEls.title = document.getElementById('errors-title');
+  }
+  return _errorsEls;
+}
+
+// `esc` on every field without exception: an error message is arbitrary text —
+// paths, quotes, angle brackets, whatever the failing tool happened to print.
+function errorItemHTML(rec) {
+  // La presence du noeud se decide ICI, contre le graphe reel. Le module de
+  // formatage ne connait pas le graphe : lui laisser deduire la rejoignabilite
+  // de l'identifiant annoncait une ligne cliquable qui ne menait nulle part.
+  const row = errorRow(rec, Boolean(rec.nodeId) && state.nodes.has(rec.nodeId));
+  return `<div class="error-item${row.reachable ? ' reachable' : ''}"${row.reachable ? ` data-node="${esc(row.nodeId)}"` : ''}>
+    <div class="error-head">
+      <span class="error-tool">${esc(row.tool)}</span>
+      <span class="error-time">${esc(row.time)}</span>
+    </div>
+    ${row.subject ? `<div class="error-subject">${esc(row.subject)}</div>` : ''}
+    <div class="error-msg">${esc(row.message)}</div>
+    ${row.goneNote ? `<div class="error-gone">${esc(row.goneNote)}</div>` : ''}
+  </div>`;
+}
+
+function renderErrorsPopup() {
+  const els = _errorsDOM();
+  const recs = getErrors();
+  // Newest first: the error being looked for is almost always the last one.
+  const shown = recs.slice().reverse();
+  // The session is named ONCE, in the header, rather than on every row: the
+  // tab only ever shows one session, and repeating it would push the message
+  // — the only part that explains anything — out of view.
+  const sid = recs.length ? recs[recs.length - 1].sessionId : (state._lastServerId || '');
+  els.title.textContent = errorsPanelTitle(sid, recs.length);
+  els.list.innerHTML = shown.length
+    ? shown.map(errorItemHTML).join('')
+    : '<div class="errors-empty">No tool errors in this session.</div>';
+}
+
+export function renderErrorsPill() {
+  const els = _errorsDOM();
+  // The words come from viz-topbar-status, where a unit test pins them —
+  // including the plural that made the chip read "1 errors".
+  const p = errorsPresentation(getErrors().length);
+  els.count.textContent = p.countText;
+  els.count.classList.toggle('has-errors', p.hasErrors);
+  els.label.textContent = p.label;
+  els.pill.title = p.title;
+  els.pill.setAttribute('aria-label', p.ariaLabel);
+  if (els.popup.classList.contains('visible')) renderErrorsPopup();
+}
+
+document.getElementById('errors-pill').addEventListener('click', () => {
+  const popup = document.getElementById('errors-popup');
+  const opening = !popup.classList.contains('visible');
+  popup.classList.toggle('visible', opening);
+  if (opening) renderErrorsPopup();
+});
+
+document.getElementById('errors-close').addEventListener('click', () => {
+  document.getElementById('errors-popup').classList.remove('visible');
+});
+
+document.getElementById('errors-list').addEventListener('click', (e) => {
+  const item = e.target.closest('.error-item.reachable');
+  if (!item) return;
+  focusNode(item.dataset.node);
+});
+
+// A new error repaints the chip, and forces a full feed rebuild so the row
+// that just turned red actually turns red: feed rows are appended once and
+// never re-rendered. Errors are rare — median one per session, measured over
+// thirty days — so rebuilding sixty rows costs nothing.
+onErrorsChanged(() => {
+  markFeedFullRebuild();
+  renderFeed();
+  renderErrorsPill();
+});
+
+// Initial render so the chip is correct and named from the first paint.
+renderErrorsPill();
 
 // Lazy permission request — only on the first alert, never at page load.
 // Browsers dedupe by `tag`, so re-emitting a notification with the same id

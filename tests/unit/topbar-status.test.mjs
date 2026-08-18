@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import {
   connectionPresentation,
   watchdogPresentation,
+  errorsPresentation,
 } from '../../src/web/viz-topbar-status.mjs';
 
 // ─── Le temoin de connexion : un voyant etiquete, pas un rond anonyme ────────
@@ -75,4 +76,62 @@ test('la cloche porte un nom pour les lecteurs d ecran, dans les deux etats', ()
   // l'aria-label est le nom, il doit exister avec ou sans alerte.
   assert.match(watchdogPresentation(0).ariaLabel, /watchdog/i);
   assert.match(watchdogPresentation(2).ariaLabel, /2/);
+});
+
+// ─── La pastille des erreurs : un compteur qui mene quelque part ─────────────
+// Troisieme temoin du bandeau, et le meme defaut que les deux premiers avant
+// leur correction : « 1 errors » se lisait sans savoir OU etait cette erreur,
+// ni meme que le chiffre etait cliquable.
+
+test('une erreur s accorde au singulier', () => {
+  // Le bandeau affichait litteralement « 1 errors ». La faute est visible a
+  // l'oeil nu sur la capture d'ecran d'un utilisateur — elle se corrige ici.
+  // Arrange
+  const p = errorsPresentation(1);
+  // Act — lecture pure, l'Act est la construction ci-dessus
+  // Assert
+  assert.equal(p.countText, '1');
+  assert.equal(p.label, 'error');
+});
+
+test('plusieurs erreurs s accordent au pluriel', () => {
+  // Arrange
+  const p = errorsPresentation(4);
+  // Act — lecture pure
+  // Assert
+  assert.equal(p.countText, '4');
+  assert.equal(p.label, 'errors');
+});
+
+test('zero erreur garde le pluriel et le calme', () => {
+  // Arrange
+  const p = errorsPresentation(0);
+  // Act — lecture pure
+  // Assert
+  assert.equal(p.countText, '0');
+  assert.equal(p.label, 'errors');
+  assert.equal(p.hasErrors, false);
+});
+
+test('des qu il y a une erreur, la pastille le signale', () => {
+  assert.equal(errorsPresentation(1).hasErrors, true);
+});
+
+test('l infobulle dit qu on peut cliquer, meme a zero', () => {
+  // Exactement la lecon de la cloche : une pastille qui est un bouton dans les
+  // deux etats doit le dire dans les deux etats, sinon elle se lit comme un
+  // simple chiffre mort — le reproche d'origine.
+  assert.match(errorsPresentation(0).title, /click/i);
+  assert.match(errorsPresentation(3).title, /click/i);
+});
+
+test('l infobulle borne la portee du chiffre a la session', () => {
+  // « 1 error » sans plus rend le chiffre inutilisable : une erreur de quoi,
+  // depuis quand ? La reponse est : de la session affichee.
+  assert.match(errorsPresentation(2).title, /session/i);
+});
+
+test('la pastille porte un nom pour les lecteurs d ecran, dans les deux etats', () => {
+  assert.match(errorsPresentation(0).ariaLabel, /error/i);
+  assert.match(errorsPresentation(5).ariaLabel, /5/);
 });
