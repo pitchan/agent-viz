@@ -15,9 +15,12 @@
       <span id="topbar-agent" class="agent-badge"></span>
     </div>
     <span class="sep"></span>
-    <div id="connection-dot" title="Disconnected"></div>
-    <button type="button" id="watchdog-pill" class="watchdog-pill" title="No active alerts">
-      <span class="watchdog-dot"></span>
+    <div id="connection-status">
+      <span id="connection-dot"></span>
+      <span id="connection-label"></span>
+    </div>
+    <button type="button" id="watchdog-pill" class="watchdog-pill">
+      <svg class="watchdog-bell" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a6 6 0 0 0-6 6v3.6l-1.7 2.9a.9.9 0 0 0 .8 1.4h13.8a.9.9 0 0 0 .8-1.4L18 12.6V9a6 6 0 0 0-6-6M9.8 19a2.3 2.3 0 0 0 4.4 0"/></svg>
       <span id="watchdog-count" class="watchdog-count" hidden></span>
     </button>
     <span id="topbar-prompt" style="font-size:12px;color:var(--text-dim);max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title=""></span>

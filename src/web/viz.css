@@ -104,39 +104,53 @@ body {
 #topbar-agent.visible { display: inline-block; }
 .sep { width: 1px; height: 24px; background: var(--glass-border); }
 
+/* Connection witness — a labeled light, like a recorder's REC lamp. The label
+   is what makes it self-explanatory: the bare dot next to the (equally green)
+   watchdog dot read as its twin. */
+#connection-status {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+  color: var(--error); transition: color 0.3s;
+}
 #connection-dot {
   width: 8px; height: 8px; border-radius: 50%;
   background: var(--error); transition: all 0.3s;
 }
-#connection-dot.connected {
+#connection-status.connected { color: var(--complete); }
+#connection-status.connected #connection-dot {
   background: var(--complete);
   box-shadow: 0 0 8px var(--complete-dim), 0 0 20px rgba(102,255,170,0.15);
+  animation: breathe-dot 2.4s ease-in-out infinite;
 }
 
-/* Watchdog pill — green by default, red+pulsing when alerts are active. */
+/* Watchdog bell — quiet and gray when there is nothing to say, red with a
+   count when alerts are active. Border, hover and pointer make it read as the
+   button it always was. */
 .watchdog-pill {
-  display: inline-flex; align-items: center; gap: 6px;
+  display: inline-flex; align-items: center; gap: 5px;
   height: 22px; padding: 0 8px;
   background: rgba(102, 204, 255, 0.04);
   border: 1px solid var(--glass-border); border-radius: 11px;
-  color: var(--text-dim);
+  color: var(--text-muted);
   font-family: inherit; font-size: 11px; font-weight: 600;
   cursor: pointer; transition: all 0.15s;
 }
-.watchdog-pill:hover { background: var(--glass-hover); }
-.watchdog-pill .watchdog-dot {
-  width: 8px; height: 8px; border-radius: 50%;
-  background: var(--complete);
-  box-shadow: 0 0 6px var(--complete-dim);
+.watchdog-pill:hover {
+  background: var(--glass-hover);
+  color: var(--text-dim);
+  border-color: rgba(102, 204, 255, 0.25);
+}
+.watchdog-bell {
+  width: 13px; height: 13px; display: block;
+  fill: none; stroke: currentColor; stroke-width: 1.8;
+  stroke-linecap: round; stroke-linejoin: round;
 }
 .watchdog-pill.has-alerts {
   border-color: var(--error-dim);
   color: var(--error);
   background: rgba(255, 85, 102, 0.08);
 }
-.watchdog-pill.has-alerts .watchdog-dot {
-  background: var(--error);
-  box-shadow: 0 0 8px var(--error-dim), 0 0 16px rgba(255,85,102,0.25);
+.watchdog-pill.has-alerts .watchdog-bell {
   animation: pulse-dot 1s ease-in-out infinite;
 }
 .watchdog-count[hidden] { display: none; }
@@ -364,6 +378,7 @@ canvas { display: block; width: 100%; height: 100%; }
 
 /* ─── Animations ─── */
 @keyframes pulse-dot { 0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(0.8)} }
+@keyframes breathe-dot { 0%,100%{opacity:1}50%{opacity:0.55} }
 @keyframes slide-in { from{opacity:0;transform:translateX(10px)}to{opacity:1;transform:translateX(0)} }
 @keyframes slide-up { from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)} }
 

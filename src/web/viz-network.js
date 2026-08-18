@@ -14,6 +14,7 @@ import {
   pauseTick, resumeTick, markNarratorDirty,
 } from './viz-narrator.js';
 import { raiseExternalAlert, applyServerAlert, refreshAlerts } from './viz-watchdog-client.js';
+import { connectionPresentation } from './viz-topbar-status.mjs';
 
 // Nothing here tells the watchdog whether we can still hear the agent. That
 // question belonged to a detector running in the tab; detection now runs on
@@ -29,7 +30,19 @@ function badgeHtml(agentSource) {
 }
 
 // ─── DOM refs ─────────────────────────────────────────────────────────────
-const connDot = document.getElementById('connection-dot');
+const connStatus = document.getElementById('connection-status');
+const connLabel = document.getElementById('connection-label');
+
+// The words come from viz-topbar-status, where a unit test pins them; this
+// only applies them. Called once at load: the witness must already say
+// OFFLINE while the first connection attempt is still in flight.
+function renderConnection(connected) {
+  const p = connectionPresentation(connected);
+  connStatus.classList.toggle('connected', connected);
+  connLabel.textContent = p.label;
+  connStatus.title = p.title;
+}
+renderConnection(false);
 
 // ─── Session selection (owned here, read-only from elsewhere) ─────────────
 export let currentSessionId = null;
@@ -87,14 +100,12 @@ export function connectSSE() {
   sseSource = new EventSource('/stream');
   sseSource.onopen = () => {
     sseConnected = true;
-    connDot.classList.add('connected');
-    connDot.title = 'Connected';
+    renderConnection(true);
     stopPollFallback();
   };
   sseSource.onerror = () => {
     sseConnected = false;
-    connDot.classList.remove('connected');
-    connDot.title = 'Disconnected';
+    renderConnection(false);
     startPollFallback();
   };
   sseSource.onmessage = (msg) => {

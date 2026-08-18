@@ -28,6 +28,7 @@ import {
 import {
   alertActor, alertDetailLines, notificationPayload, truncate,
 } from './viz-alert-format.mjs';
+import { watchdogPresentation } from './viz-topbar-status.mjs';
 import { formatDuration } from './viz-duration.mjs';
 
 // ─── Feed panel ───────────────────────────────────────────────────────────
@@ -525,16 +526,15 @@ function renderAlertsPopup() {
 
 export function renderWatchdogPill() {
   const els = _watchdogDOM();
-  const n = getActiveAlerts().length;
-  els.pill.classList.toggle('has-alerts', n > 0);
-  if (n > 0) {
-    els.count.hidden = false;
-    els.count.textContent = String(n);
-    els.pill.title = `${n} active alert${n > 1 ? 's' : ''} — click for details`;
-  } else {
-    els.count.hidden = true;
-    els.pill.title = 'No active alerts';
-  }
+  // The words come from viz-topbar-status, where a unit test pins them; this
+  // only applies them. The aria-label is the button's accessible name — its
+  // only visible content is an icon.
+  const p = watchdogPresentation(getActiveAlerts().length);
+  els.pill.classList.toggle('has-alerts', p.hasAlerts);
+  els.count.hidden = p.countText === null;
+  els.count.textContent = p.countText ?? '';
+  els.pill.title = p.title;
+  els.pill.setAttribute('aria-label', p.ariaLabel);
   if (els.popup.classList.contains('visible')) renderAlertsPopup();
 }
 
