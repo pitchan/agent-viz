@@ -14,6 +14,7 @@ const rec = (id, over = {}) => ({
   id, ruleId: 'R1', subject: `s${id}`, title: `t${id}`, category: 'modele',
   confidence: 'fait', estimatedCostUsd: 10, costBasis: 'jetons-mesures',
   evidence: {}, action: 'a', status: 'new', costAtStatusUsd: null,
+  statusReason: null, statusAt: null,
   createdAt: '2026-07-01T00:00:00.000Z', updatedAt: SCAN, lastSeenAt: SCAN,
   ...over,
 });
@@ -108,7 +109,53 @@ test('when every score in a basis is zero the block still proposes something', (
 });
 
 test('an empty input yields empty structures, never undefined', () => {
-  assert.deepEqual(rankByBasis([], { lastScanAt: SCAN }), { groups: [], stale: [] });
+  assert.deepEqual(rankByBasis([], { lastScanAt: SCAN }), { groups: [], stale: [], arbitrated: [] });
+});
+
+// ─── Statut « arbitré » (doc/42) : jamais re-proposé, jamais silencieux ────
+
+test('un arbitrage ne revient jamais de lui-même, quel que soit le coût', () => {
+  assert.equal(isEligible(rec(1, { status: 'arbitrated', estimatedCostUsd: 99, costAtStatusUsd: 1 })), false);
+});
+
+test('les cartes arbitrées quittent les groupes et vivent dans leur propre liste', () => {
+  // Arrange
+  const input = [
+    rec(1, { status: 'arbitrated', statusAt: '2026-07-10T00:00:00.000Z', statusReason: 'déjà pesé' }),
+    rec(2),
+  ];
+  // Act
+  const { groups, arbitrated } = rankByBasis(input, { lastScanAt: SCAN });
+  // Assert
+  assert.deepEqual(groups[0].all.map(r => r.id), [2], 'ni en priorité ni dans « autres »');
+  assert.deepEqual(arbitrated.map(r => r.id), [1]);
+  assert.equal(arbitrated[0].statusReason, 'déjà pesé', 'la raison voyage jusqu’à la page');
+});
+
+test('l’arbitrage prime sur la fraîcheur — une carte arbitrée non ré-émise reste un arbitrage', () => {
+  // Arrange
+  const input = [rec(1, {
+    status: 'arbitrated', statusAt: '2026-07-10T00:00:00.000Z',
+    lastSeenAt: '2026-07-01T00:00:00.000Z',
+  })];
+  // Act
+  const { stale, arbitrated } = rankByBasis(input, { lastScanAt: SCAN });
+  // Assert
+  assert.deepEqual(stale, [], 'jamais dans « ne se produit plus »');
+  assert.deepEqual(arbitrated.map(r => r.id), [1]);
+});
+
+test('les arbitrages s’affichent du plus récent au plus ancien', () => {
+  // Arrange
+  const input = [
+    rec(1, { status: 'arbitrated', statusAt: '2026-07-05T00:00:00.000Z' }),
+    rec(2, { status: 'arbitrated', statusAt: '2026-07-12T00:00:00.000Z' }),
+    rec(3, { status: 'arbitrated', statusAt: '2026-07-08T00:00:00.000Z' }),
+  ];
+  // Act
+  const { arbitrated } = rankByBasis(input, { lastScanAt: SCAN });
+  // Assert
+  assert.deepEqual(arbitrated.map(r => r.id), [2, 3, 1]);
 });
 
 test('the module exposes no way to total costs across recommendations', () => {

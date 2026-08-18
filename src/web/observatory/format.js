@@ -85,6 +85,18 @@ export function formatDayMonth(iso) {
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
+/** JJ/MM/AAAA local time — an arbitration can be old, the year matters. */
+function formatDayMonthYear(iso) {
+  return `${formatDayMonth(iso)}/${new Date(iso).getFullYear()}`;
+}
+
+// One line per folded card (doc/42): the decision date, then the user's own
+// reason. Both are enforced at write time; a hole says so, never guesses.
+export function arbitratedLine(rec) {
+  const when = rec.statusAt ? `Arbitré le ${formatDayMonthYear(rec.statusAt)}` : 'Arbitré (date non consignée)';
+  return rec.statusReason ? `${when} — ${rec.statusReason}` : when;
+}
+
 /** Every card states its window; a card without one says so, never guesses. */
 export function periodLabel(rec) {
   if (!rec.periodFrom || !rec.periodTo) return 'période du constat non enregistrée (re-scanner)';

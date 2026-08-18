@@ -5,6 +5,7 @@ import {
   formatUsd, formatBytes, formatDuration, confidenceLabel, costBasisLabel, costLabel, basisTitle,
   formatDayMonth, periodLabel, basisLabel, periodHeader, scanProgressLabel, formatTokens,
   formatUsdPerMTok, formatShare, formatUsdExact, modelLabel, summaryHeadline, summaryDetails,
+  arbitratedLine,
 } from '../../src/web/observatory/format.js';
 
 test('formatUsd uses a French decimal comma and two digits', () => {
@@ -206,4 +207,22 @@ test('modelLabel derives readable labels, Claude 5 single-digit families include
   assert.equal(modelLabel('<synthetic>'), '<synthetic>');
   assert.equal(modelLabel('ministral-3:latest'), 'ministral-3:latest');
   assert.equal(modelLabel(''), '');
+});
+
+// ─── Statut « arbitré » (doc/42) : la ligne de carte arbitrée ──────────────
+
+test('arbitratedLine : la date en JJ/MM/AAAA puis la raison, en français', () => {
+  assert.equal(
+    arbitratedLine({ statusAt: '2026-08-08T12:00:00.000Z', statusReason: 'tests vérifiés au terminal, hors session' }),
+    'Arbitré le 08/08/2026 — tests vérifiés au terminal, hors session');
+});
+
+test('arbitratedLine sans raison consignée n’invente rien', () => {
+  assert.equal(arbitratedLine({ statusAt: '2026-08-08T12:00:00.000Z', statusReason: null }),
+    'Arbitré le 08/08/2026');
+});
+
+test('arbitratedLine sans date consignée le dit, sans deviner', () => {
+  assert.equal(arbitratedLine({ statusAt: null, statusReason: 'déjà pesé' }),
+    'Arbitré (date non consignée) — déjà pesé');
 });

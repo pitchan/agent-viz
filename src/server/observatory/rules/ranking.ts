@@ -31,8 +31,10 @@ interface RankedRecommendation {
   costBasis: string;
   evidence: Record<string, unknown>;
   action: string | null;
-  status: 'new' | 'accepted' | 'ignored';
+  status: 'new' | 'accepted' | 'ignored' | 'arbitrated';
   costAtStatusUsd: number | null;
+  statusReason: string | null;
+  statusAt: string | null;
   createdAt: string;
   updatedAt: string;
   lastSeenAt: string | null;
@@ -50,8 +52,11 @@ function scoreOf(rec: RankedRecommendation): number {
 // 'new' is always proposed; 'accepted' never is again; 'ignored' comes back
 // only once its recomputed cost has grown by at least 50 % since the user
 // dismissed it. A missing baseline is not a reason to guess — it stays out.
+// 'arbitrated' never comes back on its own (doc/42): the user already weighed
+// this exact choice, only lifting the arbitration re-proposes it — its frozen
+// costAtStatusUsd is kept for a FUTURE resurfacing rule, none exists in v1.
 function isEligible(rec: RankedRecommendation): boolean {
-  if (rec.status === 'accepted') return false;
+  if (rec.status === 'accepted' || rec.status === 'arbitrated') return false;
   if (rec.status === 'ignored') {
     if (typeof rec.costAtStatusUsd !== 'number') return false;
     return rec.estimatedCostUsd >= rec.costAtStatusUsd * IGNORED_RETURN_FACTOR;
@@ -73,10 +78,19 @@ interface RankGroup {
 
 function rankByBasis(
   recs: RankedRecommendation[], { lastScanAt }: { lastScanAt: string | null },
-): { groups: RankGroup[]; stale: RankedRecommendation[] } {
+): { groups: RankGroup[]; stale: RankedRecommendation[]; arbitrated: RankedRecommendation[] } {
+  // Arbitration wins over freshness: a card the user has already weighed stays
+  // a rendered arbitration even when the scan no longer emits it — most recent
+  // decision first, the folded section reads as a journal.
+  const arbitrated = recs
+    .filter(r => r.status === 'arbitrated')
+    .sort((a, b) => (b.statusAt ?? '').localeCompare(a.statusAt ?? '') || a.id - b.id);
+
   const stale: RankedRecommendation[] = [];
   const current: RankedRecommendation[] = [];
-  for (const rec of recs) (isStale(rec, lastScanAt) ? stale : current).push(rec);
+  for (const rec of recs.filter(r => r.status !== 'arbitrated')) {
+    (isStale(rec, lastScanAt) ? stale : current).push(rec);
+  }
 
   const groups: RankGroup[] = [];
   for (const basis of BASIS_ORDER) {
@@ -86,7 +100,7 @@ function rankByBasis(
     if (all.length === 0) continue;
     groups.push({ basis, priority: all.filter(isEligible).slice(0, PRIORITY_SIZE), all });
   }
-  return { groups, stale };
+  return { groups, stale, arbitrated };
 }
 
 export {

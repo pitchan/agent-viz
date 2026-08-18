@@ -35,6 +35,8 @@ const MIGRATIONS: Migration[] = [
   { table: 'sessions', column: 'session_kind', ddl: 'session_kind TEXT' },
   { table: 'recommendations', column: 'period_from', ddl: 'period_from TEXT' },
   { table: 'recommendations', column: 'period_to', ddl: 'period_to TEXT' },
+  { table: 'recommendations', column: 'status_reason', ddl: 'status_reason TEXT' },
+  { table: 'recommendations', column: 'status_at', ddl: 'status_at TEXT' },
 ];
 
 function applyMigrations(db: SqliteDb): void {

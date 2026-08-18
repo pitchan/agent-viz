@@ -6,7 +6,7 @@
 
 const EMPTY = () => ({
   summary: null,
-  recommendations: { groups: [], stale: [] },
+  recommendations: { groups: [], stale: [], arbitrated: [] },
   sessions: [],
   selectedSession: null,
   scan: null,
@@ -98,8 +98,8 @@ export const loadPricing = api => run(async () => {
 // After a status change the server decides what the list becomes — the page
 // never patches a recommendation locally, or the +50 % and freshness rules
 // would be re-implemented in two places.
-export const changeStatus = (api, id, status) => run(async () => {
-  await api.setRecommendationStatus(id, status);
+export const changeStatus = (api, id, status, reason) => run(async () => {
+  await api.setRecommendationStatus(id, status, reason);
   return { recommendations: await api.fetchRecommendations() };
 });
 

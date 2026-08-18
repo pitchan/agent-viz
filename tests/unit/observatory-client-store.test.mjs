@@ -24,7 +24,7 @@ test('the store starts empty and resets cleanly', () => {
   resetStore();
   const s = getState();
   assert.equal(s.summary, null);
-  assert.deepEqual(s.recommendations, { groups: [], stale: [] });
+  assert.deepEqual(s.recommendations, { groups: [], stale: [], arbitrated: [] });
   assert.equal(s.error, null);
   assert.equal(s.loading, false);
 });
@@ -74,6 +74,19 @@ test('changeStatus refreshes the recommendations rather than patching them local
   await loadAdvisor(api);
   await changeStatus(api, 1, 'ignored');
   assert.equal(refreshes, 2, 'the server decides what the list becomes, not the page');
+});
+
+test('changeStatus transmet la raison d’arbitrage au client HTTP', async () => {
+  // Arrange
+  resetStore();
+  let got;
+  const api = fakeApi({
+    setRecommendationStatus: async (id, status, reason) => { got = { id, status, reason }; return {}; },
+  });
+  // Act
+  await changeStatus(api, 4, 'arbitrated', 'déjà pesé');
+  // Assert
+  assert.deepEqual(got, { id: 4, status: 'arbitrated', reason: 'déjà pesé' });
 });
 
 test('loadAdvisor passes the selected window and toggle to the api', async () => {

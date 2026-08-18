@@ -3,7 +3,7 @@
 // without a real server.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fetchSummary, fetchSessions, requestScan, requestPurge, fetchModelCosts, fetchPricing, acknowledgeAlert } from '../../src/web/observatory/api.js';
+import { fetchSummary, fetchSessions, requestScan, requestPurge, fetchModelCosts, fetchPricing, acknowledgeAlert, setRecommendationStatus } from '../../src/web/observatory/api.js';
 
 function stubFetch(body = {}) {
   const calls = [];
@@ -108,6 +108,33 @@ test('acknowledgeAlert poste id et createdAt en corps JSON', async () => {
     assert.equal(calls[0].opts.headers['Content-Type'], 'application/json');
     assert.deepEqual(JSON.parse(calls[0].opts.body),
       { id: 'badInvocation:sid1:inv-x', createdAt: 1754700000000 });
+  } finally {
+    restore();
+  }
+});
+
+test('setRecommendationStatus encode la raison d’arbitrage dans l’URL', async () => {
+  // Arrange
+  const { calls, restore } = stubFetch({ id: 3, status: 'arbitrated' });
+  try {
+    // Act
+    await setRecommendationStatus(3, 'arbitrated', 'déjà pesé');
+    // Assert
+    assert.equal(calls[0].url, '/recommendations/3?status=arbitrated&reason=d%C3%A9j%C3%A0%20pes%C3%A9');
+    assert.equal(calls[0].opts.method, 'POST');
+  } finally {
+    restore();
+  }
+});
+
+test('sans raison, l’URL de statut reste celle d’avant', async () => {
+  // Arrange
+  const { calls, restore } = stubFetch({ id: 3, status: 'new' });
+  try {
+    // Act
+    await setRecommendationStatus(3, 'new');
+    // Assert
+    assert.equal(calls[0].url, '/recommendations/3?status=new');
   } finally {
     restore();
   }

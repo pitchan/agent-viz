@@ -63,8 +63,11 @@ export function requestPurge(opts = {}) {
 
 export const fetchConfigAudit = () => getJson('/config/audit');
 export const fetchRecommendations = () => getJson('/recommendations');
-export const setRecommendationStatus = (id, status) =>
-  postJson(`/recommendations/${encodeURIComponent(id)}?status=${encodeURIComponent(status)}`);
+// La raison n'accompagne qu'un arbitrage (doc/42) ; absente, l'URL reste
+// celle des statuts historiques.
+export const setRecommendationStatus = (id, status, reason) =>
+  postJson(`/recommendations/${encodeURIComponent(id)}?status=${encodeURIComponent(status)}`
+    + (reason ? `&reason=${encodeURIComponent(reason)}` : ''));
 
 export function fetchModelCosts(opts = {}) {
   const q = windowParams(opts).toString();

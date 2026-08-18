@@ -216,6 +216,92 @@ test('purge empties every table and the store stays usable', () => {
   } finally { cleanup(h); }
 });
 
+// ─── Statut « arbitré » (doc/42) : raison et date portées par le même rail ──
+
+test('une recommandation neuve n’a ni raison ni date de statut', () => {
+  const h = tmpStore();
+  try {
+    // Arrange — rien de plus que le magasin vide.
+    // Act
+    h.store.upsertRecommendations([REC], '2026-07-01T00:00:00.000Z');
+    // Assert
+    const [first] = h.store.listRecommendations({});
+    assert.equal(first.statusReason, null);
+    assert.equal(first.statusAt, null);
+  } finally { cleanup(h); }
+});
+
+test('un arbitrage consigne la raison, la date, et fige le coût', () => {
+  const h = tmpStore();
+  try {
+    // Arrange
+    h.store.upsertRecommendations([REC], '2026-07-01T00:00:00.000Z');
+    const [first] = h.store.listRecommendations({});
+    // Act
+    const ok = h.store.setRecommendationStatus(first.id, 'arbitrated',
+      '2026-07-02T00:00:00.000Z', 'tests vérifiés hors session, au terminal');
+    // Assert
+    assert.equal(ok, true);
+    const [row] = h.store.listRecommendations({ status: 'arbitrated' });
+    assert.equal(row.status, 'arbitrated');
+    assert.equal(row.statusReason, 'tests vérifiés hors session, au terminal');
+    assert.equal(row.statusAt, '2026-07-02T00:00:00.000Z');
+    assert.equal(row.costAtStatusUsd, 1.25, 'le coût est figé au moment de l’arbitrage');
+  } finally { cleanup(h); }
+});
+
+test('un rescan ne touche ni la raison ni la date d’arbitrage', () => {
+  const h = tmpStore();
+  try {
+    // Arrange
+    h.store.upsertRecommendations([REC], '2026-07-01T00:00:00.000Z');
+    const [first] = h.store.listRecommendations({});
+    h.store.setRecommendationStatus(first.id, 'arbitrated',
+      '2026-07-02T00:00:00.000Z', 'déjà pesé');
+    // Act
+    h.store.upsertRecommendations([{ ...REC, estimatedCostUsd: 3 }], '2026-07-03T00:00:00.000Z');
+    // Assert
+    const [row] = h.store.listRecommendations({});
+    assert.equal(row.status, 'arbitrated', 'un rescan ne ressuscite pas une décision');
+    assert.equal(row.statusReason, 'déjà pesé');
+    assert.equal(row.statusAt, '2026-07-02T00:00:00.000Z');
+    assert.equal(row.lastSeenAt, '2026-07-03T00:00:00.000Z', 'la fraîcheur, elle, avance');
+  } finally { cleanup(h); }
+});
+
+test('le retour à new efface la raison et date le geste', () => {
+  const h = tmpStore();
+  try {
+    // Arrange
+    h.store.upsertRecommendations([REC], '2026-07-01T00:00:00.000Z');
+    const [first] = h.store.listRecommendations({});
+    h.store.setRecommendationStatus(first.id, 'arbitrated',
+      '2026-07-02T00:00:00.000Z', 'déjà pesé');
+    // Act
+    h.store.setRecommendationStatus(first.id, 'new', '2026-07-04T00:00:00.000Z');
+    // Assert
+    const [row] = h.store.listRecommendations({});
+    assert.equal(row.status, 'new');
+    assert.equal(row.statusReason, null, 'la raison ne survit pas à la réactivation');
+    assert.equal(row.statusAt, '2026-07-04T00:00:00.000Z');
+  } finally { cleanup(h); }
+});
+
+test('les statuts existants datent aussi statusAt, sans raison', () => {
+  const h = tmpStore();
+  try {
+    // Arrange
+    h.store.upsertRecommendations([REC], '2026-07-01T00:00:00.000Z');
+    const [first] = h.store.listRecommendations({});
+    // Act
+    h.store.setRecommendationStatus(first.id, 'ignored', '2026-07-02T00:00:00.000Z');
+    // Assert
+    const [row] = h.store.listRecommendations({});
+    assert.equal(row.statusAt, '2026-07-02T00:00:00.000Z');
+    assert.equal(row.statusReason, null);
+  } finally { cleanup(h); }
+});
+
 test('a null action survives the store round-trip', () => {
   const h = tmpStore();
   try {

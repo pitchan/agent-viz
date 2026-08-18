@@ -15,7 +15,7 @@ import type { createObservatoryService } from './service.ts';
 type Service = ReturnType<typeof createObservatoryService>;
 
 const PRICE_SOURCE = 'netgain-table-embarquee';
-const VALID_STATUSES = new Set(['new', 'accepted', 'ignored']);
+const VALID_STATUSES = new Set(['new', 'accepted', 'ignored', 'arbitrated']);
 
 function sendJson(res: ServerResponse, code: number, payload: unknown): void {
   res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -145,7 +145,15 @@ function createObservatoryRoutes(getService: () => Service): Route[] {
           sendJson(res, 400, { error: 'identifiant ou statut invalide' });
           return;
         }
-        if (!await service.setRecommendationStatus(id, status)) {
+        // La raison n'a de sens que pour un arbitrage (doc/42) : exigée non
+        // blanche là, ignorée partout ailleurs — un retour à 'new' l'efface.
+        const rawReason = url.searchParams.get('reason');
+        if (status === 'arbitrated' && (rawReason === null || rawReason.trim() === '')) {
+          sendJson(res, 400, { error: 'raison d’arbitrage manquante' });
+          return;
+        }
+        const reason = status === 'arbitrated' && rawReason !== null ? rawReason.trim() : null;
+        if (!await service.setRecommendationStatus(id, status, reason)) {
           sendJson(res, 404, { error: 'recommandation inconnue' });
           return;
         }

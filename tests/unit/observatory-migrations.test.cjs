@@ -39,6 +39,46 @@ test('opening an M1 database adds session_kind and period columns, rows intact',
   }
 });
 
+// Copie du schéma des recommandations tel que livré en 0.17.0 (avant le
+// statut « arbitré ») — le test ouvre une base construite par la version
+// PRÉCÉDENTE, statuts posés compris.
+const V017_RECOMMENDATIONS = `CREATE TABLE recommendations (
+  id INTEGER PRIMARY KEY, rule_id TEXT, subject TEXT,
+  created_at TEXT, updated_at TEXT, last_seen_at TEXT,
+  title TEXT, category TEXT, confidence TEXT,
+  estimated_cost_usd REAL, cost_basis TEXT,
+  period_from TEXT, period_to TEXT,
+  evidence_json TEXT, action TEXT,
+  status TEXT DEFAULT 'new', cost_at_status_usd REAL)`;
+
+test('une base 0.17.0 gagne status_reason et status_at, statuts posés intacts', () => {
+  // Arrange
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'obs-mig3-'));
+  const dbPath = path.join(dir, 'observatory.db');
+  const db = new DatabaseSync(dbPath);
+  db.exec(V017_RECOMMENDATIONS);
+  db.prepare(`INSERT INTO recommendations
+    (rule_id, subject, created_at, updated_at, last_seen_at, title, category, confidence,
+     estimated_cost_usd, cost_basis, evidence_json, action, status, cost_at_status_usd)
+    VALUES ('R7', 'F--boulot', 't0', 't0', 't0', 't', 'c', 'fait', 2, 'jetons-mesures',
+     '{}', 'a', 'ignored', 2)`).run();
+  db.close();
+
+  // Act
+  const store = openStore(dbPath);
+
+  // Assert
+  try {
+    const [row] = store.listRecommendations({});
+    assert.equal(row.status, 'ignored', 'le statut posé avant migration survit');
+    assert.equal(row.statusReason, null, 'pas de raison inventée aux lignes anciennes');
+    assert.equal(row.statusAt, null, 'pas de date inventée non plus');
+  } finally {
+    store.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('applyMigrations is idempotent — a second open changes nothing', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'obs-mig2-'));
   const dbPath = path.join(dir, 'observatory.db');

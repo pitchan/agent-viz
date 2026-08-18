@@ -43,7 +43,9 @@ CREATE TABLE IF NOT EXISTS recommendations (
   evidence_json TEXT,
   action TEXT,
   status TEXT DEFAULT 'new',
-  cost_at_status_usd REAL
+  cost_at_status_usd REAL,
+  status_reason TEXT,
+  status_at TEXT
 );
 CREATE UNIQUE INDEX IF NOT EXISTS recommendations_identity
   ON recommendations (rule_id, subject);
@@ -80,6 +82,11 @@ export interface SessionRow {
   reportJson: string | null;
 }
 
+// 'arbitrated' : le choix est déjà pesé par l'utilisateur — jamais re-proposé
+// tant qu'il n'est pas levé, à la différence d'un 'ignored' qui revient à
+// +50 % de coût (doc/42).
+type RecommendationStatus = 'new' | 'accepted' | 'ignored' | 'arbitrated';
+
 interface RecommendationRow {
   id: number;
   ruleId: string;
@@ -93,11 +100,13 @@ interface RecommendationRow {
   periodTo: string | null;
   evidence: Record<string, unknown>;
   action: string | null;
-  status: 'new' | 'accepted' | 'ignored';
+  status: RecommendationStatus;
   createdAt: string;
   updatedAt: string;
   lastSeenAt: string | null;
   costAtStatusUsd: number | null;
+  statusReason: string | null;
+  statusAt: string | null;
 }
 
 interface RecommendationInput {
@@ -145,8 +154,8 @@ export interface Store {
   replaceConfigItems(takenAt: string, items: ConfigItem[]): void;
   listConfigItems(): ConfigItem[];
   upsertRecommendations(recs: RecommendationInput[], now: string): void;
-  listRecommendations(opts?: { status?: 'new' | 'accepted' | 'ignored' }): RecommendationRow[];
-  setRecommendationStatus(id: number, status: string, now: string): boolean;
+  listRecommendations(opts?: { status?: RecommendationStatus }): RecommendationRow[];
+  setRecommendationStatus(id: number, status: string, now: string, reason?: string | null): boolean;
   getScanState(claudeDir: string): ScanState | null;
   setScanState(claudeDir: string, lastScanAt: string, engineVersion: string): void;
 }
@@ -194,8 +203,8 @@ function toSessionRow(v: unknown): SessionRow {
   };
 }
 
-const isStatus = (v: unknown): v is 'new' | 'accepted' | 'ignored' =>
-  v === 'new' || v === 'accepted' || v === 'ignored';
+const isStatus = (v: unknown): v is RecommendationStatus =>
+  v === 'new' || v === 'accepted' || v === 'ignored' || v === 'arbitrated';
 
 interface RecommendationColumns {
   id: number; rule_id: string; subject: string; title: string; category: string;
@@ -204,6 +213,7 @@ interface RecommendationColumns {
   evidence_json: string; action: string | null; status: string;
   created_at: string; updated_at: string; last_seen_at: string | null;
   cost_at_status_usd: number | null;
+  status_reason: string | null; status_at: string | null;
 }
 
 function isRecommendationColumns(v: unknown): v is RecommendationColumns {
@@ -214,7 +224,8 @@ function isRecommendationColumns(v: unknown): v is RecommendationColumns {
     && isStringOrNull(v.period_from) && isStringOrNull(v.period_to)
     && typeof v.evidence_json === 'string' && isStringOrNull(v.action) && typeof v.status === 'string'
     && typeof v.created_at === 'string' && typeof v.updated_at === 'string'
-    && isStringOrNull(v.last_seen_at) && isNumberOrNull(v.cost_at_status_usd);
+    && isStringOrNull(v.last_seen_at) && isNumberOrNull(v.cost_at_status_usd)
+    && isStringOrNull(v.status_reason) && isStringOrNull(v.status_at);
 }
 
 function toRecommendation(v: unknown): RecommendationRow {
@@ -229,6 +240,7 @@ function toRecommendation(v: unknown): RecommendationRow {
     action: v.action,
     status: v.status, createdAt: v.created_at, updatedAt: v.updated_at,
     lastSeenAt: v.last_seen_at, costAtStatusUsd: v.cost_at_status_usd,
+    statusReason: v.status_reason, statusAt: v.status_at,
   };
 }
 
@@ -376,7 +388,11 @@ function openStore(dbPath: string): Store {
     },
 
     // Identity is (ruleId, subject) so a rescan refreshes the numbers without
-    // ever resurrecting a decision the user already made. last_seen_at only
+    // ever resurrecting a decision the user already made. Assumed limit
+    // (doc/42): for project-scoped rules the subject IS the project path — a
+    // moved or renamed project is a new subject, its card is reborn active and
+    // the old path keeps its own decision. A choice, not an oversight.
+    // last_seen_at only
     // moves for recommendations the scan re-emitted; rows left behind keep
     // their older date and are NOT deleted — the ranking decides what a stale
     // date means, this module only records it.
@@ -388,7 +404,7 @@ function openStore(dbPath: string): Store {
       }
     },
 
-    listRecommendations(opts: { status?: 'new' | 'accepted' | 'ignored' } = {}): RecommendationRow[] {
+    listRecommendations(opts: { status?: RecommendationStatus } = {}): RecommendationRow[] {
       const { status } = opts;
       const rows = status
         ? db.prepare('SELECT * FROM recommendations WHERE status = ? ORDER BY id').all(status)
@@ -397,11 +413,15 @@ function openStore(dbPath: string): Store {
     },
 
     // Freezes the cost at decision time — the baseline for the "+50 % before it
-    // comes back" rule applied at ranking time.
-    setRecommendationStatus(id: number, status: string, now: string): boolean {
+    // comes back" rule applied at ranking time. status_at is the date the user
+    // DECIDED (updated_at moves at every rescan, it cannot carry that fact);
+    // the reason travels with the same gesture and a reason-less status (a
+    // reactivation included) clears it.
+    setRecommendationStatus(id: number, status: string, now: string, reason: string | null = null): boolean {
       const res = db.prepare(`UPDATE recommendations
-        SET status = ?, updated_at = ?, cost_at_status_usd = estimated_cost_usd
-        WHERE id = ?`).run(status, now, id);
+        SET status = ?, updated_at = ?, status_at = ?, status_reason = ?,
+            cost_at_status_usd = estimated_cost_usd
+        WHERE id = ?`).run(status, now, now, reason, id);
       return res.changes > 0;
     },
 

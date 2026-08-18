@@ -227,8 +227,8 @@ function createObservatoryService(deps: ServiceDeps) {
         { lastScanAt: state ? state.lastScanAt : null });
     },
 
-    async setRecommendationStatus(id: number, status: string): Promise<boolean> {
-      return store.setRecommendationStatus(id, status, now().toISOString());
+    async setRecommendationStatus(id: number, status: string, reason: string | null = null): Promise<boolean> {
+      return store.setRecommendationStatus(id, status, now().toISOString(), reason);
     },
   };
 }

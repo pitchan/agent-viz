@@ -155,6 +155,53 @@ test('POST /recommendations/:id accepts a known status, rejects anything else', 
   assert.equal((await call('abc', 'ignored')).statusCode, 400);
 });
 
+// ─── Statut « arbitré » (doc/42) : la raison entre par la même route ───────
+
+test('POST arbitrated transmet la raison décodée au service', async () => {
+  // Arrange
+  let got;
+  const spy = { ...SERVICE,
+    setRecommendationStatus: async (id, status, reason) => { got = { id, status, reason }; return true; } };
+  // Act
+  const res = await router(spy)('POST',
+    '/recommendations/1?status=arbitrated&reason=d%C3%A9j%C3%A0%20pes%C3%A9');
+  // Assert
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(JSON.parse(res.body), { id: 1, status: 'arbitrated' });
+  assert.deepEqual(got, { id: 1, status: 'arbitrated', reason: 'déjà pesé' });
+});
+
+test('un arbitrage sans raison est un 400, avec le libellé exact', async () => {
+  // Arrange — le service ne doit jamais être atteint.
+  let called = false;
+  const spy = { ...SERVICE, setRecommendationStatus: async () => { called = true; return true; } };
+  // Act
+  const res = await router(spy)('POST', '/recommendations/1?status=arbitrated');
+  // Assert
+  assert.equal(res.statusCode, 400);
+  assert.equal(JSON.parse(res.body).error, 'raison d’arbitrage manquante');
+  assert.equal(called, false);
+});
+
+test('une raison blanche vaut une raison absente', async () => {
+  // Arrange
+  // Act
+  const res = await router()('POST', '/recommendations/1?status=arbitrated&reason=%20%20');
+  // Assert
+  assert.equal(res.statusCode, 400);
+});
+
+test('la raison ne voyage que pour un arbitrage — nulle pour les autres statuts', async () => {
+  // Arrange
+  let got;
+  const spy = { ...SERVICE,
+    setRecommendationStatus: async (id, status, reason) => { got = { id, status, reason }; return true; } };
+  // Act
+  await router(spy)('POST', '/recommendations/1?status=ignored&reason=parasite');
+  // Assert
+  assert.deepEqual(got, { id: 1, status: 'ignored', reason: null });
+});
+
 test('a missing engine answers 503 with the exact error, never an empty page', async () => {
   const broken = {
     ...SERVICE,

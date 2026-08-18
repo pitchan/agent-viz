@@ -15,6 +15,7 @@ import { evidenceLines } from './evidence.js';
 import { initPeriodSelector } from './period-selector.js';
 import { initConfirmButton } from './confirm-button.js';
 import { renderFailures } from './failures-view.js';
+import { renderArbitrated, arbitrationControls } from './arbitration-view.js';
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -51,6 +52,10 @@ function recommendationCard(rec, { actionable }) {
       btn.dataset.status = status;
       buttons.appendChild(btn);
     }
+    // « Déjà arbitré » : câblé ici avec sa raison (doc/42) — il ne passe pas
+    // par la délégation data-status, qui partirait au serveur sans raison.
+    buttons.appendChild(arbitrationControls(
+      reason => changeStatus(api, rec.id, 'arbitrated', reason)));
     card.appendChild(buttons);
   }
   return card;
@@ -67,9 +72,9 @@ function renderSummary(node, summary) {
   );
 }
 
-function renderList(node, { groups, stale }) {
+function renderList(node, { groups, stale, arbitrated }) {
   node.textContent = '';
-  if (groups.length === 0 && stale.length === 0) {
+  if (groups.length === 0 && stale.length === 0 && arbitrated.length === 0) {
     node.appendChild(el('div', 'advisor-empty', 'Aucune recommandation sur la période — rien à corriger.'));
     return;
   }
@@ -90,6 +95,9 @@ function renderList(node, { groups, stale }) {
       `Ne se produit plus depuis la dernière analyse (${stale.length})`));
     for (const rec of stale) node.appendChild(recommendationCard(rec, { actionable: false }));
   }
+  // Dernière section, repliée mais jamais silencieuse : le compte reste
+  // visible depuis la vue principale, la raison et la date dans le dépliage.
+  renderArbitrated(node, arbitrated);
 }
 
 function render() {
