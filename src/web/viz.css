@@ -67,7 +67,24 @@ body {
   border-bottom: 1px solid var(--glass-border);
   display: flex; align-items: center; padding: 0 20px; gap: 16px;
   z-index: 100;
+  /* Rien ne s'echappe de la fenetre. Mesure a 1248px avec une invite longue et
+     la pastille de budget remplie : le bandeau RECLAMAIT 1484px, la boite de
+     filtre sortait de 216px et la page defilait horizontalement. */
+  overflow: hidden;
 }
+/* Ce qui a une largeur propre ne se replie jamais sur deux lignes. Sous la
+   pression, le logo passait a 38px de haut et le groupe de compteurs a 58 —
+   dans une barre haute de 48. C'est ce debordement VERTICAL qui se voyait. */
+.logo, #connection-status, #watchdog-pill, .sep, .stat { flex: none; white-space: nowrap; }
+/* L'invite absorbe la pression EN PREMIER : elle porte deja son ellipse, donc
+   elle se raccourcit sans rien perdre d'irremplacable. */
+#topbar-prompt { flex: 0 1 auto; min-width: 0; }
+/* Ensuite les compteurs defilent DANS leur groupe. Les faire simplement
+   deborder chasserait la boite de filtre hors de l'ecran, ou la ferait couper
+   par l'`overflow` ci-dessus : elle deviendrait inutilisable sans que rien ne
+   le dise. Ici tout reste atteignable. */
+.stat-group { flex: 1 1 auto; min-width: 0; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+.stat-group::-webkit-scrollbar { display: none; }
 .logo {
   font-weight: 700; font-size: 14px; color: var(--holo);
   letter-spacing: 1px; text-transform: uppercase;
@@ -247,8 +264,19 @@ body {
 .error-item.reachable { cursor: pointer; }
 .error-item.reachable:hover { background: rgba(255, 85, 102, 0.1); border-color: rgba(255, 85, 102, 0.35); }
 .error-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-.error-tool { font-size: 12px; font-weight: 700; color: var(--error); }
-.error-time { font-size: 10px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+/* `min-width: 0` est ce qui manquait : par defaut un element flexible refuse de
+   descendre sous la largeur de son contenu, et un nom d'outil MCP n'offre aucune
+   coupure naturelle. Mesure : a 68 caracteres il reclamait 409px dans une carte
+   de 402 et chassait l'heure 66px HORS du cadre, invisible. */
+.error-tool {
+  font-size: 12px; font-weight: 700; color: var(--error);
+  min-width: 0; overflow-wrap: anywhere;
+}
+/* L'heure, elle, ne cede jamais : c'est le repere qui situe l'echec. */
+.error-time {
+  font-size: 10px; color: var(--text-muted); font-variant-numeric: tabular-nums;
+  flex: none; white-space: nowrap;
+}
 /* Arbitrary text in a fixed-width panel: wrap it, including mid-token, so a
    long unbroken path grows the row downward instead of widening the popup. */
 .error-subject {
