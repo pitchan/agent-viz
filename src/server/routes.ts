@@ -136,6 +136,19 @@ async function staticHandler(_req: IncomingMessage, res: ServerResponse, url: UR
   }
 }
 
+// Read once at boot, deliberately: the number must describe the code that IS
+// running. A re-read at request time would report whatever sits on disk —
+// after an `npm i -g`, that is the NEXT version, not this process. Proving
+// what a daemon serves is a measured pain of this project; this is the answer.
+const VERSION: string = (JSON.parse(
+  fs.readFileSync(path.join(PROJECT_ROOT, 'package.json'), 'utf8'),
+) as { version: string }).version;
+
+function versionHandler(_req: IncomingMessage, res: ServerResponse): void {
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ version: VERSION }));
+}
+
 async function indexHandler(_req: IncomingMessage, res: ServerResponse): Promise<void> {
   try {
     const html = await fsp.readFile(HTML);
@@ -311,6 +324,7 @@ const ROUTES: Route[] = [
   { method: 'GET',  prefix: '/src/web/', handler: staticHandler },
   { method: 'GET',  path: '/',           handler: indexHandler },
   { method: 'GET',  path: '/index.html', handler: indexHandler },
+  { method: 'GET',  path: '/version',    handler: versionHandler },
   { method: 'GET',  path: '/stream',     handler: streamHandler },
   { method: 'GET',  path: '/events',     handler: eventsGetHandler },
   { method: 'POST', path: '/events',     handler: eventsClearHandler, sameOrigin: true },

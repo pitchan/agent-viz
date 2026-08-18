@@ -44,6 +44,16 @@ function renderConnection(connected) {
 }
 renderConnection(false);
 
+// The daemon's version, fetched once at load: the topbar identifies WHICH
+// daemon is serving — the number that runs, not the number on disk. A daemon
+// too old to have /version leaves the span empty; guessing would be worse.
+fetch('/version')
+  .then(r => r.json())
+  .then(({ version }) => {
+    document.getElementById('app-version').textContent = `v${version}`;
+  })
+  .catch(() => {});
+
 // ─── Session selection (owned here, read-only from elsewhere) ─────────────
 export let currentSessionId = null;
 export const sessionTitles = new Map();
