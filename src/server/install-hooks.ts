@@ -18,15 +18,16 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 
+import type { AgentName, Scope, AgentOpts, ResolvedTarget, ResolvedCommand } from './install-hooks/types.ts';
+import { HOOK_TIMEOUT_SEC } from './install-hooks/types.ts';
+import { AGENT_CONFIG, GITIGNORE_EXTRAS, EVENTS, eventsFor } from './install-hooks/config.ts';
+
 // ── Types ──
 //
 // Vocabulaire commun à ce fichier : les settings Claude Code et le fichier de
 // hooks Copilot ne sont typés que sur ce que CE fichier lit/écrit réellement —
 // une index signature ouverte tolère le reste (un settings.json porte bien
 // d'autres clés que `hooks`).
-
-type AgentName = 'claude' | 'copilot';
-type Scope = 'user' | 'project' | 'local';
 
 interface HookCommand {
   type: string;
@@ -55,91 +56,11 @@ interface CopilotHooksFile {
   hooks: Record<string, CopilotHookEntry[]>;
 }
 
-interface AgentConfigEntry {
-  events: string[];
-  userFile: () => string;
-  projectFile: (root: string) => string;
-  localFile: (root: string) => string;
-  gitignoreEntry: string;
-}
-
-interface ResolvedTarget {
-  scope: Scope;
-  file: string;
-  projectRoot: string | null;
-}
-
-interface ResolvedCommand {
-  command: string;
-  mode: 'absolute' | 'npx';
-  path?: string;
-  spec?: string;
-}
-
-// Le sac d'options partagé par toute l'API haut niveau (`auditClaude`,
-// `installClaude`, `findInstalledScopes`, `dispatch`, `install`, …) — un seul
-// type, réutilisé bien au-delà de la deuxième occurrence (précédent du dépôt),
-// parce que ce sont toutes des variations du MÊME sac.
-interface AgentOpts {
-  scope?: Scope;
-  cwd?: string;
-  packageRoot?: string;
-  version?: string;
-  agent?: AgentName;
-  target?: string;
-}
-
 // Un objet exploitable par accès de champ — même garde locale que les autres
 // fichiers du serveur : `JSON.parse` ne promet qu'un JSON valide, pas un objet.
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
-
-// Per-event timeout written into agent settings. Must stay > 1 s (Windows node
-// + AV cold start) and > the in-process safety net in src/server/hook.js so the safety
-// fires *before* the agent kills us. Bumped from 5 s → 10 s when the safety
-// dropped to 3 s; install() now also refreshes existing standard-shape hooks
-// whose timeout drifted away from this value.
-const HOOK_TIMEOUT_SEC = 10;
-
-// Per-agent paths + gitignore entry + liste d'evenements. Add a third agent
-// here, then map it in detectAgents() and resolveTargets().
-//
-// Pourquoi la liste d'evenements est PAR AGENT et non partagee : les deux
-// agents n'ont pas le meme vocabulaire. PostToolUseFailure a ete releve sur
-// machine cote Claude Code ; rien ne dit que Copilot CLI le connaisse, et on
-// n'a aucun moyen de le verifier d'ici. Ecrire dans la configuration d'un
-// tiers un nom d'evenement qu'on n'a pas mesure, c'est lui faire porter un
-// risque qu'on n'a pas evalue — chaque agent ne recoit donc que ce qu'on lui
-// a constate.
-const AGENT_CONFIG: Record<AgentName, AgentConfigEntry> = {
-  claude: {
-    // PostToolUseFailure est le SEUL endroit ou un outil en erreur se signale :
-    // PostToolUse ne se declenche que sur un succes. Sans cet abonnement, une
-    // commande qui echoue ne laisse qu'un PreToolUse orphelin — un trou, que
-    // rien ne distingue d'un outil encore en vol.
-    events: ['UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'Stop', 'SessionStart'],
-    userFile: () => path.join(os.homedir(), '.claude', 'settings.json'),
-    projectFile: (root) => path.join(root, '.claude', 'settings.json'),
-    localFile: (root) => path.join(root, '.claude', 'settings.local.json'),
-    gitignoreEntry: '.claude/settings.local.json',
-  },
-  copilot: {
-    events: ['UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop', 'SessionStart'],
-    userFile: () => path.join(os.homedir(), '.copilot', 'hooks', 'agent-viz.json'),
-    projectFile: (root) => path.join(root, '.github', 'hooks', 'agent-viz.json'),
-    localFile: (root) => path.join(root, '.github', 'hooks', 'agent-viz.local.json'),
-    gitignoreEntry: '.github/hooks/agent-viz.local.json',
-  },
-};
-
-function eventsFor(agent: AgentName): string[] {
-  return AGENT_CONFIG[agent].events;
-}
-
-// Retro-compat : l'export public `EVENTS` a toujours designe les evenements de
-// Claude Code. Il continue de le faire.
-const EVENTS: string[] = AGENT_CONFIG.claude.events;
 
 // Match three forms used historically + currently:
 //   1. node /abs/.../agent-viz/hook.js              (legacy)
@@ -374,12 +295,6 @@ function ensureGitignore(
   fs.appendFileSync(gi, `${sep}${target}\n`);
   return { changed: true };
 }
-
-// Per-agent broader patterns that count as "already covers our local file".
-const GITIGNORE_EXTRAS: Record<AgentName, string[]> = {
-  claude: ['.claude/', '.claude', '.claude/*.local.json', '*.local.json'],
-  copilot: ['.github/hooks/', '.github/hooks/*.local.json'],
-};
 
 // ── Copilot helpers ──
 
