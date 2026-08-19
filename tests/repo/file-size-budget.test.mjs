@@ -15,7 +15,6 @@ const BUDGET = 450; // lignes (au sens wc -l : nombre de \n)
 
 // Assiette du 2026-08-19 (fichiers > 450 lignes ce jour-là), une raison par entrée.
 const ASSUMED = new Map([
-  ['src/server/install-hooks.ts', 'découpage en cours (doc/43 privé) — DOIT sortir de cette liste à la fin du chantier'],
   ['src/web/viz-ui.js',           'fourre-tout identifié — découpage décidé post-étape 5 (2026-08-19)'],
   ['src/web/viz-watchdog.mjs',    'registre DETECTORS cohésif : la taille = le nombre de détecteurs'],
   ['src/engine/map/env.ts',       'un seul algorithme (AST des variables d\'environnement), un seul export public'],
