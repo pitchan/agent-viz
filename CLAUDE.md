@@ -39,6 +39,7 @@ Les modules de haut niveau ne dépendent pas des modules de bas niveau ; les deu
 - **Avant d'ajouter une dépendance, un fichier, ou une couche d'abstraction**, vérifie qu'aucun pattern existant ne couvre déjà le besoin (lis `src/server/` avant de créer un nouveau module).
 - **Pas d'abstraction prématurée** : SOLID ≠ sur-ingénierie. Trois lignes dupliquées peuvent rester dupliquées tant qu'elles n'ont pas une vraie raison commune de changer. La règle SRP s'applique au moment où une *deuxième raison de changer* apparaît, pas avant.
 - **Pas de fallback silencieux** ni d'`error handling` défensif pour des cas qui ne peuvent pas arriver (cf. consigne globale du repo).
+- **Garde-fou mesuré de taille** : `tests/repo/file-size-budget.test.mjs` échoue si un fichier de `src/` dépasse 450 lignes sans entrée justifiée dans sa liste `ASSUMED` — découper d'abord, justifier sinon. La liste est un cliquet : une entrée repassée sous le seuil doit en sortir.
 - Quand un refactor SOLID dépasse le scope du ticket en cours, **ouvre une note / TODO** — n'élargis pas une PR de bugfix en chantier de redesign sans validation explicite.
 - Si un test ne passe plus, comprend pourquoi avant de corriger quoi que ce soit
 
