@@ -26,6 +26,8 @@ import {
   removeHook, hasHookForEvent, inspectEvent, refreshStaleCommand,
   type ClaudeSettings,
 } from './install-hooks/settings-io.ts';
+import { resolveScope, resolveHookCommand, findProjectRoot, ensureGitignore, scanInstalled } from './install-hooks/scopes.ts';
+import { inPath, dirHasFiles } from './install-hooks/detect.ts';
 
 // ── Types ──
 //
@@ -58,103 +60,6 @@ function auditSettings(
     const info = inspectEvent(settings, ev, desiredCommand);
     return { event: ev, installed: info.present, stale: info.stale, others: info.others };
   });
-}
-
-// Walk up from `cwd` looking for a project root marker (.git or package.json).
-// Stop at homedir or filesystem root. Returns absolute path or null.
-//
-// Two skip rules: the home directory itself never counts as a project (a .git
-// in ~ is a dotfiles repo, not a project we want to install hooks into), and
-// the agent-viz package root never counts either (auto-install ran from
-// inside the agent-viz checkout would otherwise scope hooks to the repo
-// itself, useful to nobody). Both skips fall through to user scope.
-function findProjectRoot(
-  cwd: string, { packageRoot, homedir = os.homedir() }: { packageRoot?: string; homedir?: string } = {},
-): string | null {
-  let dir = path.resolve(cwd);
-  const root = path.parse(dir).root;
-  while (dir && dir !== root && dir !== path.dirname(homedir)) {
-    if (dir === homedir) { dir = path.dirname(dir); continue; }
-    if (packageRoot && dir === packageRoot) { dir = path.dirname(dir); continue; }
-    if (fs.existsSync(path.join(dir, '.git')) || fs.existsSync(path.join(dir, 'package.json'))) {
-      return dir;
-    }
-    const parent = path.dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
-  }
-  return null;
-}
-
-// Decide where to write hooks.
-//   resolveScope({ scope: 'user'|'project'|'local'|undefined, cwd, agent })
-//     → { scope, file, projectRoot }
-// Defaults: explicit scope respected; no scope → 'user' (global), for every
-// agent. A user-scope hook fires from any directory, so an agent session
-// launched outside the install directory is still captured. The previous
-// default ('local' when a project was detected) only registered the hook for
-// that one project — sessions run from anywhere else silently produced no
-// events. This mirrors how agent-viz itself is installed: globally.
-function resolveScope({ scope, cwd, agent = 'claude', packageRoot }: AgentOpts = {}): ResolvedTarget {
-  const cfg = AGENT_CONFIG[agent];
-  cwd = cwd || process.cwd();
-  if (!scope || scope === 'user') {
-    return { scope: 'user', file: cfg.userFile(), projectRoot: null };
-  }
-  const projectRoot = findProjectRoot(cwd, { packageRoot });
-  if (scope === 'project') {
-    if (!projectRoot) throw new Error('--project requested but no .git/ or package.json found from cwd');
-    return { scope: 'project', file: cfg.projectFile(projectRoot), projectRoot };
-  }
-  // scope === 'local'
-  if (!projectRoot) throw new Error('--local requested but no .git/ or package.json found from cwd');
-  return { scope: 'local', file: cfg.localFile(projectRoot), projectRoot };
-}
-
-// Decide what command string to embed in agent settings.
-// If the binary is on a stable absolute path (not in an /_npx/ cache), embed
-// `node "<abs>/bin/agent-viz.js" hook --source=<agent>` (fast). Otherwise use
-// `npx --yes @vcueto/agent-viz@<version> hook --source=<agent>` pinned to the
-// currently-running version (~300-800ms cold start).
-function resolveHookCommand({ packageRoot, version, agent = 'claude' }: AgentOpts = {}): ResolvedCommand {
-  packageRoot = packageRoot || path.resolve(import.meta.dirname, '..', '..');
-  const binPath = path.join(packageRoot, 'bin', 'agent-viz.js');
-  // npx caches always live under "/_npx/" on every platform.
-  const isEphemeral = packageRoot.includes(`${path.sep}_npx${path.sep}`)
-                   || packageRoot.includes('/_npx/');
-  if (!isEphemeral && fs.existsSync(binPath)) {
-    const norm = binPath.replace(/\\/g, '/');
-    return { command: `node "${norm}" hook --source=${agent}`, mode: 'absolute', path: norm };
-  }
-  let v = version;
-  if (!v) {
-    // BOM retire avant l analyse (constat C1, idiome de hook.js:64) : sans lui,
-    // un package.json prefixe rendrait un spec npx SANS version, en silence.
-    try {
-      const brut = fs.readFileSync(path.join(packageRoot, 'package.json'), 'utf8');
-      const pkg: unknown = JSON.parse(brut.charCodeAt(0) === 0xFEFF ? brut.slice(1) : brut);
-      if (isRecord(pkg) && typeof pkg.version === 'string') v = pkg.version;
-    } catch {}
-  }
-  const spec = v ? `@vcueto/agent-viz@${v}` : '@vcueto/agent-viz';
-  return { command: `npx --yes ${spec} hook --source=${agent}`, mode: 'npx', spec };
-}
-
-// Append the local-scope file to .gitignore if not already covered. No-op when
-// .gitignore doesn't exist (we don't create one). Idempotent. `extraPatterns`
-// holds historical broader patterns we accept as "already ignored".
-function ensureGitignore(
-  projectRoot: string, target: string, extraPatterns: string[] = [],
-): { changed: boolean; reason?: string } {
-  const gi = path.join(projectRoot, '.gitignore');
-  if (!fs.existsSync(gi)) return { changed: false, reason: 'no .gitignore (skipped)' };
-  const content = fs.readFileSync(gi, 'utf8');
-  const lines = content.split('\n').map(l => l.trim());
-  const accepted = new Set([target, ...extraPatterns]);
-  if (lines.some(l => accepted.has(l))) return { changed: false, reason: 'already ignored' };
-  const sep = content.endsWith('\n') ? '' : '\n';
-  fs.appendFileSync(gi, `${sep}${target}\n`);
-  return { changed: true };
 }
 
 // ── Copilot helpers ──
@@ -490,23 +395,6 @@ function agentDetected(agent: string): boolean {
   }
   if (agent === 'copilot') {
     return inPath('copilot') || dirHasFiles(path.join(home, '.copilot'));
-  }
-  return false;
-}
-
-function dirHasFiles(p: string): boolean {
-  try { return fs.readdirSync(p).length > 0; } catch { return false; }
-}
-
-function inPath(name: string): boolean {
-  const PATH = process.env.PATH || '';
-  const sep = process.platform === 'win32' ? ';' : ':';
-  const exts = process.platform === 'win32' ? (process.env.PATHEXT || '.EXE;.CMD;.BAT').split(';') : [''];
-  for (const dir of PATH.split(sep)) {
-    if (!dir) continue;
-    for (const ext of exts) {
-      try { if (fs.existsSync(path.join(dir, name + ext))) return true; } catch {}
-    }
   }
   return false;
 }
