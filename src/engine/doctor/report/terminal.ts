@@ -46,6 +46,9 @@ export function renderChurnCauses(causes: Record<ChurnCause, ChurnCauseStat>): s
 
 const PREFIX_MARKER_LABELS: [PrefixMarker, string][] = [
   ['modelSwitch', 'modèle changé'],
+  ['systemChanged', 'bloc système modifié'],
+  ['toolsChanged', 'bloc d’outils modifié'],
+  ['messagesChanged', 'historique modifié'],
   ['toolsAppeared', 'outils apparus'],
   ['noMarker', 'sans marqueur'],
 ];

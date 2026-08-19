@@ -71,6 +71,20 @@ describe('normalizeEvent', () => {
     expect(evt).toMatchObject({ kind: 'assistant', msgId: 'msg_02', isSidechain: true, agentId: 'a23dd33e' });
   });
 
+  test('ligne assistant à diagnostics.cache_miss_reason → cacheMissReason (le type brut)', () => {
+    const raw = {
+      type: 'assistant',
+      message: {
+        id: 'msg_03',
+        role: 'assistant',
+        content: [],
+        diagnostics: { cache_miss_reason: { type: 'tools_changed', cache_missed_input_tokens: 165887 } },
+      },
+    };
+    const [evt] = normalizeEvent(raw);
+    expect(evt).toMatchObject({ kind: 'assistant', msgId: 'msg_03', cacheMissReason: 'tools_changed' });
+  });
+
   test('tool_result à contenu string → octets UTF-8', () => {
     const raw = {
       type: 'user',

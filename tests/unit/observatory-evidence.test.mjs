@@ -44,6 +44,23 @@ test('R1 says so plainly when no marker explains the break', () => {
       '54 % des jetons nets de ces sessions']);
 });
 
+// cache_miss_reason markers are first-hand diagnostics written by Claude Code:
+// unlike toolsAppeared, the wording MAY assert what changed — the client itself
+// compared the requests — but never which setting caused it.
+test('R1 presents each diagnosed marker as a first-hand fact', () => {
+  const evidence = dominant => ({ ruleId: 'R1', evidence: { sessions: ['a'], prefixChangeTokens: 50000,
+    markerTokens: { modelSwitch: 0, systemChanged: 0, toolsChanged: 0, messagesChanged: 0,
+      toolsAppeared: 0, noMarker: 0, [dominant]: 50000 }, dominantMarker: dominant,
+    depthTokens: { facade: 50000, d10to50: 0, d50to90: 0, tail: 0 }, dominantDepth: 'facade',
+    shareOfNetPercent: 30 } });
+  assert.equal(evidenceLines(evidence('systemChanged'))[2],
+    'marqueur dominant : bloc système modifié — diagnostiqué par Claude Code (réglage, mode ou version changés en cours de session) (50k jetons)');
+  assert.equal(evidenceLines(evidence('toolsChanged'))[2],
+    'marqueur dominant : bloc d’outils modifié — diagnostiqué par Claude Code (serveur MCP ou outil basculé en cours de session) (50k jetons)');
+  assert.equal(evidenceLines(evidence('messagesChanged'))[2],
+    'marqueur dominant : historique modifié — diagnostiqué par Claude Code (contenu déjà servi ré-écrit) (50k jetons)');
+});
+
 test('R2 states loaded versus called, and that the inventory is a snapshot', () => {
   assert.deepEqual(
     evidenceLines({ ruleId: 'R2', evidence: { sessions: ['a'], loadedSessions: 10, usedSessions: 0,

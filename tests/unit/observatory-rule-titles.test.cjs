@@ -40,7 +40,10 @@ const ALL_FIRING_SESSION = {
         growth: stat(0, 0), unknown: stat(0, 0),
       },
       prefixBreakdown: {
-        markers: { modelSwitch: stat(1, 40000), toolsAppeared: stat(0, 0), noMarker: stat(0, 0) },
+        markers: {
+          modelSwitch: stat(1, 40000), systemChanged: stat(0, 0), toolsChanged: stat(0, 0),
+          messagesChanged: stat(0, 0), toolsAppeared: stat(0, 0), noMarker: stat(0, 0),
+        },
         noMarkerDetail: { earlyMcp: stat(0, 0), other: stat(0, 0) },
         depth: {
           facade: stat(0, 0), d10to50: stat(1, 40000), d50to90: stat(0, 0), tail: stat(0, 0),

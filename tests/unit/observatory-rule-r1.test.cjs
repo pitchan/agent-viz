@@ -15,6 +15,7 @@ const { evaluateAll, RULES } = require('../../src/server/observatory/rules/regis
 // the default puts every unclaimed token on modelSwitch: tests that say nothing
 // about markers describe the pre-existing "model was switched" case.
 function session(id, { project = 'F--proj', prefixChange = 0, compaction = 0, expiration = 0,
+  systemChanged = 0, toolsChanged = 0, messagesChanged = 0,
   toolsAppeared = 0, noMarker = 0, depth = null,
   netTokens = 100000, costUsd = 10, costComplete = true } = {}) {
   return {
@@ -31,7 +32,10 @@ function session(id, { project = 'F--proj', prefixChange = 0, compaction = 0, ex
         },
         prefixBreakdown: {
           markers: {
-            modelSwitch: { events: 1, tokens: prefixChange - toolsAppeared - noMarker },
+            modelSwitch: { events: 1, tokens: prefixChange - systemChanged - toolsChanged - messagesChanged - toolsAppeared - noMarker },
+            systemChanged: { events: 0, tokens: systemChanged },
+            toolsChanged: { events: 0, tokens: toolsChanged },
+            messagesChanged: { events: 0, tokens: messagesChanged },
             toolsAppeared: { events: 0, tokens: toolsAppeared },
             noMarker: { events: 0, tokens: noMarker },
           },
@@ -157,6 +161,30 @@ test('when deferred tools were loaded mid-session, R1 emits no action either', (
   assert.equal(recs[0].action, null);
 });
 
+// cache_miss_reason (Claude Code ≥ ~2.1.220) is a first-hand diagnostic: the
+// client itself names the block that changed. toolsChanged is the one diagnosed
+// marker with an unambiguous documented gesture (official docs: connecting or
+// disconnecting an MCP server mid-session rewrites the tools block).
+test('when the diagnosed tools_changed marker dominates, the action names the MCP gesture', () => {
+  const recs = r1.evaluate(ctx([session('s1', { prefixChange: 50000, toolsChanged: 50000 })]));
+  assert.equal(recs[0].evidence.dominantMarker, 'toolsChanged');
+  assert.match(recs[0].action, /MCP/);
+});
+
+test('a diagnosed system_changed break stays informative: the block is named, the lever is not', () => {
+  const recs = r1.evaluate(ctx([session('s1', { prefixChange: 50000, systemChanged: 50000 })]));
+  assert.equal(recs[0].evidence.dominantMarker, 'systemChanged');
+  // The diagnostic proves WHAT changed (the system block), never WHICH setting
+  // did it (effort, fast mode, upgrade…): prescribing one would be a guess.
+  assert.equal(recs[0].action, null);
+});
+
+test('a diagnosed messages_changed break stays informative too', () => {
+  const recs = r1.evaluate(ctx([session('s1', { prefixChange: 50000, messagesChanged: 50000 })]));
+  assert.equal(recs[0].evidence.dominantMarker, 'messagesChanged');
+  assert.equal(recs[0].action, null);
+});
+
 test('dominance is decided on the aggregate of the sessions that fired', () => {
   // s1 alone would read as a model switch; across the project noMarker wins.
   const recs = r1.evaluate(ctx([
@@ -167,9 +195,12 @@ test('dominance is decided on the aggregate of the sessions that fired', () => {
 });
 
 test('the evidence carries every marker, and they sum to the prefix-change tokens', () => {
-  const recs = r1.evaluate(ctx([session('s1', { prefixChange: 50000, toolsAppeared: 5000, noMarker: 40000 })]));
+  const recs = r1.evaluate(ctx([session('s1', { prefixChange: 50000, toolsChanged: 3000, toolsAppeared: 5000, noMarker: 40000 })]));
   const { markerTokens, prefixChangeTokens } = recs[0].evidence;
-  assert.deepEqual(markerTokens, { modelSwitch: 5000, toolsAppeared: 5000, noMarker: 40000 });
+  assert.deepEqual(markerTokens, {
+    modelSwitch: 2000, systemChanged: 0, toolsChanged: 3000, messagesChanged: 0,
+    toolsAppeared: 5000, noMarker: 40000,
+  });
   const summed = Object.values(markerTokens).reduce((a, b) => a + b, 0);
   assert.equal(summed, prefixChangeTokens, 'the engine invariant must survive aggregation');
 });
@@ -202,7 +233,10 @@ test('R1 evidence carries the noMarkerDetail ventilation in tokens', () => {
         growth: stat(0, 0), unknown: stat(0, 0),
       },
       prefixBreakdown: {
-        markers: { modelSwitch: stat(0, 0), toolsAppeared: stat(0, 0), noMarker: stat(1, 40000) },
+        markers: {
+          modelSwitch: stat(0, 0), systemChanged: stat(0, 0), toolsChanged: stat(0, 0),
+          messagesChanged: stat(0, 0), toolsAppeared: stat(0, 0), noMarker: stat(1, 40000),
+        },
         noMarkerDetail: { earlyMcp: stat(2, 30000), other: stat(1, 10000) },
         depth: { facade: stat(1, 40000), d10to50: stat(0, 0), d50to90: stat(0, 0), tail: stat(0, 0) },
       },

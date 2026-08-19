@@ -83,6 +83,17 @@ describe('renderPrefixBreakdown — sous-ligne du « début de contexte modifié
     expect(s!.indexOf('modèle changé')).toBeLessThan(s!.indexOf('façade'));
   });
 
+  test('les marqueurs diagnostiqués (cache_miss_reason) ont chacun leur étiquette', () => {
+    const b = emptyPrefixBreakdown();
+    b.markers.systemChanged = { events: 1, tokens: 40000 };
+    b.markers.toolsChanged = { events: 2, tokens: 30000 };
+    b.markers.messagesChanged = { events: 1, tokens: 20000 };
+    const s = renderPrefixBreakdown(b);
+    expect(s).toContain(`bloc système modifié ×1 (${n(40000)} tk)`);
+    expect(s).toContain(`bloc d’outils modifié ×2 (${n(30000)} tk)`);
+    expect(s).toContain(`historique modifié ×1 (${n(20000)} tk)`);
+  });
+
   test('tout à zéro → null (pas de ligne)', () => {
     expect(renderPrefixBreakdown(emptyPrefixBreakdown())).toBeNull();
   });

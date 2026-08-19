@@ -27,7 +27,11 @@ import type {
 const ID = 'R1';
 const CATEGORY = 'modele';
 
-const MARKERS: readonly PrefixMarker[] = ['modelSwitch', 'toolsAppeared', 'noMarker'];
+// L'ordre est le départage à égalité : les marqueurs diagnostiqués (première
+// main, cache_miss_reason) avant les heuristiques, noMarker toujours dernier.
+const MARKERS: readonly PrefixMarker[] = [
+  'modelSwitch', 'systemChanged', 'toolsChanged', 'messagesChanged', 'toolsAppeared', 'noMarker',
+];
 const DEPTHS: readonly PrefixDepth[] = ['facade', 'd10to50', 'd50to90', 'tail'];
 
 // One action per journaled marker, declarative so that a new marker in the
@@ -36,6 +40,15 @@ const DEPTHS: readonly PrefixDepth[] = ['facade', 'd10to50', 'd50to90', 'tail'];
 // mechanism (caches are model-scoped — two models, two cache spaces).
 const ACTION_BY_MARKER = Object.freeze({
   modelSwitch: 'Démarrer la session avec le bon modèle, ou ouvrir une nouvelle session avant d’en changer.',
+  // systemChanged / messagesChanged : le diagnostic cache_miss_reason prouve
+  // QUEL bloc a changé, jamais QUEL réglage l'a changé (effort, mode rapide,
+  // mise à jour, contenu ré-injecté…) : prescrire un levier serait deviner.
+  systemChanged: null,
+  messagesChanged: null,
+  // toolsChanged : le seul marqueur diagnostiqué au geste documenté sans
+  // ambiguïté (doc officielle : connecter/déconnecter un serveur MCP en cours
+  // de session réécrit le bloc d'outils ; le chargement différé, lui, préserve).
+  toolsChanged: 'Connecter (ou déconnecter) les serveurs MCP avant la session, pas en cours de route — chaque bascule réécrit le bloc d’outils.',
   // toolsAppeared: corrected 2026-08-05. The former action ("load deferred
   // tools up front — each mid-session load rewrites the tools block") named a
   // mechanism the official docs refute: tool search APPENDS the discovered

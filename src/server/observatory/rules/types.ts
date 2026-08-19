@@ -12,7 +12,9 @@
 
 export type ChurnStat = { events: number; tokens: number };
 
-export type PrefixMarker = 'modelSwitch' | 'toolsAppeared' | 'noMarker';
+export type PrefixMarker =
+  | 'modelSwitch' | 'systemChanged' | 'toolsChanged' | 'messagesChanged'
+  | 'toolsAppeared' | 'noMarker';
 export type PrefixDepth = 'facade' | 'd10to50' | 'd50to90' | 'tail';
 
 // Forme de session posée par l'agrégateur du moteur (session-kind.ts) —

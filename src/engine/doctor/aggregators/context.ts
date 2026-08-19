@@ -57,14 +57,31 @@ const MCP_TOOL_PREFIX = 'mcp__';
 
 /**
  * Marqueur journalisé attribuable à une re-création « prefixChange » (une seule case, par priorité) :
- * - modelSwitch : le modèle a changé depuis le tour précédent — deux espaces de cache, mécanique ;
+ * - systemChanged / toolsChanged / messagesChanged : diagnostic de PREMIÈRE MAIN écrit par
+ *   Claude Code (≥ ~2.1.220) dans message.diagnostics.cache_miss_reason — le client compare la
+ *   requête à la précédente et nomme le bloc qui a changé octet par octet ; prime sur toute
+ *   heuristique (relevé 2026-08-19 : 88 % des grosses refactures du projet en portent un) ;
+ * - modelSwitch : diagnostic model_changed, ou modèle observé différent du tour précédent —
+ *   deux espaces de cache, mécanique ;
  * - toolsAppeared : un chargement d'outils différés (ToolSearch) depuis le tour précédent —
  *   coïncidence temporelle observée, PAS un mécanisme (correctif 2026-08-05 : la doc officielle
  *   établit que le chargement différé via tool search ajoute la définition à l'historique et
  *   préserve le cache ; notre test contrôlé l'avait innocenté, +265 tk plein relu) ;
- * - noMarker : rien de journalisé n'explique la cassure — affiché tel quel, jamais deviné.
+ * - noMarker : rien de journalisé n'explique la cassure — affiché tel quel, jamais deviné
+ *   (y compris un diagnostic sans bloc nommé : unavailable, previous_message_not_found).
  */
-export type PrefixMarker = 'modelSwitch' | 'toolsAppeared' | 'noMarker';
+export type PrefixMarker =
+  | 'modelSwitch' | 'systemChanged' | 'toolsChanged' | 'messagesChanged'
+  | 'toolsAppeared' | 'noMarker';
+
+/** Table déclarative diagnostic → marqueur : un nouveau type journalisé = une entrée ici,
+ * jamais un branchement. Les types sans bloc nommé n'y figurent pas — retombée heuristique. */
+const MARKER_BY_DIAGNOSTIC: Readonly<Partial<Record<string, PrefixMarker>>> = Object.freeze({
+  model_changed: 'modelSwitch',
+  system_changed: 'systemChanged',
+  tools_changed: 'toolsChanged',
+  messages_changed: 'messagesChanged',
+});
 
 /**
  * Profondeur de cassure = ratio relu/attendu (cacheRead / cachéTotal précédent) : où le préfixe a
@@ -83,6 +100,9 @@ export function emptyPrefixBreakdown(): PrefixBreakdown {
   return {
     markers: {
       modelSwitch: { events: 0, tokens: 0 },
+      systemChanged: { events: 0, tokens: 0 },
+      toolsChanged: { events: 0, tokens: 0 },
+      messagesChanged: { events: 0, tokens: 0 },
       toolsAppeared: { events: 0, tokens: 0 },
       noMarker: { events: 0, tokens: 0 },
     },
@@ -259,12 +279,17 @@ export class ContextAggregator {
         this.pauseBuckets[pause.ttl][pause.bucket].tokens += cacheCreate;
       }
       if (cause === 'prefixChange') {
+        // Le diagnostic écrit par Claude Code fait autorité ; les heuristiques
+        // (modèle observé, ToolSearch) ne servent que les journaux qui n'en ont pas.
+        const diagnosed = evt.cacheMissReason !== undefined ? MARKER_BY_DIAGNOSTIC[evt.cacheMissReason] : undefined;
         const marker: PrefixMarker =
-          prev.model !== null && evt.model !== null && evt.model !== prev.model
-            ? 'modelSwitch'
-            : toolsAppeared
-              ? 'toolsAppeared'
-              : 'noMarker';
+          diagnosed !== undefined
+            ? diagnosed
+            : prev.model !== null && evt.model !== null && evt.model !== prev.model
+              ? 'modelSwitch'
+              : toolsAppeared
+                ? 'toolsAppeared'
+                : 'noMarker';
         this.prefixBreakdown.markers[marker].events += 1;
         this.prefixBreakdown.markers[marker].tokens += cacheCreate;
         if (marker === 'noMarker') {

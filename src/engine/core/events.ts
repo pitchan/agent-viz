@@ -27,6 +27,9 @@ export type NormalizedEvent =
       textChars: number;
       timestamp?: string;
       agentId?: string;
+      /** Type brut de message.diagnostics.cache_miss_reason (Claude Code ≥ ~2.1.220) :
+       * l'attribution de première main d'une perte de cache. Absent des vieux journaux. */
+      cacheMissReason?: string;
       isSidechain: boolean;
     }
   | { kind: 'tool_result'; toolUseId: string; bytes: number; isError: boolean; contentHash: string | null; timestamp?: string }
@@ -92,6 +95,9 @@ function normalizeAssistant(line: Rec): NormalizedEvent {
   }
   const timestamp = asStr(line['timestamp']);
   const agentId = asStr(line['agentId']);
+  const diagnostics = asRec(message['diagnostics']);
+  const missReason = diagnostics === null ? null : asRec(diagnostics['cache_miss_reason']);
+  const cacheMissReason = missReason === null ? null : asStr(missReason['type']);
   return {
     kind: 'assistant',
     msgId: asStr(message['id']),
@@ -101,6 +107,7 @@ function normalizeAssistant(line: Rec): NormalizedEvent {
     textChars,
     ...(timestamp !== null ? { timestamp } : {}),
     ...(agentId !== null ? { agentId } : {}),
+    ...(cacheMissReason !== null ? { cacheMissReason } : {}),
     isSidechain: line['isSidechain'] === true,
   };
 }

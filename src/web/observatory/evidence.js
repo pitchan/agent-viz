@@ -15,8 +15,15 @@ import { formatTokens, formatBytes } from './format.js';
 // loading appends to the history and preserves the cache, and our controlled
 // test agreed (+265 tk, full re-read). Asserting it as a cause was false
 // information served to the user.
+// The three *Changed markers come from message.diagnostics.cache_miss_reason
+// (Claude Code ≥ ~2.1.220): the client compared the request to the previous one
+// and named the block that changed. First-hand facts — the wording may assert
+// WHAT changed, never WHICH setting caused it.
 const R1_MARKER_LABEL = {
   modelSwitch: 'changement de modèle — mécanisme certain, un cache par modèle',
+  systemChanged: 'bloc système modifié — diagnostiqué par Claude Code (réglage, mode ou version changés en cours de session)',
+  toolsChanged: 'bloc d’outils modifié — diagnostiqué par Claude Code (serveur MCP ou outil basculé en cours de session)',
+  messagesChanged: 'historique modifié — diagnostiqué par Claude Code (contenu déjà servi ré-écrit)',
   toolsAppeared: 'chargement d’outils différés — coïncidence observée, sans mécanisme établi',
   noMarker: 'aucun marqueur journalisé',
 };

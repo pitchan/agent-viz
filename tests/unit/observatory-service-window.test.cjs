@@ -23,7 +23,10 @@ const R1_REPORT = {
       growth: stat(0, 0), unknown: stat(0, 0),
     },
     prefixBreakdown: {
-      markers: { modelSwitch: stat(0, 0), toolsAppeared: stat(0, 0), noMarker: stat(1, 40000) },
+      markers: {
+        modelSwitch: stat(0, 0), systemChanged: stat(0, 0), toolsChanged: stat(0, 0),
+        messagesChanged: stat(0, 0), toolsAppeared: stat(0, 0), noMarker: stat(1, 40000),
+      },
       noMarkerDetail: { earlyMcp: stat(0, 0), other: stat(1, 40000) },
       depth: { facade: stat(1, 40000), d10to50: stat(0, 0), d50to90: stat(0, 0), tail: stat(0, 0) },
     },

@@ -9,7 +9,7 @@ function assistant(
   msgId: string,
   usage: RawUsage,
   timestamp?: string,
-  opts?: { model?: string | null; toolUses?: ToolUseRef[] },
+  opts?: { model?: string | null; toolUses?: ToolUseRef[]; cacheMissReason?: string },
 ): Extract<NormalizedEvent, { kind: 'assistant' }> {
   return {
     kind: 'assistant',
@@ -19,6 +19,7 @@ function assistant(
     toolUses: opts?.toolUses ?? [],
     textChars: 0,
     ...(timestamp !== undefined ? { timestamp } : {}),
+    ...(opts?.cacheMissReason !== undefined ? { cacheMissReason: opts.cacheMissReason } : {}),
     isSidechain: false,
   };
 }
@@ -306,6 +307,53 @@ describe('ContextAggregator — sous-ventilation du « préfixe modifié » (pre
     const r = agg.result();
     expect(r.prefixBreakdown.markers.modelSwitch).toEqual(zero);
     expect(r.prefixBreakdown.markers.noMarker).toEqual({ events: 1, tokens: 60000 });
+  });
+
+  test('diagnostic journalisé tools_changed → « bloc outils modifié », prioritaire sur « outils apparus »', () => {
+    const agg = new ContextAggregator();
+    agg.addAssistant(assistant('m1', { cache_creation_input_tokens: 50000, cache_read_input_tokens: 0, output_tokens: 1 }, T0, { toolUses: [toolSearch] }), 'main');
+    agg.addAssistant(assistant('m2', { cache_creation_input_tokens: 60000, cache_read_input_tokens: 0, output_tokens: 1 }, plus(60), { cacheMissReason: 'tools_changed' }), 'main');
+    const r = agg.result();
+    expect(r.prefixBreakdown.markers.toolsChanged).toEqual({ events: 1, tokens: 60000 });
+    expect(r.prefixBreakdown.markers.toolsAppeared).toEqual(zero);
+    expect(r.prefixBreakdown.markers.noMarker).toEqual(zero);
+  });
+
+  test('diagnostic journalisé, prioritaire sur le changement de modèle observé (première main)', () => {
+    const agg = new ContextAggregator();
+    agg.addAssistant(assistant('m1', { cache_creation_input_tokens: 50000, cache_read_input_tokens: 0, output_tokens: 1 }, T0), 'main');
+    agg.addAssistant(assistant('m2', { cache_creation_input_tokens: 60000, cache_read_input_tokens: 0, output_tokens: 1 }, plus(60), { model: 'claude-sonnet-5', cacheMissReason: 'system_changed' }), 'main');
+    const r = agg.result();
+    expect(r.prefixBreakdown.markers.systemChanged).toEqual({ events: 1, tokens: 60000 });
+    expect(r.prefixBreakdown.markers.modelSwitch).toEqual(zero);
+  });
+
+  test('diagnostic model_changed → « modèle changé », même sans deux modèles observés', () => {
+    const agg = new ContextAggregator();
+    agg.addAssistant(assistant('m1', { cache_creation_input_tokens: 50000, cache_read_input_tokens: 0, output_tokens: 1 }, T0), 'main');
+    agg.addAssistant(assistant('m2', { cache_creation_input_tokens: 60000, cache_read_input_tokens: 0, output_tokens: 1 }, plus(60), { cacheMissReason: 'model_changed' }), 'main');
+    const r = agg.result();
+    expect(r.prefixBreakdown.markers.modelSwitch).toEqual({ events: 1, tokens: 60000 });
+    expect(r.prefixBreakdown.markers.noMarker).toEqual(zero);
+  });
+
+  test('diagnostic messages_changed → « historique modifié »', () => {
+    const agg = new ContextAggregator();
+    agg.addAssistant(assistant('m1', { cache_creation_input_tokens: 50000, cache_read_input_tokens: 0, output_tokens: 1 }, T0), 'main');
+    agg.addAssistant(assistant('m2', { cache_creation_input_tokens: 60000, cache_read_input_tokens: 0, output_tokens: 1 }, plus(60), { cacheMissReason: 'messages_changed' }), 'main');
+    const r = agg.result();
+    expect(r.prefixBreakdown.markers.messagesChanged).toEqual({ events: 1, tokens: 60000 });
+  });
+
+  test('diagnostic sans bloc nommé (unavailable) → retombe sur les heuristiques, jamais deviné', () => {
+    const agg = new ContextAggregator();
+    agg.addAssistant(assistant('m1', { cache_creation_input_tokens: 50000, cache_read_input_tokens: 0, output_tokens: 1 }, T0), 'main');
+    agg.addAssistant(assistant('m2', { cache_creation_input_tokens: 60000, cache_read_input_tokens: 0, output_tokens: 1 }, plus(60), { cacheMissReason: 'unavailable' }), 'main');
+    const r = agg.result();
+    expect(r.prefixBreakdown.markers.noMarker).toEqual({ events: 1, tokens: 60000 });
+    expect(r.prefixBreakdown.markers.systemChanged).toEqual(zero);
+    expect(r.prefixBreakdown.markers.toolsChanged).toEqual(zero);
+    expect(r.prefixBreakdown.markers.messagesChanged).toEqual(zero);
   });
 
   test('profondeur de cassure : ratio relu/attendu rangé en façade / 10–50 / 50–90 / queue', () => {
