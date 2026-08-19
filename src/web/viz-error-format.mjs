@@ -26,6 +26,8 @@ export const MESSAGE_MAX = 220;
 // l'appelant sait si le noeud existe encore, et il le dit.
 export function errorRow(rec, hasNode = false) {
   const reachable = Boolean(rec.nodeId) && Boolean(hasNode);
+  const count = rec.count || 1;
+  const since = rec.successesSince || 0;
   return {
     tool: rec.toolName || '',
     subject: rec.subject || '',
@@ -33,6 +35,14 @@ export function errorRow(rec, hasNode = false) {
     time: clockTime(rec.ts),
     nodeId: rec.nodeId || null,
     reachable,
+    // « ×3 » seulement a partir de deux : un ×1 n'apprend rien et alourdit la
+    // ligne — or la repetition est justement ce qui doit sauter aux yeux.
+    repeat: count >= 2 ? `×${count}` : '',
+    // Le fait de continuite : combien d'outils ont REUSSI depuis la derniere
+    // occurrence. C'est un compte, pas un verdict — le volet ne pretend jamais
+    // que l'agent « s'est rattrape », il laisse le chiffre le dire. A zero, la
+    // note se tait : l'echec est le dernier mot, et ca se voit deja.
+    sinceNote: since > 0 ? `${since} tool${since === 1 ? '' : 's'} succeeded since` : '',
     // Une ligne morte sans explication se lit comme un bug du volet. Elle porte
     // deja tout ce qu'il faut pour comprendre l'echec ; il reste a dire qu'il
     // n'y a rien de plus a ouvrir.

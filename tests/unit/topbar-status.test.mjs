@@ -82,12 +82,23 @@ test('la cloche porte un nom pour les lecteurs d ecran, dans les deux etats', ()
 // Troisieme temoin du bandeau, et le meme defaut que les deux premiers avant
 // leur correction : « 1 errors » se lisait sans savoir OU etait cette erreur,
 // ni meme que le chiffre etait cliquable.
+//
+// Puis un second defaut, trouve comme le premier par un utilisateur devant
+// l'ecran : « 1 error » rouge TOUTE la session, pour une sonde rattrapee
+// trente secondes plus tard. La pastille distingue desormais deux etats a
+// partir des faits du registre — l'alarme (un echec se repete, ou le tout
+// dernier outil a echoue) et le calme (il y a eu des erreurs, la session a
+// continue depuis).
+
+// Le resume tel que le registre le rend ; chaque test ne nomme que ce qui
+// l'ecarte du calme.
+const resume = (total, extra = {}) => ({ total, hasRepeat: false, lastFailed: false, ...extra });
 
 test('une erreur s accorde au singulier', () => {
   // Le bandeau affichait litteralement « 1 errors ». La faute est visible a
   // l'oeil nu sur la capture d'ecran d'un utilisateur — elle se corrige ici.
   // Arrange
-  const p = errorsPresentation(1);
+  const p = errorsPresentation(resume(1));
   // Act — lecture pure, l'Act est la construction ci-dessus
   // Assert
   assert.equal(p.countText, '1');
@@ -96,7 +107,7 @@ test('une erreur s accorde au singulier', () => {
 
 test('plusieurs erreurs s accordent au pluriel', () => {
   // Arrange
-  const p = errorsPresentation(4);
+  const p = errorsPresentation(resume(4));
   // Act — lecture pure
   // Assert
   assert.equal(p.countText, '4');
@@ -105,33 +116,83 @@ test('plusieurs erreurs s accordent au pluriel', () => {
 
 test('zero erreur garde le pluriel et le calme', () => {
   // Arrange
-  const p = errorsPresentation(0);
+  const p = errorsPresentation(resume(0));
   // Act — lecture pure
   // Assert
   assert.equal(p.countText, '0');
   assert.equal(p.label, 'errors');
   assert.equal(p.hasErrors, false);
+  assert.equal(p.alarm, false);
 });
 
 test('des qu il y a une erreur, la pastille le signale', () => {
-  assert.equal(errorsPresentation(1).hasErrors, true);
+  assert.equal(errorsPresentation(resume(1)).hasErrors, true);
 });
 
 test('l infobulle dit qu on peut cliquer, meme a zero', () => {
   // Exactement la lecon de la cloche : une pastille qui est un bouton dans les
   // deux etats doit le dire dans les deux etats, sinon elle se lit comme un
   // simple chiffre mort — le reproche d'origine.
-  assert.match(errorsPresentation(0).title, /click/i);
-  assert.match(errorsPresentation(3).title, /click/i);
+  assert.match(errorsPresentation(resume(0)).title, /click/i);
+  assert.match(errorsPresentation(resume(3)).title, /click/i);
 });
 
 test('l infobulle borne la portee du chiffre a la session', () => {
   // « 1 error » sans plus rend le chiffre inutilisable : une erreur de quoi,
   // depuis quand ? La reponse est : de la session affichee.
-  assert.match(errorsPresentation(2).title, /session/i);
+  assert.match(errorsPresentation(resume(2)).title, /session/i);
 });
 
 test('la pastille porte un nom pour les lecteurs d ecran, dans les deux etats', () => {
-  assert.match(errorsPresentation(0).ariaLabel, /error/i);
-  assert.match(errorsPresentation(5).ariaLabel, /5/);
+  assert.match(errorsPresentation(resume(0)).ariaLabel, /error/i);
+  assert.match(errorsPresentation(resume(5)).ariaLabel, /5/);
+});
+
+test('des erreurs passees SANS signe d insistance restent calmes', () => {
+  // Le cas vecu : une sonde `ls` ratee, corrigee au coup suivant, et un
+  // « 1 error » rouge qui se lit comme un probleme ouvert toute la session.
+  // Arrange
+  const p = errorsPresentation(resume(2));
+  // Act — lecture pure
+  // Assert — l'infobulle dit que la session a continue depuis
+  assert.equal(p.alarm, false);
+  assert.match(p.title, /moved on/i);
+});
+
+test('un echec qui se repete met la pastille en alarme, et l infobulle le dit', () => {
+  // Arrange
+  const p = errorsPresentation(resume(4, { hasRepeat: true }));
+  // Act — lecture pure
+  // Assert
+  assert.equal(p.alarm, true);
+  assert.match(p.title, /repeat/i);
+});
+
+test('un dernier outil en echec met la pastille en alarme, et l infobulle le dit', () => {
+  // « En train d'echouer, maintenant » — c'est le seul moment ou la pastille
+  // doit appeler le regard sans attendre.
+  // Arrange
+  const p = errorsPresentation(resume(2, { lastFailed: true }));
+  // Act — lecture pure
+  // Assert
+  assert.equal(p.alarm, true);
+  assert.match(p.title, /last tool call failed/i);
+});
+
+test('quand tout va mal a la fois, la repetition a le dernier mot', () => {
+  // La repetition est le signe le plus diagnostique : un agent qui boucle.
+  // L'infobulle n'a la place que d'une explication ; c'est celle-la.
+  // Arrange
+  const p = errorsPresentation(resume(6, { hasRepeat: true, lastFailed: true }));
+  // Act — lecture pure
+  // Assert
+  assert.equal(p.alarm, true);
+  assert.match(p.title, /repeat/i);
+});
+
+test('l alarme se dit aussi aux lecteurs d ecran', () => {
+  // Le rouge du chiffre est invisible a qui ne le voit pas : l'etat doit
+  // passer par les mots.
+  assert.match(errorsPresentation(resume(4, { hasRepeat: true })).ariaLabel, /repeat/i);
+  assert.match(errorsPresentation(resume(2, { lastFailed: true })).ariaLabel, /fail/i);
 });

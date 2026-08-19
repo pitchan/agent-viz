@@ -30,7 +30,7 @@ import {
 } from './viz-alert-format.mjs';
 import { watchdogPresentation, errorsPresentation } from './viz-topbar-status.mjs';
 import { errorRow, errorsPanelTitle } from './viz-error-format.mjs';
-import { getErrors, onErrorsChanged } from './viz-errors.mjs';
+import { getErrors, getErrorsSummary, onErrorsChanged } from './viz-errors.mjs';
 import { formatDuration } from './viz-duration.mjs';
 
 // ─── Feed panel ───────────────────────────────────────────────────────────
@@ -623,11 +623,12 @@ function errorItemHTML(rec) {
   const row = errorRow(rec, Boolean(rec.nodeId) && state.nodes.has(rec.nodeId));
   return `<div class="error-item${row.reachable ? ' reachable' : ''}"${row.reachable ? ` data-node="${esc(row.nodeId)}"` : ''}>
     <div class="error-head">
-      <span class="error-tool">${esc(row.tool)}</span>
+      <span class="error-tool">${esc(row.tool)}${row.repeat ? ` <span class="error-repeat">${esc(row.repeat)}</span>` : ''}</span>
       <span class="error-time">${esc(row.time)}</span>
     </div>
     ${row.subject ? `<div class="error-subject">${esc(row.subject)}</div>` : ''}
     <div class="error-msg">${esc(row.message)}</div>
+    ${row.sinceNote ? `<div class="error-since">${esc(row.sinceNote)}</div>` : ''}
     ${row.goneNote ? `<div class="error-gone">${esc(row.goneNote)}</div>` : ''}
   </div>`;
 }
@@ -641,7 +642,9 @@ function renderErrorsPopup() {
   // tab only ever shows one session, and repeating it would push the message
   // — the only part that explains anything — out of view.
   const sid = recs.length ? recs[recs.length - 1].sessionId : (state._lastServerId || '');
-  els.title.textContent = errorsPanelTitle(sid, recs.length);
+  // Le titre dit le TOTAL des echecs, pas le nombre de lignes : deux
+  // occurrences empilees restent deux echecs aux yeux du chiffre.
+  els.title.textContent = errorsPanelTitle(sid, getErrorsSummary().total);
   els.list.innerHTML = shown.length
     ? shown.map(errorItemHTML).join('')
     : '<div class="errors-empty">No tool errors in this session.</div>';
@@ -650,10 +653,13 @@ function renderErrorsPopup() {
 export function renderErrorsPill() {
   const els = _errorsDOM();
   // The words come from viz-topbar-status, where a unit test pins them —
-  // including the plural that made the chip read "1 errors".
-  const p = errorsPresentation(getErrors().length);
+  // including the plural that made the chip read "1 errors". Two exclusive
+  // classes carry the two states: amber for "errors happened, session moved
+  // on", red only when the registry's facts say the session needs eyes now.
+  const p = errorsPresentation(getErrorsSummary());
   els.count.textContent = p.countText;
-  els.count.classList.toggle('has-errors', p.hasErrors);
+  els.count.classList.toggle('has-errors', p.hasErrors && !p.alarm);
+  els.count.classList.toggle('has-errors-alarm', p.alarm);
   els.label.textContent = p.label;
   els.pill.title = p.title;
   els.pill.setAttribute('aria-label', p.ariaLabel);
@@ -681,7 +687,13 @@ document.getElementById('errors-list').addEventListener('click', (e) => {
 // that just turned red actually turns red: feed rows are appended once and
 // never re-rendered. Errors are rare — median one per session, measured over
 // thirty days — so rebuilding sixty rows costs nothing.
-onErrorsChanged(() => {
+//
+// A SUCCESS notification is a different economy: it fires on every tool call
+// once an error is on the board, and it changes no feed row's color. It only
+// ages the chip — and the popup rows' "N tools succeeded since", which
+// renderErrorsPill already refreshes when the popup is open.
+onErrorsChanged((_recs, reason) => {
+  if (reason === 'success') { renderErrorsPill(); return; }
   markFeedFullRebuild();
   renderFeed();
   renderErrorsPill();

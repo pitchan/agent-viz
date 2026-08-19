@@ -11,7 +11,7 @@ import {
 import { markNarratorDirty } from './viz-narrator.js';
 import { toolSubject } from './viz-tool-subject.mjs';
 import { formatDuration } from './viz-duration.mjs';
-import { recordError } from './viz-errors.mjs';
+import { recordError, recordSuccess } from './viz-errors.mjs';
 
 // ─── Feed-cursor adjust hook ──────────────────────────────────────────────
 // When the timeline ring-buffer shifts, viz-ui's _feedRenderedCount must be
@@ -279,6 +279,10 @@ function onPostToolUse(evt, sid, ts) {
     const childNode = state.nodes.get(`a:${childAid}`);
     if (childNode) reparentNode(childNode, `a:${parentAid}`);
   }
+  // EN DERNIER, comme recordError dans le pendant echec : l'abonne repeint de
+  // facon synchrone, il doit lire des noeuds deja a jour. C'est le fait de
+  // continuite de la pastille — combien d'outils ont reussi depuis un echec.
+  recordSuccess(evt);
 }
 
 function onPostToolUseFailure(evt, sid, ts) {

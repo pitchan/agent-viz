@@ -101,6 +101,37 @@ test('une ligne non rejoignable DIT pourquoi, au lieu de se taire', () => {
   assert.equal(errorRow(rec(), true).goneNote, '');
 });
 
+test('la ligne dit combien de fois l erreur est revenue', () => {
+  // Une erreur qui se repete est LE signal d'alarme reel — un agent qui
+  // boucle. Elle s'empile sur sa ligne au registre ; la ligne doit le dire.
+  // Arrange / Act
+  const row = errorRow(rec({ count: 3 }));
+  // Assert
+  assert.equal(row.repeat, '×3');
+});
+
+test('une erreur survenue une seule fois ne s affuble pas d un ×1', () => {
+  // Arrange / Act / Assert — et une ligne d'avant le compteur non plus
+  assert.equal(errorRow(rec({ count: 1 })).repeat, '');
+  assert.equal(errorRow(rec()).repeat, '');
+});
+
+test('la ligne porte le fait de continuite : N outils reussis depuis', () => {
+  // C'est le fait qui laisse conclure « l'agent s'est rattrape » sans que le
+  // volet le pretende jamais : un compteur ne peut pas mentir.
+  // Arrange / Act / Assert — pluriel et singulier
+  assert.equal(errorRow(rec({ successesSince: 27 })).sinceNote, '27 tools succeeded since');
+  assert.equal(errorRow(rec({ successesSince: 1 })).sinceNote, '1 tool succeeded since');
+});
+
+test('rien reussi depuis : la ligne se tait plutot que d afficher un zero', () => {
+  // « 0 tools succeeded since » se lirait comme une accusation ; l'absence de
+  // la note dit deja tout — l'echec est le dernier mot de la session.
+  // Arrange / Act / Assert
+  assert.equal(errorRow(rec({ successesSince: 0 })).sinceNote, '');
+  assert.equal(errorRow(rec()).sinceNote, '');
+});
+
 test('le titre du volet NOMME la session qu il montre', () => {
   // C'est la question posee devant l'ecran : « une erreur, oui, mais de quoi ? »
   // Le bandeau ne montre qu'une session a la fois ; le volet doit le dire.

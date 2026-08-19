@@ -42,17 +42,37 @@ export function watchdogPresentation(activeCount) {
 // it sits in a row of counters and a blank there would read as "not measured".
 // What it owes the reader is the rest: that the number is clickable, and that
 // it counts THIS session and nothing else.
-export function errorsPresentation(count) {
-  const plural = count === 1 ? 'error' : 'errors';
+//
+// It takes the registry's summary, not a bare count, because one number cannot
+// say the thing users actually asked about: "1 error" stayed red all session
+// for a probe the agent corrected thirty seconds later. Two states now:
+// - alarm: an error keeps repeating, or the very last tool call failed —
+//   the two mechanical signs that the session needs eyes NOW;
+// - calm: errors happened, the session has moved on since.
+// The registry states facts; deciding which facts deserve red happens here,
+// where a unit test can pin it.
+export function errorsPresentation({ total, hasRepeat, lastFailed }) {
+  const plural = total === 1 ? 'error' : 'errors';
+  const alarm = total > 0 && (hasRepeat || lastFailed);
+  // One explanation fits the tooltip; repetition is the more diagnostic sign
+  // (an agent looping), so it wins when both are true.
+  const why = hasRepeat
+    ? 'the same error keeps repeating'
+    : 'the last tool call failed';
   return {
-    hasErrors: count > 0,
-    countText: String(count),
+    hasErrors: total > 0,
+    alarm,
+    countText: String(total),
     label: plural,
-    title: count > 0
-      ? `${count} tool ${plural} in this session — click to see which`
-      : 'No tool errors in this session. Click to open the errors panel.',
-    ariaLabel: count > 0
-      ? `Errors: ${count} in this session`
-      : 'Errors: none in this session',
+    title: total === 0
+      ? 'No tool errors in this session. Click to open the errors panel.'
+      : alarm
+        ? `${total} tool ${plural} in this session — ${why}. Click to see which.`
+        : `${total} tool ${plural} in this session — the session has moved on since. Click to see which.`,
+    ariaLabel: total === 0
+      ? 'Errors: none in this session'
+      : alarm
+        ? `Errors: ${total} in this session — ${why}`
+        : `Errors: ${total} in this session — session has moved on`,
   };
 }

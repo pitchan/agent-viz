@@ -288,6 +288,12 @@ body {
   font-size: 11px; color: var(--text-dim); margin-top: 4px; line-height: 1.45;
   overflow-wrap: anywhere; white-space: pre-wrap;
 }
+/* Le « ×3 » : la repetition est le signal d'alarme reel, il se porte comme un
+   badge a cote du nom de l'outil, dans le meme rouge que lui. */
+.error-repeat { font-size: 11px; font-weight: 700; color: var(--error); }
+/* Le fait de continuite, en vert « complete » : c'est un compte de succes.
+   Le volet ne dit jamais « rattrape » — le chiffre laisse conclure. */
+.error-since { font-size: 10px; color: var(--complete); margin-top: 4px; }
 .error-gone { font-size: 10px; color: var(--text-muted); margin-top: 4px; font-style: italic; }
 .errors-empty { padding: 16px; color: var(--text-muted); font-size: 12px; text-align: center; }
 
@@ -311,7 +317,11 @@ body {
 .stat-button:focus-visible { outline: 2px solid var(--error); outline-offset: 2px; }
 .stat-dot { width: 6px; height: 6px; border-radius: 50%; }
 .stat-val { font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums; }
-.stat-val.has-errors { color: var(--error); }
+/* Deux etats, decides par viz-topbar-status sur les faits du registre :
+   ambre = des erreurs ont eu lieu, la session a continue depuis ;
+   rouge = un echec se repete, ou le tout dernier outil a echoue. */
+.stat-val.has-errors { color: var(--notification); }
+.stat-val.has-errors-alarm { color: var(--error); }
 .stat-val.has-running { color: var(--notification); }
 
 /* Budget pill — model · context% · cost. Same shape as .stat. */
