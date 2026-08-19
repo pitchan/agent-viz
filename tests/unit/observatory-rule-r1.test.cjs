@@ -185,6 +185,20 @@ test('a diagnosed messages_changed break stays informative too', () => {
   assert.equal(recs[0].action, null);
 });
 
+// The DB stores session reports computed by the engine that scanned them: after
+// an upgrade, reports written by an older engine legitimately lack the newer
+// marker cells. Caught live on 2026-08-19: a copied pre-0.24 DB made R1 throw
+// ("Cannot read properties of undefined") and the card vanished entirely.
+test('a report stored by an older engine (missing marker cells) still evaluates, absent cells read zero', () => {
+  const s = session('s1', { prefixChange: 50000, noMarker: 50000 });
+  const markers = s.report.context.prefixBreakdown.markers;
+  delete markers.systemChanged; delete markers.toolsChanged; delete markers.messagesChanged;
+  const recs = r1.evaluate(ctx([s]));
+  assert.equal(recs.length, 1);
+  assert.equal(recs[0].evidence.dominantMarker, 'noMarker');
+  assert.equal(recs[0].evidence.markerTokens.systemChanged, 0);
+});
+
 test('dominance is decided on the aggregate of the sessions that fired', () => {
   // s1 alone would read as a model switch; across the project noMarker wins.
   const recs = r1.evaluate(ctx([

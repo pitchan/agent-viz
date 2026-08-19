@@ -22,6 +22,10 @@
 // v8 : queue non vérifiée (agent-viz ≥ 0.17.0, doc/41) — les rapports v7 ne
 // portent pas le champ verification ; sans ce bump, needsScan sauterait les
 // sessions déjà en base et R7 resterait muette à jamais.
-const SCAN_VERSION = 8;
+// v9 : marqueurs diagnostiqués (agent-viz ≥ 0.24.0) — les rapports v8 n'ont que
+// 3 cases de marqueurs ; les cases systemChanged/toolsChanged/messagesChanged
+// (cache_miss_reason) resteraient à zéro sur toute session déjà en base, et la
+// carte R1 continuerait d'afficher « aucun marqueur journalisé » à tort.
+const SCAN_VERSION = 9;
 
 export { SCAN_VERSION };

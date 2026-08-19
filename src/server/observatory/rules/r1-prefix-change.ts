@@ -69,14 +69,18 @@ const prefixTokensOf = (report: Session['report']): number => report.context.chu
 
 type Breakdown = Session['report']['context']['prefixBreakdown'];
 
-/** Somme d'une découpe du prefixBreakdown sur les sessions retenues. */
+/** Somme d'une découpe du prefixBreakdown sur les sessions retenues.
+ * Une case absente vaut zéro : la base conserve des rapports calculés par le
+ * moteur qui les a scannés, et un rapport d'avant l'ajout d'un marqueur n'a
+ * légitimement pas sa case (vécu 2026-08-19 : base pré-0.24 → R1 levait et la
+ * carte disparaissait entière jusqu'au re-scan). */
 function sumBreakdown<K extends string>(
   sessions: Session[], part: keyof Breakdown, keys: readonly K[],
 ): Record<K, number> {
   return Object.fromEntries(keys.map(key => {
     const total = sessions.reduce((acc, s) => {
-      const section = s.report.context.prefixBreakdown[part] as Record<K, ChurnStat>;
-      return acc + section[key].tokens;
+      const section = s.report.context.prefixBreakdown[part] as Partial<Record<K, ChurnStat>>;
+      return acc + (section[key]?.tokens ?? 0);
     }, 0);
     return [key, total] as const;
   })) as Record<K, number>;
