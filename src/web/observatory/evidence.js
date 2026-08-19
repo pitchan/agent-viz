@@ -34,10 +34,32 @@ const R1_DEPTH_LABEL = {
   tail: 'en fin de contexte',
 };
 
+// Short cell names for the diagnosed-attribution detail line — the long
+// R1_MARKER_LABEL wordings would drown a three-cell enumeration.
+const R1_DIAGNOSED_SHORT = {
+  toolsChanged: 'bloc d’outils',
+  messagesChanged: 'historique',
+  systemChanged: 'bloc système',
+};
+
+/** Ligne facultative : sous un dominant « sans marqueur » (poids des vieux
+ * journaux), les attributions de première main de la fenêtre restent dites. */
+function diagnosedDetailLine(markerTokens) {
+  const cells = Object.entries(R1_DIAGNOSED_SHORT)
+    .map(([key, label]) => [label, markerTokens[key] ?? 0])
+    .filter(([, tokens]) => tokens > 0)
+    .sort((a, b) => b[1] - a[1]);
+  if (cells.length === 0) return [];
+  const total = cells.reduce((acc, [, tokens]) => acc + tokens, 0);
+  return [`dont attribués par le diagnostic de Claude Code : ${formatTokens(total)} jetons `
+    + `(${cells.map(([label, tokens]) => `${label} ${formatTokens(tokens)}`).join(' · ')})`];
+}
+
 const EVIDENCE_BY_RULE = {
   R1: e => [
     `${formatTokens(e.prefixChangeTokens)} jetons de préfixe reconstruit`,
     `marqueur dominant : ${R1_MARKER_LABEL[e.dominantMarker]} (${formatTokens(e.markerTokens[e.dominantMarker])} jetons)`,
+    ...(e.dominantMarker === 'noMarker' ? diagnosedDetailLine(e.markerTokens) : []),
     `cassure ${R1_DEPTH_LABEL[e.dominantDepth]} (${formatTokens(e.depthTokens[e.dominantDepth])} jetons)`,
     `${Math.round(e.shareOfNetPercent)} % des jetons nets de ces sessions`,
     // Absent from M1-era evidence: an optional detail, not a required field —

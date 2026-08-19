@@ -61,6 +61,30 @@ test('R1 presents each diagnosed marker as a first-hand fact', () => {
     'marqueur dominant : historique modifié — diagnostiqué par Claude Code (contenu déjà servi ré-écrit) (50k jetons)');
 });
 
+// Old journals predate cache_miss_reason, so noMarker can stay dominant for a
+// while even when the window's recent sessions are fully attributed. The card
+// must not hide those attributions behind the dominant line — same optional-
+// detail pattern as the earlyMcp line: shown with a real figure, never a zero.
+test('R1 under a dominant noMarker still surfaces the diagnosed attributions', () => {
+  const lines = evidenceLines({ ruleId: 'R1', evidence: { sessions: ['a'], prefixChangeTokens: 5900000,
+    markerTokens: { modelSwitch: 0, systemChanged: 1100000, toolsChanged: 1400000, messagesChanged: 1200000,
+      toolsAppeared: 0, noMarker: 2200000 }, dominantMarker: 'noMarker',
+    depthTokens: { facade: 5900000, d10to50: 0, d50to90: 0, tail: 0 }, dominantDepth: 'facade',
+    shareOfNetPercent: 29 } });
+  assert.ok(lines.includes(
+    'dont attribués par le diagnostic de Claude Code : 3.7M jetons '
+    + '(bloc d’outils 1.4M · historique 1.2M · bloc système 1.1M)'));
+});
+
+test('R1 with a dominant noMarker and no diagnosed tokens shows no attribution line', () => {
+  const lines = evidenceLines({ ruleId: 'R1', evidence: { sessions: ['a'], prefixChangeTokens: 50000,
+    markerTokens: { modelSwitch: 0, systemChanged: 0, toolsChanged: 0, messagesChanged: 0,
+      toolsAppeared: 0, noMarker: 50000 }, dominantMarker: 'noMarker',
+    depthTokens: { facade: 50000, d10to50: 0, d50to90: 0, tail: 0 }, dominantDepth: 'facade',
+    shareOfNetPercent: 30 } });
+  assert.ok(!lines.some(l => l.includes('diagnostic de Claude Code')));
+});
+
 test('R2 states loaded versus called, and that the inventory is a snapshot', () => {
   assert.deepEqual(
     evidenceLines({ ruleId: 'R2', evidence: { sessions: ['a'], loadedSessions: 10, usedSessions: 0,
