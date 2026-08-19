@@ -28,6 +28,7 @@ import {
 } from './install-hooks/settings-io.ts';
 import { resolveScope, resolveHookCommand, findProjectRoot, ensureGitignore, scanInstalled } from './install-hooks/scopes.ts';
 import { inPath, dirHasFiles } from './install-hooks/detect.ts';
+import { auditSettings, claudeInstaller, claudeSweepTargets } from './install-hooks/claude.ts';
 
 // ── Types ──
 //
@@ -51,15 +52,6 @@ interface CopilotHooksFile {
 // fichiers du serveur : `JSON.parse` ne promet qu'un JSON valide, pas un objet.
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
-}
-
-function auditSettings(
-  settings: ClaudeSettings, desiredCommand: string | undefined,
-): Array<{ event: string; installed: boolean; stale: boolean; others: number }> {
-  return EVENTS.map(ev => {
-    const info = inspectEvent(settings, ev, desiredCommand);
-    return { event: ev, installed: info.present, stale: info.stale, others: info.others };
-  });
 }
 
 // ── Copilot helpers ──
@@ -235,94 +227,6 @@ function uninstallCopilot({ scope, cwd, packageRoot }: AgentOpts = {}) {
   return { results };
 }
 
-// ── High-level API ──
-
-function auditClaude({ scope, cwd, packageRoot, version }: AgentOpts = {}) {
-  const target = resolveScope({ scope, cwd, packageRoot });
-  const settings = readSettings(target.file);
-  const cmd = resolveHookCommand({ packageRoot, version });
-  return { ...target, audit: auditSettings(settings, cmd.command), command: cmd };
-}
-
-// Install / refresh agent-viz hooks. Returns:
-//   action: 'noop' | 'installed' | 'updated' | 'installed+updated'
-//   missing:    events where no agent-viz hook existed (now added)
-//   updated:    events where a stale standard-shape command was rewritten
-//   present:    events where an up-to-date agent-viz hook was already there
-//   coexisting: { event: count } — non-agent-viz hooks sharing the same events
-//                (informational; they will run in parallel, we never touch them)
-function installClaude({ scope, cwd, packageRoot, version }: AgentOpts = {}) {
-  const target = resolveScope({ scope, cwd, packageRoot });
-  const settings = readSettings(target.file);
-  const cmd = resolveHookCommand({ packageRoot, version });
-
-  const missing: string[] = [];
-  const updated: string[] = [];
-  const present: string[] = [];
-  const coexisting: Record<string, number> = {};
-  for (const ev of EVENTS) {
-    const info = inspectEvent(settings, ev, cmd.command);
-    if (info.others > 0) coexisting[ev] = info.others;
-    if (!info.present) missing.push(ev);
-    else if (info.stale) updated.push(ev);
-    else present.push(ev);
-  }
-
-  if (missing.length === 0 && updated.length === 0) {
-    const crossScope = findInstalledScopes({ cwd, packageRoot, agent: 'claude' })
-      .filter(s => s.scope !== target.scope);
-    return { target, action: 'noop', missing, updated, present, coexisting, command: cmd, crossScope };
-  }
-
-  for (const ev of updated) refreshStaleCommand(settings, ev, cmd.command);
-  for (const ev of missing) addHook(settings, ev, cmd.command);
-  writeSettings(target.file, settings);
-
-  let gitignore: { changed: boolean; reason?: string } | null = null;
-  if (target.scope === 'local' && target.projectRoot) {
-    gitignore = ensureGitignore(target.projectRoot, AGENT_CONFIG.claude.gitignoreEntry, GITIGNORE_EXTRAS.claude);
-  }
-
-  let action: string;
-  if (missing.length > 0 && updated.length > 0) action = 'installed+updated';
-  else if (missing.length > 0) action = 'installed';
-  else action = 'updated';
-
-  const crossScope = findInstalledScopes({ cwd, packageRoot, agent: 'claude' })
-    .filter(s => s.scope !== target.scope);
-
-  return { target, action, missing, updated, present, coexisting, command: cmd, gitignore, crossScope };
-}
-
-function claudeSweepTargets(cwd: string | undefined, { packageRoot }: { packageRoot?: string } = {}): ResolvedTarget[] {
-  const out: ResolvedTarget[] = [{ scope: 'user', file: AGENT_CONFIG.claude.userFile(), projectRoot: null }];
-  const projectRoot = findProjectRoot(cwd || process.cwd(), { packageRoot });
-  if (projectRoot) {
-    out.push({ scope: 'project', file: AGENT_CONFIG.claude.projectFile(projectRoot), projectRoot });
-    out.push({ scope: 'local', file: AGENT_CONFIG.claude.localFile(projectRoot), projectRoot });
-  }
-  return out;
-}
-
-function uninstallClaude({ scope, cwd, packageRoot }: AgentOpts = {}) {
-  const targets = scope
-    ? [resolveScope({ scope, cwd, packageRoot })]
-    : claudeSweepTargets(cwd, { packageRoot });
-  const results: Array<ResolvedTarget & { removed: number; exists: boolean }> = [];
-  for (const t of targets) {
-    if (!fs.existsSync(t.file)) {
-      results.push({ ...t, removed: 0, exists: false });
-      continue;
-    }
-    const settings = readSettings(t.file);
-    let total = 0;
-    for (const ev of EVENTS) total += removeHook(settings, ev);
-    if (total > 0) writeSettings(t.file, settings);
-    results.push({ ...t, removed: total, exists: true });
-  }
-  return { results };
-}
-
 // Scan every scope (user + project + local) for the given agent and report
 // which ones currently carry an agent-viz hook. Used to detect cross-scope
 // duplicates: Claude Code merges hooks across scopes, so the same event fires
@@ -374,12 +278,7 @@ interface AgentInstaller {
 }
 
 const INSTALLERS: Record<AgentName, AgentInstaller> = {
-  claude: {
-    install: installClaude,
-    uninstall: uninstallClaude,
-    audit: auditClaude,
-    detect: () => agentDetected('claude'),
-  },
+  claude: claudeInstaller,
   copilot: {
     install: installCopilot,
     uninstall: uninstallCopilot,
