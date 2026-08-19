@@ -72,7 +72,17 @@ let firstRead = true;
 // in a number, and ids already carry punctuation (loop:s1:Bash).
 const keyOf = a => `${a.id}\u0000${a.createdAt}`;
 
+// Les cles serveur vivantes au moment de la DERNIERE notification — donc ce
+// que l'interface montre en ce moment. C'est a CET etat-la qu'un rechargement
+// doit se comparer. Le recalculer au debut du rechargement avec l'horloge
+// courante rendait l'expiration invisible : une alerte morte entre deux
+// rechargements manquait deja des DEUX cotes de la comparaison, aucun retrait
+// n'etait signale, et la cloche restait allumee a vie sur un volet vide
+// (vecu sur capture : cloche a « 1 », « No active alerts »).
+let shownKeys = new Set();
+
 function notify(newAlerts) {
+  shownKeys = new Set(liveServerAlerts().map(keyOf));
   for (const fn of listeners) fn(newAlerts);
 }
 
@@ -110,7 +120,9 @@ export async function refreshAlerts() {
   // whatever it last knew, looking perfectly healthy.
   const journal = payload && Array.isArray(payload.alerts) ? payload.alerts : [];
   const live = payload && Array.isArray(payload.activeIds) ? payload.activeIds : [];
-  const before = new Set(liveServerAlerts().map(keyOf));
+  // L'etat affiche, PAS `liveServerAlerts()` a l'instant courant : la
+  // difference entre les deux est precisement le retrait par expiration.
+  const before = shownKeys;
   const next = new Map();
   for (const a of journal) {
     if (!a || !a.id || a.acknowledged) continue;

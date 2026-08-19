@@ -139,6 +139,28 @@ test('un incident evenementiel perime ne redevient pas vif parce que le serveur 
     'ce qui est fini est fini, quoi que le registre en garde');
 });
 
+// ─── Expiry between two polls must turn the badge OFF ─────────────────────
+
+test('une alerte qui expire entre deux chargements est retiree — et l abonne est PREVENU', async () => {
+  // Le cas vecu (capture du 2026-08-19) : cloche a « 1 », volet « No active
+  // alerts ». La vivacite se juge a l'instant de la lecture, mais la pastille
+  // n'est repeinte que sur notification — et l'expiration n'en produisait
+  // aucune : au chargement suivant, `before` etait recalcule avec l'horloge
+  // COURANTE, donc l'alerte expiree manquait deja des DEUX cotes de la
+  // comparaison. Aucun retrait signale, cloche allumee a vie.
+  // Arrange — une alerte evenementielle fraiche, affichee
+  const { mod, calls, at } = await freshClient({ alerts: [evt(T - 1000, 'a')] });
+  assert.deepEqual(ids(mod.getActiveAlerts()), ['a']);
+  const repaints = calls.length;
+  // Act — trois minutes passent (la fraicheur en accorde deux), le journal n'a pas change
+  at(T + 3 * 60_000);
+  await mod.refreshAlerts();
+  // Assert — l'etat reel est vide, et l'interface doit l'apprendre
+  assert.deepEqual(mod.getActiveAlerts(), []);
+  assert.ok(calls.length > repaints,
+    'le retrait par expiration est un changement : sans notification, la cloche reste allumee a tort');
+});
+
 // ─── Same identity, several incidents ─────────────────────────────────────
 
 test('de deux incidents de meme identite, c est le plus recent qui parle', async () => {

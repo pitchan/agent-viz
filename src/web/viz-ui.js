@@ -575,7 +575,11 @@ document.getElementById('watchdog-pill').addEventListener('click', () => {
   const popup = document.getElementById('alerts-popup');
   const opening = !popup.classList.contains('visible');
   popup.classList.toggle('visible', opening);
-  if (opening) renderAlertsPopup();
+  // Le badge AUSSI, pas seulement le volet : la vivacite se juge a l'instant
+  // de la lecture, et peindre les deux du meme instant est ce qui interdit
+  // l'ecran incoherent « cloche a 1, volet vide » entre deux rechargements.
+  // (Le volet etant visible desormais, renderWatchdogPill le rend aussi.)
+  if (opening) renderWatchdogPill();
 });
 
 document.getElementById('alerts-close').addEventListener('click', () => {
