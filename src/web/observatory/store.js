@@ -6,7 +6,7 @@
 
 const EMPTY = () => ({
   summary: null,
-  recommendations: { groups: [], stale: [], arbitrated: [] },
+  recommendations: { groups: [], stale: [], decided: [] },
   sessions: [],
   selectedSession: null,
   scan: null,

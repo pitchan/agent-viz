@@ -13,6 +13,9 @@
 // * A recommendation the latest scan did not re-emit leaves the ranking and is
 //   reported as "no longer occurring" — a fact, not a claim that anything the
 //   user did caused it (effect measurement is M3).
+// * A DECIDED recommendation (accepted, ignored, arbitrated) lives in the
+//   journal, not in the groups (doc/44): the decision wins over freshness,
+//   and only the +50 % return rule can surface it again — never arbitrated.
 
 import { COST_BASIS } from './cost.ts';
 
@@ -41,7 +44,7 @@ interface RankedRecommendation {
 }
 
 const CONFIDENCE_WEIGHT: Record<string, number> = { fait: 1, correlation: 0.6, hypothese: 0.3 };
-const IGNORED_RETURN_FACTOR = 1.5;
+const RETURN_FACTOR = 1.5;
 const PRIORITY_SIZE = 3;
 const BASIS_ORDER: string[] = [COST_BASIS.MEASURED_TOKENS, COST_BASIS.APPROX_BYTES];
 
@@ -49,17 +52,18 @@ function scoreOf(rec: RankedRecommendation): number {
   return rec.estimatedCostUsd * (CONFIDENCE_WEIGHT[rec.confidence] ?? 0);
 }
 
-// 'new' is always proposed; 'accepted' never is again; 'ignored' comes back
-// only once its recomputed cost has grown by at least 50 % since the user
-// dismissed it. A missing baseline is not a reason to guess — it stays out.
+// 'new' is always proposed; 'accepted' and 'ignored' come back only once the
+// recomputed cost has grown by at least 50 % since the user decided (doc/44 —
+// an adoption is a watched commitment, not a pledge taken on faith). A missing
+// baseline is not a reason to guess — the card stays in the journal.
 // 'arbitrated' never comes back on its own (doc/42): the user already weighed
 // this exact choice, only lifting the arbitration re-proposes it — its frozen
-// costAtStatusUsd is kept for a FUTURE resurfacing rule, none exists in v1.
+// costAtStatusUsd is kept for a FUTURE resurfacing rule, none exists yet.
 function isEligible(rec: RankedRecommendation): boolean {
-  if (rec.status === 'accepted' || rec.status === 'arbitrated') return false;
-  if (rec.status === 'ignored') {
+  if (rec.status === 'arbitrated') return false;
+  if (rec.status === 'accepted' || rec.status === 'ignored') {
     if (typeof rec.costAtStatusUsd !== 'number') return false;
-    return rec.estimatedCostUsd >= rec.costAtStatusUsd * IGNORED_RETURN_FACTOR;
+    return rec.estimatedCostUsd >= rec.costAtStatusUsd * RETURN_FACTOR;
   }
   return true;
 }
@@ -78,17 +82,19 @@ interface RankGroup {
 
 function rankByBasis(
   recs: RankedRecommendation[], { lastScanAt }: { lastScanAt: string | null },
-): { groups: RankGroup[]; stale: RankedRecommendation[]; arbitrated: RankedRecommendation[] } {
-  // Arbitration wins over freshness: a card the user has already weighed stays
-  // a rendered arbitration even when the scan no longer emits it — most recent
-  // decision first, the folded section reads as a journal.
-  const arbitrated = recs
-    .filter(r => r.status === 'arbitrated')
+): { groups: RankGroup[]; stale: RankedRecommendation[]; decided: RankedRecommendation[] } {
+  // The decision wins over freshness: a card the user has already ruled on
+  // stays a readable journal line even when the scan no longer emits it —
+  // most recent decision first. Only a card past its return threshold leaves
+  // the journal, and it re-enters the normal ranking with its status intact:
+  // the page needs the status to pick the right return banner.
+  const decided = recs
+    .filter(r => r.status !== 'new' && !isEligible(r))
     .sort((a, b) => (b.statusAt ?? '').localeCompare(a.statusAt ?? '') || a.id - b.id);
 
   const stale: RankedRecommendation[] = [];
   const current: RankedRecommendation[] = [];
-  for (const rec of recs.filter(r => r.status !== 'arbitrated')) {
+  for (const rec of recs.filter(r => r.status === 'new' || isEligible(r))) {
     (isStale(rec, lastScanAt) ? stale : current).push(rec);
   }
 
@@ -98,12 +104,14 @@ function rankByBasis(
       .filter(r => r.costBasis === basis)
       .sort((a, b) => scoreOf(b) - scoreOf(a) || a.id - b.id);
     if (all.length === 0) continue;
-    groups.push({ basis, priority: all.filter(isEligible).slice(0, PRIORITY_SIZE), all });
+    // Everything that reaches a group is eligible by construction; priority
+    // is only the size cut.
+    groups.push({ basis, priority: all.slice(0, PRIORITY_SIZE), all });
   }
-  return { groups, stale, arbitrated };
+  return { groups, stale, decided };
 }
 
 export {
-  CONFIDENCE_WEIGHT, IGNORED_RETURN_FACTOR, PRIORITY_SIZE, BASIS_ORDER,
+  CONFIDENCE_WEIGHT, RETURN_FACTOR, PRIORITY_SIZE, BASIS_ORDER,
   scoreOf, isEligible, isStale, rankByBasis,
 };

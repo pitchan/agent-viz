@@ -5,7 +5,7 @@ import {
   formatUsd, formatBytes, formatDuration, confidenceLabel, costBasisLabel, costLabel, basisTitle,
   formatDayMonth, periodLabel, basisLabel, periodHeader, scanProgressLabel, formatTokens,
   formatUsdPerMTok, formatShare, formatUsdExact, modelLabel, summaryHeadline, summaryDetails,
-  arbitratedLine,
+  decisionLine, returnBanner,
 } from '../../src/web/observatory/format.js';
 
 test('formatUsd uses a French decimal comma and two digits', () => {
@@ -209,20 +209,58 @@ test('modelLabel derives readable labels, Claude 5 single-digit families include
   assert.equal(modelLabel(''), '');
 });
 
-// ─── Statut « arbitré » (doc/42) : la ligne de carte arbitrée ──────────────
+// ─── Le journal des décisions (doc/44) : une ligne par carte décidée ───────
 
-test('arbitratedLine : la date en JJ/MM/AAAA puis la raison, en français', () => {
+test('decisionLine : un refus porte la date en JJ/MM/AAAA puis la raison, en français', () => {
   assert.equal(
-    arbitratedLine({ statusAt: '2026-08-08T12:00:00.000Z', statusReason: 'tests vérifiés au terminal, hors session' }),
-    'Arbitré le 08/08/2026 — tests vérifiés au terminal, hors session');
+    decisionLine({ status: 'arbitrated', statusAt: '2026-08-08T12:00:00.000Z', statusReason: 'tests vérifiés au terminal, hors session' }),
+    'Refusé le 08/08/2026 — tests vérifiés au terminal, hors session');
 });
 
-test('arbitratedLine sans raison consignée n’invente rien', () => {
-  assert.equal(arbitratedLine({ statusAt: '2026-08-08T12:00:00.000Z', statusReason: null }),
-    'Arbitré le 08/08/2026');
+test('decisionLine : une adoption annonce sa surveillance', () => {
+  assert.equal(
+    decisionLine({ status: 'accepted', statusAt: '2026-08-08T12:00:00.000Z', statusReason: null }),
+    'Adopté le 08/08/2026 — reviendra si le coût regrossit malgré tout');
 });
 
-test('arbitratedLine sans date consignée le dit, sans deviner', () => {
-  assert.equal(arbitratedLine({ statusAt: null, statusReason: 'déjà pesé' }),
-    'Arbitré (date non consignée) — déjà pesé');
+test('decisionLine : une mise en veille annonce son seuil de retour', () => {
+  assert.equal(
+    decisionLine({ status: 'ignored', statusAt: '2026-08-08T12:00:00.000Z', statusReason: null }),
+    'Mis en veille le 08/08/2026 — reviendra si le coût regrossit de moitié');
+});
+
+test('decisionLine sans raison consignée n’invente rien', () => {
+  assert.equal(decisionLine({ status: 'arbitrated', statusAt: '2026-08-08T12:00:00.000Z', statusReason: null }),
+    'Refusé le 08/08/2026');
+});
+
+test('decisionLine sans date consignée le dit, sans deviner', () => {
+  assert.equal(decisionLine({ status: 'arbitrated', statusAt: null, statusReason: 'déjà pesé' }),
+    'Refusé (date non consignée) — déjà pesé');
+});
+
+// ─── Le bandeau de retour (doc/44) : une carte décidée qui re-surface ──────
+
+test('returnBanner : une adoption revenue interpelle sur le geste, pourcentage arrondi', () => {
+  assert.equal(
+    returnBanner({ status: 'accepted', statusAt: '2026-08-08T12:00:00.000Z', estimatedCostUsd: 16, costAtStatusUsd: 10 }),
+    'Adopté le 08/08/2026 — le coût a pourtant regrossi de 60 % depuis. Le geste a-t-il pris ?');
+});
+
+test('returnBanner : une mise en veille revenue constate, sans interpeller', () => {
+  assert.equal(
+    returnBanner({ status: 'ignored', statusAt: '2026-08-08T12:00:00.000Z', estimatedCostUsd: 15, costAtStatusUsd: 10 }),
+    'Mis en veille le 08/08/2026 — le coût a regrossi de 50 % depuis.');
+});
+
+test('returnBanner : une carte neuve n’a pas de bandeau', () => {
+  assert.equal(returnBanner({ status: 'new', estimatedCostUsd: 15, costAtStatusUsd: null }), '');
+});
+
+test('returnBanner sans coût de référence exploitable ne chiffre rien', () => {
+  // Un zéro au moment du clic rend le pourcentage indéfini : le bandeau
+  // constate le retour sans inventer un chiffre.
+  assert.equal(
+    returnBanner({ status: 'ignored', statusAt: '2026-08-08T12:00:00.000Z', estimatedCostUsd: 15, costAtStatusUsd: 0 }),
+    'Mis en veille le 08/08/2026 — le coût a regrossi depuis.');
 });

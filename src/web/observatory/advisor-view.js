@@ -9,13 +9,13 @@ import * as api from './api.js';
 import { getState, subscribe, loadAdvisor, changeStatus, applyScanEvent } from './store.js';
 import {
   confidenceLabel, costLabel, basisTitle, periodLabel, basisLabel, periodHeader,
-  scanProgressLabel, summaryHeadline, summaryDetails,
+  scanProgressLabel, summaryHeadline, summaryDetails, returnBanner,
 } from './format.js';
 import { evidenceLines } from './evidence.js';
 import { initPeriodSelector } from './period-selector.js';
 import { initConfirmButton } from './confirm-button.js';
 import { renderFailures } from './failures-view.js';
-import { renderArbitrated, arbitrationControls } from './arbitration-view.js';
+import { renderDecisions, refusalControls } from './decisions-view.js';
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -24,11 +24,32 @@ function el(tag, className, text) {
   return node;
 }
 
-function recommendationCard(rec, { actionable }) {
+// Les trois intentions (doc/44) : chaque bouton répond à « Que fais-tu de ce
+// conseil ? » dans les mots de l'utilisateur, et sa conséquence est écrite
+// dessous — le contrat au moment du clic, pas dans un mode d'emploi ailleurs.
+const CHOICE_CAPTIONS = {
+  accepted: 'La carte part au journal. Si le coût regrossit malgré tout, elle reviendra te demander si le geste a vraiment pris.',
+  ignored: 'Revient d’elle-même si le coût regrossit de moitié.',
+  refuse: 'Dis pourquoi en une ligne ; c’est consigné au journal et ne sera plus proposé.',
+};
+
+function choice(content, caption) {
+  const wrap = el('div', 'advisor-choice');
+  wrap.append(content, el('div', 'advisor-choice-caption', caption));
+  return wrap;
+}
+
+// Exported for its tests: the card IS the page's contract with the user —
+// the labels and captions are behavior here, not decoration.
+export function recommendationCard(rec, { actionable }) {
   const card = el('div', 'advisor-card');
   card.dataset.recId = String(rec.id);
+  card.appendChild(el('div', 'advisor-card-title', rec.title));
+  // Une carte décidée qui re-surface dit son histoire avant ses mesures :
+  // le statut choisit le bandeau (adoption interpellée, veille constatée).
+  const banner = returnBanner(rec);
+  if (banner) card.appendChild(el('div', 'advisor-card-return', banner));
   card.append(
-    el('div', 'advisor-card-title', rec.title),
     el('div', 'advisor-card-meta', `${confidenceLabel(rec.confidence)} · ${costLabel(rec)}`),
     el('div', 'advisor-card-period', periodLabel(rec)),
     el('div', 'advisor-card-action', rec.action
@@ -40,22 +61,23 @@ function recommendationCard(rec, { actionable }) {
   card.appendChild(evidence);
 
   if (actionable) {
-    // 'J'applique' only exists when there is a gesture to apply; an
-    // informative card can still be dismissed.
+    // « Je l'adopte » n'existe que s'il y a un geste à adopter ; une carte
+    // informative peut toujours être mise en veille ou refusée.
     const entries = rec.action == null
-      ? [['ignored', 'Ignorer']]
-      : [['accepted', 'J’applique'], ['ignored', 'Ignorer']];
+      ? [['ignored', 'Plus tard']]
+      : [['accepted', 'Je l’adopte'], ['ignored', 'Plus tard']];
     const buttons = el('div', 'advisor-card-buttons');
     for (const [status, label] of entries) {
       const btn = el('button', 'obs-btn', label);
       btn.type = 'button';
       btn.dataset.status = status;
-      buttons.appendChild(btn);
+      buttons.appendChild(choice(btn, CHOICE_CAPTIONS[status]));
     }
-    // « Déjà arbitré » : câblé ici avec sa raison (doc/42) — il ne passe pas
-    // par la délégation data-status, qui partirait au serveur sans raison.
-    buttons.appendChild(arbitrationControls(
-      reason => changeStatus(api, rec.id, 'arbitrated', reason)));
+    // « Non merci » : câblé avec sa raison (doc/42) — il ne passe pas par la
+    // délégation data-status, qui partirait au serveur sans raison.
+    buttons.appendChild(choice(
+      refusalControls(reason => changeStatus(api, rec.id, 'arbitrated', reason)),
+      CHOICE_CAPTIONS.refuse));
     card.appendChild(buttons);
   }
   return card;
@@ -72,9 +94,9 @@ function renderSummary(node, summary) {
   );
 }
 
-function renderList(node, { groups, stale, arbitrated }) {
+function renderList(node, { groups, stale, decided }) {
   node.textContent = '';
-  if (groups.length === 0 && stale.length === 0 && arbitrated.length === 0) {
+  if (groups.length === 0 && stale.length === 0 && decided.length === 0) {
     node.appendChild(el('div', 'advisor-empty', 'Aucune recommandation sur la période — rien à corriger.'));
     return;
   }
@@ -96,8 +118,8 @@ function renderList(node, { groups, stale, arbitrated }) {
     for (const rec of stale) node.appendChild(recommendationCard(rec, { actionable: false }));
   }
   // Dernière section, repliée mais jamais silencieuse : le compte reste
-  // visible depuis la vue principale, la raison et la date dans le dépliage.
-  renderArbitrated(node, arbitrated);
+  // visible depuis la vue principale, la décision et sa date dans le dépliage.
+  renderDecisions(node, decided);
 }
 
 function render() {

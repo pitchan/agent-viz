@@ -24,7 +24,7 @@ test('the store starts empty and resets cleanly', () => {
   resetStore();
   const s = getState();
   assert.equal(s.summary, null);
-  assert.deepEqual(s.recommendations, { groups: [], stale: [], arbitrated: [] });
+  assert.deepEqual(s.recommendations, { groups: [], stale: [], decided: [] });
   assert.equal(s.error, null);
   assert.equal(s.loading, false);
 });

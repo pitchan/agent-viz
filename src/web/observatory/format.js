@@ -90,11 +90,38 @@ function formatDayMonthYear(iso) {
   return `${formatDayMonth(iso)}/${new Date(iso).getFullYear()}`;
 }
 
-// One line per folded card (doc/42): the decision date, then the user's own
-// reason. Both are enforced at write time; a hole says so, never guesses.
-export function arbitratedLine(rec) {
-  const when = rec.statusAt ? `Arbitré le ${formatDayMonthYear(rec.statusAt)}` : 'Arbitré (date non consignée)';
-  return rec.statusReason ? `${when} — ${rec.statusReason}` : when;
+// The decision journal (doc/44): the user's intention in their own words,
+// never the machine statuses. Dates and reasons are enforced at write time;
+// a hole says so, never guesses.
+const DECISION_VERBS = { accepted: 'Adopté', ignored: 'Mis en veille', arbitrated: 'Refusé' };
+const DECISION_WATCH = {
+  accepted: 'reviendra si le coût regrossit malgré tout',
+  ignored: 'reviendra si le coût regrossit de moitié',
+};
+
+function decidedWhen(rec) {
+  const verb = DECISION_VERBS[rec.status] ?? rec.status;
+  return rec.statusAt ? `${verb} le ${formatDayMonthYear(rec.statusAt)}` : `${verb} (date non consignée)`;
+}
+
+// One line per journal card: what was decided, when, and either the user's
+// reason (a refusal) or the watch that stays armed (adoption, sleep).
+export function decisionLine(rec) {
+  const tail = rec.statusReason ?? DECISION_WATCH[rec.status] ?? null;
+  return tail ? `${decidedWhen(rec)} — ${tail}` : decidedWhen(rec);
+}
+
+// Banner of a decided card that crossed its return threshold and surfaced
+// again. The percentage needs a usable baseline; a zero at decision time
+// makes it undefined, so the banner states the return without inventing one.
+export function returnBanner(rec) {
+  if (rec.status !== 'accepted' && rec.status !== 'ignored') return '';
+  const base = rec.costAtStatusUsd;
+  const growth = typeof base === 'number' && base > 0
+    ? ` de ${Math.round((rec.estimatedCostUsd / base - 1) * 100)} %` : '';
+  return rec.status === 'accepted'
+    ? `${decidedWhen(rec)} — le coût a pourtant regrossi${growth} depuis. Le geste a-t-il pris ?`
+    : `${decidedWhen(rec)} — le coût a regrossi${growth} depuis.`;
 }
 
 /** Every card states its window; a card without one says so, never guesses. */
