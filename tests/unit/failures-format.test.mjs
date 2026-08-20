@@ -5,7 +5,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { failureLine, projectLabel, failuresSummary, groupKey, groupAlerts, causeLabel, episodeLabel } from '../../src/web/observatory/failures-format.js';
+import { failureLine, projectLabel, failuresSummary, groupKey, groupAlerts, causeLabel, episodeLabel, panelAlerts } from '../../src/web/observatory/failures-format.js';
 import { _DETECTOR_TYPES } from '../../src/web/viz-watchdog.mjs';
 
 const base = {
@@ -190,6 +190,31 @@ test('le resume compte les non acquittees, il ne prononce pas « en cours »', (
     failuresSummary([{ acknowledged: false }, { acknowledged: true }, { acknowledged: false }]),
     '2 non acquittées',
   );
+});
+
+// ── Ce que le panneau accepte de montrer : des fautes, pas des etats ───────
+//
+// `stuck` decrit un etat passager qui se resout tout seul. En vivant il a sa
+// pastille et sa notification bureau, qui nomment chaque commande en vol ; en
+// memoire, declenche des 3 minutes de silence, il noyait les vraies fautes
+// sous des commandes simplement longues (mesure en prod : 67 des 73
+// non-acquittees). Un etat qui se resout seul n'est pas une dette du lecteur.
+
+test('panelAlerts ecarte les silences (stuck) et garde tout le reste', () => {
+  const kept = panelAlerts([
+    base,
+    { ...base, type: 'stuck', toolName: '', count: 1 },
+    invocation,
+    // Un type de demain TRAVERSE : le filtre est nomme, jamais en creux — on
+    // n'ecarte que ce qu'on sait etre un etat, pas ce qu'on ne connait pas.
+    { ...base, type: 'unTypeDeDemain' },
+  ]);
+  assert.deepEqual(kept.map(a => a.type), ['loop', 'badInvocation', 'unTypeDeDemain']);
+});
+
+test('panelAlerts tolere une liste absente ou abimee, sans jeter', () => {
+  assert.deepEqual(panelAlerts(undefined), []);
+  assert.deepEqual(panelAlerts(null), []);
 });
 
 // ── Regroupement par cause ─────────────────────────────────────────────────

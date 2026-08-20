@@ -64,19 +64,36 @@ test('l episode montre la commande en defaut ; sans commande consignee, il le di
   assert.equal(cmds[1].textContent, 'commande non consignée (alerte ancienne)');
 });
 
-test('une alerte stuck liste TOUS ses outils en vol', () => {
+// Decision du 2026-08-20 : le bloc est la memoire des FAUTES, et `stuck` est
+// un etat passager qui se resout tout seul — en memoire il noyait les vraies
+// pannes (67 des 73 non-acquittees en prod). Sa place vivante ne bouge pas :
+// pastille et notification bureau nomment chaque commande en vol.
+const stuck = (sur = {}) => invocation({
+  type: 'stuck', toolName: '', patternId: '', subject: '', count: 2, standing: true,
+  tools: [{ toolName: 'Bash', subject: 'npm run build' }, { toolName: 'Read', subject: 'a.js' }],
+  ...sur,
+});
+
+test('une alerte stuck ne s affiche pas : le bloc ne montre que des fautes', () => {
   const node = fauxElement('div');
-  renderFailures(node, [invocation({
-    type: 'stuck', toolName: '', patternId: '', subject: '', count: 2,
-    tools: [{ toolName: 'Bash', subject: 'npm run build' }, { toolName: 'Read', subject: 'a.js' },
-      { toolName: 'AskUserQuestion', subject: '' }],
-  })]);
-  const cmds = parClasse(node, 'failure-cmd');
-  assert.equal(cmds.length, 3);
-  assert.match(cmds[0].textContent, /Bash · npm run build/);
-  assert.match(cmds[1].textContent, /Read · a\.js/);
-  // Un outil sans sujet ne laisse pas un separateur suspendu a l ecran.
-  assert.equal(cmds[2].textContent, 'AskUserQuestion');
+  renderFailures(node, [invocation(), stuck()]);
+  assert.equal(parClasse(node, 'failure-group').length, 1, 'la faute reste, le silence non');
+  assert.equal(parClasse(node, 'failure-cause')[0].textContent.includes('en vol'), false);
+});
+
+test('le compteur du bloc ignore les stuck non acquittes', () => {
+  const node = fauxElement('div');
+  renderFailures(node, [invocation(), stuck()]);
+  assert.equal(parClasse(node, 'failures-count')[0].textContent, '1 non acquittée');
+});
+
+test('rien que des stuck = le bloc dit « aucune panne », pas un bloc vide', () => {
+  const node = fauxElement('div');
+  renderFailures(node, [stuck(), stuck({ createdAt: T0 - 1000 })]);
+  assert.equal(parClasse(node, 'failure-group').length, 0);
+  assert.equal(parClasse(node, 'failures-count')[0].textContent, 'aucune');
+  assert.equal(parClasse(node, 'failures-empty').length, 1,
+    'un bloc vide sans un mot serait indiscernable d un bug du panneau');
 });
 
 test('le remede s affiche avec son extrait ; le filet n en a pas', () => {

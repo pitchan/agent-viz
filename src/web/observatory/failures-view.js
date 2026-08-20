@@ -5,7 +5,7 @@
 // (`onAckGroup`), advisor-view l'orchestre. Le regroupement et les phrases
 // viennent de failures-format.js, les remedes de remedies.js.
 
-import { groupAlerts, causeLabel, episodeLabel, failuresSummary, projectLabel } from './failures-format.js';
+import { groupAlerts, causeLabel, episodeLabel, failuresSummary, projectLabel, panelAlerts } from './failures-format.js';
 import { remedyFor } from './remedies.js';
 
 function el(tag, className, text) {
@@ -119,16 +119,20 @@ function groupNode(group, onAckGroup) {
 
 export function renderFailures(node, alerts, { onAckGroup } = {}) {
   node.textContent = '';
-  const enAttente = (alerts || []).some(a => !a.acknowledged);
+  // Le filtre se pose ICI, a l'affichage, et nulle part en amont : le journal
+  // continue de consigner les stuck (la pastille vivante les lit par la meme
+  // route), seul ce bloc refuse de les montrer — voir panelAlerts.
+  const pannes = panelAlerts(alerts);
+  const enAttente = pannes.some(a => !a.acknowledged);
   const title = el('div', 'failures-title');
   title.append(el('span', undefined, 'Pannes détectées'));
   title.appendChild(el('span', enAttente ? 'failures-count' : 'failures-count is-quiet',
-    failuresSummary(alerts)));
+    failuresSummary(pannes)));
   node.appendChild(title);
-  if (!alerts || alerts.length === 0) {
+  if (pannes.length === 0) {
     node.appendChild(el('div', 'failures-empty',
       'Aucune panne sur la période. Ce bloc garde ce qui s’est produit même quand personne ne regardait.'));
     return;
   }
-  for (const group of groupAlerts(alerts)) node.appendChild(groupNode(group, onAckGroup));
+  for (const group of groupAlerts(pannes)) node.appendChild(groupNode(group, onAckGroup));
 }

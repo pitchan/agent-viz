@@ -143,6 +143,25 @@ export function failuresSummary(alerts) {
   return `${n} non acquittée${n > 1 ? 's' : ''}`;
 }
 
+// ── Ce que le panneau accepte de montrer ───────────────────────────────────
+//
+// Des FAUTES, pas des etats passagers. `stuck` decrit un etat qui se resout
+// tout seul : en vivant il a sa pastille et sa notification bureau, qui
+// nomment chaque commande en vol (DETAIL_LINES.stuck, viz-alert-format.mjs) ;
+// en memoire, declenche des 3 minutes de silence, il noyait les vraies fautes
+// sous des commandes simplement longues — 67 des 73 non-acquittees mesurees
+// en prod le 2026-08-20. Un etat qui se resout seul n'est pas une dette du
+// lecteur : il n'a pas a reclamer d'acquittement.
+//
+// Le filtre est NOMME, jamais en creux : seul `stuck` est ecarte. Un type de
+// demain traverse — le filet « tout detecteur arrive avec sa phrase » ne
+// protege que ce qui s'affiche. Et les formulations stuck restent dans les
+// tables ci-dessus : le contrat se verifie des deux cotes du detecteur, et le
+// jour ou cette decision se rejoue, tout est encore la.
+export function panelAlerts(alerts) {
+  return listeDe(alerts).filter(a => a.type !== 'stuck');
+}
+
 // ── Regroupement par cause ─────────────────────────────────────────────────
 //
 // Une ligne par CAUSE, plus jamais une ligne par episode (doc/32). La clef dit
