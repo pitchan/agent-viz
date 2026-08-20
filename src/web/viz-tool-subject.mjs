@@ -15,6 +15,10 @@ function basename(p) {
 
 const TOOL_SUBJECT = {
   Bash:  ti => ti.command,
+  // Same field as Bash, and its absence here cost real information: every
+  // PowerShell alert (retryStorm, stuck, badInvocation) rendered without its
+  // command while the ps-* motifs and their remedies already existed.
+  PowerShell: ti => ti.command,
   Read:  ti => ti.file_path && basename(ti.file_path),
   Write: ti => ti.file_path && basename(ti.file_path),
   Edit:  ti => ti.file_path && basename(ti.file_path),

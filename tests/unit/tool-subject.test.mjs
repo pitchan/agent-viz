@@ -14,6 +14,15 @@ test('Bash: returns the full command, untruncated', () => {
   assert.equal(toolSubject({ tool_name: 'Bash', tool_input: { command: long } }), long);
 });
 
+// PowerShell carries its command in the same field as Bash. Its absence from
+// the table was measured in production: a retryStorm episode on PowerShell
+// (18/08 23:19, rejeu-r7) displayed with no command at all — the one fact the
+// reader needed.
+test('PowerShell: returns the full command, untruncated', () => {
+  const long = 'Get-Content "F:/DEV/rejeu-r7/sans/backend/log.txt" -Tail 50; if ($?) { npm run replay }';
+  assert.equal(toolSubject({ tool_name: 'PowerShell', tool_input: { command: long } }), long);
+});
+
 test('Read/Write/Edit: returns the basename of the path', () => {
   for (const tool of ['Read', 'Write', 'Edit']) {
     assert.equal(
