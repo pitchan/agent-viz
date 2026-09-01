@@ -211,6 +211,14 @@ async function cmdStop(argv) {
       let totalRemoved = 0;
       for (const [agent, x] of Object.entries(result)) {
         const label = agent === 'claude' ? 'Claude Code' : 'Copilot CLI';
+        if (x.error) {
+          // Le signal d'echec ne doit jamais se perdre ici (décision D3) : stop
+          // retire des hooks de maniere routiniere, donc un refus tu = des
+          // hooks qui restent poses et continuent de se declencher sans que
+          // l'utilisateur le sache.
+          console.log(`${c.err('✗')} ${label} hooks NOT removed: ${x.error}`);
+          continue;
+        }
         for (const r of (x.results || [])) {
           if (r.removed > 0) {
             totalRemoved += r.removed;

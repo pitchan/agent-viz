@@ -17,6 +17,7 @@ interface CliAuditResult {
 }
 interface CliUninstallResult {
   results: Array<{ file: string; scope: Scope; removed: number; exists: boolean }>;
+  error?: string;
 }
 interface CliInstallResult {
   target: { file: string; scope: Scope };
@@ -69,7 +70,13 @@ export function cliMain(argv: string[]): void {
   if (mode === 'uninstall') {
     const result = uninstall({ scope, cwd }) as Record<string, CliUninstallResult>;
     let total = 0;
+    let failed = false;
     for (const [agent, x] of Object.entries(result)) {
+      if (x.error) {
+        console.log(`[${agent}] ! ${x.error}`);
+        failed = true;
+        continue;
+      }
       const results = x.results || [];
       for (const r of results) {
         total += r.removed;
@@ -77,7 +84,9 @@ export function cliMain(argv: string[]): void {
         else if (r.exists) console.log(`[${agent}]   rien à retirer dans ${r.file} (${r.scope})`);
       }
     }
-    if (total === 0) console.log('Aucun hook agent-viz trouvé.');
+    // Une erreur ne doit jamais se lire comme « rien à retirer » (décision D3) :
+    // le total peut rester à 0 alors qu'un agent n'a pas pu être traité du tout.
+    if (total === 0 && !failed) console.log('Aucun hook agent-viz trouvé.');
     return;
   }
 
