@@ -216,6 +216,16 @@ async function cmdStop(argv) {
           // retire des hooks de maniere routiniere, donc un refus tu = des
           // hooks qui restent poses et continuent de se declencher sans que
           // l'utilisateur le sache.
+          //
+          // Le refus est IMPRIME, mais ne fixe PAS le code de sortie — et c'est
+          // deliberé, meme regle que `cmdStart` : le code de sortie de `start` /
+          // `stop` rend compte du CYCLE DE VIE DU SERVEUR, leur unique objet.
+          // Le retrait des hooks y est un service annexe, explicitement
+          // desactivable (`--keep-hooks` / `--no-install-hooks`) : laisser des
+          // hooks en place est un mode supporte de la commande, donc pas un
+          // echec de la commande. Les codes de sortie QUI PARLENT DES HOOKS
+          // sont ceux des commandes dediees, `install-hooks` et
+          // `uninstall-hooks` — elles, sortent 1 (D3).
           console.log(`${c.err('✗')} ${label} hooks NOT removed: ${x.error}`);
           continue;
         }
@@ -308,7 +318,18 @@ async function cmdInstallHooks(argv) {
     const result = audit({ target, scope, cwd: process.cwd(), packageRoot: PKG_ROOT, version: PKG_VERSION });
     let exitCode = 0;
     for (const [agent, a] of Object.entries(result)) {
-      console.log(`${agent === 'claude' ? 'Claude Code' : 'Copilot CLI'}:`);
+      const label = agent === 'claude' ? 'Claude Code' : 'Copilot CLI';
+      // `audit` passe par le registre, qui traduit tout refus en `{ error }` :
+      // un fichier de hooks illisible fait lever la lecture. Sans cette garde,
+      // `--check` imprimait « settings : undefined » puis mourait sur
+      // `a.audit is not iterable`, en ne nommant plus le fichier fautif.
+      if (a.error) {
+        console.log(`${label}:`);
+        console.log(`  ${c.err('✗')} ${a.error}`);
+        exitCode = 1;
+        continue;
+      }
+      console.log(`${label}:`);
       console.log(c.dim(`  settings : ${a.file}  (scope: ${a.scope})`));
       for (const { event, installed, stale, others } of a.audit) {
         const flag = installed ? (stale ? c.warn('~') : c.ok('x')) : c.err(' ');
@@ -397,6 +418,11 @@ async function cmdUninstallHooks(argv) {
   // Une erreur ne doit jamais se lire comme « rien à retirer » (décision D3) :
   // le total peut rester a 0 alors qu un agent n a pas pu etre traite du tout.
   if (total === 0 && !failed) console.log(c.dim('No agent-viz hooks found.'));
+  // …ni comme un succes pour le script qui appelle (D3, le code de sortie).
+  // Avant que le registre ne traduise le refus en valeur, la levee sortait 1 ;
+  // sortir 0 en annoncant « hooks NOT removed » ferait lire un succes a une
+  // etape de CI alors que les hooks restent poses et continuent de tirer.
+  if (failed) process.exitCode = 1;
 }
 
 async function cmdHook() {

@@ -14,6 +14,7 @@ interface CliAuditResult {
   file: string;
   scope: Scope;
   audit: Array<{ event: string; installed: boolean; stale: boolean; others: number }>;
+  error?: string;
 }
 interface CliUninstallResult {
   results: Array<{ file: string; scope: Scope; removed: number; exists: boolean }>;
@@ -54,6 +55,15 @@ export function cliMain(argv: string[]): void {
     const result = audit({ scope, cwd }) as Record<string, CliAuditResult>;
     let allGood = true;
     for (const [agent, a] of Object.entries(result)) {
+      // `audit` passe par `dispatch`, qui traduit tout refus en `{ error }` :
+      // un fichier de hooks illisible fait lever `readSettings`/`readCopilotFile`.
+      // Sans cette garde, l'audit imprimait « settings : undefined » puis mourait
+      // sur `a.audit is not iterable` — un vrai diagnostic remplacé par un faux.
+      if (a.error) {
+        console.log(`[${agent}] ! ${a.error}`);
+        allGood = false;
+        continue;
+      }
       console.log(`[${agent}] settings : ${a.file}  (scope: ${a.scope})`);
       for (const { event, installed, stale, others } of a.audit) {
         const flag = installed ? (stale ? '~' : 'x') : ' ';
@@ -87,6 +97,12 @@ export function cliMain(argv: string[]): void {
     // Une erreur ne doit jamais se lire comme « rien à retirer » (décision D3) :
     // le total peut rester à 0 alors qu'un agent n'a pas pu être traité du tout.
     if (total === 0 && !failed) console.log('Aucun hook agent-viz trouvé.');
+    // …et elle ne doit pas non plus se lire comme un succès dans un script
+    // (D3, le code de sortie) : avant la traduction du refus en valeur, la
+    // levée remontait au gestionnaire global et sortait 1. Un `uninstall-hooks`
+    // qui sort 0 en disant « hooks NON retirés » fait lire un succès à une
+    // étape de CI alors que les hooks sont posés et se déclenchent toujours.
+    if (failed) process.exit(1);
     return;
   }
 
