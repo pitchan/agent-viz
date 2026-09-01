@@ -81,7 +81,11 @@ test('l\'install préserve les entrées tierces du fichier — la postcondition 
     commandes.includes('echo hook-d-un-tiers'),
     `entrée tierce détruite par l'install : ${JSON.stringify(commandes)}`,
   );
-  // …et notre hook a bien été rafraîchi au passage
+  // …et notre hook a bien été rafraîchi au passage : la commande exacte
+  // annoncée par le résultat a atteint le disque, l'ancienne a disparu — ni
+  // l'une ni l'autre n'était vraie tant que `mergeCopilotHooks` préservait
+  // l'entrée périmée au lieu de la remplacer.
   assert.equal(result.copilot.coexisting.PreToolUse, 1);
-  assert.ok(commandes.some(cmd => cmd !== 'echo hook-d-un-tiers' && /agent-viz/.test(cmd)));
+  assert.ok(commandes.includes(result.copilot.command.command));
+  assert.ok(!commandes.includes(notre));
 });
