@@ -38,10 +38,27 @@ export function pickAgents({ target }: { target?: string }): AgentName[] {
   return detected.length > 0 ? detected : [all[0]!];
 }
 
+// Un adaptateur a le droit de REFUSER : copilot.ts refuse d'écraser un fichier
+// qui porte notre nom sans être à nous (sécurité voulue, cf. config.ts). Ce
+// refus est une DONNÉE du résultat, pas une exception qui traverse — sinon la
+// table `out`, donc le travail déjà fait par les agents précédents, est perdue
+// et l'appelant annonce « skipped » alors que des hooks SONT posés.
+//
+// Convention restaurée, pas inventée : b0b0e8e l'avait introduite et
+// bin/agent-viz.js la consommait ; 677771e l'a retirée en annonçant « no more
+// wrapped errors » — faux le jour même, le throw de f7bc172 étant antérieur et
+// jamais retiré. Le consommateur orphelin `if (r.error)` a survécu dans cli.ts.
+function failure(err: unknown): { error: string } {
+  return { error: err instanceof Error ? err.message : String(err) };
+}
+
 export function dispatch(method: 'install' | 'uninstall' | 'audit', opts: AgentOpts): Record<string, unknown> {
   const agents = pickAgents(opts);
   const out: Record<string, unknown> = {};
-  for (const a of agents) out[a] = INSTALLERS[a][method](opts);
+  for (const a of agents) {
+    try { out[a] = INSTALLERS[a][method](opts); }
+    catch (err) { out[a] = failure(err); }
+  }
   return out;
 }
 
@@ -51,7 +68,10 @@ export function uninstall(opts: AgentOpts = {}): Record<string, unknown> {
   // Default to ALL registered agents (sweep), even if not currently detected.
   const agents: AgentName[] = opts.target ? pickAgents(opts) : (Object.keys(INSTALLERS) as AgentName[]);
   const out: Record<string, unknown> = {};
-  for (const a of agents) out[a] = INSTALLERS[a].uninstall(opts);
+  for (const a of agents) {
+    try { out[a] = INSTALLERS[a].uninstall(opts); }
+    catch (err) { out[a] = failure(err); }
+  }
   return out;
 }
 

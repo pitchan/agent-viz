@@ -3,7 +3,19 @@
 // installedIn, findInstalledScopes rebrancherait sur le nom d'agent.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { INSTALLERS } from '../../src/server/install-hooks/registry.ts';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { INSTALLERS, install } from '../../src/server/install-hooks/registry.ts';
+
+// Un bac à sable qui ressemble à un projet : `resolveScope({ scope: 'project' })`
+// exige un `.git` pour trouver la racine. On n'utilise JAMAIS la portée `user`
+// dans les tests — `os.homedir()` n'est pas interceptable.
+function sandboxProject(prefix) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  fs.mkdirSync(path.join(root, '.git'));
+  return root;
+}
 
 const METHODS = ['install', 'uninstall', 'audit', 'detect', 'sweepTargets', 'installedIn'];
 
@@ -18,4 +30,26 @@ test('chaque adaptateur du registre expose le contrat AgentInstaller complet', (
       assert.equal(typeof inst[m], 'function', `${name}.${m} doit être une fonction`);
     }
   }
+});
+
+test('le refus d\'un adaptateur ne traverse pas le registre et ne jette pas le résultat des autres', () => {
+  // Arrange — un fichier Copilot qui existe, JSON valide, mais qui n'est pas à nous
+  const root = sandboxProject('avtest-liskov-hostile-');
+  const packageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'avtest-pkg-'));
+  const copilotFile = path.join(root, '.github', 'hooks', 'agent-viz.json');
+  fs.mkdirSync(path.dirname(copilotFile), { recursive: true });
+  fs.writeFileSync(copilotFile, JSON.stringify({ version: 99, note: 'pas à nous' }, null, 2));
+
+  // Act — les DEUX agents, Claude passe en premier dans le registre
+  const result = install({ target: 'all', scope: 'project', cwd: root, packageRoot });
+
+  // Assert — la case fautive porte une valeur, pas une exception
+  assert.equal(typeof result.copilot.error, 'string', 'copilot doit rendre { error }');
+  assert.match(result.copilot.error, /refusing to overwrite/);
+  // …et le travail de l'agent sain n'est pas jeté avec l'exception
+  assert.equal(result.claude.action, 'installed');
+  assert.ok(
+    fs.existsSync(path.join(root, '.claude', 'settings.json')),
+    'l\'install claude doit avoir eu lieu et être visible sur le disque',
+  );
 });
