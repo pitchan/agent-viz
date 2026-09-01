@@ -224,8 +224,37 @@ export function uninstallCopilot({ scope, cwd, packageRoot }: AgentOpts = {}) {
     }
     const content = readCopilotFile(t.file);
     if (isAgentVizCopilotFile(content)) {
-      try { fs.unlinkSync(t.file); } catch {}
-      results.push({ ...t, removed: eventsFor('copilot').length, exists: true });
+      // Compter ce qui est RÉELLEMENT à nous, événement par événement — et non
+      // un forfait `eventsFor('copilot').length` qui annonçait 5 retraits même
+      // quand le fichier n'en portait qu'un.
+      let removed = 0;
+      const kept: Record<string, CopilotHookEntry[]> = {};
+      for (const [ev, arr] of Object.entries(content.hooks)) {
+        // `isAgentVizCopilotFile` ne garantit que `isRecord(content.hooks)` :
+        // une valeur non-tableau est un contenu disque possible, pas une
+        // impossibilité — on la préserve telle quelle. (Le prédicat type `arr`
+        // en `CopilotHookEntry[]`, donc TypeScript narrowe la branche fausse en
+        // `never` : c'est le type qui ment, pas le garde qui est inutile — même
+        // situation que le commentaire de `readCopilotFile`. Si le compilateur
+        // proteste, caster `content.hooks as Record<string, unknown>` pour
+        // l'itération plutôt que retirer le garde.)
+        if (!Array.isArray(arr)) { kept[ev] = arr; continue; }
+        const others = arr.filter(e => !isAgentVizCommand(copilotEntryCommand(e)));
+        removed += arr.length - others.length;
+        if (others.length > 0) kept[ev] = others;
+      }
+      if (Object.keys(kept).length > 0) {
+        // Des entrées tierces coexistent : retrait chirurgical, on ne supprime
+        // pas le fichier qui les porte.
+        fs.writeFileSync(t.file, JSON.stringify({ ...content, hooks: kept }, null, 2) + '\n');
+      } else {
+        // Le fichier ne portait que nous : il s'en va. Plus de `catch {}` muet —
+        // un retrait qui échoue ne doit pas s'annoncer « removed » (règle maison
+        // « pas de fallback silencieux »). La levée devient une valeur au
+        // registre, cf. tâche 1.
+        fs.unlinkSync(t.file);
+      }
+      results.push({ ...t, removed, exists: true });
     } else {
       results.push({ ...t, removed: 0, exists: true });
     }

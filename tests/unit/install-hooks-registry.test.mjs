@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { INSTALLERS, install } from '../../src/server/install-hooks/registry.ts';
+import { INSTALLERS, install, uninstall } from '../../src/server/install-hooks/registry.ts';
 
 // Un bac à sable qui ressemble à un projet : `resolveScope({ scope: 'project' })`
 // exige un `.git` pour trouver la racine. On n'utilise JAMAIS la portée `user`
@@ -88,4 +88,53 @@ test('l\'install préserve les entrées tierces du fichier — la postcondition 
   assert.equal(result.copilot.coexisting.PreToolUse, 1);
   assert.ok(commandes.includes(result.copilot.command.command));
   assert.ok(!commandes.includes(notre));
+});
+
+test('uninstall rend le nombre réel de retraits, jamais un forfait', () => {
+  // Arrange — notre fichier, mais notre hook sur 2 événements SEULEMENT (sur 5)
+  const root = sandboxProject('avtest-liskov-removed-');
+  const packageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'avtest-pkg-'));
+  const file = path.join(root, '.github', 'hooks', 'agent-viz.json');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const notre = 'node /ailleurs/agent-viz/hook.js --source=copilot';
+  const entree = { type: 'command', bash: notre, powershell: notre, timeoutSec: 10 };
+  fs.writeFileSync(file, JSON.stringify({
+    version: 1,
+    hooks: { PreToolUse: [entree], Stop: [entree] },
+  }, null, 2));
+
+  // Act — PORTÉE EXPLICITE : sans portée, uninstall balaye depuis le cwd
+  const result = uninstall({ target: 'copilot', scope: 'project', cwd: root, packageRoot });
+
+  // Assert
+  const total = result.copilot.results.reduce((n, r) => n + r.removed, 0);
+  assert.equal(total, 2, `attendu 2 retraits réels, reçu ${total} (forfait ?)`);
+});
+
+test('uninstall ne supprime pas le fichier qui porte encore des entrées tierces', () => {
+  // Arrange — notre hook sur 1 événement, plus un hook tiers sur le même
+  const root = sandboxProject('avtest-liskov-uninst-tiers-');
+  const packageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'avtest-pkg-'));
+  const file = path.join(root, '.github', 'hooks', 'agent-viz.json');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const notre = 'node /ailleurs/agent-viz/hook.js --source=copilot';
+  fs.writeFileSync(file, JSON.stringify({
+    version: 1,
+    hooks: {
+      PreToolUse: [
+        { type: 'command', bash: notre, powershell: notre, timeoutSec: 10 },
+        { type: 'command', bash: 'echo hook-d-un-tiers' },
+      ],
+    },
+  }, null, 2));
+
+  // Act
+  const result = uninstall({ target: 'copilot', scope: 'project', cwd: root, packageRoot });
+
+  // Assert — le fichier survit, l'entrée tierce aussi, et removed vaut 1
+  assert.ok(fs.existsSync(file), 'le fichier portant une entrée tierce ne doit pas être supprimé');
+  const apres = JSON.parse(fs.readFileSync(file, 'utf8'));
+  assert.deepEqual(apres.hooks.PreToolUse.map(e => e.bash), ['echo hook-d-un-tiers']);
+  const total = result.copilot.results.reduce((n, r) => n + r.removed, 0);
+  assert.equal(total, 1);
 });
