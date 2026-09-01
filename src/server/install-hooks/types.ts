@@ -42,8 +42,14 @@ export interface AgentOpts {
 // L'interface du registre INSTALLERS. Les quatre premières méthodes existaient
 // déjà ; sweepTargets et installedIn comblent les deux endroits où le code
 // branchait encore sur le nom d'agent (findInstalledScopes, agentDetected) au
-// lieu de passer par le registre. Ajouter un 3e agent = un fichier
-// d'adaptateur + une entrée AGENT_CONFIG + une entrée INSTALLERS.
+// lieu de passer par le registre.
+// Les six méthodes valent pour tout agent enregistré. Un adaptateur a le droit
+// de REFUSER une opération (installCopilot refuse d'écraser un fichier qui
+// porte notre nom sans être à nous) : le registre traduit ce refus en
+// `{ error: string }` dans la case de cet agent, et les autres agents gardent
+// leur résultat. Les consommateurs n'ont donc jamais à connaître l'agent
+// concret. Ajouter un 3e agent = un fichier d'adaptateur + une entrée
+// AGENT_CONFIG + une entrée INSTALLERS.
 export interface AgentInstaller {
   install: (opts: AgentOpts) => unknown;
   uninstall: (opts: AgentOpts) => unknown;
