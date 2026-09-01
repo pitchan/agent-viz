@@ -51,6 +51,23 @@ function buildCopilotHookFile(command: string): CopilotHooksFile {
   return { version: 1, hooks };
 }
 
+// Fusion chirurgicale dans un fichier DÉJÀ reconnu comme nôtre — même
+// postcondition que l'adaptateur Claude (`refreshStaleCommand` / `addHook`) :
+// ce qui n'est pas à nous survit. Écraser par `buildCopilotHookFile` détruisait
+// les entrées tierces que la CLI annonce pourtant « untouched ».
+function mergeCopilotHooks(existing: CopilotHooksFile, command: string): CopilotHooksFile {
+  const entry: CopilotHookEntry = { type: 'command', bash: command, powershell: command, timeoutSec: HOOK_TIMEOUT_SEC };
+  const hooks: Record<string, CopilotHookEntry[]> = { ...existing.hooks };
+  for (const ev of eventsFor('copilot')) {
+    const arr = Array.isArray(hooks[ev]) ? [...hooks[ev]] : [];
+    const i = arr.findIndex(e => isAgentVizCommand(copilotEntryCommand(e)));
+    if (i >= 0) arr[i] = entry;
+    else arr.push(entry);
+    hooks[ev] = arr;
+  }
+  return { ...existing, version: 1, hooks };
+}
+
 // Retour `unknown`, PAS `CopilotHooksFile | null` : `JSON.parse` d'un fichier
 // disque ne garantit RIEN sur sa forme — un `agent-viz.json` JSON-valide sans
 // clé `hooks` est un contenu réel possible, pas une impossibilité que le type
@@ -133,6 +150,9 @@ export function installCopilot({ scope, cwd, packageRoot, version }: AgentOpts =
   const desired = buildCopilotHookFile(cmd.command);
   const existing = readCopilotFile(target.file);
 
+  // Ce qu'on écrira : le fichier neuf si rien n'existe, la fusion sinon.
+  let content: CopilotHooksFile = desired;
+
   let action = 'noop';
   let missing: string[] = [];
   let updated: string[] = [];
@@ -161,12 +181,13 @@ export function installCopilot({ scope, cwd, packageRoot, version }: AgentOpts =
         .filter(s => s.scope !== target.scope);
       return { target, action: 'noop', missing, updated, present, coexisting, command: cmd, crossScope };
     }
+    content = mergeCopilotHooks(existing, cmd.command);
     action = (missing.length && updated.length) ? 'installed+updated'
            : missing.length ? 'installed' : 'updated';
   }
 
   fs.mkdirSync(path.dirname(target.file), { recursive: true });
-  fs.writeFileSync(target.file, JSON.stringify(desired, null, 2) + '\n');
+  fs.writeFileSync(target.file, JSON.stringify(content, null, 2) + '\n');
 
   let gitignore: { changed: boolean; reason?: string } | null = null;
   if (target.scope === 'local' && target.projectRoot) {

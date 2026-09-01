@@ -53,3 +53,35 @@ test('le refus d\'un adaptateur ne traverse pas le registre et ne jette pas le r
     'l\'install claude doit avoir eu lieu et être visible sur le disque',
   );
 });
+
+test('l\'install préserve les entrées tierces du fichier — la postcondition « untouched » est vraie', () => {
+  // Arrange — NOTRE fichier (version 1 + une commande agent-viz), plus un hook tiers
+  const root = sandboxProject('avtest-liskov-tiers-');
+  const packageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'avtest-pkg-'));
+  const file = path.join(root, '.github', 'hooks', 'agent-viz.json');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const notre = 'node /ailleurs/agent-viz/hook.js --source=copilot';
+  fs.writeFileSync(file, JSON.stringify({
+    version: 1,
+    hooks: {
+      PreToolUse: [
+        { type: 'command', bash: notre, powershell: notre, timeoutSec: 10 },
+        { type: 'command', bash: 'echo hook-d-un-tiers' },
+      ],
+    },
+  }, null, 2));
+
+  // Act
+  const result = install({ target: 'copilot', scope: 'project', cwd: root, packageRoot });
+
+  // Assert — on relit le DISQUE, on ne croit pas la valeur de retour
+  const apres = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const commandes = apres.hooks.PreToolUse.map(e => e.bash);
+  assert.ok(
+    commandes.includes('echo hook-d-un-tiers'),
+    `entrée tierce détruite par l'install : ${JSON.stringify(commandes)}`,
+  );
+  // …et notre hook a bien été rafraîchi au passage
+  assert.equal(result.copilot.coexisting.PreToolUse, 1);
+  assert.ok(commandes.some(cmd => cmd !== 'echo hook-d-un-tiers' && /agent-viz/.test(cmd)));
+});
