@@ -45,11 +45,25 @@ export interface AgentOpts {
 // lieu de passer par le registre.
 // Les six méthodes valent pour tout agent enregistré. Un adaptateur a le droit
 // de REFUSER une opération (installCopilot refuse d'écraser un fichier qui
-// porte notre nom sans être à nous) : le registre traduit ce refus en
-// `{ error: string }` dans la case de cet agent, et les autres agents gardent
-// leur résultat. Les consommateurs n'ont donc jamais à connaître l'agent
-// concret. Ajouter un 3e agent = un fichier d'adaptateur + une entrée
-// AGENT_CONFIG + une entrée INSTALLERS.
+// porte notre nom sans avoir la forme d'un fichier de hooks Copilot).
+//
+// La traduction de ce refus en `{ error: string }` ne couvre que TROIS des six
+// méthodes — `install`, `uninstall` et `audit`, les seules qui passent par
+// `dispatch` / `uninstall` de registry.ts. Pour celles-là, le refus est rangé
+// dans la case de cet agent, les autres agents gardent leur résultat, et les
+// consommateurs n'ont jamais à connaître l'agent concret.
+//
+// `detect`, `sweepTargets` et `installedIn` sont appelées DIRECTEMENT, sans
+// garde : `pickAgents` appelle `detect`, `findInstalledScopes` appelle
+// `sweepTargets` et `installedIn`. Elles PEUVENT LEVER et la levée traverse
+// jusqu'à l'appelant — `installedIn` lève sur un fichier de hooks illisible,
+// donc `agent-viz status` casse (noté « hors périmètre » dans la spec du
+// 2026-09-02, à traiter séparément). Ne pas écrire ici que le registre traduit
+// tout : c'est exactement le sur-engagement de commentaire qui a fondé ce
+// chantier.
+//
+// Ajouter un 3e agent = un fichier d'adaptateur + une entrée AGENT_CONFIG +
+// une entrée INSTALLERS.
 export interface AgentInstaller {
   install: (opts: AgentOpts) => unknown;
   uninstall: (opts: AgentOpts) => unknown;
