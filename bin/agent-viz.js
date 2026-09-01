@@ -141,8 +141,16 @@ async function cmdStart(argv) {
       const result = install({ cwd: process.cwd(), packageRoot: PKG_ROOT, version: PKG_VERSION });
       let printed = false;
       for (const [agent, r] of Object.entries(result)) {
-        if (!r || r.action === 'noop') continue;
+        if (!r) continue;
         const label = agent === 'claude' ? 'Claude Code' : 'Copilot CLI';
+        if (r.error) {
+          // Ne plus dire « skipped » pour TOUS quand un SEUL refuse : les hooks
+          // de l'autre agent sont posés, et le disaient déjà avant ce message.
+          console.error(`${c.warn('!')} ${label} hooks not installed: ${r.error}`);
+          printed = true;
+          continue;
+        }
+        if (r.action === 'noop') continue;
         const verb = r.action === 'updated' ? 'refreshed'
                    : r.action === 'installed+updated' ? 'installed + refreshed'
                    : 'installed';
@@ -308,8 +316,15 @@ async function cmdInstallHooks(argv) {
   }
 
   const result = install({ target, scope, cwd: process.cwd(), packageRoot: PKG_ROOT, version: PKG_VERSION });
+  let refused = false;
   for (const [agent, r] of Object.entries(result)) {
     const label = agent === 'claude' ? 'Claude Code' : 'Copilot CLI';
+    if (r.error) {
+      console.log(`${label}:`);
+      console.log(`  ${c.err('✗')} ${r.error}`);
+      refused = true;
+      continue;
+    }
     console.log(`${label}:`);
     console.log(c.dim(`  settings : ${r.target.file}  (scope: ${r.target.scope})`));
     console.log(c.dim(`  hook cmd : ${r.command.command}  (mode: ${r.command.mode})`));
@@ -343,6 +358,7 @@ async function cmdInstallHooks(argv) {
     console.log(`  To uninstall later: run \`${c.ok('agent-viz uninstall-hooks')}\` BEFORE \`npm uninstall\``);
     console.log(c.dim('  (npm 7+ does not run lifecycle scripts on uninstall — manual cleanup required).'));
   }
+  if (refused) process.exitCode = 1;
 }
 
 async function cmdUninstallHooks(argv) {
@@ -358,6 +374,10 @@ async function cmdUninstallHooks(argv) {
   for (const [agent, x] of Object.entries(result)) {
     const results = x.results || [];
     const label = agent === 'claude' ? 'Claude Code' : 'Copilot CLI';
+    if (x.error) {
+      console.log(`${label}: ${c.err('✗')} ${x.error}`);
+      continue;
+    }
     for (const r of results) {
       total += r.removed;
       if (r.removed > 0) console.log(`${label}: ${c.ok('✓')} removed ${r.removed} from ${c.dim(r.file)} (${r.scope})`);

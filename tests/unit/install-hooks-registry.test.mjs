@@ -138,3 +138,22 @@ test('uninstall ne supprime pas le fichier qui porte encore des entrées tierces
   const total = result.copilot.results.reduce((n, r) => n + r.removed, 0);
   assert.equal(total, 1);
 });
+
+test('un 3e agent hypothétique serait affiché : le rendu ne nomme aucun agent en dur', () => {
+  // Arrange — le registre réel, plus une entrée synthétique qui n'existe pas
+  // dans AGENT_CONFIG : on ne teste que la FORME du rendu, pas l'installation.
+  const noms = Object.keys(INSTALLERS);
+
+  // Act
+  const source = fs.readFileSync(
+    new URL('../../src/server/install-hooks/cli.ts', import.meta.url), 'utf8',
+  );
+
+  // Assert — plus aucun accès en dur `result.claude` / `result.copilot`
+  for (const nom of noms) {
+    assert.ok(
+      !source.includes(`result.${nom}`),
+      `cli.ts nomme encore result.${nom} en dur — un 3e agent ne serait pas affiché`,
+    );
+  }
+});

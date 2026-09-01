@@ -81,27 +81,27 @@ export function cliMain(argv: string[]): void {
     return;
   }
 
-  // install
-  const result = install({ scope, cwd }) as { claude?: CliInstallResult; copilot?: CliInstallResult };
-  if (result.claude) {
-    const r = result.claude;
-    console.log(`[claude] settings : ${r.target.file}  (scope: ${r.target.scope})`);
-    console.log(`[claude] hook cmd : ${r.command.command}  (mode: ${r.command.mode})`);
-    if (r.action === 'noop') console.log('[claude] ✓ déjà installé et à jour.');
-    else {
-      if (r.missing.length > 0) console.log(`[claude] ✓ Ajouté sur : ${r.missing.join(', ')}`);
-      if (r.updated.length > 0) console.log(`[claude] ✓ Rafraîchi sur : ${r.updated.join(', ')}`);
-    }
-  }
-  if (result.copilot) {
-    const r = result.copilot;
+  // install — une seule boucle : le registre garantit la même forme pour tout
+  // agent enregistré, y compris un 3e. La branche `error` valait jusqu'ici pour
+  // copilot seulement, et rien ne la produisait ; le registre la produit
+  // désormais pour n'importe quel agent (cf. registry.ts).
+  const result = install({ scope, cwd }) as Record<string, CliInstallResult>;
+  let refused = false;
+  for (const [agent, r] of Object.entries(result)) {
     if (r.error) {
-      console.log(`[copilot] ! ${r.error}`);
-    } else {
-      console.log(`[copilot] file : ${r.target.file}  (scope: ${r.target.scope})`);
-      console.log(`[copilot] hook cmd : ${r.command.command}  (mode: ${r.command.mode})`);
-      if (r.action === 'noop') console.log('[copilot] ✓ déjà installé et à jour.');
-      else console.log(`[copilot] ✓ ${r.action}`);
+      console.log(`[${agent}] ! ${r.error}`);
+      refused = true;
+      continue;
     }
+    console.log(`[${agent}] settings : ${r.target.file}  (scope: ${r.target.scope})`);
+    console.log(`[${agent}] hook cmd : ${r.command.command}  (mode: ${r.command.mode})`);
+    if (r.action === 'noop') {
+      console.log(`[${agent}] ✓ déjà installé et à jour.`);
+      continue;
+    }
+    if (r.missing.length > 0) console.log(`[${agent}] ✓ Ajouté sur : ${r.missing.join(', ')}`);
+    if (r.updated.length > 0) console.log(`[${agent}] ✓ Rafraîchi sur : ${r.updated.join(', ')}`);
   }
+  // Une erreur-valeur ne doit pas perdre le signal d'échec (décision D3).
+  if (refused) process.exit(1);
 }
