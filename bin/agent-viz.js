@@ -147,7 +147,6 @@ async function cmdStart(argv) {
           // Ne plus dire « skipped » pour TOUS quand un SEUL refuse : les hooks
           // de l'autre agent sont posés, et le disaient déjà avant ce message.
           console.error(`${c.warn('!')} ${label} hooks not installed: ${r.error}`);
-          printed = true;
           continue;
         }
         if (r.action === 'noop') continue;
@@ -371,13 +370,15 @@ async function cmdUninstallHooks(argv) {
   const { uninstall } = await import(pathToFileURL(path.join(PKG_ROOT, 'dist', 'server', 'install-hooks.js')).href);
   const result = uninstall({ target, scope, cwd: process.cwd(), packageRoot: PKG_ROOT });
   let total = 0;
+  let failed = false;
   for (const [agent, x] of Object.entries(result)) {
-    const results = x.results || [];
     const label = agent === 'claude' ? 'Claude Code' : 'Copilot CLI';
     if (x.error) {
       console.log(`${label}: ${c.err('✗')} ${x.error}`);
+      failed = true;
       continue;
     }
+    const results = x.results || [];
     for (const r of results) {
       total += r.removed;
       if (r.removed > 0) console.log(`${label}: ${c.ok('✓')} removed ${r.removed} from ${c.dim(r.file)} (${r.scope})`);
@@ -385,7 +386,9 @@ async function cmdUninstallHooks(argv) {
       else console.log(c.dim(`${label}:   ${r.file} does not exist (${r.scope})`));
     }
   }
-  if (total === 0) console.log(c.dim('No agent-viz hooks found.'));
+  // Une erreur ne doit jamais se lire comme « rien à retirer » (décision D3) :
+  // le total peut rester a 0 alors qu un agent n a pas pu etre traite du tout.
+  if (total === 0 && !failed) console.log(c.dim('No agent-viz hooks found.'));
 }
 
 async function cmdHook() {
