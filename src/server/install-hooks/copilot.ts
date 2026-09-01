@@ -88,11 +88,22 @@ function readCopilotFile(file: string): unknown {
   }
 }
 
+// « Ce fichier est un fichier de hooks Copilot » — la FORME seule, sans rien
+// exiger de son contenu. C'est la question que pose le refus d'écrasement
+// (D2 bis) : un fichier de forme étrangère est refusé, un fichier de hooks
+// valide est fusionné, qu'il porte ou non l'une de nos entrées — exactement ce
+// que fait déjà `installClaude` avec n'importe quel `settings.json`.
+function isCopilotHooksFile(content: unknown): content is CopilotHooksFile {
+  return isRecord(content) && content.version === 1 && isRecord(content.hooks);
+}
+
 // True if the file shape matches what buildCopilotHookFile produced AND any
-// entry's command mentions agent-viz hook.
+// entry's command mentions agent-viz hook. Question STRICTEMENT plus forte que
+// `isCopilotHooksFile` : elle répond « ce fichier porte-t-il NOTRE hook ? »,
+// et c'est ce que `installedIn` doit continuer de signifier — `status` s'en
+// sert pour dire OÙ les hooks vivent. Ne pas l'assouplir.
 function isAgentVizCopilotFile(content: unknown): content is CopilotHooksFile {
-  if (!isRecord(content)) return false;
-  if (content.version !== 1 || !isRecord(content.hooks)) return false;
+  if (!isCopilotHooksFile(content)) return false;
   const hooks = content.hooks as Record<string, unknown>;
   for (const ev of eventsFor('copilot')) {
     const entries = hooks[ev];
@@ -162,12 +173,26 @@ export function installCopilot({ scope, cwd, packageRoot, version }: AgentOpts =
   if (!existing) {
     action = 'installed';
     missing = [...eventsFor('copilot')];
-  } else if (!isAgentVizCopilotFile(existing)) {
-    // File exists under our name but isn't ours — refuse to overwrite.
+  } else if (!isCopilotHooksFile(existing)) {
+    // Le fichier porte notre nom mais n'a pas la FORME d'un fichier de hooks
+    // Copilot — on refuse de l'écraser. Le refus interroge la forme, PAS la
+    // présence de notre entrée (D2 bis) : exiger notre entrée rendait
+    // l'aller-retour install → uninstall → install définitivement bloqué dès
+    // qu'une entrée tierce faisait survivre le fichier vidé du nôtre — donc un
+    // seul cycle `agent-viz stop` / `start`.
     throw new Error(`refusing to overwrite ${target.file}: not an agent-viz hooks file`);
   } else {
     for (const ev of eventsFor('copilot')) {
-      const arr = (existing.hooks && existing.hooks[ev]) || [];
+      // Même garde que `mergeCopilotHooks` et `uninstallCopilot` : le type dit
+      // `CopilotHookEntry[]`, le disque ne le garantit pas (cf.
+      // `readCopilotFile`). Depuis que le refus interroge la FORME du fichier
+      // et non la présence de notre entrée, un `hooks[ev]` non-tableau atteint
+      // cette boucle au lieu d'être refusé en amont — sans ce garde il en
+      // sortait « arr.find is not a function », une erreur qui ne nomme ni le
+      // fichier ni le problème. `mergeCopilotHooks` écrit ensuite notre entrée
+      // à cette clef, comme il le fait déjà pour toute valeur non-tableau.
+      const brut = existing.hooks && existing.hooks[ev];
+      const arr = Array.isArray(brut) ? brut : [];
       const ours = arr.find(e => isAgentVizCommand(copilotEntryCommand(e)));
       const others = arr.filter(e => e !== ours).length;
       if (others > 0) coexisting[ev] = others;

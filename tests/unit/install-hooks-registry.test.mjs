@@ -139,6 +139,61 @@ test('uninstall ne supprime pas le fichier qui porte encore des entrées tierces
   assert.equal(total, 1);
 });
 
+test('aller-retour install → uninstall → install : le cycle stop/start reste réinstallable', () => {
+  // Arrange — NOTRE entrée plus une entrée tierce, exactement l'état qu'un
+  // utilisateur a sur le disque avant un `agent-viz stop` suivi d'un `start`.
+  // Chaque test précédent ne regardait QU'UNE opération isolée : c'est ce qui a
+  // laissé passer un refus définitif au 2e install (cf. D2 bis de la spec).
+  const root = sandboxProject('avtest-liskov-allerretour-');
+  const packageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'avtest-pkg-'));
+  const file = path.join(root, '.github', 'hooks', 'agent-viz.json');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const notre = 'node /ailleurs/agent-viz/hook.js --source=copilot';
+  const tiers = 'echo hook-d-un-tiers';
+  fs.writeFileSync(file, JSON.stringify({
+    version: 1,
+    hooks: {
+      PreToolUse: [
+        { type: 'command', bash: notre, powershell: notre, timeoutSec: 10 },
+        { type: 'command', bash: tiers },
+      ],
+    },
+  }, null, 2));
+  const surLeDisque = () => JSON.parse(fs.readFileSync(file, 'utf8'));
+  const toutesCommandes = () => Object.values(surLeDisque().hooks)
+    .flat()
+    .map(e => e.bash);
+
+  // Act 1 — install
+  const install1 = install({ target: 'copilot', scope: 'project', cwd: root, packageRoot });
+  // Assert 1 — l'entrée tierce survit
+  assert.equal(install1.copilot.error, undefined, `install #1 refusé : ${install1.copilot.error}`);
+  assert.ok(toutesCommandes().includes(tiers), 'entrée tierce perdue à l\'install #1');
+
+  // Act 2 — uninstall (PORTÉE EXPLICITE : sans portée, le balayage part du cwd)
+  const desinstall = uninstall({ target: 'copilot', scope: 'project', cwd: root, packageRoot });
+  // Assert 2 — le fichier est conservé pour l'entrée tierce, qui survit
+  assert.equal(desinstall.copilot.error, undefined, `uninstall refusé : ${desinstall.copilot.error}`);
+  assert.ok(fs.existsSync(file), 'le fichier portant une entrée tierce ne doit pas être supprimé');
+  assert.ok(toutesCommandes().includes(tiers), 'entrée tierce perdue à l\'uninstall');
+
+  // Act 3 — install de nouveau, sur le fichier qui ne porte PLUS aucune de nos
+  // entrées : c'est ici que le refus se déclenchait, définitivement.
+  const install2 = install({ target: 'copilot', scope: 'project', cwd: root, packageRoot });
+
+  // Assert 3 — aucun refus, l'entrée tierce est toujours là, la nôtre est revenue
+  assert.equal(
+    install2.copilot.error, undefined,
+    `install #2 refusé — l'aller-retour n'est pas réinstallable : ${install2.copilot.error}`,
+  );
+  const finales = toutesCommandes();
+  assert.ok(finales.includes(tiers), `entrée tierce perdue à l'install #2 : ${JSON.stringify(finales)}`);
+  assert.ok(
+    finales.includes(install2.copilot.command.command),
+    `notre entrée absente du disque après l'install #2 : ${JSON.stringify(finales)}`,
+  );
+});
+
 test('un 3e agent hypothétique serait affiché : le rendu ne nomme aucun agent en dur', () => {
   // Arrange — le registre réel, plus une entrée synthétique qui n'existe pas
   // dans AGENT_CONFIG : on ne teste que la FORME du rendu, pas l'installation.
