@@ -312,7 +312,16 @@ l'attendrait* : la primitive charge désormais par un `require` fabriqué
 **synchrone**, ce qui est la propriété qui compte — un `import()` aurait
 contaminé d'`await` les quatre ré-exports et leurs appelants.
 
-### 4.1 Par `require` synchrone — 5 fichiers, 173 lignes
+### 4.1 Par `require` synchrone — 5 fichiers, 199 lignes
+
+> **Corrigé le 2026-08-27.** Ce titre annonçait « 173 lignes » — un chiffre resté
+> de l'étape 3, quand la table portait l'en-tête « Lignes » (toutes lignes) sur
+> les cinq fichiers `.js` : 68 + 39 + 25 + 22 + 19 = 173. La table a été refaite
+> à l'étape 4 (bascule `.ts`) avec un nouvel en-tête, « Lignes non vides », et de
+> nouvelles valeurs ; le titre, lui, n'a jamais suivi. Les valeurs par fichier
+> ci-dessous sont justes (recomptées par `grep -cve '^[[:space:]]*$'` et par
+> `awk 'NF>0'`, résultats identiques) — c'est leur somme au titre qui était
+> périmée de deux conventions et d'une migration.
 
 ```
 grep -rln "engine-require\|requireEngineModule" src/server
