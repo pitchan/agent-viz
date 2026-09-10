@@ -17,9 +17,7 @@ const BUDGET = 450; // lignes (au sens wc -l : nombre de \n)
 const ASSUMED = new Map([
   ['src/web/viz-ui.js',           'fourre-tout identifié — découpage décidé post-étape 5 (2026-08-19)'],
   ['src/web/viz-watchdog.mjs',    'registre DETECTORS cohésif : la taille = le nombre de détecteurs'],
-  ['src/engine/map/env.ts',       'un seul algorithme (AST des variables d\'environnement), un seul export public'],
   ['src/web/viz-layout.js',       'deux métiers (état + géométrie) — découpage décidé post-étape 5 (2026-08-19)'],
-  ['src/engine/map/routes.ts',    'assiette 2026-08-19 — dette constatée, non auditée'],
   ['src/web/viz-canvas.js',       'dessin du nœud — responsabilité établie (docs/audit-qualite-code.md § sain)'],
   ['src/server/transcript.ts',    'assiette 2026-08-19 — dette constatée, non auditée'],
 ]);

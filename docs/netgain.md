@@ -8,17 +8,14 @@ Moteur d'analyse de l'Observatoire d'[agent-viz](https://github.com/pitchan/agen
 Il lit les transcripts Claude Code de votre poste (`~/.claude/projects/**.jsonl`) et répond à
 une seule question, avec des faits : **où partent vos jetons ?**
 
-Il fournit aussi `netgain-map`, un serveur MCP qui sert la carte exacte d'un dépôt (routes,
-variables d'environnement, graphe d'imports) pour éviter de la redécouvrir à la main.
-
 ## Installation
 
 ```bash
 npm install -g @vcueto/agent-viz
 ```
 
-Il n'y a rien d'autre à installer : les commandes `netgain` et `netgain-map` ci-dessous sont
-posées par agent-viz, en même temps que l'interface web.
+Il n'y a rien d'autre à installer : la commande `netgain` ci-dessous est
+posée par agent-viz, en même temps que l'interface web.
 
 ## Usage
 
@@ -30,10 +27,6 @@ netgain doctor --since 7d            # sessions de moins de 7 jours
 netgain doctor --json > rapport.json # rapport JSON complet (clés triées, diffable)
 netgain doctor --list                # lister projets/sessions sans scanner
 netgain doctor --claude-dir <dir>    # autre racine (défaut ~/.claude)
-
-netgain on [dir]                     # activer la carte + le router pour un dépôt
-netgain off [dir]                    # les retirer — idempotent
-netgain status [dir]                 # état scriptable : 0 = actif, 1 = inactif/partiel
 ```
 
 ## Ce que `doctor` mesure — des faits, jamais un gain projeté
@@ -53,45 +46,6 @@ netgain status [dir]                 # état scriptable : 0 = actif, 1 = inactif
    symptôme « préfixe invalidé, re-facturé »), croissance du contexte par tour, compactions.
 5. **Forme des questions posées** — détecteur déterministe (français et anglais) des questions
    de cartographie de dépôt.
-
-## Le serveur MCP `netgain-map`
-
-Serveur MCP stdio (`netgain-map [racine]`) qui extrait des faits d'un dépôt par analyse
-syntaxique — jamais par recherche textuelle :
-
-- **`map_env`** — variables d'environnement réellement lues et validées : accès directs à
-  `process.env`, gardes qui lèvent une erreur (seule une **preuve d'existence** rend la
-  variable « requise » ; une variable seulement comparée reste « indéterminée »), schémas zod,
-  Joi / `@nestjs/config`, envalid. Jamais `.env.example`.
-- **`map_routes`** — NestJS (contrôleurs, verbes, gardes de classe et de méthode), Express
-  (montages résolus dans le fichier, jamais inventés), Angular (routes, enfants, gardes
-  cumulées, chargement différé, tableaux conditionnels marqués comme tels), Next.js app router
-  (`route.*` par verbe exporté, `page.*`, groupes et slots hors URL).
-- **`map_orient`** — volumes, frameworks détectés, principaux fichiers de routes.
-- **`map_health`** — fichiers analysés et échecs listés : **un fichier qui ne s'analyse pas ne
-  produit jamais de fait**.
-- Budget de réponse d'environ 2 Ko par défaut, pagination, toute coupe annotée `+N omitted`.
-
-Enregistrement auprès de Claude Code : `netgain on <racine>` (effet au prochain démarrage de
-session).
-
-**Justesse mesurée sur des dépôts publics épinglés, en lecture seule** — umami (`af1b6c6`) :
-115/115 fichiers de route couverts, 149/149 verbes et 56/56 pages, zéro échec d'analyse ;
-grist-core (`d1c1145`) : 218 routes Express trouvées là où une recherche textuelle en voyait
-8, chaque écart arbitré un par un. Limite connue et assumée : un premier argument en gabarit
-de chaîne à substitution n'est pas deviné.
-
-## Ce que `on` écrit, exactement
-
-1. **Serveur MCP, portée locale** : `~/.claude.json` →
-   `projects["<dépôt>"].mcpServers["netgain-map"]`. Pris en compte au prochain démarrage de
-   session.
-2. **Hook** : `<dépôt>/.claude/settings.local.json` → `hooks.UserPromptSubmit[]`. Rechargé à
-   chaud.
-
-Toute écriture est atomique (fichier temporaire puis renommage), préserve vos autres réglages,
-leur indentation et leur ordre ; un JSON invalide provoque une erreur explicite et **le
-fichier n'est jamais touché**. `netgain off` retire exactement ces deux entrées.
 
 ## Garanties d'honnêteté
 

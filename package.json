@@ -4,8 +4,7 @@
   "description": "Real-time visualizer for Claude Code and GitHub Copilot CLI sessions: live event stream, token tracking, multi-agent topology with per-source badges, plus a token observatory built on the bundled netgain analysis engine.",
   "bin": {
     "agent-viz": "bin/agent-viz.js",
-    "netgain": "dist/engine/cli.js",
-    "netgain-map": "dist/engine/mcp/main.js"
+    "netgain": "dist/engine/cli.js"
   },
   "main": "dist/server/server.js",
   "type": "module",

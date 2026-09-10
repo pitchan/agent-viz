@@ -59,26 +59,14 @@ describe('parseCliArgs', () => {
     expect(() => parseCliArgs(['fixit'])).toThrow(UsageError);
   });
 
-  test('router-hook donne la commande router-hook', () => {
-    expect(parseCliArgs(['router-hook'])).toEqual({ command: 'router-hook' });
+  test('router-hook est desormais une commande inconnue (retrait moteur de carte)', () => {
+    expect(() => parseCliArgs(['router-hook'])).toThrow(UsageError);
   });
 
-  test.each(['on', 'off', 'status'] as const)('%s sans dir donne install sans dir', (cmd) => {
-    expect(parseCliArgs([cmd])).toEqual({ command: cmd, install: {} });
-  });
-
-  test.each(['on', 'off', 'status'] as const)('%s avec dir positionnel le capture', (cmd) => {
-    expect(parseCliArgs([cmd, 'D:\\scratch\\repo'])).toEqual({
-      command: cmd,
-      install: { dir: 'D:\\scratch\\repo' },
-    });
-  });
-
-  test('on avec 2 positionnels est une UsageError citant on', () => {
-    expect(() => parseCliArgs(['on', 'a', 'b'])).toThrow(/on : un seul répertoire attendu/);
-  });
-
-  test('status avec un flag inconnu est une UsageError citant le flag', () => {
-    expect(() => parseCliArgs(['status', '--bogus'])).toThrow(/--bogus/);
-  });
+  test.each(['on', 'off', 'status'] as const)(
+    '%s est desormais une commande inconnue (retrait moteur de carte)',
+    (cmd) => {
+      expect(() => parseCliArgs([cmd])).toThrow(UsageError);
+    },
+  );
 });

@@ -72,29 +72,8 @@ const RACINE_MORTE = /(^|[^A-Za-z0-9_-])(lib|public|netgain)\//;
 // au-dessus, et un test d hygiene qui rougit sur un ajout innocent finit
 // desactive.
 const LISTE_BLANCHE = [
-  // CONSTANTES, par conception — la queue d AVANT la fusion EST la donnee.
-  { fichier: 'src/engine/install/rupture.ts', fragment: "QUEUE_HOOK = 'netgain/dist/cli.js'", raison: 'la queue d avant la fusion, donnee du predicat de rupture (tache 2)' },
-  { fichier: 'src/engine/install/rupture.ts', fragment: "QUEUE_MCP = 'netgain/dist/mcp/main.js'", raison: 'idem, cote MCP' },
-  { fichier: 'src/engine/install/rupture.ts', fragment: 'netgain/src \u2192 src/engine', raison: 'en-tete : le deplacement que les queues datent' },
-  { fichier: 'src/engine/install/rupture.ts', fragment: 'netgain/dist \u2192 dist/engine', raison: 'idem' },
-  { fichier: 'src/engine/install/rupture.ts', fragment: 'le chemin contient netgain/dist', raison: 'en-tete : la forme ECARTEE, citee pour dire pourquoi' },
-  { fichier: 'src/engine/install/rupture.ts', fragment: 'chemin portant netgain/dist', raison: 'en-tete : un des cinq faux negatifs mesures' },
-
   // FORMES HISTORIQUES RECONNUES, que le produit doit continuer de reconnaitre.
-  { fichier: 'src/engine/install/hook-edit.ts', fragment: '/netgain/i.test(command)', raison: 'litteral d expression reguliere, pas un chemin' },
   { fichier: 'src/server/install-hooks/settings-io.ts', fragment: 'node /abs/.../agent-viz/lib/hook.js', raison: 'une des 4 formes historiques que `isAgentVizHook` doit reconnaitre' },
-  { fichier: 'tests/install/hook-edit.test.ts', fragment: "'node C:/vieux/netgain/dist/cli.js router-hook'", raison: 'entree perimee et etrangere DELIBEREE (3 sites)' },
-  { fichier: 'tests/install/hook-edit.test.ts', fragment: "'node netgain/dist/cli.js doctor'", raison: 'entree netgain sans router-hook : doit rendre false' },
-  { fichier: 'tests/install/hook-edit.test.ts', fragment: "CMD = 'node \"F:/DEV/agent-viz/netgain/dist/engine/cli.js\" router-hook'", raison: 'racine SIMULEE : le test prouve la forme de la commande, pas l adresse de ce depot' },
-  { fichier: 'tests/install/mcp-edit.test.ts', fragment: "'F:/DEV/agent-viz/netgain/dist/engine/mcp/main.js'", raison: 'racine SIMULEE, idem' },
-  { fichier: 'tests/install/rupture.test.ts', fragment: "AUTRE_RACINE_SANS_QUOTES = 'node C:/vieux/netgain/dist/cli.js router-hook'", raison: 'fixture de la tache 2' },
-  { fichier: 'tests/install/rupture.test.ts', fragment: "SOUHAITE_AVANT_FUSION = 'node \"F:/DEV/agent-viz/netgain/dist/cli.js\" router-hook'", raison: 'fixture de la tache 2' },
-  { fichier: 'tests/install/rupture.test.ts', fragment: '/netgain/i.test(commande)', raison: 'litteral d expression reguliere' },
-  { fichier: 'tests/install/status-rupture.test.ts', fragment: "HOOK_PERIME = 'node C:/vieux/netgain/dist/cli.js router-hook'", raison: 'fixture de la tache 2' },
-  { fichier: 'tests/install/status-rupture.test.ts', fragment: "MCP_PERIME = 'C:/vieux/netgain/dist/mcp/main.js'", raison: 'fixture de la tache 2' },
-  { fichier: 'tests/install/status-rupture.test.ts', fragment: "HOOK_APRES = 'node C:/vieux/netgain/dist/engine/cli.js router-hook'", raison: 'fixture de la tache 2 : le meme hook, APRES reparation' },
-  { fichier: 'tests/install/status-rupture.test.ts', fragment: "MCP_APRES = 'C:/vieux/netgain/dist/engine/mcp/main.js'", raison: 'idem' },
-  { fichier: 'tests/install/status-rupture.test.ts', fragment: "'node C:/vieux/netgain/dist/cli.js doctor'", raison: 'entree ETRANGERE : ni hook netgain, ni a reparer' },
 
   // DONNEES DE TEST — un chemin SIMULE, dont on asserte autre chose que le chemin.
   { fichier: 'tests/unit/install-hooks.test.cjs', fragment: "'node /tmp/agent-viz/lib/hook.js --source=claude'", raison: 'jumeau cote test de la forme historique n 2 : perime EXPRES' },
@@ -110,12 +89,6 @@ const LISTE_BLANCHE = [
   { fichier: 'tests/doctor/agent-gestures.test.ts', fragment: "@/lib/foo", raison: 'alias d un projet tiers, simule' },
   { fichier: 'tests/doctor/turns.test.ts', fragment: 'lib/GristServer', raison: 'depot Grist : sujet simule (3 sites)' },
   { fichier: 'tests/doctor/turns.test.ts', fragment: "@/lib/foo", raison: 'alias d un projet tiers, simule' },
-  { fichier: 'tests/map/graph.test.ts', fragment: "alias paths : '@lib/*'", raison: 'sous-projet FIXTURE ecrit dans un tmpdir' },
-  { fichier: 'tests/map/graph.test.ts', fragment: '"@lib/*": ["src/lib/*"]', raison: 'le tsconfig de cette fixture' },
-  { fichier: 'tests/map/graph.test.ts', fragment: "'lapp/src/lib/util.ts'", raison: 'un fichier de cette fixture (2 sites)' },
-  { fichier: 'tests/map/graph.test.ts', fragment: "from '@lib/util'", raison: 'l import qui exerce l alias' },
-  { fichier: 'tests/map/graph.test.ts', fragment: '(@lib/*)', raison: 'le nom du test qui l exerce' },
-  { fichier: 'tests/map/routes-next.test.ts', fragment: "from '@/lib/response'", raison: 'route Next.js FIXTURE' },
 
   // RECITS HISTORIQUES DATES — la phrase nomme l adresse d AVANT, et la reecrire
   // la rendrait FAUSSE. Ce ne sont pas des citations perimees : ce sont des
@@ -124,14 +97,18 @@ const LISTE_BLANCHE = [
   { fichier: 'docs/sources-externes.md', fragment: 'netgain/docs/calibration-observatoire-m1.md', raison: 'constat C7, idem : l adresse morte que ce fichier existe pour remplacer' },
   { fichier: 'docs/sources-externes.md', fragment: '`netgain/docs/` tant que le moteur y', raison: 'ou vivaient ces documents dans le depot PRIVE, avant le demenagement du moteur' },
 
-  // ARCHITECTURE.md — le document qui RACONTE le deplacement. Les DOUZE entrees
+  // ARCHITECTURE.md — le document qui RACONTE le deplacement. Les ONZE entrees
   // ci-dessous nomment l arbre d AVANT pour dire ce qui a bouge et pourquoi ;
   // les reecrire les rendrait fausses, et le document perdrait justement ce
   // qu il a de plus utile a la prochaine etape.
   // Compte verifie par commande, jamais a l oeil — et la commande s ancre sur
   // l indentation d une entree, sinon elle se compterait ELLE-MEME depuis ce
-  // commentaire (mesure : 13 au lieu de 12) :
-  //   grep -c "^  { fichier: 'ARCHITECTURE" tests/repo/stale-path-citations.test.mjs  -> 12
+  // commentaire (mesure : 12 au lieu de 11) :
+  //   grep -c "^  { fichier: 'ARCHITECTURE" tests/repo/stale-path-citations.test.mjs  -> 11
+  // La douzieme entree (le fragment `…/netgain/dist/cli.js` ; § 6, la queue
+  // d avant la fusion que `netgain status` nommait) a ete retiree a la tache 3
+  // de doc/47 : l etape 6 bis reecrit ce paragraphe (le mecanisme qui la
+  // reparait disparait avec `on`/`status`), donc le fragment cesse d exister.
   { fichier: 'ARCHITECTURE.md', fragment: 'vivaient auparavant dans `lib/`', raison: '§ 2.1 : la fusion a plat des cinq fichiers du haut' },
   { fichier: 'ARCHITECTURE.md', fragment: "`lib/server/` ; l'étape 2 les a fusionnés", raison: '§ 2.1, suite de la meme phrase' },
   { fichier: 'ARCHITECTURE.md', fragment: '`lib/server/**` : un renommage verbatim', raison: '§ 2.1 : ce que la fusion a laisse invariant' },
@@ -140,7 +117,6 @@ const LISTE_BLANCHE = [
   { fichier: 'ARCHITECTURE.md', fragment: 'lib/server/observatory/engine.js:20', raison: '§ 2.1 : idem' },
   { fichier: 'ARCHITECTURE.md', fragment: 'lib/server/observatory/engine.js:21', raison: '§ 2.1 : idem — deux sites dans un meme fichier, ce qui motive le decompte par SITE' },
   { fichier: 'ARCHITECTURE.md', fragment: "s'atteignait par `../netgain/dist/`", raison: '§ 3 : pourquoi l ancien motif de controle serait MUET aujourd hui' },
-  { fichier: 'ARCHITECTURE.md', fragment: '`…/netgain/dist/cli.js` ;', raison: '§ 6 : la queue d avant la fusion que `netgain status` nomme' },
   { fichier: 'ARCHITECTURE.md', fragment: "`lib/`, `public/` et", raison: '§ 8 : les trois racines mortes, nommees comme mortes' },
   { fichier: 'ARCHITECTURE.md', fragment: "`netgain/` n'existent plus", raison: '§ 8, suite de la meme phrase' },
   { fichier: 'ARCHITECTURE.md', fragment: '`netgain/tests/` a rejoint', raison: '§ 9 : la fusion a plat des deux arbres de tests' },
@@ -194,8 +170,11 @@ test('aucune adresse d avant le deplacement ne subsiste hors liste blanche', () 
   const perimees = toutes.filter(o => !couvertePar(o));
 
   // Assert — l assiette est dite AVANT le verdict : un balayage qui ne lit
-  // rien passerait aussi, et ne prouverait rien.
-  assert.ok(toutes.length >= 40, `assiette suspecte : ${toutes.length} occurrences vues, attendu >= 40`);
+  // rien passerait aussi, et ne prouverait rien. Plancher redescendu de 40 a
+  // 20 a la tache 3 de doc/47 (retrait du moteur de carte) : la purge du
+  // registre et la suppression des 33 fichiers cites font tomber le compte
+  // reel a 27 (mesure) — 40 aurait fait rougir ce test pour une bonne raison.
+  assert.ok(toutes.length >= 20, `assiette suspecte : ${toutes.length} occurrences vues, attendu >= 20`);
   assert.deepEqual(
     perimees.map(o => `${o.fichier}:${o.ligne} \u2192 ${o.texte.trim()}`),
     [],

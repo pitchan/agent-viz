@@ -117,10 +117,6 @@ le précédent que [CLAUDE.md](./CLAUDE.md) cite pour le principe ouvert/fermé.
 ```
 src/engine/core/       lecture JSONL, découverte de sessions, usage, tarifs
 src/engine/doctor/     les règles de diagnostic, leurs agrégateurs, leur rapport
-src/engine/install/    écriture de la configuration de l'utilisateur
-src/engine/map/        la carte de projet
-src/engine/mcp/        le serveur MCP
-src/engine/router/     l'aiguillage du crochet
 src/engine/cli.ts      le binaire `netgain`
 ```
 
@@ -434,7 +430,6 @@ Ils se comptent en deux temps, et les confondre fait manquer un crochet.
 |---|---|---|
 | `agent-viz` | `bin/agent-viz.js` | l'utilisateur |
 | `netgain` | `dist/engine/cli.js` | l'utilisateur |
-| `netgain-map` | `dist/engine/mcp/main.js` | un client MCP |
 | `main` | `dist/server/server.js` | déclaré pour `require('@vcueto/agent-viz')`, qu'aucun code connu n'appelle — mais le fichier lui-même est bien vivant : c'est l'émission du script que le démon lance (`src/server/lifecycle.ts:12`). **Ce qu'il rend a changé à l'étape 3 : voir juste sous cette table.** |
 | la page | `index.html` | le navigateur ; importe `./src/web/…` en 10 lignes |
 
@@ -450,7 +445,7 @@ observable que l'étape 3 déclare sur le produit, et elle est écrite ici parce
 qu'aucun test ne peut l'attraper : rien, dans ce dépôt, n'appelle
 `require('@vcueto/agent-viz')`.
 
-**Un test permanent tient les quatre premières lignes de cette table**, plus
+**Un test permanent tient les trois premières lignes de cette table**, plus
 chaque entrée du champ `files` — `tests/repo/package-entrypoints.test.mjs` : elles
 doivent résoudre sur le disque. Il est né à l'étape 3 de la migration, et sa
 raison d'être est un fait mesuré : c'était la **seule** surface du produit
@@ -461,13 +456,11 @@ n'est pas tourner, et c'est pourquoi chaque étape de la migration se termine
 encore par `node bin/agent-viz.js --version`, `node dist/engine/cli.js --version`
 et `npm pack --dry-run --ignore-scripts`.
 
-**Ce que l'agent invoque tout seul** — deux crochets, sur deux binaires
-différents, et c'est la partie qu'on oublie :
+**Ce que l'agent invoque tout seul** — un crochet, sur un seul binaire :
 
 | Crochet | Commande inscrite | Événement |
 |---|---|---|
 | agent-viz | `node "<abs>/bin/agent-viz.js" hook --source=claude\|copilot` **ou** `npx --yes @vcueto/agent-viz@X.Y.Z hook --source=…` | les événements Claude / Copilot |
-| moteur | `node "<abs>/dist/engine/cli.js" router-hook` | `UserPromptSubmit` |
 
 Le crochet agent-viz a **deux modes**, et la différence compte : si la racine du
 paquet est un cache `npx` éphémère, la commande écrite ne contient **aucun
@@ -476,11 +469,13 @@ locale produit la forme absolue ; `npx` produit la forme portable.
 
 **`bin/agent-viz.js` n'ayant pas bougé à l'étape 2, le crochet agent-viz en mode
 `absolute` a survécu au déplacement** — c'est le crochet du **moteur** qui a
-cassé, et lui seul. Une configuration écrite avant la fusion porte encore
-`…/netgain/dist/cli.js` ; `netgain status` la nomme désormais au lieu de répondre
-ON, et `netgain on` la répare.
+cassé, et lui seul. Le mécanisme qui le nommait et le réparait (`netgain
+status` / `netgain on`) a disparu avec l'étape 6 bis (2026-09, doc/36) : une
+configuration écrite avant la fusion et jamais réparée entre-temps reste
+orpheline, sans outil pour la retirer — mesuré sans exposition connue au jour
+du retrait (doc/36 § 1.4).
 
-### Le produit écrit chez son utilisateur — en trois endroits de natures différentes
+### Le produit écrit chez son utilisateur — en deux endroits de natures différentes
 
 C'est le point le plus rigide du produit, et l'inventaire en est plus large qu'il
 n'y paraît.
@@ -488,10 +483,9 @@ n'y paraît.
 | Qui écrit | Où | Chemin absolu ? |
 |---|---|---|
 | `src/server/install-hooks.ts` | **six** destinations possibles selon l'agent et la portée : `~/.claude/settings.json`, `<dépôt>/.claude/settings{,.local}.json`, `~/.copilot/hooks/agent-viz.json`, `<dépôt>/.github/hooks/agent-viz{,.local}.json` | **seulement en mode `absolute`** |
-| `src/engine/install/` | `~/.claude.json` (le serveur MCP) et `<dépôt>/.claude/settings.local.json` (le crochet routeur) | **toujours** |
 | `src/server/install-hooks.ts` | ajoute une ligne au **`.gitignore` du dépôt de l'utilisateur**, quand il écrit un fichier de portée locale — jamais n'en crée un (l. 361-376) | sans objet |
 
-La troisième ligne est la plus intrusive des trois : c'est la seule qui touche un
+La deuxième ligne est la plus intrusive des deux : c'est la seule qui touche un
 fichier **versionné** de l'utilisateur.
 
 `install-hooks.ts` reconnaît **quatre formes** de sa propre ligne

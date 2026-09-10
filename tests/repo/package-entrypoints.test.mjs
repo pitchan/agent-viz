@@ -3,7 +3,7 @@
 // Relevee a la fin de l etape 2 de la migration, par la premiere revue qui ait
 // installe le paquet et lance le produit : sept taches, sept revues
 // independantes, dix commits et une etiquette de version — et personne n avait
-// execute `node bin/agent-viz.js --version`. Les trois `bin`, le `main` et
+// execute `node bin/agent-viz.js --version`. Les deux `bin`, le `main` et
 // chaque entree de `files` de `package.json` ne sont vus ni par le typecheck, ni
 // par le build, ni par les tests, ni par le filet de citations. Verifie par
 // commande au moment d ecrire ce fichier : les deux seuls tests qui lisent le
@@ -19,8 +19,9 @@
 // PORTEE — ecrite parce qu une commande dont on ignore la portee finit par
 // servir de preuve de ce qu elle ne regarde pas :
 //   - ce filet dit qu une entree DESIGNE quelque chose sur le disque. Il ne dit
-//     pas que ce quelque chose soit COMPLET : la completude du build est
-//     l affaire de `REQUIRED_DIST` / `missingDistFiles` (tests/install/paths.test.ts) ;
+//     pas que ce quelque chose soit COMPLET : aucun filet ne verifie plus la
+//     completude du build depuis le retrait de `tests/install/paths.test.ts`
+//     avec le moteur de carte (etape 6 bis, doc/36, doc/47 tache 3) ;
 //   - il ne dit pas non plus que le point d entree S EXECUTE. Resoudre n est pas
 //     tourner, et l etape 3 est precisement celle qui peut casser l execution en
 //     laissant la resolution intacte — une racine passee en `"type": "module"`
@@ -28,7 +29,7 @@
 //     restent : `node bin/agent-viz.js --version`,
 //     `node dist/engine/cli.js --version`, `npm pack --dry-run --ignore-scripts`.
 //
-// PRECONDITION : deux des trois `bin` et une entree de `files` vivent sous
+// PRECONDITION : un des deux `bin` et une entree de `files` vivent sous
 // `dist/engine/`, genere et git-ignore. Ce filet exige donc un arbre CONSTRUIT,
 // au meme titre qu une douzaine d autres — `npm run build` d abord.
 //

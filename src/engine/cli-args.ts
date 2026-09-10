@@ -12,15 +12,9 @@ export interface DoctorCliOptions {
   maxPrompts?: number;
 }
 
-export interface InstallCliOptions {
-  dir?: string;
-}
-
 export type CliCommand =
   | { command: 'version' }
   | { command: 'help' }
-  | { command: 'router-hook' }
-  | { command: 'on' | 'off' | 'status'; install: InstallCliOptions }
   | { command: 'doctor'; doctor: DoctorCliOptions };
 
 export function parseCliArgs(argv: string[]): CliCommand {
@@ -28,19 +22,6 @@ export function parseCliArgs(argv: string[]): CliCommand {
   const [cmd, ...rest] = argv;
   if (cmd === undefined || cmd === '--help' || cmd === '-h' || cmd === 'help') {
     return { command: 'help' };
-  }
-  if (cmd === 'router-hook') return { command: 'router-hook' };
-  if (cmd === 'on' || cmd === 'off' || cmd === 'status') {
-    let positionals: string[];
-    try {
-      ({ positionals } = parseArgs({ args: rest, options: {}, allowPositionals: true }));
-    } catch (err) {
-      throw new UsageError((err as Error).message);
-    }
-    if (positionals.length > 1) throw new UsageError(`${cmd} : un seul répertoire attendu`);
-    const install: InstallCliOptions = {};
-    if (positionals[0] !== undefined) install.dir = positionals[0];
-    return { command: cmd, install };
   }
   if (cmd !== 'doctor') throw new UsageError(`commande inconnue : ${cmd}`);
 
