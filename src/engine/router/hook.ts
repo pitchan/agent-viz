@@ -1,4 +1,4 @@
-import { detectGraphSignal, NUDGE_LINE } from './detector.js';
+import { detectGraphSignal, NUDGE_LINE } from '../doctor/detector.js';
 
 /**
  * Hook UserPromptSubmit (spec §2.3) — l'enveloppe autour du détecteur.

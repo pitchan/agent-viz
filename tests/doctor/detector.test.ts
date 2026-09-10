@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { detectGraphSignal, NUDGE_LINE } from '../../src/engine/router/detector.js';
+import { detectGraphSignal, NUDGE_LINE } from '../../src/engine/doctor/detector.js';
 
 /**
  * Corpus étiqueté selon la ligne de partage post-J5 (spec §2.3 corrigée) :

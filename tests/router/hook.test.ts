@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { NUDGE_LINE } from '../../src/engine/router/detector.js';
+import { NUDGE_LINE } from '../../src/engine/doctor/detector.js';
 import { buildHookResponse } from '../../src/engine/router/hook.js';
 
 /**

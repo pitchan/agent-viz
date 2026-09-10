@@ -1,5 +1,5 @@
 import type { ToolUseRef } from '../../core/events.js';
-import { detectGraphSignal } from '../../router/detector.js';
+import { detectGraphSignal } from '../detector.js';
 import { SPAWN_TOOL_NAMES } from './subagents.js';
 
 /**

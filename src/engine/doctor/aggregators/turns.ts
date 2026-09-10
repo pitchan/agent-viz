@@ -1,5 +1,5 @@
 import type { NormalizedEvent, RawUsage, ToolUseRef } from '../../core/events.js';
-import { detectGraphSignal, type GraphSignal } from '../../router/detector.js';
+import { detectGraphSignal, type GraphSignal } from '../detector.js';
 import { detectAgentGesture, type AgentGestureKind } from './agent-gestures.js';
 import { isNoisePrompt } from './prompts.js';
 

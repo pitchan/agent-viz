@@ -1,4 +1,4 @@
-import { isNoisePrompt } from '../doctor/aggregators/prompts.js';
+import { isNoisePrompt } from './aggregators/prompts.js';
 
 /**
  * Détecteur DÉTERMINISTE (0 appel modèle) du router — spec §2.3 CORRIGÉE post-J5.
