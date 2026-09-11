@@ -5,8 +5,9 @@ type UserPromptEvent = Extract<NormalizedEvent, { kind: 'user_prompt' }>;
 export type PromptCategory = 'where' | 'how-works' | 'impact' | 'dependents' | 'env' | 'routes';
 
 /**
- * Détecteur DÉTERMINISTE (0 appel modèle) des « questions de forme carte » —
- * celles que le futur router nudgera vers map_orient/map_routes.
+ * Détecteur DÉTERMINISTE (0 appel modèle) des « questions de forme carte »
+ * (où / comment ça marche / impact / dépendants / env / routes) : il ne sert
+ * qu'à `mapShapedCount`, un fait que `doctor` rapporte.
  * L'ordre compte : le premier qui matche gagne ('where' avant 'routes' pour
  * que « où est définie la route X » soit une question de localisation).
  */
@@ -43,7 +44,7 @@ export interface PromptsStats {
   corpus: { text: string; category: PromptCategory }[];
 }
 
-/** Métrique 5 : part des prompts de forme carte + corpus réel pour le futur router. */
+/** Métrique 5 : part des prompts de forme carte, un fait rapporté par `doctor`. */
 export class PromptsAggregator {
   private totalPrompts = 0;
   private mapShapedCount = 0;

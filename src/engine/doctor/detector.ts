@@ -1,7 +1,8 @@
 import { isNoisePrompt } from './aggregators/prompts.js';
 
 /**
- * Détecteur DÉTERMINISTE (0 appel modèle) du router — spec §2.3 CORRIGÉE post-J5.
+ * Détecteur DÉTERMINISTE (0 appel modèle) de signal de graphe d'imports —
+ * spec §2.3 CORRIGÉE post-J5. Alimente `turns.bySignal` et `agentGraph` du doctor.
  *
  * Ne tire QUE sur les signaux de graphe d'imports : impact / dépendants /
  * importeurs / blast radius / fichiers chauds. Les motifs d'énumération
@@ -60,9 +61,9 @@ export function detectGraphSignal(prompt: string): GraphSignal | null {
 }
 
 /**
- * La ligne injectée quand un signal tire. Une seule ligne, map_impact/map_hot
- * SEULS — jamais map_routes/map_orient/map_env (la séduction S11). Le coût
- * d'un faux positif est exactement cette ligne.
+ * Texte du nudge, une seule ligne, map_impact/map_hot SEULS — jamais
+ * map_routes/map_orient/map_env (la séduction S11). Aucun code ne l'injecte :
+ * seul `tests/doctor/detector.test.ts` la lit et en verrouille le contenu.
  */
 export const NUDGE_LINE =
   "Signal de graphe d'imports détecté : consulte d'abord les outils MCP `map_impact` (blast radius exact d'un fichier, dépendants transitifs) et `map_hot` (fichiers les plus importés) au lieu de remonter les imports à la main.";

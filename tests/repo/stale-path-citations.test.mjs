@@ -170,11 +170,10 @@ test('aucune adresse d avant le deplacement ne subsiste hors liste blanche', () 
   const perimees = toutes.filter(o => !couvertePar(o));
 
   // Assert — l assiette est dite AVANT le verdict : un balayage qui ne lit
-  // rien passerait aussi, et ne prouverait rien. Plancher redescendu de 40 a
-  // 20 a la tache 3 de doc/47 (retrait du moteur de carte) : la purge du
-  // registre et la suppression des 33 fichiers cites font tomber le compte
-  // reel a 27 (mesure) — 40 aurait fait rougir ce test pour une bonne raison.
-  assert.ok(toutes.length >= 20, `assiette suspecte : ${toutes.length} occurrences vues, attendu >= 20`);
+  // rien passerait aussi, et ne prouverait rien. Plancher 25 = compte reel
+  // (27) moins une marge de 2 : plus bas, une purge legitime du registre
+  // suffirait a rendre cette garde vide.
+  assert.ok(toutes.length >= 25, `assiette suspecte : ${toutes.length} occurrences vues, attendu >= 25`);
   assert.deepEqual(
     perimees.map(o => `${o.fichier}:${o.ligne} \u2192 ${o.texte.trim()}`),
     [],
