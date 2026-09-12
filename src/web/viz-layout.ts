@@ -7,21 +7,42 @@
 import {
   COLORS, SPAWN_DIST, TIMELINE_CAP, NODE_GC_MAX_AGE_MS,
   state, vis, markDirty, parseMcpName,
+  type VizNode, type VisNode, type DrawBucketEntry,
 } from './viz-state.ts';
 import { markNarratorDirty } from './viz-narrator.ts';
-import { toolSubject } from '../engine/core/tool-subject.ts';
+import { toolSubject, type ToolInput } from '../engine/core/tool-subject.ts';
 import { formatDuration } from './viz-duration.ts';
 import { recordError, recordSuccess } from './viz-errors.ts';
+
+// L'evenement hook tel que ce module le lit : les champs de ToolCallEvent
+// (moteur, deja type) plus ceux que la carte du graphe consomme. Tous
+// facultatifs — l'objet arrive du flux SSE ou d'une ligne de journal rejouee.
+export interface HookEvent {
+  hook_event_name?: string;
+  session_id?: string;
+  agent_id?: string;
+  agent_type?: string;
+  subagent_type?: string;
+  tool_name?: string;
+  tool_use_id?: string;
+  // `isolation` s'ajoute a ToolInput : seul le graphe s'en sert, pour la
+  // pastille « worktree » d'un sous-agent isole.
+  tool_input?: ToolInput & { isolation?: string };
+  tool_response?: { agentId?: string; status?: string };
+  message?: string;
+  _ts?: string;
+}
 
 // ─── Feed-cursor adjust hook ──────────────────────────────────────────────
 // When the timeline ring-buffer shifts, viz-ui's _feedRenderedCount must be
 // decremented by the drop count so incremental append keeps working. Injected
 // by viz-ui at load time to avoid a circular import.
-let _feedCursorAdjust = () => {};
-export function setFeedCursorAdjust(fn) { _feedCursorAdjust = fn || (() => {}); }
+type FeedCursorAdjust = (drop: number) => void;
+let _feedCursorAdjust: FeedCursorAdjust = () => {};
+export function setFeedCursorAdjust(fn: FeedCursorAdjust | null | undefined) { _feedCursorAdjust = fn || (() => {}); }
 
 // ─── Node creation ────────────────────────────────────────────────────────
-export function getNode(id) {
+export function getNode(id: string): VizNode {
   if (!state.nodes.has(id)) {
     state.nodes.set(id, {
       id, type: 'tool', label: '', sub: '', color: COLORS.tool,
@@ -30,10 +51,12 @@ export function getNode(id) {
       isIsolated: false, isParallel: false,
     });
   }
-  return state.nodes.get(id);
+  // La clef vient d'etre posee juste au-dessus quand elle manquait : la table
+  // la contient forcement ici.
+  return state.nodes.get(id)!;
 }
 
-export function ensureVisNode(id) {
+export function ensureVisNode(id: string): VisNode {
   if (!vis.nodes.has(id)) {
     const n = state.nodes.get(id);
     const parent = n && n.parentId ? vis.nodes.get(n.parentId) : null;
@@ -57,10 +80,11 @@ export function ensureVisNode(id) {
       bucket.push({ n, vn });
     }
   }
-  return vis.nodes.get(id);
+  // Meme garantie que getNode : la position vient d'etre posee au-dessus.
+  return vis.nodes.get(id)!;
 }
 
-export function addTimelineEntry(evt, nodeId, type, label, sub) {
+export function addTimelineEntry(evt: HookEvent, nodeId: string, type: string, label: string, sub?: string) {
   state.timelineEntries.push({
     ts: evt._ts || new Date().toISOString(),
     nodeId, type, label, sub: sub || '',
@@ -72,7 +96,7 @@ export function addTimelineEntry(evt, nodeId, type, label, sub) {
   }
 }
 
-export function setRunning(id, on) {
+export function setRunning(id: string, on: boolean) {
   if (on) vis.runningNodes.add(id);
   else vis.runningNodes.delete(id);
 }
@@ -81,7 +105,7 @@ export function setRunning(id, on) {
 // into a real agent node. Claude Code does not emit SubagentStart hooks today,
 // so the first child PreToolUse carrying agent_id is our spawn signal.
 // Child events also carry agent_type, so we have a real label immediately.
-function promoteAgentNode(n, evt, sid, ts) {
+function promoteAgentNode(n: VizNode, evt: HookEvent, sid: string, ts: string) {
   n.type = 'agent';
   n.label = evt.agent_type || evt.subagent_type || 'Agent';
   if (!n.sub) n.sub = (evt.agent_id || '').slice(0, 8);
@@ -111,7 +135,7 @@ function promoteAgentNode(n, evt, sid, ts) {
 
 // Detach `n` from its current parent's children list and attach it under
 // `newParentId`. No-op if newParent is unknown or already the parent.
-function reparentNode(n, newParentId) {
+function reparentNode(n: VizNode, newParentId: string) {
   if (!n || !newParentId || n.parentId === newParentId) return;
   const newParent = state.nodes.get(newParentId);
   if (!newParent) return;
@@ -129,7 +153,7 @@ function reparentNode(n, newParentId) {
 
 // Mark all running agents under this session as parallel if 2+ run at once.
 // Sticky: once flagged, an agent keeps isParallel=true for the rest of its life.
-export function recomputeParallelFlags(sessionId) {
+export function recomputeParallelFlags(sessionId: string) {
   const session = state.nodes.get(sessionId);
   if (!session) return;
   const runningAgents = session.children.filter(c =>
@@ -142,12 +166,13 @@ export function recomputeParallelFlags(sessionId) {
 
 // On SessionEnd, close every descendant that was still running so particle
 // generation (which iterates vis.runningNodes) stops immediately.
-export function cascadeTerminate(rootNodeId, ts) {
+export function cascadeTerminate(rootNodeId: string, ts: string) {
   const root = state.nodes.get(rootNodeId);
   if (!root) return;
   const stack = [...(root.children || [])];
   while (stack.length) {
-    const n = stack.pop();
+    // La condition de boucle dit que la pile n'est pas vide : `pop` rend un noeud.
+    const n = stack.pop()!;
     if (n.status === 'running') {
       n.status = 'done';
       n.endTime = ts;
@@ -164,7 +189,7 @@ export function cascadeTerminate(rootNodeId, ts) {
 // Per-event handlers receive the same context bag (evt, sid, ts) and mutate
 // state/vis directly. Adding a new hook event = one entry in EVENT_HANDLERS.
 
-function ensureSessionParent(sid) {
+function ensureSessionParent(sid: string) {
   const parent = getNode(`s:${sid}`);
   parent.type = 'session';
   parent.label = parent.label || 'Session';
@@ -172,7 +197,7 @@ function ensureSessionParent(sid) {
   return parent;
 }
 
-function onSessionStart(evt, sid, ts) {
+function onSessionStart(evt: HookEvent, sid: string, ts: string) {
   const n = getNode(`s:${sid}`);
   n.type = 'session'; n.label = 'Session'; n.sub = sid.slice(0, 8);
   n.color = COLORS.session; n.data = evt; n.status = 'running'; n.startTime = ts;
@@ -180,7 +205,7 @@ function onSessionStart(evt, sid, ts) {
   addTimelineEntry(evt, n.id, 'session', 'Session', sid.slice(0, 8));
 }
 
-function onSubagentStart(evt, sid, ts) {
+function onSubagentStart(evt: HookEvent, sid: string, ts: string) {
   const aid = evt.agent_id || sid;
   const n = getNode(`a:${aid}`);
   n.type = 'agent';
@@ -195,7 +220,7 @@ function onSubagentStart(evt, sid, ts) {
   addTimelineEntry(evt, n.id, 'agent', n.label, n.sub);
 }
 
-function onSubagentStop(evt, sid, ts) {
+function onSubagentStop(evt: HookEvent, sid: string, ts: string) {
   const aid = evt.agent_id || sid;
   const n = state.nodes.get(`a:${aid}`);
   if (!n) return;
@@ -206,7 +231,7 @@ function onSubagentStop(evt, sid, ts) {
   if (n.parentId) recomputeParallelFlags(n.parentId);
 }
 
-function onPreToolUse(evt, sid, ts) {
+function onPreToolUse(evt: HookEvent, sid: string, ts: string) {
   const tid = evt.tool_use_id || `t${state.eventSeq++}`;
   const n = getNode(`t:${tid}`);
   const isSkill = evt.tool_name === 'Skill';
@@ -239,7 +264,7 @@ function onPreToolUse(evt, sid, ts) {
 // tool_response.agentId. This is the canonical "subagent done" signal,
 // since SubagentStop hooks are not reliably emitted. terminalStatus is
 // 'done' (PostToolUse) or 'error' (PostToolUseFailure).
-function settleAgentFromAgentToolResponse(evt, ts, terminalStatus) {
+function settleAgentFromAgentToolResponse(evt: HookEvent, ts: string, terminalStatus: 'done' | 'error') {
   if (evt.tool_name !== 'Agent') return;
   const aid = evt.tool_response && evt.tool_response.agentId;
   const an = aid ? state.nodes.get(`a:${aid}`) : null;
@@ -256,7 +281,7 @@ function settleAgentFromAgentToolResponse(evt, ts, terminalStatus) {
   if (an.parentId) recomputeParallelFlags(an.parentId);
 }
 
-function onPostToolUse(evt, sid, ts) {
+function onPostToolUse(evt: HookEvent, sid: string, ts: string) {
   const tid = evt.tool_use_id || '';
   const n = state.nodes.get(`t:${tid}`);
   if (n) {
@@ -285,7 +310,7 @@ function onPostToolUse(evt, sid, ts) {
   recordSuccess(evt);
 }
 
-function onPostToolUseFailure(evt, sid, ts) {
+function onPostToolUseFailure(evt: HookEvent, sid: string, ts: string) {
   const tid = evt.tool_use_id || '';
   const n = state.nodes.get(`t:${tid}`);
   if (n) {
@@ -307,7 +332,7 @@ function onPostToolUseFailure(evt, sid, ts) {
   recordError(evt);
 }
 
-function onNotification(evt, sid, ts) {
+function onNotification(evt: HookEvent, sid: string, ts: string) {
   const nid = `n:${state.eventSeq++}`;
   const n = getNode(nid);
   n.type = 'notification'; n.label = 'Notification'; n.sub = (evt.message || '').slice(0, 50);
@@ -317,7 +342,7 @@ function onNotification(evt, sid, ts) {
   addTimelineEntry(evt, nid, 'notification', 'Notification', n.sub);
 }
 
-function onSessionEnd(evt, sid, ts) {
+function onSessionEnd(evt: HookEvent, sid: string, ts: string) {
   const n = state.nodes.get(`s:${sid}`);
   if (!n) return;
   n.status = 'done'; n.data = evt; n.endTime = ts;
@@ -327,7 +352,9 @@ function onSessionEnd(evt, sid, ts) {
   cascadeTerminate(n.id, ts);
 }
 
-const EVENT_HANDLERS = {
+type EventHandler = (evt: HookEvent, sid: string, ts: string) => void;
+
+const EVENT_HANDLERS: Record<string, EventHandler> = {
   SessionStart: onSessionStart,
   SubagentStart: onSubagentStart,
   SubagentStop: onSubagentStop,
@@ -339,7 +366,7 @@ const EVENT_HANDLERS = {
   SessionEnd: onSessionEnd,
 };
 
-export function processEvent(evt) {
+export function processEvent(evt: HookEvent) {
   const sid = evt.session_id;
   if (typeof sid !== 'string' || !sid) {
     console.warn('[viz] event without session_id — ignored', evt.hook_event_name);
@@ -347,7 +374,7 @@ export function processEvent(evt) {
   }
   const ts = evt._ts || new Date().toISOString();
   layoutDirtyRoots.add(`s:${sid}`);
-  const handler = EVENT_HANDLERS[evt.hook_event_name];
+  const handler = evt.hook_event_name ? EVENT_HANDLERS[evt.hook_event_name] : undefined;
   if (handler) handler(evt, sid, ts);
   // No watchdog feed here any more. The events this function receives are the
   // ones a tab happened to be open for; the server sees all of them, and it is
@@ -358,29 +385,29 @@ export function processEvent(evt) {
 // Le format vit dans viz-duration.mjs (constat C8) ; ici on ne garde que la
 // traduction de « pas de durée » propre à la carte du graphe : `null`, que
 // `viz-canvas` et le panneau de détail savent déjà taire.
-export function calcDuration(start, end) {
+export function calcDuration(start: string | null | undefined, end: string | null | undefined): string | null {
   if (!start || !end) return null;
-  return formatDuration(new Date(end) - new Date(start));
+  return formatDuration(new Date(end).getTime() - new Date(start).getTime());
 }
 
 // Feed label: the shared subject rule, cut to the width the feed column can
 // show. The rule itself lives in the engine's tool-subject.ts — the watchdog
 // needs the same answer at a different length.
-export function formatToolSub(evt) {
+export function formatToolSub(evt: HookEvent) {
   return toolSubject(evt).slice(0, 45);
 }
 
 // ─── Layout (incremental orbital) ─────────────────────────────────────────
-export const layoutDirtyRoots = new Set();
+export const layoutDirtyRoots = new Set<string>();
 let _lastRootCount = -1;
 let _layoutFullDirty = true;
 
-function getRootId(n) {
+function getRootId(n: VizNode | undefined): string | null {
   while (n && n.parentId) n = state.nodes.get(n.parentId);
   return n ? n.id : null;
 }
 
-export function markLayoutDirty(node) {
+export function markLayoutDirty(node: VizNode) {
   const rid = getRootId(node);
   if (rid) layoutDirtyRoots.add(rid);
 }
@@ -397,7 +424,7 @@ export function resetLayout() {
 // Count agent nodes in a subtree (the node + all transitively-reachable agent
 // children). Used by the root layout to inflate the agent ring proportionally
 // to how much room each branch needs.
-function subtreeAgentCount(n) {
+function subtreeAgentCount(n: VizNode): number {
   let w = 1;
   for (const c of n.children) if (c.type === 'agent') w += subtreeAgentCount(c);
   return w;
@@ -408,7 +435,7 @@ function subtreeAgentCount(n) {
 // out on an outer arc; tools either fan along the parent axis (no sub-agents)
 // or split into two short lateral fans (sub-agents present) so they avoid
 // both the sub-agent ring and the path back to the parent.
-function layoutAgent(agent, dirFromParent) {
+function layoutAgent(agent: VizNode, dirFromParent: number) {
   const filtered = agent.children.filter(c => matchesFilter(c));
   const subAgents = filtered.filter(c => c.type === 'agent');
   const tools = filtered.filter(c => c.type !== 'agent');
@@ -461,7 +488,7 @@ function layoutAgent(agent, dirFromParent) {
   tools.filter(c => !visibleTools.includes(c)).forEach(c => { c._visible = false; });
 }
 
-function layoutRoot(root) {
+function layoutRoot(root: VizNode) {
   const cx = root.x;
   const agents = root.children.filter(c => c.type === 'agent');
   const tools = root.children.filter(c => c.type !== 'agent');
@@ -491,10 +518,11 @@ function layoutRoot(root) {
   visibleRootTools.filter(c => !recentRootTools.includes(c)).forEach(c => { c._visible = false; });
 }
 
-function pushTargetsForSubtree(root) {
+function pushTargetsForSubtree(root: VizNode) {
   const stack = [root];
   while (stack.length) {
-    const n = stack.pop();
+    // La condition de boucle dit que la pile n'est pas vide : `pop` rend un noeud.
+    const n = stack.pop()!;
     const vn = ensureVisNode(n.id);
     vn.targetX = n.x;
     vn.targetY = n.y;
@@ -539,7 +567,7 @@ export function layout() {
   layoutDirtyRoots.clear();
 }
 
-export function matchesFilter(n) {
+export function matchesFilter(n: VizNode) {
   if (!state.filter) return true;
   const f = state.filter;
   return n.label.toLowerCase().includes(f) || n.sub.toLowerCase().includes(f) || n.type.includes(f);
@@ -550,7 +578,7 @@ export function matchesFilter(n) {
 // long as no feed entry still references them (so clicks remain valid).
 export function garbageCollect() {
   const now = Date.now();
-  const referenced = new Set();
+  const referenced = new Set<string>();
   for (const e of state.timelineEntries) referenced.add(e.nodeId);
 
   const victims = [];
@@ -578,9 +606,10 @@ export function garbageCollect() {
     vis.nodes.delete(n.id);
     vis.runningNodes.delete(n.id);
   }
-  const purge = arr => {
+  const purge = (arr: DrawBucketEntry[]) => {
     for (let i = arr.length - 1; i >= 0; i--) {
-      if (victimIds.has(arr[i].n.id)) arr.splice(i, 1);
+      // `i` descend de length-1 a 0 : la case existe.
+      if (victimIds.has(arr[i]!.n.id)) arr.splice(i, 1);
     }
   };
   purge(vis.drawToolNodes);

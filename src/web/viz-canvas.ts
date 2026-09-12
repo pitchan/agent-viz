@@ -13,20 +13,25 @@ import {
   state, vis,
   markDirty, setTickFn,
   hexAlpha, easeInOut, esc,
+  type VizNode, type VisNode, type Particle,
 } from './viz-state.ts';
 import {
   drawSessionNode, drawAgentNode, drawToolNode, drawMcpNode, drawSkillNode,
 } from './viz-drawers.ts';
 
 // ─── Canvas setup ─────────────────────────────────────────────────────────
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
-const tooltipEl = document.getElementById('node-tooltip');
+// Les trois elements sont declares dans index.html, et le script de module qui
+// charge ce fichier vient apres eux : ils existent des la premiere ligne.
+// `getContext('2d')` d'un canevas ne rend null qu'apres un contexte d'un AUTRE
+// type sur le meme element, ce que personne ne demande ici.
+const canvas = document.getElementById('canvas') as HTMLCanvasElement;
+const ctx = canvas.getContext('2d')!;
+const tooltipEl = document.getElementById('node-tooltip')!;
 
 // Update the hover tooltip. nodeId=null hides it. Positions the tooltip at
 // the cursor with a small offset, flipping across the cursor if it would
 // otherwise overflow the viewport.
-function updateTooltip(clientX, clientY, nodeId) {
+function updateTooltip(clientX: number, clientY: number, nodeId: string | null) {
   if (!nodeId) { tooltipEl.classList.remove('visible'); return; }
   const n = state.nodes.get(nodeId);
   if (!n) { tooltipEl.classList.remove('visible'); return; }
@@ -57,12 +62,12 @@ export let W = 0, H = 0;
 
 // Static background canvas (void + grid), invalidated on camera/resize.
 const staticCanvas = document.createElement('canvas');
-const staticCtx = staticCanvas.getContext('2d');
+const staticCtx = staticCanvas.getContext('2d')!;
 let _bgDirty = true;
 function markBgDirty() { _bgDirty = true; }
 
 function resize() {
-  const main = document.getElementById('main');
+  const main = document.getElementById('main')!;
   W = main.clientWidth; H = main.clientHeight;
   canvas.width = W * devicePixelRatio;
   canvas.height = H * devicePixelRatio;
@@ -77,9 +82,11 @@ function resize() {
 }
 
 // ─── Canvas → UI callbacks (wired by bootstrap/viz-ui) ────────────────────
-let _onSelectNode = () => {};
-let _onAfterSelect = () => {};
-export function setCanvasCallbacks({ showDetail, renderFeed }) {
+let _onSelectNode: (n: VizNode) => void = () => {};
+let _onAfterSelect: () => void = () => {};
+export function setCanvasCallbacks(
+  { showDetail, renderFeed }: { showDetail?: (n: VizNode) => void; renderFeed?: () => void },
+) {
   _onSelectNode = showDetail || (() => {});
   _onAfterSelect = renderFeed || (() => {});
 }
@@ -150,11 +157,11 @@ canvas.addEventListener('pointerleave', () => {
   markDirty();
 });
 
-function screenToWorld(sx, sy) {
+function screenToWorld(sx: number, sy: number) {
   return { x: sx / vis.camera.zoom - vis.camera.x, y: sy / vis.camera.zoom - vis.camera.y };
 }
 
-function hitTest(wx, wy) {
+function hitTest(wx: number, wy: number) {
   // Iterate forward and keep the last match — equivalent to "reverse +
   // first match" (= last-inserted-on-top wins) but without allocating
   // a new entries array on every pointermove.
@@ -183,8 +190,8 @@ function hitTest(wx, wy) {
 
 // ─── Grid pattern (cached, zoom-snapped) ──────────────────────────────────
 const _gridTile = document.createElement('canvas');
-const _gridCtx = _gridTile.getContext('2d');
-let _gridPattern = null;
+const _gridCtx = _gridTile.getContext('2d')!;
+let _gridPattern: CanvasPattern | null = null;
 let _gridZoomSnap = -1;
 
 function ensureGridPattern() {
@@ -203,7 +210,7 @@ function ensureGridPattern() {
   _gridPattern = ctx.createPattern(_gridTile, 'repeat');
 }
 
-function drawGrid(targetCtx) {
+function drawGrid(targetCtx?: CanvasRenderingContext2D) {
   ensureGridPattern();
   if (!_gridPattern) return;
   const c = targetCtx || ctx;
@@ -219,7 +226,7 @@ function drawGrid(targetCtx) {
 }
 
 // ─── Node/edge drawers ────────────────────────────────────────────────────
-function drawEdge(from, to, active) {
+function drawEdge(from: VisNode, to: VisNode, active: boolean) {
   const alpha = Math.min(from.opacity, to.opacity);
   if (alpha < 0.05) return;
   ctx.beginPath();
@@ -277,7 +284,7 @@ function drawEmptyState() {
 // ─── Particles ────────────────────────────────────────────────────────────
 const PARTICLE_CAP = 80;
 
-function updateParticles(dt) {
+function updateParticles(dt: number) {
   const heavy = vis.avgFrameMs > 25;
   if (heavy) {
     vis._particleSkipToggle = !vis._particleSkipToggle;
@@ -304,7 +311,8 @@ function updateParticles(dt) {
   }
 
   for (let i = vis.particles.length - 1; i >= 0; i--) {
-    const p = vis.particles[i];
+    // `i` descend de length-1 a 0 : la case existe.
+    const p = vis.particles[i]!;
     p.progress += dt * p.speed;
     if (p.progress >= 1) { vis.particles.splice(i, 1); continue; }
     const t = easeInOut(p.progress);
@@ -316,10 +324,15 @@ function updateParticles(dt) {
   if (vis.particles.length > PARTICLE_CAP) vis.particles.splice(0, vis.particles.length - PARTICLE_CAP);
 }
 
-function drawParticlesBatched(vw) {
+// Une particule dont la position courante est posee. `updateParticles` ecrit
+// `x`/`y` sur CHAQUE particule — celles qu'elle vient de creer comprises —
+// avant que `draw` ne lise quoi que ce soit, et rien d'autre n'alimente la liste.
+type PlacedParticle = Particle & { x: number; y: number };
+
+function drawParticlesBatched(vw: WorldBounds) {
   if (!vis.particles.length) return;
-  const byColor = new Map();
-  for (const p of vis.particles) {
+  const byColor = new Map<string, PlacedParticle[]>();
+  for (const p of vis.particles as PlacedParticle[]) {
     if (p.opacity <= 0) continue;
     if (p.x < vw.minX || p.x > vw.maxX || p.y < vw.minY || p.y > vw.maxY) continue;
     let arr = byColor.get(p.color);
@@ -374,7 +387,7 @@ function isCameraMoving() {
     || Math.abs(cam.zoom - cam.targetZoom) > 0.002;
 }
 
-function tick(now) {
+function tick(now: number) {
   vis.rafHandle = null;
   vis.pulseTimer = null;
   if (!lastFrame) lastFrame = now;
@@ -422,7 +435,10 @@ function tick(now) {
   }
 }
 
-function getWorldBounds() {
+// Le rectangle du monde visible a l'ecran, marge comprise.
+interface WorldBounds { minX: number; minY: number; maxX: number; maxY: number }
+
+function getWorldBounds(): WorldBounds {
   const cam = vis.camera;
   const padWorld = 120 / Math.max(0.001, cam.zoom);
   const tl = screenToWorld(0, 0);
@@ -433,7 +449,7 @@ function getWorldBounds() {
   };
 }
 
-function inBounds(vn, vw) {
+function inBounds(vn: VisNode, vw: WorldBounds) {
   return vn.x >= vw.minX && vn.x <= vw.maxX && vn.y >= vw.minY && vn.y <= vw.maxY;
 }
 
