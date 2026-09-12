@@ -6,13 +6,13 @@
 // are one product; it names its single price source and shows how every
 // number is made.
 
-import * as api from './api.js';
-import { getState, subscribe, loadPricing } from './store.js';
+import * as api from './api.ts';
+import { getState, subscribe, loadPricing } from './store.ts';
 import {
   formatTokens, formatUsdExact, formatUsdPerMTok, formatShare, modelLabel,
   basisLabel, periodHeader,
-} from './format.js';
-import { initPeriodSelector } from './period-selector.js';
+} from './format.ts';
+import { initPeriodSelector } from './period-selector.ts';
 
 const COST_HEADERS = ['Modèle', 'Entrée', 'Sortie', 'Création de cache',
   'Relecture de cache', 'Jetons nets', 'Coût', 'Part'];

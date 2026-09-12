@@ -5,7 +5,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { failureLine, projectLabel, failuresSummary, groupKey, groupAlerts, causeLabel, episodeLabel, panelAlerts } from '../../src/web/observatory/failures-format.js';
+import { failureLine, projectLabel, failuresSummary, groupKey, groupAlerts, causeLabel, episodeLabel, panelAlerts } from '../../src/web/observatory/failures-format.ts';
 import { _DETECTOR_TYPES } from '../../src/engine/watchdog/detector.ts';
 
 const base = {

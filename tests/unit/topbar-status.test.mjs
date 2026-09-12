@@ -12,7 +12,7 @@ import {
   connectionPresentation,
   watchdogPresentation,
   errorsPresentation,
-} from '../../src/web/viz-topbar-status.mjs';
+} from '../../src/web/viz-topbar-status.ts';
 
 // ─── Le temoin de connexion : un voyant etiquete, pas un rond anonyme ────────
 

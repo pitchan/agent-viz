@@ -117,7 +117,7 @@ function pointDEntree() {
 // (`dist/server/server.js`), plus la SOURCE (`src/server/server.ts`) — la
 // comparaison directe entre `entree` et les fichiers de `RACINE_SERVEUR` ne
 // peut donc plus mordre, `dist/server` et `src/server` etant deux arbres
-// distincts. `tsconfig.node.build.json` fixe `rootDir: src` / `outDir: dist` :
+// distincts. `tsconfig.build.json` fixe `rootDir: src` / `outDir: dist` :
 // les deux arbres partagent la MEME arborescence relative (meme geste que
 // `PROJECT_ROOT` dans `routes.ts`), donc la source correspondant a `entree`
 // se retrouve en substituant `dist` par `src` sur son premier segment et

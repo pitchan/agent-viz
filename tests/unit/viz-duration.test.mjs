@@ -15,7 +15,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatDuration } from '../../src/web/viz-duration.mjs';
+import { formatDuration } from '../../src/web/viz-duration.ts';
 
 test('sous la seconde, la durée s écrit en millisecondes entières', () => {
   assert.equal(formatDuration(0), '0ms');

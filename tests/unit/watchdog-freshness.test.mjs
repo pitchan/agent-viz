@@ -22,7 +22,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createWatchdog } from '../../src/engine/watchdog/detector.ts';
-import { isFresh } from '../../src/web/viz-alert-freshness.mjs';
+import { isFresh } from '../../src/web/viz-alert-freshness.ts';
 
 const T = 1_700_000_000_000; // fixed "now" for every test
 

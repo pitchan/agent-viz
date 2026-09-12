@@ -5,17 +5,17 @@
 // to viz-layout (processEvent, layout), and trigger viz-ui (renderFeed,
 // updateStats, fitView) via `scheduleRender` which coalesces bursts.
 
-import { state, vis, markDirty, esc } from './viz-state.js';
-import { processEvent, layout, resetLayout } from './viz-layout.js';
+import { state, vis, markDirty, esc } from './viz-state.ts';
+import { processEvent, layout, resetLayout } from './viz-layout.ts';
 import {
   renderFeed, updateStats, updateBudget, fitView, startDurationsTicker, stopDurationsTicker,
-} from './viz-ui.js';
+} from './viz-ui.ts';
 import {
   pauseTick, resumeTick, markNarratorDirty,
-} from './viz-narrator.js';
-import { raiseExternalAlert, applyServerAlert, refreshAlerts } from './viz-watchdog-client.js';
-import { connectionPresentation } from './viz-topbar-status.mjs';
-import { resetErrors } from './viz-errors.mjs';
+} from './viz-narrator.ts';
+import { raiseExternalAlert, applyServerAlert, refreshAlerts } from './viz-watchdog-client.ts';
+import { connectionPresentation } from './viz-topbar-status.ts';
+import { resetErrors } from './viz-errors.ts';
 
 // Nothing here tells the watchdog whether we can still hear the agent. That
 // question belonged to a detector running in the tab; detection now runs on

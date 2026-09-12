@@ -1,9 +1,9 @@
-// Smoke tests for pure helpers in src/web/viz-state.js. No DOM access here,
+// Smoke tests for pure helpers in src/web/viz-state.ts. No DOM access here,
 // so the module imports cleanly under Node ESM.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseMcpName, state } from '../../src/web/viz-state.js';
+import { parseMcpName, state } from '../../src/web/viz-state.ts';
 
 test('parseMcpName: plugin_ prefix stripped + repeated segments dedup', () => {
   assert.deepEqual(
@@ -45,7 +45,7 @@ test('state.tokens.transcriptMissing defaults to false', () => {
 // C'est le dernier maillon de la cible : « propager cette information jusqu'à
 // l'affichage en direct ».
 // ---------------------------------------------------------------------------
-import { costCompleteness } from '../../src/web/viz-state.js';
+import { costCompleteness } from '../../src/web/viz-state.ts';
 
 test('C4 — des seaux tous complets donnent un total complet', () => {
   const r = costCompleteness([
@@ -87,7 +87,7 @@ test('C4 — un seau SANS le champ compte comme complet (enveloppe additive)', (
 // C4 — trois énoncés, trois vérités. Le troisième existe parce que
 // « au moins $0 » est vrai et ne prétend rien : quand RIEN n'est tarifé, il
 // faut avouer l'absence, pas produire une borne inutile.
-import { formatCostBound } from '../../src/web/viz-state.js';
+import { formatCostBound } from '../../src/web/viz-state.ts';
 
 test('C4 — complet : le montant nu', () => {
   assert.equal(formatCostBound(4.172108, true), '$4.17');

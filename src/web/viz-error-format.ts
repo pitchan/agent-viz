@@ -12,7 +12,7 @@
 // fichier.
 
 import { clockTime } from '../engine/core/clock-time.ts';
-import { truncate } from './viz-alert-format.mjs';
+import { truncate } from './viz-alert-format.ts';
 
 // Un message d'erreur n'a pas de longueur naturelle (une trace de pile peut
 // faire des kilo-octets) et le volet a une largeur fixe. On coupe VISIBLEMENT :

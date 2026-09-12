@@ -1,6 +1,6 @@
 // The 7/30/90 window selector, shared by both observatory pages. Display
 // copy of the service's WINDOW_DAYS table — the server clamps anyway.
-import { getState, setPeriodDays, subscribe } from './store.js';
+import { getState, setPeriodDays, subscribe } from './store.ts';
 
 export const WINDOW_DAYS = [7, 30, 90];
 

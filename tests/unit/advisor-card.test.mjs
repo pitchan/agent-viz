@@ -38,7 +38,7 @@ const parClasse = (racine, classe) =>
 
 globalThis.document = { createElement: fauxElement };
 
-const { recommendationCard } = await import('../../src/web/observatory/advisor-view.js');
+const { recommendationCard } = await import('../../src/web/observatory/advisor-view.ts');
 
 // Une carte minimale : une règle inconnue de la table d'évidences pour ne
 // tester que la carte, pas les phrases de mesure.

@@ -10,28 +10,28 @@ import {
   COLORS, state, vis, markDirty, hexAlpha, esc,
   formatTokens, tokenTotal, tokenContext, formatCost, formatCostBound, costCompleteness,
   agentIdFromNode,
-} from './viz-state.js';
+} from './viz-state.ts';
 import {
   layout, matchesFilter, markLayoutFullDirty, setFeedCursorAdjust,
-} from './viz-layout.js';
-import * as canvasMod from './viz-canvas.js';
-import { setCanvasCallbacks } from './viz-canvas.js';
+} from './viz-layout.ts';
+import * as canvasMod from './viz-canvas.ts';
+import { setCanvasCallbacks } from './viz-canvas.ts';
 import {
   loadSessions, resetEvents, setFeedResetHook,
-} from './viz-network.js';
+} from './viz-network.ts';
 import {
   composeNarrator, setRenderFn, resumeTick,
-} from './viz-narrator.js';
+} from './viz-narrator.ts';
 import {
   getActiveAlerts, acknowledgeAlert, onAlertsChanged, initAlertReader, refreshAlerts,
-} from './viz-watchdog-client.js';
+} from './viz-watchdog-client.ts';
 import {
   alertActor, alertDetailLines, notificationPayload, truncate,
-} from './viz-alert-format.mjs';
-import { watchdogPresentation, errorsPresentation } from './viz-topbar-status.mjs';
-import { errorRow, errorsPanelTitle } from './viz-error-format.mjs';
-import { getErrors, getErrorsSummary, onErrorsChanged } from './viz-errors.mjs';
-import { formatDuration } from './viz-duration.mjs';
+} from './viz-alert-format.ts';
+import { watchdogPresentation, errorsPresentation } from './viz-topbar-status.ts';
+import { errorRow, errorsPanelTitle } from './viz-error-format.ts';
+import { getErrors, getErrorsSummary, onErrorsChanged } from './viz-errors.ts';
+import { formatDuration } from './viz-duration.ts';
 
 // ─── Feed panel ───────────────────────────────────────────────────────────
 let _feedRenderedCount = 0;

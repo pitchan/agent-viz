@@ -15,7 +15,7 @@ import {
   state, vis,
   hexAlpha, roundRect, traceHexagon, traceDiamond, truncate, esc,
   formatTokens, tokenContext, agentIdFromNode,
-} from './viz-state.js';
+} from './viz-state.ts';
 
 // ─── Glow sprites (pre-rendered radial gradients, cached per color) ───────
 const GLOW_SPRITE_SIZE = 128;

@@ -1,4 +1,4 @@
-// Unit tests for src/web/viz-alert-format.mjs — how an alert is worded.
+// Unit tests for src/web/viz-alert-format.ts — how an alert is worded.
 //
 // Two consumers share this: the alerts popup and the OS notification. The
 // notification is the half no browser test can see (Playwright cannot look at
@@ -8,7 +8,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { alertActor, alertDetailLines, notificationPayload } from '../../src/web/viz-alert-format.mjs';
+import { alertActor, alertDetailLines, notificationPayload } from '../../src/web/viz-alert-format.ts';
 import { clockTime } from '../../src/engine/core/clock-time.ts';
 
 // Built from local-time components so the expectation holds in any timezone.

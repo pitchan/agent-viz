@@ -17,7 +17,7 @@ import assert from 'node:assert/strict';
 import {
   recordError, recordSuccess, getErrors, getErrorsSummary,
   resetErrors, onErrorsChanged, ERRORS_MAX,
-} from '../../src/web/viz-errors.mjs';
+} from '../../src/web/viz-errors.ts';
 
 const echec = (extra = {}) => ({
   hook_event_name: 'PostToolUseFailure',

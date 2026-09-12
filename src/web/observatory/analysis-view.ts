@@ -6,10 +6,10 @@
 // shows what was measured — and each names its own price source, because they
 // do not use the same one.
 
-import * as api from './api.js';
-import { getState, subscribe, loadAnalysis, loadSession, setIncludeMachine } from './store.js';
-import { formatUsd, formatTokens, formatBytes, formatDuration, basisLabel, periodHeader } from './format.js';
-import { initPeriodSelector } from './period-selector.js';
+import * as api from './api.ts';
+import { getState, subscribe, loadAnalysis, loadSession, setIncludeMachine } from './store.ts';
+import { formatUsd, formatTokens, formatBytes, formatDuration, basisLabel, periodHeader } from './format.ts';
+import { initPeriodSelector } from './period-selector.ts';
 
 const HEADERS = ['Session', 'Projet', 'Modèle', 'Coût', 'Jetons nets', 'Durée', 'Type'];
 

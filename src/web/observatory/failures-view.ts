@@ -5,8 +5,8 @@
 // (`onAckGroup`), advisor-view l'orchestre. Le regroupement et les phrases
 // viennent de failures-format.js, les remedes de remedies.js.
 
-import { groupAlerts, causeLabel, episodeLabel, failuresSummary, projectLabel, panelAlerts } from './failures-format.js';
-import { remedyFor } from './remedies.js';
+import { groupAlerts, causeLabel, episodeLabel, failuresSummary, projectLabel, panelAlerts } from './failures-format.ts';
+import { remedyFor } from './remedies.ts';
 
 function el(tag, className, text) {
   const node = document.createElement(tag);

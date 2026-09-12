@@ -3,7 +3,7 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "target": "ES2022",
-    "lib": ["ES2022"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "forceConsistentCasingInFileNames": true,
@@ -19,18 +19,18 @@
     // navigateur, avant meme que le retrait de types s'execute.
     "erasableSyntaxOnly": true
   },
-  // Ce projet sert au TYPECHECK, pas a l emission : `npm run typecheck:engine` le lance
-  // avec --noEmit. L emission passe par tsconfig.node.build.json, qui configure l include
-  // et le rootDir / outDir (voir tsconfig.node.build.json pour les valeurs en cours).
+  // Ce projet sert au TYPECHECK, pas a l emission : `npm run typecheck` le lance
+  // avec --noEmit. L emission passe par tsconfig.build.json, qui configure l include
+  // et le rootDir / outDir (voir tsconfig.build.json pour les valeurs en cours).
   // Mesure (tsc 5.9.3, bac a sable, emission reelle sur 3 includes) : le deplacement
   // des sorties n est PAS cause par tests/**/*.ts en particulier -- il est deja present
   // avec juste vitest.config.mts dans l include (src/engine seul -> dist/engine/cli.js
   // normal ; + vitest.config.mts OU + tests/**/*.ts -> dist/engine/src/engine/cli.js
   // deplace). Ce projet n a pas de rootDir : N IMPORTE QUELLE entree hors src/engine
   // suffit a deplacer toutes les sorties.
-  // ETAPE 4 (2026-08-14) : rootDir pose dans tsconfig.node.build.json
+  // ETAPE 4 (2026-08-14) : rootDir pose dans tsconfig.build.json
   // (les tests/** et vitest.config.mts d ici interdisent un rootDir src sur CE projet).
-  "include": ["src/server/**/*.ts", "src/engine/**/*.ts", "tests/**/*.ts", "vitest.config.mts"],
+  "include": ["src/server/**/*.ts", "src/engine/**/*.ts", "src/web/**/*.ts", "tests/**/*.ts", "vitest.config.mts"],
   // Un `exclude` explicite REMPLACE le defaut de tsc au lieu de s'y ajouter :
   // les trois dossiers par defaut et le outDir reviennent ici en dur, pour que
   // l'`include` elargi de la tache suivante ne les perde pas en silence.

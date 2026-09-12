@@ -51,7 +51,7 @@ async function freshClient({ alerts = [], activeIds = [], now = T, ack } = {}) {
     }
     return { ok: true, json: async () => ({ alerts: journal.alerts, activeIds: journal.activeIds }) };
   };
-  const mod = await import(`../../src/web/viz-watchdog-client.js?t=${T}-${Math.random()}`);
+  const mod = await import(`../../src/web/viz-watchdog-client.ts?t=${T}-${Math.random().toString(36).slice(2)}`);
   await mod.initAlertReader({ fetchImpl, now: () => clock });
   // Two different things, and the difference matters. `seen` is what gets
   // ANNOUNCED — the signal the desktop notification hangs off. `calls` is how
@@ -225,7 +225,7 @@ test('le premier chargement montre, il n annonce pas', async () => {
   // nouveau. Une alerte permanente encore vraie sonnerait a CHAQUE F5 : la
   // notification bureau est faite pour ce qui SURVIENT pendant qu on regarde
   // ailleurs, la pastille rouge suffit a qui vient d ouvrir la page.
-  const mod = await import(`../../src/web/viz-watchdog-client.js?t=${T}-premier-${Math.random()}`);
+  const mod = await import(`../../src/web/viz-watchdog-client.ts?t=${T}-premier-${Math.random().toString(36).slice(2)}`);
   const calls = [];
   mod.onAlertsChanged(a => calls.push(a));
   await mod.initAlertReader({
@@ -371,7 +371,7 @@ test('acquitter une alerte externe ne poste rien au journal', async () => {
 // ─── The server going quiet ───────────────────────────────────────────────
 
 test('un serveur muet ne fait pas tomber la pastille', async () => {
-  const mod = await import(`../../src/web/viz-watchdog-client.js?t=${T}-muet-${Math.random()}`);
+  const mod = await import(`../../src/web/viz-watchdog-client.ts?t=${T}-muet-${Math.random().toString(36).slice(2)}`);
   await mod.initAlertReader({
     fetchImpl: async () => { throw new Error('connexion refusee'); },
     now: () => T,
@@ -384,7 +384,7 @@ test('un serveur qui repond n importe quoi ne casse pas la pastille', async () =
   // d un nombre levent tous les deux, et personne n attend cette promesse :
   // le rejet ne serait rattrape par rien, et le rafraichissement periodique
   // s arreterait la, sans un mot.
-  const mod = await import(`../../src/web/viz-watchdog-client.js?t=${T}-charge-${Math.random()}`);
+  const mod = await import(`../../src/web/viz-watchdog-client.ts?t=${T}-charge-${Math.random().toString(36).slice(2)}`);
   await mod.initAlertReader({
     fetchImpl: async () => ({ ok: true, json: async () => ({ alerts: 5, activeIds: 7 }) }),
     now: () => T,

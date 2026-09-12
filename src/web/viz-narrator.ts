@@ -5,7 +5,7 @@
 // setRenderFn() by viz-ui.js. Tests can import composeNarrator/commonPathPrefix
 // without triggering any side effect (no setInterval at import time).
 
-import { formatDuration } from './viz-duration.mjs';
+import { formatDuration } from './viz-duration.ts';
 
 // ─── commonPathPrefix ─────────────────────────────────────────────────────
 // Returns the common directory prefix of the given paths (e.g. "auth/" for

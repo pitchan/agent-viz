@@ -29,7 +29,7 @@
 // carry no triggering event, hence no createdAt. They are current by
 // construction and are kept in their own registry, out of both sieves.
 
-import { isFresh } from './viz-alert-freshness.mjs';
+import { isFresh } from './viz-alert-freshness.ts';
 // Les deux routes du journal des pannes sont décrites une seule fois, dans le
 // client HTTP de l'Observatoire (constat C6). La pastille en garde la POLITIQUE
 // — ne rien vider sur une lecture ratée, remettre l'alerte à l'écran sur un
@@ -41,7 +41,7 @@ import { isFresh } from './viz-alert-freshness.mjs';
 // L'alias n'est pas cosmétique : ce module exporte lui aussi un
 // `acknowledgeAlert`, et c'est un geste différent — celui-ci retire l'alerte de
 // l'écran d'abord, puis consigne ; celui de l'API ne fait que poster.
-import { fetchAlerts, acknowledgeAlert as postAcknowledgement } from './observatory/api.js';
+import { fetchAlerts, acknowledgeAlert as postAcknowledgement } from './observatory/api.ts';
 
 const listeners = new Set();
 const externalAlerts = new Map();

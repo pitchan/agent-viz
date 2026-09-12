@@ -163,21 +163,21 @@
 </div>
 <div id="node-tooltip"></div>
 
-<!-- Modularized JS — see ./src/web/viz-*.js -->
+<!-- Modularized JS — see ./src/web/viz-*.ts -->
 <script type="module">
   // Order: state → canvas (registers tick) → layout → ui → network.
   // viz-ui and viz-network have a benign import cycle; ES modules handle it
   // because all cross-calls happen inside event handlers.
-  import './src/web/viz-state.js';
-  import './src/web/viz-canvas.js';
-  import './src/web/viz-layout.js';
-  import './src/web/viz-ui.js';
-  import { loadSessions, connectSSE, poll } from './src/web/viz-network.js';
-  import { garbageCollect } from './src/web/viz-layout.js';
-  import { requestRender } from './src/web/viz-state.js';
-  import { initAdvisor } from './src/web/observatory/advisor-view.js';
-  import { initAnalysis } from './src/web/observatory/analysis-view.js';
-  import { initPricing } from './src/web/observatory/pricing-view.js';
+  import './src/web/viz-state.ts';
+  import './src/web/viz-canvas.ts';
+  import './src/web/viz-layout.ts';
+  import './src/web/viz-ui.ts';
+  import { loadSessions, connectSSE, poll } from './src/web/viz-network.ts';
+  import { garbageCollect } from './src/web/viz-layout.ts';
+  import { requestRender } from './src/web/viz-state.ts';
+  import { initAdvisor } from './src/web/observatory/advisor-view.ts';
+  import { initAnalysis } from './src/web/observatory/analysis-view.ts';
+  import { initPricing } from './src/web/observatory/pricing-view.ts';
 
   initAdvisor();
   initAnalysis();

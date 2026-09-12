@@ -4,7 +4,7 @@
 // formatTokens is NOT redefined here: viz-state.js already owns it and is
 // importable under Node.
 
-import { formatTokens } from '../viz-state.js';
+import { formatTokens } from '../viz-state.ts';
 export { formatTokens };
 
 export function formatUsd(n) {

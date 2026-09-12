@@ -5,17 +5,17 @@
 // not comparable with the other — and no total anywhere, because a same
 // session feeds several rules.
 
-import * as api from './api.js';
-import { getState, subscribe, loadAdvisor, changeStatus, applyScanEvent } from './store.js';
+import * as api from './api.ts';
+import { getState, subscribe, loadAdvisor, changeStatus, applyScanEvent } from './store.ts';
 import {
   confidenceLabel, costLabel, basisTitle, periodLabel, basisLabel, periodHeader,
   scanProgressLabel, summaryHeadline, summaryDetails, returnBanner,
-} from './format.js';
-import { evidenceLines } from './evidence.js';
-import { initPeriodSelector } from './period-selector.js';
-import { initConfirmButton } from './confirm-button.js';
-import { renderFailures } from './failures-view.js';
-import { renderDecisions, refusalControls } from './decisions-view.js';
+} from './format.ts';
+import { evidenceLines } from './evidence.ts';
+import { initPeriodSelector } from './period-selector.ts';
+import { initConfirmButton } from './confirm-button.ts';
+import { renderFailures } from './failures-view.ts';
+import { renderDecisions, refusalControls } from './decisions-view.ts';
 
 function el(tag, className, text) {
   const node = document.createElement(tag);

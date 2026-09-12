@@ -7,11 +7,11 @@
 import {
   COLORS, SPAWN_DIST, TIMELINE_CAP, NODE_GC_MAX_AGE_MS,
   state, vis, markDirty, parseMcpName,
-} from './viz-state.js';
-import { markNarratorDirty } from './viz-narrator.js';
+} from './viz-state.ts';
+import { markNarratorDirty } from './viz-narrator.ts';
 import { toolSubject } from '../engine/core/tool-subject.ts';
-import { formatDuration } from './viz-duration.mjs';
-import { recordError, recordSuccess } from './viz-errors.mjs';
+import { formatDuration } from './viz-duration.ts';
+import { recordError, recordSuccess } from './viz-errors.ts';
 
 // ─── Feed-cursor adjust hook ──────────────────────────────────────────────
 // When the timeline ring-buffer shifts, viz-ui's _feedRenderedCount must be

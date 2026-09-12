@@ -3,7 +3,7 @@
 // que failures-view.test.mjs : pas de navigateur, pas de jsdom.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { renderDecisions, refusalControls } from '../../src/web/observatory/decisions-view.js';
+import { renderDecisions, refusalControls } from '../../src/web/observatory/decisions-view.ts';
 
 function fauxElement(tag) {
   const classes = new Set();

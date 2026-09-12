@@ -1,5 +1,5 @@
 // Ambient shim for 'node:sqlite' — @types/node 20.x ships no declarations for
-// it (TS2307), and this repo's engine tsconfig proved (sandbox, tsc 5.9.3)
+// it (TS2307), and this repo's tsconfig proved (sandbox, tsc 5.9.3)
 // that a `declare module 'node:sqlite'` block placed INSIDE a regular .ts
 // module is read as a module AUGMENTATION and rejected ("cannot be found"):
 // only a standalone .d.ts is honoured as a fresh ambient declaration for a

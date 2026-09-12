@@ -1,12 +1,12 @@
-// Smoke test for processEvent / EVENT_HANDLERS dispatch in src/web/viz-layout.js.
+// Smoke test for processEvent / EVENT_HANDLERS dispatch in src/web/viz-layout.ts.
 // state and vis are module-level singletons, so we reset their relevant slices
 // before each test to keep tests independent.
 
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { state, vis } from '../../src/web/viz-state.js';
-import { processEvent, layoutDirtyRoots, calcDuration } from '../../src/web/viz-layout.js';
-import { getErrors, resetErrors, onErrorsChanged } from '../../src/web/viz-errors.mjs';
+import { state, vis } from '../../src/web/viz-state.ts';
+import { processEvent, layoutDirtyRoots, calcDuration } from '../../src/web/viz-layout.ts';
+import { getErrors, resetErrors, onErrorsChanged } from '../../src/web/viz-errors.ts';
 
 function resetState() {
   state.nodes.clear();

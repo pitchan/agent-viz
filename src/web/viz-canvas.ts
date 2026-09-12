@@ -13,10 +13,10 @@ import {
   state, vis,
   markDirty, setTickFn,
   hexAlpha, easeInOut, esc,
-} from './viz-state.js';
+} from './viz-state.ts';
 import {
   drawSessionNode, drawAgentNode, drawToolNode, drawMcpNode, drawSkillNode,
-} from './viz-drawers.js';
+} from './viz-drawers.ts';
 
 // ─── Canvas setup ─────────────────────────────────────────────────────────
 const canvas = document.getElementById('canvas');

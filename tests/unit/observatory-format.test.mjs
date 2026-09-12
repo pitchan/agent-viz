@@ -6,7 +6,7 @@ import {
   formatDayMonth, periodLabel, basisLabel, periodHeader, scanProgressLabel, formatTokens,
   formatUsdPerMTok, formatShare, formatUsdExact, modelLabel, summaryHeadline, summaryDetails,
   decisionLine, returnBanner,
-} from '../../src/web/observatory/format.js';
+} from '../../src/web/observatory/format.ts';
 
 test('formatUsd uses a French decimal comma and two digits', () => {
   assert.equal(formatUsd(0.4213), '0,42 $');
@@ -101,8 +101,8 @@ test('scanProgressLabel counts every handled session, silent when idle or done',
 // formatTokens is not redefined by the observatory — it is re-exported from
 // viz-state.js. Pinned here so a page never quietly gets two token formats.
 test('formatTokens comes from viz-state and keeps its existing rendering', async () => {
-  const { formatTokens } = await import('../../src/web/observatory/format.js');
-  const { formatTokens: original } = await import('../../src/web/viz-state.js');
+  const { formatTokens } = await import('../../src/web/observatory/format.ts');
+  const { formatTokens: original } = await import('../../src/web/viz-state.ts');
   assert.equal(formatTokens, original);
   assert.equal(formatTokens(1234567), '1.2M');
 });

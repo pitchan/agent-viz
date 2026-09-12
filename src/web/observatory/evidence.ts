@@ -5,7 +5,7 @@
 // from format.js because it changes for a different reason — a new rule, not a
 // new display convention.
 
-import { formatTokens, formatBytes } from './format.js';
+import { formatTokens, formatBytes } from './format.ts';
 
 // R1 names the marker the engine journaled and where the prefix broke. The
 // rule decides which one dominates; this file only puts it into French.

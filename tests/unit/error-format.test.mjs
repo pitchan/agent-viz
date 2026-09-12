@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 
 import {
   errorRow, errorsPanelTitle, MESSAGE_MAX,
-} from '../../src/web/viz-error-format.mjs';
+} from '../../src/web/viz-error-format.ts';
 
 // L'heure se lit en heure LOCALE, comme celle des alertes : c'est l'heure a
 // laquelle l'utilisateur a vu passer l'echec. L'instant est donc construit en

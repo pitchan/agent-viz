@@ -8,7 +8,7 @@
 // sa raison — il ne porte PAS de data-status, sinon la délégation partirait
 // au serveur sans raison (piège doc/42, conservé tel quel).
 
-import { decisionLine } from './format.js';
+import { decisionLine } from './format.ts';
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
