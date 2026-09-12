@@ -46,12 +46,20 @@
 //   1. Que les modules atteints TOURNENT dans un navigateur. Il ne lit que des
 //      imports : une API Node atteinte sans import (`process.env`,
 //      `globalThis.require`) lui echappe entierement.
-//   2. Que la table de routes ne s'ouvre pas trop. Une route
-//      `prefix: '/src/engine/'` rendrait R4 verte pour tout le moteur ; c'est
-//      `served-ts-strip-check.test.mjs` qui interdit ce prefixe.
+//   2. Que la table de routes ne s'ouvre pas trop. R4 demande qu'un module
+//      atteint SOIT servi ; elle ne dit rien de ce qui est servi EN PLUS. Un
+//      prefixe qui recouvre `/src/engine/` — par le bas (`/src/engine/core/`)
+//      comme par le haut (`/src/`) — rendrait R4 verte en ouvrant tout le
+//      moteur au navigateur. C'est `served-ts-strip-check.test.mjs` qui
+//      interdit ces prefixes, dans les deux sens.
 //   3. Que le corps servi compile : c'est `served-ts-strip-check.test.mjs`.
 //   4. Que le graphe est complet si un `import()` a specificateur calcule
 //      apparait : R0 signale l'angle mort, il ne le comble pas.
+//   5. Que le PAQUET PUBLIE emporte ce que R4 declare servi. R4 garantit le
+//      serveur de developpement. Le champ `files` de `package.json` recopie a
+//      la main les fichiers du moteur embarques : c'est une troisieme liste, et
+//      rien ne la croise avec la table de routes. Mesure : une route du moteur
+//      ajoutee sans toucher `files` laisse `package-entrypoints.test.mjs` vert.
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire, stripTypeScriptTypes } from 'node:module';

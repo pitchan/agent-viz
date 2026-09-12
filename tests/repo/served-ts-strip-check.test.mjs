@@ -56,13 +56,25 @@ test('la liste blanche sert exactement 29 fichiers (27 modules + 2 primitives du
   assert.equal(SERVED.length, 29);
 });
 
-test('aucune route du moteur ne declare de prefixe : le filtre ci-dessus ne saute rien', () => {
+test('aucun prefixe de route ne recouvre /src/engine/ : le filtre ci-dessus ne saute rien', () => {
   // Le filtre d'enginePrimitives() ne lit que route.path : une route ecrite
   // avec route.prefix passerait au travers en silence et ouvrirait tout
   // src/engine/ au navigateur sans que le compte SERVED.length ne bouge.
-  assert.equal(
-    ROUTES.filter(r => typeof r.prefix === 'string' && r.prefix.startsWith('/src/engine')).length, 0,
-    'la liste blanche du moteur nomme des chemins exacts : aucun prefixe.');
+  //
+  // Un prefixe est dangereux dans les DEUX sens, et un seul des deux tests ne
+  // suffit pas (mesure) : `/src/engine/core/` tombe SOUS le chemin garde et
+  // ouvre events.ts et usage.ts ; `/src/` le RECOUVRE par le haut et ouvre
+  // tout le moteur. Le premier ne passe que `r.prefix.startsWith(...)`, le
+  // second que `...startsWith(r.prefix)`. Les deux sens, donc. `/src/web/`,
+  // la route legitime, n'est attrape par aucun des deux.
+  const recouvre = (prefixe) => prefixe.startsWith('/src/engine')
+    || '/src/engine/'.startsWith(prefixe);
+  const fautives = ROUTES
+    .filter(r => typeof r.prefix === 'string' && recouvre(r.prefix))
+    .map(r => r.prefix);
+  assert.deepEqual(fautives, [],
+    'la liste blanche du moteur nomme des chemins exacts : aucun prefixe ne doit '
+    + `recouvrir /src/engine/ — trouve : ${fautives.join(', ')}`);
 });
 
 for (const abs of SERVED) {
