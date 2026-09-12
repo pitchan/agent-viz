@@ -11,12 +11,49 @@
 // src/web/observatory/analysis-view.js, dont la part testable est exportee nue
 // et la part DOM ne l'est pas.
 
+// Une alerte telle que le journal la rend (GET /alerts) — pas TrackedAlert
+// (ce que le lecteur du chien de garde SUIT, viz-watchdog-client.ts) ni
+// AlertContent (ce que la mise en forme temps reel LIT, viz-alert-format.ts) :
+// un troisieme jeu de champs, propre au journal, avec ses propres extras
+// (cwd, count, patternId, toolName) que les deux autres n'ont pas.
+export interface JournalOccurrence {
+  ts?: number;
+  failed?: boolean;
+}
+
+export interface JournalTool {
+  toolName: string;
+  subject?: string;
+}
+
+export interface JournalAlert {
+  id: string;
+  type: string;
+  createdAt: number;
+  acknowledged?: boolean;
+  cwd?: string | null;
+  toolName?: string;
+  count?: number;
+  occurrences?: JournalOccurrence[];
+  patternId?: string;
+  subject?: string;
+  tools?: JournalTool[];
+}
+
+// Une cause (groupKey) et ses episodes, du plus recent au plus ancien.
+export interface AlertGroup {
+  key: string;
+  episodes: JournalAlert[];
+  lastAt: number;
+  unacked: number;
+}
+
 // Meme convention que src/server/observatory/project-label.js : la lettre de
 // lecteur en majuscule, parce que Windows ignore la casse et que le libelle ne
 // doit pas suivre celle du terminal qui a lance la derniere session. Le module
 // serveur n'est pas reutilisable ici — il prend des sessions,
 // pas un chemin nu.
-export function projectLabel(cwd) {
+export function projectLabel(cwd: string | null | undefined): string {
   if (!cwd) return 'projet inconnu';
   return cwd.replace(/^([a-z]):/, (_, d) => `${d.toUpperCase()}:`);
 }
@@ -31,7 +68,7 @@ export function projectLabel(cwd) {
 // l'erreur, si bien qu'un jet ici n'abimerait pas une ligne mais afficherait le
 // bloc ENTIER vide — indiscernable de « aucune panne » sur le seul panneau
 // charge de dire qu'il y en a eu.
-const listeDe = v => (Array.isArray(v) ? v : []);
+function listeDe<T>(v: T[] | null | undefined): T[] { return Array.isArray(v) ? v : []; }
 
 // Ce qu'on peut honnetement dire des issues : un compte, jamais un
 // quantificateur. L'alerte se leve SUR l'appel qui se repete, dont l'issue
@@ -39,7 +76,7 @@ const listeDe = v => (Array.isArray(v) ? v : []);
 // jamais. « Toutes en echec » affirmerait donc sur un appel qu'on n'a pas vu.
 // Le denominateur est affiche : le lecteur voit sur quoi porte le compte.
 // Meme regle que `failureSuffix` cote module pur, dans l'autre langue.
-function failureNote(occurrences) {
+function failureNote(occurrences: JournalOccurrence[]) {
   const failed = occurrences.filter(o => o.failed === true);
   if (failed.length === 0) return '';
   return `, ${failed.length} sur ${occurrences.length} en échec`;
@@ -57,7 +94,7 @@ function failureNote(occurrences) {
 //
 // Chaque phrase dit ce qui a ete mal ecrit, pas ce que l'outil a repondu : ce
 // que le lecteur cherche ici, c'est le reglage a poser une fois.
-const MOTIFS = {
+const MOTIFS: Record<string, string> = {
   'inv-bash-windows-path-unquoted': 'un chemin Windows non protégé sous un shell POSIX',
   'inv-bash-cd-too-many-args': 'un changement de dossier vers un chemin non protégé',
   'inv-bash-trailing-backslash-in-path': 'un guillemet double non fermé — typiquement un chemin Windows terminé par un antislash',
@@ -95,18 +132,18 @@ const REGLAGE_INCONNU = 'un réglage du poste de travail';
 // Le detecteur compte des la premiere occurrence — c'est son role. Mais « 1
 // fois dans la session » n'apprend rien et occupe la ligne : le compte ne se
 // dit qu'a partir du moment ou il distingue quelque chose.
-const repetitionNote = count => (count > 1 ? `, ${count} fois dans la session` : '');
+const repetitionNote = (count: number | undefined) => ((count ?? 0) > 1 ? `, ${count} fois dans la session` : '');
 
-const HEADLINES = {
+const HEADLINES: Record<string, (a: JournalAlert) => string> = {
   loop: a => `${a.toolName} · même commande ${a.count}×${failureNote(listeDe(a.occurrences))}`,
   retryStorm: a => `${a.toolName} · ${a.count} échecs consécutifs`,
-  stuck: a => `Aucun événement · ${a.count} outil${a.count > 1 ? 's' : ''} encore en vol`,
+  stuck: a => `Aucun événement · ${a.count} outil${(a.count ?? 0) > 1 ? 's' : ''} encore en vol`,
   badInvocation: a =>
-    `${a.toolName} · appel mal formé : ${MOTIFS[a.patternId] || REGLAGE_INCONNU}`
+    `${a.toolName} · appel mal formé : ${MOTIFS[a.patternId ?? ''] || REGLAGE_INCONNU}`
     + repetitionNote(a.count),
 };
 
-function subjectOf(alert) {
+function subjectOf(alert: JournalAlert) {
   if (alert.type === 'stuck') {
     const first = listeDe(alert.tools)[0];
     return first ? `${first.toolName} · ${first.subject}` : '';
@@ -114,7 +151,7 @@ function subjectOf(alert) {
   return alert.subject || '';
 }
 
-export function failureLine(alert) {
+export function failureLine(alert: JournalAlert) {
   const build = HEADLINES[alert.type];
   return {
     time: alert.createdAt,
@@ -137,7 +174,7 @@ export function failureLine(alert) {
 // rejouerait la confusion que la tache 9 a paye pour trancher.
 //
 // Donc un compte, et le mot exact de ce qui est compte.
-export function failuresSummary(alerts) {
+export function failuresSummary(alerts: JournalAlert[] | null | undefined) {
   const n = listeDe(alerts).filter(a => !a.acknowledged).length;
   if (n === 0) return 'aucune';
   return `${n} non acquittée${n > 1 ? 's' : ''}`;
@@ -158,7 +195,7 @@ export function failuresSummary(alerts) {
 // protege que ce qui s'affiche. Et les formulations stuck restent dans les
 // tables ci-dessus : le contrat se verifie des deux cotes du detecteur, et le
 // jour ou cette decision se rejoue, tout est encore la.
-export function panelAlerts(alerts) {
+export function panelAlerts(alerts: JournalAlert[] | null | undefined) {
   return listeDe(alerts).filter(a => a.type !== 'stuck');
 }
 
@@ -170,52 +207,58 @@ export function panelAlerts(alerts) {
 // (une boucle sur Bash et une sur Grep sont deux histoires), le type seul pour
 // les silences.
 
-export function groupKey(alert) {
+export function groupKey(alert: JournalAlert): string {
   if (alert.type === 'badInvocation') return `badInvocation:${alert.patternId || ''}`;
   if (alert.type === 'stuck') return 'stuck';
   return `${alert.type}:${alert.toolName || ''}`;
 }
 
-export function groupAlerts(alerts) {
-  const parClef = new Map();
+export function groupAlerts(alerts: JournalAlert[] | null | undefined): AlertGroup[] {
+  const parClef = new Map<string, JournalAlert[]>();
   for (const a of listeDe(alerts)) {
     const key = groupKey(a);
     if (!parClef.has(key)) parClef.set(key, []);
-    parClef.get(key).push(a);
+    parClef.get(key)!.push(a);
   }
   const groupes = [...parClef.entries()].map(([key, episodes]) => {
     episodes.sort((x, y) => (y.createdAt || 0) - (x.createdAt || 0));
     return {
       key,
       episodes,
-      lastAt: episodes[0].createdAt || 0,
+      // `episodes` vient toujours d'au moins un push ci-dessus : l'index 0
+      // existe reellement, noUncheckedIndexedAccess ne le sait pas.
+      lastAt: episodes[0]!.createdAt || 0,
       unacked: episodes.filter(e => !e.acknowledged).length,
     };
   });
   // « À traiter » d'abord — c'est la question que la page pose — puis le plus
   // recent : une panne d'hier soir se cherche avant celle du mois dernier.
-  groupes.sort((a, b) => (b.unacked > 0) - (a.unacked > 0) || b.lastAt - a.lastAt);
+  // Comparateur numerique : les deux booleens se convertissent en 0/1, comme
+  // la soustraction `true - false` le faisait deja implicitement en JS.
+  groupes.sort((a, b) => Number(b.unacked > 0) - Number(a.unacked > 0) || b.lastAt - a.lastAt);
   return groupes;
 }
 
 // La cause se nomme SANS les chiffres d'un episode : « meme commande 4× » est
 // un fait d'episode, pas un nom de cause (revue doc/32). L'outil ne se dit que
 // s'il est uniforme — jamais celui d'un episode arbitraire.
-function outilUniforme(episodes) {
+function outilUniforme(episodes: JournalAlert[]) {
   const outils = new Set(episodes.map(e => e.toolName || ''));
   return outils.size === 1 ? [...outils][0] : '';
 }
 
-const CAUSES = {
+const CAUSES: Record<string, (first: JournalAlert, prefix: string) => string> = {
   badInvocation: (first, prefix) =>
-    `${prefix}appel mal formé : ${MOTIFS[first.patternId] || REGLAGE_INCONNU}`,
+    `${prefix}appel mal formé : ${MOTIFS[first.patternId ?? ''] || REGLAGE_INCONNU}`,
   loop: (_first, prefix) => `${prefix}même commande répétée`,
   retryStorm: (_first, prefix) => `${prefix}échecs consécutifs`,
   stuck: () => 'Aucun événement · outils encore en vol',
 };
 
-export function causeLabel(group) {
-  const first = group.episodes[0];
+export function causeLabel(group: AlertGroup) {
+  // Meme invariant qu'a la construction du groupe (groupAlerts) : au moins
+  // un episode.
+  const first = group.episodes[0]!;
   const build = CAUSES[first.type];
   if (!build) return String(first.type);
   const outil = outilUniforme(group.episodes);
@@ -223,14 +266,14 @@ export function causeLabel(group) {
 }
 
 // Les faits d'UN episode, l'outil en moins (il est dit par la cause).
-const EPISODES = {
+const EPISODES: Record<string, (a: JournalAlert) => string> = {
   loop: a => `même commande ${a.count}×${failureNote(listeDe(a.occurrences))}`,
   retryStorm: a => `${a.count} échecs consécutifs`,
-  stuck: a => `${a.count} outil${a.count > 1 ? 's' : ''} encore en vol`,
-  badInvocation: a => (a.count > 1 ? `${a.count} fois dans la session` : ''),
+  stuck: a => `${a.count} outil${(a.count ?? 0) > 1 ? 's' : ''} encore en vol`,
+  badInvocation: a => ((a.count ?? 0) > 1 ? `${a.count} fois dans la session` : ''),
 };
 
-export function episodeLabel(alert) {
+export function episodeLabel(alert: JournalAlert) {
   const build = EPISODES[alert.type];
   return build ? build(alert) : '';
 }

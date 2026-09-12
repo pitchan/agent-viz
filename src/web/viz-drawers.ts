@@ -17,16 +17,41 @@ import {
   formatTokens, tokenContext, agentIdFromNode,
 } from './viz-state.ts';
 
+// Le noeud et la vis-node tels que les dessinateurs les lisent — le sous-
+// ensemble de ce que viz-layout.ts (fourre-tout, hors lot) construit sur
+// state.nodes/vis.nodes.
+interface DrawerNode {
+  id: string;
+  status: string;
+  color: string;
+  label: string;
+  sub: string;
+  duration: string | null;
+  isParallel?: boolean;
+  isIsolated?: boolean;
+  children: { status: string }[];
+}
+
+interface DrawerVisNode {
+  x: number;
+  y: number;
+  scale: number;
+  opacity: number;
+  glowPhase: number;
+}
+
 // ─── Glow sprites (pre-rendered radial gradients, cached per color) ───────
 const GLOW_SPRITE_SIZE = 128;
-const _glowSprites = new Map();
+const _glowSprites = new Map<string, HTMLCanvasElement>();
 
-function getGlowSprite(color) {
+function getGlowSprite(color: string) {
   let cv = _glowSprites.get(color);
   if (cv) return cv;
   cv = document.createElement('canvas');
   cv.width = GLOW_SPRITE_SIZE; cv.height = GLOW_SPRITE_SIZE;
-  const gctx = cv.getContext('2d');
+  // Un canvas fraichement cree n'a encore aucun contexte requis : '2d' reussit
+  // toujours ici, a la difference d'un rappel apres un contexte webgl deja pris.
+  const gctx = cv.getContext('2d')!;
   const cx = GLOW_SPRITE_SIZE / 2, cy = GLOW_SPRITE_SIZE / 2;
   const grad = gctx.createRadialGradient(cx, cy, 0, cx, cy, GLOW_SPRITE_SIZE / 2);
   grad.addColorStop(0, hexAlpha(color, 1));
@@ -37,7 +62,7 @@ function getGlowSprite(color) {
   return cv;
 }
 
-function drawGlowSprite(ctx, color, cx, cy, r, alpha) {
+function drawGlowSprite(ctx: CanvasRenderingContext2D, color: string, cx: number, cy: number, r: number, alpha: number) {
   const sprite = getGlowSprite(color);
   const size = r * 2;
   ctx.save();
@@ -52,7 +77,7 @@ function sessionContextSize() {
   return tokenContext(state.tokens.main);
 }
 
-export function drawSessionNode(ctx, n, vn) {
+export function drawSessionNode(ctx: CanvasRenderingContext2D, n: DrawerNode, vn: DrawerVisNode) {
   const r = SESSION_R * vn.scale;
   const isSelected = state.selected === n.id;
   const isHovered = vis.hoveredNode === n.id;
@@ -118,7 +143,7 @@ export function drawSessionNode(ctx, n, vn) {
 // Overlay markers for agent flags — dashed ring when isolated (worktree),
 // concentric ring when running as part of a parallel batch. Kept out of
 // drawAgentNode so the base renderer stays untouched by this concern.
-function drawAgentDecorations(ctx, n, vn, r) {
+function drawAgentDecorations(ctx: CanvasRenderingContext2D, n: DrawerNode, vn: DrawerVisNode, r: number) {
   if (n.isParallel) {
     ctx.save();
     ctx.setLineDash([]);
@@ -142,7 +167,7 @@ function drawAgentDecorations(ctx, n, vn, r) {
   }
 }
 
-export function drawAgentNode(ctx, n, vn) {
+export function drawAgentNode(ctx: CanvasRenderingContext2D, n: DrawerNode, vn: DrawerVisNode) {
   const r = AGENT_R * vn.scale;
   const isSelected = state.selected === n.id;
   const isHovered = vis.hoveredNode === n.id;
@@ -220,7 +245,7 @@ export function drawAgentNode(ctx, n, vn) {
   ctx.restore();
 }
 
-export function drawToolNode(ctx, n, vn) {
+export function drawToolNode(ctx: CanvasRenderingContext2D, n: DrawerNode, vn: DrawerVisNode) {
   const w = TOOL_W * vn.scale;
   const h = TOOL_H * vn.scale;
   const isSelected = state.selected === n.id;
@@ -282,7 +307,7 @@ export function drawToolNode(ctx, n, vn) {
   ctx.restore();
 }
 
-export function drawMcpNode(ctx, n, vn) {
+export function drawMcpNode(ctx: CanvasRenderingContext2D, n: DrawerNode, vn: DrawerVisNode) {
   const r = MCP_R * vn.scale;
   const isSelected = state.selected === n.id;
   const isHovered = vis.hoveredNode === n.id;
@@ -339,7 +364,7 @@ export function drawMcpNode(ctx, n, vn) {
   ctx.restore();
 }
 
-export function drawSkillNode(ctx, n, vn) {
+export function drawSkillNode(ctx: CanvasRenderingContext2D, n: DrawerNode, vn: DrawerVisNode) {
   const r = SKILL_R * vn.scale;
   const isSelected = state.selected === n.id;
   const isHovered = vis.hoveredNode === n.id;

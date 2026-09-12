@@ -8,22 +8,59 @@
 
 import * as api from './api.ts';
 import { getState, subscribe, loadAnalysis, loadSession, setIncludeMachine } from './store.ts';
-import { formatUsd, formatTokens, formatBytes, formatDuration, basisLabel, periodHeader } from './format.ts';
+import { formatUsd, formatTokens, formatBytes, formatDuration, basisLabel, periodHeader, type Summary } from './format.ts';
 import { initPeriodSelector } from './period-selector.ts';
+
+// Une ligne de GET /analysis/sessions.
+interface SessionSummaryRow {
+  id: string;
+  projectPath?: string | null;
+  project?: string;
+  modelMain?: string | null;
+  costComplete?: boolean;
+  costUsd: number;
+  netTokens: number;
+  startedAt?: string | null;
+  endedAt?: string | null;
+  sessionKind?: 'interactive' | 'headless' | 'unknown' | null;
+}
+
+// Le rapport détaillé d'UNE session (drill-down), sous-ensemble du rapport
+// du moteur (src/engine — jamais importé ici, frontière navigateur/Node,
+// doc/36 §2) reduit aux champs que ce panneau affiche.
+interface SessionReport {
+  sessionId: string;
+  netTokens: number;
+  tokens: { total: { cacheRead: number } };
+  context: {
+    cacheChurnTokens: number;
+    churnCauses: { prefixChange: { tokens: number } };
+    compactions: unknown[];
+  };
+  toolResults: { totalResults: number; totalBytes: number };
+  reads: { cases: { crossAgentDuplicate: { bytes: number } } };
+  subagents: { spawnToolUses: number; sidecarCount: number };
+  parseErrors: number;
+}
+
+interface SelectedSession {
+  report: SessionReport;
+  priceSource: string;
+}
 
 const HEADERS = ['Session', 'Projet', 'Modèle', 'Coût', 'Jetons nets', 'Durée', 'Type'];
 
 // A null kind is a pre-migration row (scanned before sessionKind existed):
 // it is shown as unknown, never as human.
 const KIND_BADGE = { interactive: 'humain', headless: 'machine', unknown: '?' };
-const kindBadgeOf = kind => KIND_BADGE[kind] ?? '?';
+const kindBadgeOf = (kind: string | null | undefined) => KIND_BADGE[kind as 'interactive' | 'headless' | 'unknown'] ?? '?';
 
-export function sessionRow(session) {
+export function sessionRow(session: SessionSummaryRow) {
   return [
     session.id.slice(0, 8),
     // Le vrai chemin de travail quand le service a su le lire ; le slug encodé
     // par Claude Code sinon — jamais une cellule vide.
-    session.projectPath || session.project,
+    session.projectPath || session.project || '',
     session.modelMain || '—',
     session.costComplete ? formatUsd(session.costUsd) : `${formatUsd(session.costUsd)} (partiel)`,
     formatTokens(session.netTokens),
@@ -35,7 +72,7 @@ export function sessionRow(session) {
 // Only lines carrying a non-zero number are shown: a wall of zeros hides the
 // one figure that matters. Net tokens and cache reads stay on separate lines —
 // they are not the same thing and are never added.
-export function drillDownLines(report) {
+export function drillDownLines(report: SessionReport) {
   const lines = [
     `${report.netTokens} jetons nets, ${report.tokens.total.cacheRead} jetons relus depuis le cache`,
   ];
@@ -62,7 +99,7 @@ export function drillDownLines(report) {
   return lines;
 }
 
-function buildTable(sessions) {
+function buildTable(sessions: SessionSummaryRow[]) {
   const table = document.createElement('table');
   table.className = 'analysis-table';
   const head = document.createElement('tr');
@@ -91,12 +128,15 @@ function buildTable(sessions) {
 
 function render() {
   const state = getState();
-  const head = document.getElementById('analysis-summary');
-  const list = document.getElementById('analysis-list');
-  const detail = document.getElementById('analysis-detail');
+  const head = document.getElementById('analysis-summary')!;
+  const list = document.getElementById('analysis-list')!;
+  const detail = document.getElementById('analysis-detail')!;
 
   if (state.error) { head.textContent = `Analyse indisponible : ${state.error}`; return; }
-  const { sessions, summary } = state;
+  // state.sessions/state.summary/state.selectedSession restent `unknown` cote
+  // magasin (store.ts) : ce module est celui qui sait lire leur forme reelle.
+  const sessions = state.sessions as SessionSummaryRow[];
+  const summary = state.summary as Summary | null;
   head.textContent = sessions.length
     ? [
         `${sessions.length} sessions affichées — cliquer une ligne pour le détail`,
@@ -108,8 +148,9 @@ function render() {
   if (sessions.length) list.appendChild(buildTable(sessions));
 
   detail.textContent = '';
-  if (state.selectedSession) {
-    const { report, priceSource } = state.selectedSession;
+  const selectedSession = state.selectedSession as SelectedSession | null;
+  if (selectedSession) {
+    const { report, priceSource } = selectedSession;
     const title = document.createElement('div');
     title.className = 'analysis-detail-title';
     title.textContent = `${report.sessionId} — prix : ${priceSource}`;
@@ -124,27 +165,27 @@ function render() {
 }
 
 export function initAnalysis() {
-  const panel = document.getElementById('analysis-overlay');
+  const panel = document.getElementById('analysis-overlay')!;
   subscribe(() => { if (panel.classList.contains('visible')) render(); });
 
-  initPeriodSelector(document.getElementById('analysis-period'), () => loadAnalysis(api));
+  initPeriodSelector(document.getElementById('analysis-period')!, () => loadAnalysis(api));
 
-  document.getElementById('analysis-include-machine').addEventListener('change', e => {
-    setIncludeMachine(e.target.checked);
+  document.getElementById('analysis-include-machine')!.addEventListener('change', e => {
+    setIncludeMachine((e.target as HTMLInputElement).checked);
     loadAnalysis(api);
   });
 
-  document.getElementById('btn-analysis').addEventListener('click', () => {
+  document.getElementById('btn-analysis')!.addEventListener('click', () => {
     panel.classList.toggle('visible');
     if (panel.classList.contains('visible')) loadAnalysis(api);
   });
 
-  document.getElementById('analysis-close').addEventListener('click', () => {
+  document.getElementById('analysis-close')!.addEventListener('click', () => {
     panel.classList.remove('visible');
   });
 
-  document.getElementById('analysis-list').addEventListener('click', e => {
-    const row = e.target.closest('tr[data-session-id]');
-    if (row) loadSession(api, row.dataset.sessionId);
+  document.getElementById('analysis-list')!.addEventListener('click', e => {
+    const row = (e.target as HTMLElement).closest('tr[data-session-id]') as HTMLElement | null;
+    if (row) loadSession(api, row.dataset.sessionId as string);
   });
 }

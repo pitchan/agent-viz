@@ -5,7 +5,7 @@
 // to viz-layout (processEvent, layout), and trigger viz-ui (renderFeed,
 // updateStats, fitView) via `scheduleRender` which coalesces bursts.
 
-import { state, vis, markDirty, esc } from './viz-state.ts';
+import { state, vis, markDirty, esc, type TokenBucket } from './viz-state.ts';
 import { processEvent, layout, resetLayout } from './viz-layout.ts';
 import {
   renderFeed, updateStats, updateBudget, fitView, startDurationsTicker, stopDurationsTicker,
@@ -24,20 +24,20 @@ import { resetErrors } from './viz-errors.ts';
 
 // Render a small pill badge identifying the source agent. Returns HTML safe to
 // inline (label is fixed, no user input).
-function badgeHtml(agentSource) {
+function badgeHtml(agentSource: string | undefined) {
   if (agentSource !== 'claude' && agentSource !== 'copilot') return '';
   const src = agentSource;
   return `<span class="agent-badge agent-${src}">${src}</span>`;
 }
 
 // ─── DOM refs ─────────────────────────────────────────────────────────────
-const connStatus = document.getElementById('connection-status');
-const connLabel = document.getElementById('connection-label');
+const connStatus = document.getElementById('connection-status')!;
+const connLabel = document.getElementById('connection-label')!;
 
 // The words come from viz-topbar-status, where a unit test pins them; this
 // only applies them. Called once at load: the witness must already say
 // OFFLINE while the first connection attempt is still in flight.
-function renderConnection(connected) {
+function renderConnection(connected: boolean) {
   const p = connectionPresentation(connected);
   connStatus.classList.toggle('connected', connected);
   connLabel.textContent = p.label;
@@ -51,17 +51,17 @@ renderConnection(false);
 fetch('/version')
   .then(r => r.json())
   .then(({ version }) => {
-    document.getElementById('app-version').textContent = `v${version}`;
+    document.getElementById('app-version')!.textContent = `v${version}`;
   })
   .catch(() => {});
 
 // ─── Session selection (owned here, read-only from elsewhere) ─────────────
-export let currentSessionId = null;
-export const sessionTitles = new Map();
-export const sessionAgents = new Map(); // sid → 'claude' | 'copilot'
+export let currentSessionId: string | null = null;
+export const sessionTitles = new Map<string, string>();
+export const sessionAgents = new Map<string, string>(); // sid → 'claude' | 'copilot'
 
 // ─── SSE + poll state ─────────────────────────────────────────────────────
-let sseSource = null;
+let sseSource: EventSource | null = null;
 let sseConnected = false;
 let firstBatch = true, clearing = false;
 
@@ -89,7 +89,7 @@ export function scheduleRender() {
 }
 
 // ─── Poll fallback (only active while SSE is disconnected) ────────────────
-let _pollFallbackTimer = null;
+let _pollFallbackTimer: ReturnType<typeof setTimeout> | null = null;
 function startPollFallback() {
   if (_pollFallbackTimer != null) return;
   const loop = () => {
@@ -124,7 +124,7 @@ export function connectSSE() {
       const data = JSON.parse(msg.data);
       // One alert per drifted model, stable id — the client-side dedup contract
       // (same id active → no refire) matches the watchdog's.
-      function pricingDriftAlert(d) {
+      function pricingDriftAlert(d: { model: string; kind: string }) {
         return {
           id: `pricingDrift:${d.model}`,
           type: 'pricingDrift', sessionId: '', toolName: d.model, count: 1,
@@ -182,10 +182,20 @@ export function connectSSE() {
   };
 }
 
+// Un instantané `tokens` — SSE ou GET /tokens, seules les deux sources
+// d'applyTokens. `perAgent` est l'objet JSON du fil (indexé par id), pas une
+// Map : state.tokens.perAgent la reconstruit juste en-dessous.
+interface TokensSnapshot {
+  main?: TokenBucket | null;
+  perAgent?: Record<string, TokenBucket>;
+  tokensSupported?: boolean;
+  transcriptMissing?: boolean;
+}
+
 // ─── Token snapshots ──────────────────────────────────────────────────────
 // Apply a `tokens` snapshot (SSE message or /tokens response) to state and
 // refresh the budget pill. Single application path for both sources.
-function applyTokens(data) {
+function applyTokens(data: TokensSnapshot) {
   state.tokens.main = data.main || null;
   state.tokens.perAgent.clear();
   if (data.perAgent) {
@@ -204,7 +214,7 @@ function applyTokens(data) {
 // Fetch a specific session's token snapshot. The SSE stream only pushes
 // `tokens` for the live/active session, so a session picked from the overlay
 // needs this one-shot fetch to populate the budget pill.
-async function fetchTokens(sid) {
+async function fetchTokens(sid: string) {
   try {
     const res = await fetch(`/tokens?session=${encodeURIComponent(sid)}`);
     const msg = await res.json();
@@ -215,7 +225,7 @@ async function fetchTokens(sid) {
 }
 
 // ─── Poll ─────────────────────────────────────────────────────────────────
-export async function poll(force) {
+export async function poll(force?: boolean) {
   if (clearing || (!force && sseConnected)) return;
   try {
     const sp = currentSessionId ? `&session=${currentSessionId}` : '';
@@ -243,11 +253,21 @@ export async function poll(force) {
   } catch {}
 }
 
+// Une ligne de GET /sessions (fichiers d'événements en cours, distinct de
+// /analysis/sessions).
+interface LiveSession {
+  id: string;
+  prompt?: string;
+  agentSource?: string;
+  eventCount?: number;
+  mtime: number;
+}
+
 // ─── Sessions list ────────────────────────────────────────────────────────
 export async function loadSessions() {
   try {
     const res = await fetch('/sessions');
-    const sessions = await res.json();
+    const sessions: LiveSession[] = await res.json();
 
     for (const s of sessions) {
       if (s.prompt) sessionTitles.set(s.id, s.prompt);
@@ -255,7 +275,7 @@ export async function loadSessions() {
     }
     updateTopbarPrompt();
 
-    document.getElementById('sessions-list').innerHTML =
+    document.getElementById('sessions-list')!.innerHTML =
       `<div class="session-card${!currentSessionId ? ' active' : ''}" data-sid="">
         <div class="s-title">▶ Latest (auto)</div>
         <div class="s-meta"><span>Follows most recent session</span></div>
@@ -275,7 +295,7 @@ export async function loadSessions() {
 
 export function updateTopbarPrompt() {
   const sid = currentSessionId || state._lastServerId;
-  const el = document.getElementById('topbar-prompt');
+  const el = document.getElementById('topbar-prompt')!;
   const prompt = sid ? sessionTitles.get(sid) : null;
   el.textContent = prompt || '';
   el.title = prompt || '';
@@ -293,7 +313,7 @@ export function updateTopbarPrompt() {
   }
 }
 
-function formatAge(mtime) {
+function formatAge(mtime: number) {
   const ago = Date.now() - mtime;
   if (ago < 60000) return 'just now';
   if (ago < 3600000) return `${Math.floor(ago / 60000)}m ago`;
@@ -302,8 +322,8 @@ function formatAge(mtime) {
 }
 
 // Session-card click handler — wired here since it mutates network state.
-document.getElementById('sessions-list').addEventListener('click', e => {
-  const card = e.target.closest('.session-card');
+document.getElementById('sessions-list')!.addEventListener('click', e => {
+  const card = (e.target as HTMLElement).closest('.session-card') as HTMLElement | null;
   if (!card) return;
   currentSessionId = card.dataset.sid || null;
   clearState();
@@ -313,7 +333,7 @@ document.getElementById('sessions-list').addEventListener('click', e => {
   // clearState() blanked the pill; an explicitly-picked session won't get a
   // live SSE `tokens` push unless it's the active one — fetch its snapshot.
   if (currentSessionId) fetchTokens(currentSessionId);
-  document.getElementById('sessions-overlay').classList.remove('visible');
+  document.getElementById('sessions-overlay')!.classList.remove('visible');
 });
 
 // ─── Clear / reset ────────────────────────────────────────────────────────
@@ -347,7 +367,7 @@ export function clearState() {
 
 // UI registers a reset hook for its feed-render cursor on clearState.
 let _feedResetHook = () => {};
-export function setFeedResetHook(fn) { _feedResetHook = fn || (() => {}); }
+export function setFeedResetHook(fn: (() => void) | null | undefined) { _feedResetHook = fn || (() => {}); }
 
 export async function resetEvents() {
   clearing = true;
@@ -359,7 +379,7 @@ export async function resetEvents() {
 }
 
 // ─── Visibility API — pause everything while tab is hidden ────────────────
-let _visibilityPauseTimer = null;
+let _visibilityPauseTimer: ReturnType<typeof setTimeout> | null = null;
 let _paused = false;
 function pauseApp() {
   if (_paused) return;

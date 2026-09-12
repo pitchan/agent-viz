@@ -37,26 +37,47 @@ export const LERP_EPS_SCALE = 0.005;
 // Pulse-only animation throttle (running nodes glow at 20 fps).
 export const PULSE_FRAME_MS = 1000 / 20;
 
+// Un seau de jetons tel que le serveur l'envoie (SSE `tokens` ou GET /tokens) —
+// cumulatif + dernier message + dérivé du tarif (src/server/tokens.js).
+// `costComplete`/`unknownModels` portent la réserve C4 (voir costCompleteness
+// plus bas) : absents sur un seau d'un serveur antérieur, ce qui vaut complet.
+export interface TokenBucket {
+  in?: number;
+  out?: number;
+  cacheCreate?: number;
+  cacheRead?: number;
+  lastIn?: number;
+  lastCacheCreate?: number;
+  lastCacheRead?: number;
+  lastModel?: string;
+  contextMax?: number;
+  costUsd?: number;
+  costComplete?: boolean;
+  unknownModels?: string[];
+}
+
 // ─── App state ────────────────────────────────────────────────────────────
 export const state = {
-  eventSeq: 0, offset: 0, nodes: new Map(), selected: null,
+  eventSeq: 0, offset: 0, nodes: new Map(), selected: null as string | null,
   toolsCompleted: 0, filter: '', autoFit: true,
-  timelineEntries: [], startTimes: new Map(),
-  _lastServerId: null,
-  // Token usage — populated by SSE `tokens` events. Bucket shape:
-  //   { in, out, cacheCreate, cacheRead,
-  //     lastIn, lastCacheCreate, lastCacheRead,
-  //     lastModel, contextMax, costUsd } | null
-  // (cumulative + last-message + pricing-derived; see src/server/tokens.js)
+  timelineEntries: [] as { ts: string; nodeId: string; type: string; label: string; sub: string }[],
+  startTimes: new Map<string, string>(),
+  _lastServerId: null as string | null,
+  // Token usage — populated by SSE `tokens` events.
   // tokensSupported: false ⇒ adapter declares tokens N/A (UI shows badge).
   // null ⇒ no SSE snapshot received yet (don't show anything).
   // transcriptMissing: true ⇒ Claude session whose transcript isn't located yet.
-  tokens: { main: null, perAgent: new Map(), tokensSupported: null, transcriptMissing: false },
+  tokens: {
+    main: null as TokenBucket | null,
+    perAgent: new Map<string, TokenBucket>(),
+    tokensSupported: null as boolean | null,
+    transcriptMissing: false,
+  },
   // Map<forkedChildAgentId, parentAgentId>. Filled by PostToolUse(Skill) events
   // with tool_response.status === 'forked'. Used to attach forked sub-agents
   // under their launching agent instead of the session root — the forked
   // child's own PreToolUse events carry no parent_agent_id.
-  forkedAgentParents: new Map(),
+  forkedAgentParents: new Map<string, string>(),
 };
 
 // Visual/animation state.
@@ -65,9 +86,9 @@ export const vis = {
   particles: [],
   camera: { x: 0, y: 0, zoom: 1, targetX: 0, targetY: 0, targetZoom: 1 },
   time: 0,
-  hoveredNode: null,
-  rafHandle: null,
-  pulseTimer: null,
+  hoveredNode: null as string | null,
+  rafHandle: null as number | null,
+  pulseTimer: null as ReturnType<typeof setTimeout> | null,
   dirty: true,
   activeAnimations: 0,
   drawSessionNodes: [],
@@ -83,8 +104,8 @@ export const vis = {
 // ─── Render scheduler ─────────────────────────────────────────────────────
 // The rAF driver lives in viz-canvas.js (tick). It registers itself here so
 // markDirty/requestRender can schedule frames without a circular import.
-let _tickFn = null;
-export function setTickFn(fn) { _tickFn = fn; }
+let _tickFn: FrameRequestCallback | null = null;
+export function setTickFn(fn: FrameRequestCallback) { _tickFn = fn; }
 
 export function markDirty() {
   vis.dirty = true;
@@ -98,8 +119,8 @@ export function requestRender() {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
-const _haCache = new Map();
-export function hexAlpha(hex, alpha) {
+const _haCache = new Map<string, string>();
+export function hexAlpha(hex: string, alpha: number): string {
   if (hex.startsWith('rgba')) return hex;
   const a = Math.round(Math.max(0, Math.min(1, alpha)) * 100) / 100;
   const key = hex + a;
@@ -114,7 +135,7 @@ export function hexAlpha(hex, alpha) {
   return v;
 }
 
-export function roundRect(ctx, x, y, w, h, r) {
+export function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
   ctx.lineTo(x + w - r, y);
@@ -129,7 +150,7 @@ export function roundRect(ctx, x, y, w, h, r) {
 }
 
 // Regular hexagon with a vertex pointing up, circumscribed radius r.
-export function traceHexagon(ctx, cx, cy, r) {
+export function traceHexagon(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number) {
   ctx.beginPath();
   for (let i = 0; i < 6; i++) {
     const a = -Math.PI / 2 + i * (Math.PI / 3);
@@ -142,7 +163,7 @@ export function traceHexagon(ctx, cx, cy, r) {
 }
 
 // Diamond (losange) — square rotated 45°, half-diagonal r.
-export function traceDiamond(ctx, cx, cy, r) {
+export function traceDiamond(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number) {
   ctx.beginPath();
   ctx.moveTo(cx, cy - r);
   ctx.lineTo(cx + r, cy);
@@ -155,7 +176,7 @@ export function traceDiamond(ctx, cx, cy, r) {
 // Examples:
 //   mcp__plugin_playwright_playwright__browser_click → {label:"browser_click", sub:"playwright"}
 //   mcp__claude_ai_Gmail__authenticate              → {label:"authenticate", sub:"Gmail"}
-export function parseMcpName(toolName) {
+export function parseMcpName(toolName: string | undefined | null) {
   if (!toolName || !toolName.startsWith('mcp__')) return { label: toolName || 'MCP', sub: '' };
   const parts = toolName.split('__');
   const action = parts[parts.length - 1] || toolName;
@@ -163,18 +184,18 @@ export function parseMcpName(toolName) {
   let server = parts.length >= 3 ? parts.slice(1, -1).join('_') : '';
   server = server.replace(/^plugin_/, '').replace(/^claude_ai_/, '');
   const segs = server.split('_').filter(Boolean);
-  const dedup = [];
+  const dedup: string[] = [];
   for (const s of segs) if (dedup[dedup.length - 1] !== s) dedup.push(s);
   return { label: action, sub: dedup.join('_') };
 }
 
-export function truncate(s, max) { return s.length > max ? s.slice(0, max - 1) + '…' : s; }
-export function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
-export function easeInOut(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
-export function lerp(a, b, t) { return a + (b - a) * t; }
+export function truncate(s: string, max: number) { return s.length > max ? s.slice(0, max - 1) + '…' : s; }
+export function esc(s: unknown) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+export function easeInOut(t: number) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+export function lerp(a: number, b: number, t: number) { return a + (b - a) * t; }
 
 // Compact token display — "850" / "12.4k" / "1.3M".
-export function formatTokens(n) {
+export function formatTokens(n: number | null | undefined) {
   if (!n || n < 1000) return String(n || 0);
   if (n < 10_000) return (n / 1000).toFixed(1) + 'k';
   if (n < 1_000_000) return Math.round(n / 1000) + 'k';
@@ -182,14 +203,14 @@ export function formatTokens(n) {
 }
 
 // Sum of the 4 cumulative counters in a token bucket. Safe on null/undefined.
-export function tokenTotal(t) {
+export function tokenTotal(t: TokenBucket | null | undefined) {
   if (!t) return 0;
   return (t.in || 0) + (t.out || 0) + (t.cacheCreate || 0) + (t.cacheRead || 0);
 }
 
 // Context window size = last message's input + cache_creation + cache_read.
 // Matches Claude Code's /context semantics (not cumulative).
-export function tokenContext(t) {
+export function tokenContext(t: TokenBucket | null | undefined) {
   if (!t) return 0;
   return (t.lastIn || 0) + (t.lastCacheCreate || 0) + (t.lastCacheRead || 0);
 }
@@ -206,8 +227,8 @@ export function tokenContext(t) {
 // Un seau SANS le champ (enveloppe d'un serveur antérieur, rejeu d'un ancien
 // instantané) compte comme complet : l'enveloppe SSE est additive, et
 // `undefined` n'est pas `false`.
-export function costCompleteness(buckets) {
-  const inconnus = new Set();
+export function costCompleteness(buckets: (TokenBucket | null | undefined)[]) {
+  const inconnus = new Set<string>();
   let complete = true;
   for (const b of buckets) {
     if (!b) continue;
@@ -220,7 +241,7 @@ export function costCompleteness(buckets) {
 // Format USD cost — "$0.42", "$12.30", "$1.2k" for very large sessions.
 // 4-decimal precision for sub-cent values so cheap exploratory runs still
 // register something visible.
-export function formatCost(usd) {
+export function formatCost(usd: number | null | undefined) {
   if (!usd || usd < 0) return '$0';
   if (usd < 0.01) return '$' + usd.toFixed(4);
   if (usd < 100) return '$' + usd.toFixed(2);
@@ -245,17 +266,17 @@ export function formatCost(usd) {
 // Le mot « partiel » — celui qu'emploie déjà la page Observatoire, à six
 // endroits — tient dans l'infobulle, où il y a la place de le qualifier et de
 // nommer les modèles fautifs. La pastille n'a la place que de l'énoncé.
-export function formatCostBound(usd, complete) {
+export function formatCostBound(usd: number | null | undefined, complete: boolean) {
   if (complete) return formatCost(usd);
-  return usd > 0 ? `au moins ${formatCost(usd)}` : 'coût indisponible';
+  return usd && usd > 0 ? `au moins ${formatCost(usd)}` : 'coût indisponible';
 }
 
 // Extract the bare agent id from a node id of the form "a:<agentId>".
-export function agentIdFromNode(nodeId) {
+export function agentIdFromNode(nodeId: string | null | undefined) {
   return nodeId && nodeId.startsWith('a:') ? nodeId.slice(2) : null;
 }
 
 // Extract the bare session id from a node id of the form "s:<sid>".
-export function sessionIdFromNode(nodeId) {
+export function sessionIdFromNode(nodeId: string | null | undefined) {
   return nodeId && nodeId.startsWith('s:') ? nodeId.slice(2) : null;
 }

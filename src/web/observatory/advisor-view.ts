@@ -10,14 +10,28 @@ import { getState, subscribe, loadAdvisor, changeStatus, applyScanEvent } from '
 import {
   confidenceLabel, costLabel, basisTitle, periodLabel, basisLabel, periodHeader,
   scanProgressLabel, summaryHeadline, summaryDetails, returnBanner,
+  type Recommendation, type Summary, type ScanProgress,
 } from './format.ts';
 import { evidenceLines } from './evidence.ts';
 import { initPeriodSelector } from './period-selector.ts';
 import { initConfirmButton } from './confirm-button.ts';
 import { renderFailures } from './failures-view.ts';
 import { renderDecisions, refusalControls } from './decisions-view.ts';
+import type { JournalAlert } from './failures-format.ts';
 
-function el(tag, className, text) {
+// Le client HTTP tel qu'importe ici (`import * as api`) — meme motif que
+// store.ts (non exporte de la, un alias local par consommateur).
+type ApiClient = typeof import('./api.ts');
+
+// Ce que le magasin rend pour la liste (store.ts type `recommendations` en
+// `unknown` : ce fichier est celui qui sait lire sa forme reelle).
+interface RecommendationGroups {
+  groups: { basis: string; priority: Recommendation[]; all: Recommendation[] }[];
+  stale: Recommendation[];
+  decided: Recommendation[];
+}
+
+function el(tag: string, className?: string | null, text?: string): HTMLElement {
   const node = document.createElement(tag);
   if (className) node.className = className;
   if (text !== undefined) node.textContent = text;
@@ -27,13 +41,16 @@ function el(tag, className, text) {
 // Les trois intentions (doc/44) : chaque bouton répond à « Que fais-tu de ce
 // conseil ? » dans les mots de l'utilisateur, et sa conséquence est écrite
 // dessous — le contrat au moment du clic, pas dans un mode d'emploi ailleurs.
+// Cles litterales, pas Record<string, string> : `status` (plus bas) ne vaut
+// jamais que 'accepted' ou 'ignored', et l'indexation par une clef connue
+// evite le `| undefined` d'une signature d'index generique.
 const CHOICE_CAPTIONS = {
   accepted: 'La carte part au journal. Si le coût regrossit malgré tout, elle reviendra te demander si le geste a vraiment pris.',
   ignored: 'Revient d’elle-même si le coût regrossit de moitié.',
   refuse: 'Dis pourquoi en une ligne ; c’est consigné au journal et ne sera plus proposé.',
 };
 
-function choice(content, caption) {
+function choice(content: HTMLElement, caption: string) {
   const wrap = el('div', 'advisor-choice');
   wrap.append(content, el('div', 'advisor-choice-caption', caption));
   return wrap;
@@ -41,7 +58,7 @@ function choice(content, caption) {
 
 // Exported for its tests: the card IS the page's contract with the user —
 // the labels and captions are behavior here, not decoration.
-export function recommendationCard(rec, { actionable }) {
+export function recommendationCard(rec: Recommendation, { actionable }: { actionable: boolean }) {
   const card = el('div', 'advisor-card');
   card.dataset.recId = String(rec.id);
   card.appendChild(el('div', 'advisor-card-title', rec.title));
@@ -63,12 +80,12 @@ export function recommendationCard(rec, { actionable }) {
   if (actionable) {
     // « Je l'adopte » n'existe que s'il y a un geste à adopter ; une carte
     // informative peut toujours être mise en veille ou refusée.
-    const entries = rec.action == null
+    const entries: ['accepted' | 'ignored', string][] = rec.action == null
       ? [['ignored', 'Plus tard']]
       : [['accepted', 'Je l’adopte'], ['ignored', 'Plus tard']];
     const buttons = el('div', 'advisor-card-buttons');
     for (const [status, label] of entries) {
-      const btn = el('button', 'obs-btn', label);
+      const btn = el('button', 'obs-btn', label) as HTMLButtonElement;
       btn.type = 'button';
       btn.dataset.status = status;
       buttons.appendChild(choice(btn, CHOICE_CAPTIONS[status]));
@@ -83,7 +100,7 @@ export function recommendationCard(rec, { actionable }) {
   return card;
 }
 
-function renderSummary(node, summary) {
+function renderSummary(node: HTMLElement, summary: Summary | null | undefined) {
   node.textContent = '';
   if (!summary) return;
   node.append(
@@ -94,7 +111,7 @@ function renderSummary(node, summary) {
   );
 }
 
-function renderList(node, { groups, stale, decided }) {
+function renderList(node: HTMLElement, { groups, stale, decided }: RecommendationGroups) {
   node.textContent = '';
   if (groups.length === 0 && stale.length === 0 && decided.length === 0) {
     node.appendChild(el('div', 'advisor-empty', 'Aucune recommandation sur la période — rien à corriger.'));
@@ -124,25 +141,27 @@ function renderList(node, { groups, stale, decided }) {
 
 function render() {
   const state = getState();
-  const head = document.getElementById('advisor-summary');
-  const list = document.getElementById('advisor-list');
+  const head = document.getElementById('advisor-summary')!;
+  const list = document.getElementById('advisor-list')!;
   if (state.error) {
     head.textContent = `Analyse indisponible : ${state.error}`;
     list.textContent = '';
     return;
   }
   if (state.loading && !state.summary) { head.textContent = 'Analyse en cours…'; return; }
-  renderSummary(head, state.summary);
+  // state.summary/state.recommendations restent `unknown` cote magasin
+  // (store.ts) : ce module est celui qui sait lire leur forme reelle.
+  renderSummary(head, state.summary as Summary | null);
   const progress = scanProgressLabel(state.scan);
   if (progress) head.appendChild(el('div', 'advisor-scan-progress', progress));
-  renderList(list, state.recommendations);
+  renderList(list, state.recommendations as RecommendationGroups);
 }
 
 // L'acquittement d'un groupe : la route est unitaire, la serie est ici.
 // Sequentiel a dessein — un journal en ajout seul n'a rien a gagner a la
 // concurrence, et l'ordre rend l'interruption lisible : tout ce qui precede
 // l'erreur est acquitte, rien apres.
-export async function ackEpisodes(apiClient, episodes) {
+export async function ackEpisodes(apiClient: ApiClient, episodes: JournalAlert[]) {
   for (const a of episodes.filter(e => !e.acknowledged)) {
     await apiClient.acknowledgeAlert({ id: a.id, createdAt: a.createdAt });
   }
@@ -153,10 +172,12 @@ export async function ackEpisodes(apiClient, episodes) {
 // un bloc vide sans un mot serait indiscernable de « aucune panne », le pire
 // mode de panne du seul panneau charge de dire qu'il y en a eu (doc/32).
 async function loadFailures() {
-  const node = document.getElementById('advisor-failures');
-  const erreur = document.getElementById('advisor-failures-error');
+  const node = document.getElementById('advisor-failures')!;
+  const erreur = document.getElementById('advisor-failures-error')!;
   try {
-    const { alerts } = await api.fetchAlerts({ days: getState().periodDays });
+    // Le type non verifie de fetchAlerts (getJson, api.ts) est repris ici :
+    // c'est le point de lecture qui doit dire la vraie forme du payload.
+    const { alerts } = await api.fetchAlerts({ days: getState().periodDays }) as { alerts: JournalAlert[] };
     erreur.textContent = '';
     renderFailures(node, alerts, {
       onAckGroup: episodes => ackEpisodes(api, episodes).then(
@@ -164,35 +185,46 @@ async function loadFailures() {
         // L'etat vrai d'abord, le message ensuite : recharge PUIS pose le
         // motif d'interruption — l'ordre inverse le faisait effacer par le
         // chemin de succes du rechargement (revue finale doc/32).
-        err => loadFailures().finally(() => {
-          erreur.textContent = `Acquittement interrompu : ${err.message}`;
+        (err: unknown) => loadFailures().finally(() => {
+          erreur.textContent = `Acquittement interrompu : ${err instanceof Error ? err.message : String(err)}`;
         }),
       ),
     });
   } catch (err) {
-    erreur.textContent = `Pannes indisponibles : ${err.message}`;
+    erreur.textContent = `Pannes indisponibles : ${err instanceof Error ? err.message : String(err)}`;
   }
 }
 
+// La charge de l'evenement DOM local qui rediffuse le SSE `analysisScan`
+// (viz-network.ts) — memes cinq champs que ScanEventMessage (store.ts, non
+// exporte), toujours tous presents sur ce message-la.
+interface ScanEventDetail {
+  phase: string;
+  total: number;
+  scanned: number;
+  skipped: number;
+  failed: number;
+}
+
 export function initAdvisor() {
-  const panel = document.getElementById('advisor-overlay');
+  const panel = document.getElementById('advisor-overlay')!;
   subscribe(() => { if (panel.classList.contains('visible')) render(); });
 
-  initPeriodSelector(document.getElementById('advisor-period'), () => {
+  initPeriodSelector(document.getElementById('advisor-period')!, () => {
     loadAdvisor(api);
     loadFailures();
   });
 
-  document.getElementById('btn-advisor').addEventListener('click', () => {
+  document.getElementById('btn-advisor')!.addEventListener('click', () => {
     panel.classList.toggle('visible');
     if (panel.classList.contains('visible')) { loadAdvisor(api); loadFailures(); }
   });
 
-  document.getElementById('advisor-close').addEventListener('click', () => {
+  document.getElementById('advisor-close')!.addEventListener('click', () => {
     panel.classList.remove('visible');
   });
 
-  document.getElementById('advisor-rescan').addEventListener('click', () => {
+  document.getElementById('advisor-rescan')!.addEventListener('click', () => {
     api.requestScan({ days: getState().periodDays }).catch(() => {
       /* progress and errors arrive on the SSE stream */
     });
@@ -200,7 +232,7 @@ export function initAdvisor() {
 
   // Purge = the documented file deletion done from inside, behind a two-step
   // confirmation; the rebuild scan reports its progress on the SSE stream.
-  initConfirmButton(document.getElementById('advisor-purge'), {
+  initConfirmButton(document.getElementById('advisor-purge')!, {
     armedLabel: 'Confirmer la purge ?',
     onConfirm: () => {
       api.requestPurge({ days: getState().periodDays }).catch(() => {
@@ -209,17 +241,19 @@ export function initAdvisor() {
     },
   });
 
-  document.getElementById('advisor-list').addEventListener('click', e => {
-    const btn = e.target.closest('button[data-status]');
+  document.getElementById('advisor-list')!.addEventListener('click', e => {
+    const btn = (e.target as HTMLElement).closest('button[data-status]') as HTMLElement | null;
     if (!btn) return;
-    changeStatus(api, Number(btn.closest('.advisor-card').dataset.recId), btn.dataset.status);
+    const card = btn.closest('.advisor-card') as HTMLElement;
+    changeStatus(api, Number(card.dataset.recId), btn.dataset.status as string);
   });
 
   // The scan broadcasts its progress on the existing SSE stream; reload when
   // it finishes so the page never shows advice from before the rescan.
   window.addEventListener('agentviz:analysisScan', e => {
-    applyScanEvent(e.detail);
-    if (e.detail.phase === 'done' && panel.classList.contains('visible')) {
+    const detail = (e as CustomEvent<ScanEventDetail>).detail;
+    applyScanEvent(detail);
+    if (detail.phase === 'done' && panel.classList.contains('visible')) {
       loadAdvisor(api);
       loadFailures();
     }

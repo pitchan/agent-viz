@@ -7,11 +7,43 @@
 
 import { formatDuration } from './viz-duration.ts';
 
+// La forme du noeud et de la vis-node telle que ce module PUR la lit — il ne
+// recoit jamais `state`/`vis` par import (pas de cycle avec viz-layout.ts),
+// seulement en parametres, structurellement compatibles avec les objets
+// reels de viz-state.ts.
+interface NarratorNode {
+  id: string;
+  type: string;
+  parentId: string | null;
+  status: string;
+  label: string;
+  sub: string;
+  startTime: string | null;
+  endTime: string | null;
+}
+
+interface NarratorTimelineEntry {
+  nodeId: string;
+  type: string;
+  label: string;
+  sub: string;
+}
+
+interface NarratorState {
+  nodes: Map<string, NarratorNode>;
+  timelineEntries: NarratorTimelineEntry[];
+  toolsCompleted: number;
+}
+
+interface NarratorVis {
+  runningNodes: Set<string>;
+}
+
 // ─── commonPathPrefix ─────────────────────────────────────────────────────
 // Returns the common directory prefix of the given paths (e.g. "auth/" for
 // ["auth/x.js", "auth/y.js"]). Returns null if fewer than 2 paths or if no
 // common directory boundary exists.
-export function commonPathPrefix(paths) {
+export function commonPathPrefix(paths: string[] | null | undefined) {
   if (!paths || paths.length < 2) return null;
   const dirSegs = paths.map(p => {
     const segs = String(p).split(/[\\/]/);
@@ -20,15 +52,15 @@ export function commonPathPrefix(paths) {
   });
   let i = 0;
   outer: while (true) {
-    const seg = dirSegs[0][i];
+    const seg = dirSegs[0]?.[i];
     if (seg === undefined) break;
     for (let k = 1; k < dirSegs.length; k++) {
-      if (dirSegs[k][i] !== seg) break outer;
+      if (dirSegs[k]?.[i] !== seg) break outer;
     }
     i++;
   }
   if (i === 0) return null;
-  return dirSegs[0].slice(0, i).join('/') + '/';
+  return dirSegs[0]!.slice(0, i).join('/') + '/';
 }
 
 // ─── composeNarrator ──────────────────────────────────────────────────────
@@ -36,7 +68,7 @@ export function commonPathPrefix(paths) {
 //
 // Contract: pure. Reads state.nodes, state.timelineEntries, state.toolsCompleted,
 // vis.runningNodes. Never mutates. Never throws on partial state (returns null).
-export function composeNarrator(state, vis, now) {
+export function composeNarrator(state: NarratorState, vis: NarratorVis, now: number) {
   if (!state || !state.nodes || state.nodes.size === 0) return null;
 
   let session = null;
@@ -74,8 +106,8 @@ export function composeNarrator(state, vis, now) {
 }
 
 // ─── Internal helpers ─────────────────────────────────────────────────────
-function computePrimary(state, vis, now) {
-  const mainRunning = [];
+function computePrimary(state: NarratorState, vis: NarratorVis, now: number) {
+  const mainRunning: NarratorNode[] = [];
   for (const id of vis.runningNodes) {
     const n = state.nodes.get(id);
     if (!n) continue;
@@ -87,7 +119,7 @@ function computePrimary(state, vis, now) {
     return { text: aggregateRunning(mainRunning), isIdle: false };
   }
 
-  const agentRunCounts = new Map();
+  const agentRunCounts = new Map<string, number>();
   for (const id of vis.runningNodes) {
     const n = state.nodes.get(id);
     if (!n || (n.type !== 'tool' && n.type !== 'skill' && n.type !== 'mcp')) continue;
@@ -97,11 +129,11 @@ function computePrimary(state, vis, now) {
     }
   }
   if (agentRunCounts.size > 0) {
-    let topId = null, topN = 0;
+    let topId: string | null = null, topN = 0;
     for (const [id, n] of agentRunCounts) {
       if (n > topN) { topId = id; topN = n; }
     }
-    const agent = state.nodes.get(topId);
+    const agent = topId ? state.nodes.get(topId) : null;
     if (agent) return { text: agent.label || 'agent', isIdle: false };
   }
 
@@ -112,11 +144,11 @@ function computePrimary(state, vis, now) {
   return null;
 }
 
-function computeIdleSeconds(state, now) {
+function computeIdleSeconds(state: NarratorState, now: number) {
   const entries = state.timelineEntries;
-  let lastEnd = null;
+  let lastEnd: number | null = null;
   for (let i = entries.length - 1; i >= 0 && i >= entries.length - 50; i--) {
-    const n = state.nodes.get(entries[i].nodeId);
+    const n = state.nodes.get(entries[i]!.nodeId);
     if (!n || !n.endTime) continue;
     const t = +new Date(n.endTime);
     if (!Number.isFinite(t)) continue;
@@ -126,11 +158,11 @@ function computeIdleSeconds(state, now) {
   return Math.max(0, Math.round((now - lastEnd) / 1000));
 }
 
-function computeRecent(state, vis, now) {
+function computeRecent(state: NarratorState, vis: NarratorVis, now: number) {
   const entries = state.timelineEntries;
-  let lastError = null, lastDone = null;
+  let lastError: NarratorNode | null = null, lastDone: NarratorNode | null = null;
   for (let i = entries.length - 1; i >= 0 && i >= entries.length - 50; i--) {
-    const n = state.nodes.get(entries[i].nodeId);
+    const n = state.nodes.get(entries[i]!.nodeId);
     if (!n || !n.endTime) continue;
     if (n.type !== 'tool' && n.type !== 'skill' && n.type !== 'mcp') continue;
     if (!lastError && n.status === 'error') lastError = n;
@@ -138,41 +170,41 @@ function computeRecent(state, vis, now) {
     if (lastError && lastDone) break;
   }
   if (lastError) {
-    const ago = Math.round((now - +new Date(lastError.endTime)) / 1000);
+    const ago = Math.round((now - +new Date(lastError.endTime!)) / 1000);
     if (ago < 60) return { text: `err ${ago}s`, isError: true };
   }
   if (lastDone) {
-    const ago = Math.round((now - +new Date(lastDone.endTime)) / 1000);
+    const ago = Math.round((now - +new Date(lastDone.endTime!)) / 1000);
     if (ago < 10) return { text: `${lastDone.label} done`, isError: false };
   }
   return null;
 }
 
-function aggregateRunning(tools) {
-  if (tools.length === 1) return tools[0].label;
-  const counts = new Map();
+function aggregateRunning(tools: NarratorNode[]) {
+  if (tools.length === 1) return tools[0]!.label;
+  const counts = new Map<string, number>();
   for (const t of tools) counts.set(t.label, (counts.get(t.label) || 0) + 1);
-  let topLabel = null, topCount = 0;
+  let topLabel: string | null = null, topCount = 0;
   for (const [k, v] of counts) {
     if (v > topCount) { topLabel = k; topCount = v; }
   }
   const others = tools.length - topCount;
-  const plural = pluralize(topLabel, topCount);
+  const plural = pluralize(topLabel ?? '', topCount);
   return others > 0 ? `${topCount} ${plural} +${others}` : `${topCount} ${plural}`;
 }
 
-function pluralize(label, n) {
+function pluralize(label: string, n: number) {
   if (n <= 1) return label;
   return label.toLowerCase() + 's';
 }
 
 // Context slot: hot directory derived from recent file tools. Sub-agent
 // branches are added in later tasks. Returns a string or null.
-function computeContext(state, vis) {
-  const filePaths = [];
+function computeContext(state: NarratorState, vis: NarratorVis) {
+  const filePaths: string[] = [];
   const entries = state.timelineEntries;
   for (let i = entries.length - 1; i >= 0 && filePaths.length < 5; i--) {
-    const e = entries[i];
+    const e = entries[i]!;
     if (e.type !== 'tool') continue;
     if (e.label !== 'Read' && e.label !== 'Edit' && e.label !== 'Write') continue;
     if (!e.sub) continue;
@@ -190,9 +222,9 @@ function computeContext(state, vis) {
 // Le format vit dans viz-duration.mjs (constat C8) ; le `?` reste ici : dans une
 // phrase, l'absence de durée doit s'écrire, une phrase trouée se lit comme un
 // bug d'affichage.
-function formatSessionDuration(startIso, endIso) {
+function formatSessionDuration(startIso: string | null, endIso: string | null) {
   if (!startIso || !endIso) return '?';
-  return formatDuration(new Date(endIso) - new Date(startIso)) ?? '?';
+  return formatDuration(new Date(endIso).getTime() - new Date(startIso).getTime()) ?? '?';
 }
 
 // ─── Dirty / render driver ────────────────────────────────────────────────
@@ -201,11 +233,11 @@ function formatSessionDuration(startIso, endIso) {
 // 1 Hz tick (resumeTick / pauseTick) just calls markNarratorDirty() —
 // "Xs ago" clocks are advanced by the same render path as event-driven
 // updates.
-let _renderFn = null;
+let _renderFn: (() => void) | null = null;
 let _pending = false;
-let _tickHandle = null;
+let _tickHandle: ReturnType<typeof setInterval> | null = null;
 
-export function setRenderFn(fn) {
+export function setRenderFn(fn: (() => void) | null | undefined) {
   _renderFn = typeof fn === 'function' ? fn : null;
 }
 

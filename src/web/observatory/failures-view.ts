@@ -5,10 +5,10 @@
 // (`onAckGroup`), advisor-view l'orchestre. Le regroupement et les phrases
 // viennent de failures-format.js, les remedes de remedies.js.
 
-import { groupAlerts, causeLabel, episodeLabel, failuresSummary, projectLabel, panelAlerts } from './failures-format.ts';
-import { remedyFor } from './remedies.ts';
+import { groupAlerts, causeLabel, episodeLabel, failuresSummary, projectLabel, panelAlerts, type JournalAlert, type AlertGroup } from './failures-format.ts';
+import { remedyFor, type Remedy } from './remedies.ts';
 
-function el(tag, className, text) {
+function el(tag: string, className?: string | null, text?: string): HTMLElement {
   const node = document.createElement(tag);
   if (className) node.className = className;
   if (text !== undefined) node.textContent = text;
@@ -17,9 +17,9 @@ function el(tag, className, text) {
 
 // Date et heure : une panne d'il y a trois jours et une d'il y a trois minutes
 // se lisent dans la meme liste, une heure seule les confondrait.
-function stamp(ms) {
+function stamp(ms: number) {
   const d = new Date(ms);
-  const p = n => String(n).padStart(2, '0');
+  const p = (n: number) => String(n).padStart(2, '0');
   return `${p(d.getDate())}/${p(d.getMonth() + 1)} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
@@ -28,7 +28,7 @@ const SANS_COMMANDE = 'commande non consignée (alerte ancienne)';
 // La commande d'un episode. Vide chez badInvocation = anterieure a la
 // consigne du subject (doc/32) : le dire vaut mieux qu'un trou, qui se lirait
 // comme un bug du bloc.
-function commandes(alert) {
+function commandes(alert: JournalAlert): string[] {
   if (alert.type === 'stuck') {
     return (Array.isArray(alert.tools) ? alert.tools : [])
       .map(t => (t.subject ? `${t.toolName} · ${t.subject}` : t.toolName));
@@ -42,7 +42,7 @@ function commandes(alert) {
 // pas reserve a la souris : role, tabindex et clavier, et l'etat s'annonce
 // (aria-expanded) au lieu de ne vivre que dans une classe CSS. La ligne « non
 // consignee » n'a rien a deplier — la deguiser en bouton mentirait.
-function commandNode(cmd) {
+function commandNode(cmd: string) {
   if (cmd === SANS_COMMANDE) return el('div', 'failure-cmd is-missing', cmd);
 
   const ligne = el('div', 'failure-cmd', cmd);
@@ -62,7 +62,7 @@ function commandNode(cmd) {
   return ligne;
 }
 
-function episodeNode(alert) {
+function episodeNode(alert: JournalAlert) {
   const ep = el('div', alert.acknowledged ? 'failure-episode is-acked' : 'failure-episode');
   const faits = episodeLabel(alert);
   ep.appendChild(el('div', 'failure-head',
@@ -71,15 +71,19 @@ function episodeNode(alert) {
   return ep;
 }
 
-function remedeNode(remede) {
+function remedeNode(remede: NonNullable<Remedy>) {
   const bloc = el('div', 'failure-remede');
   bloc.appendChild(el('div', 'remede-consigne', remede.consigne));
   bloc.appendChild(el('pre', 'remede-extrait', remede.extrait));
-  const copier = el('button', 'obs-btn remede-copier', 'Copier');
+  const copier = el('button', 'obs-btn remede-copier', 'Copier') as HTMLButtonElement;
   copier.type = 'button';
   const zone = el('span', 'remede-copie', '');
   zone.setAttribute('aria-live', 'polite');
   copier.addEventListener('click', () => {
+    // Le typage DOM declare `writeText` toujours present ; en pratique absent
+    // hors contexte securise ou navigateur ancien, d'ou la garde — que tsc
+    // juge donc a tort toujours vraie.
+    // @ts-expect-error TS2774 — le typage DOM ne modelise pas cette absence reelle
     const ecrire = globalThis.navigator?.clipboard?.writeText
       ? navigator.clipboard.writeText(remede.extrait)
       : Promise.reject(new Error('presse-papier indisponible'));
@@ -90,7 +94,7 @@ function remedeNode(remede) {
   return bloc;
 }
 
-function groupNode(group, onAckGroup) {
+function groupNode(group: AlertGroup, onAckGroup: ((episodes: JournalAlert[]) => void) | undefined) {
   const det = el('details', group.unacked ? 'failure-group' : 'failure-group is-acked');
   const resume = el('summary', 'failure-group-head');
   resume.appendChild(el('span', 'failure-cause', causeLabel(group)));
@@ -102,11 +106,12 @@ function groupNode(group, onAckGroup) {
 
   for (const alert of group.episodes) det.appendChild(episodeNode(alert));
 
-  const remede = remedyFor(group.episodes[0]);
+  // Meme invariant qu'a la construction du groupe : au moins un episode.
+  const remede = remedyFor(group.episodes[0]!);
   if (remede) det.appendChild(remedeNode(remede));
 
   if (group.unacked && onAckGroup) {
-    const btn = el('button', 'obs-btn obs-btn--primary failure-ack', `Tout acquitter (${group.unacked})`);
+    const btn = el('button', 'obs-btn obs-btn--primary failure-ack', `Tout acquitter (${group.unacked})`) as HTMLButtonElement;
     btn.type = 'button';
     btn.addEventListener('click', () => {
       btn.disabled = true;
@@ -117,7 +122,11 @@ function groupNode(group, onAckGroup) {
   return det;
 }
 
-export function renderFailures(node, alerts, { onAckGroup } = {}) {
+export interface RenderFailuresOptions {
+  onAckGroup?: (episodes: JournalAlert[]) => void;
+}
+
+export function renderFailures(node: HTMLElement, alerts: JournalAlert[] | null | undefined, { onAckGroup }: RenderFailuresOptions = {}) {
   node.textContent = '';
   // Le filtre se pose ICI, a l'affichage, et nulle part en amont : le journal
   // continue de consigner les stuck (la pastille vivante les lit par la meme

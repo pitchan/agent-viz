@@ -10,9 +10,79 @@ import * as api from './api.ts';
 import { getState, subscribe, loadPricing } from './store.ts';
 import {
   formatTokens, formatUsdExact, formatUsdPerMTok, formatShare, modelLabel,
-  basisLabel, periodHeader,
+  basisLabel, periodHeader, type Period, type SummaryBasis,
 } from './format.ts';
 import { initPeriodSelector } from './period-selector.ts';
+
+// La ligne du tableau « par modèle » — un seau de jetons (memes quatre
+// compteurs que TokenBucket, viz-state.ts, mais indexes ici par modele et
+// jamais lus comme un cumul de session).
+interface ModelCostRow {
+  model: string;
+  pricing: string;
+  costUsd: number;
+  bucket: { in: number; out: number; cacheCreate: number; cacheRead: number };
+  netTokens: number;
+  shareOfCost: number | null;
+}
+
+interface ModelCostsTotals {
+  netTokens: number;
+  costUsd: number;
+  costComplete: boolean;
+  cacheReadTokens: number;
+}
+
+// GET /analysis/models.
+interface ModelCostsPayload {
+  totals: ModelCostsTotals;
+  models: ModelCostRow[];
+  period?: Period | null;
+  basis?: SummaryBasis | null;
+  excludedPendingRescan: number;
+}
+
+interface TariffPeriod {
+  until: string;
+  prices: { input: number; output: number };
+}
+
+interface TariffEntry {
+  model: string;
+  label: string;
+  current: { input: number; output: number; cacheCreate: number; cacheRead: number };
+  maxInput: number;
+  history: TariffPeriod[];
+}
+
+interface ZeroCostEntry {
+  model: string;
+  reason: string;
+}
+
+interface PriceTable {
+  source: string;
+  entries: TariffEntry[];
+  zeroCost: ZeroCostEntry[];
+}
+
+interface ProvenanceSection {
+  titre: string;
+  corps: string;
+}
+
+interface Provenance {
+  sections: ProvenanceSection[];
+  engineVersion: string;
+  scanVersion: string | number;
+  priceSource: string;
+}
+
+// GET /pricing.
+interface PricingPayload {
+  priceTable: PriceTable;
+  provenance: Provenance;
+}
 
 const COST_HEADERS = ['Modèle', 'Entrée', 'Sortie', 'Création de cache',
   'Relecture de cache', 'Jetons nets', 'Coût', 'Part'];
@@ -21,13 +91,13 @@ const TARIFF_HEADERS = ['Modèle', 'Entrée', 'Sortie', 'Écriture cache 5 min',
 
 // "tarif inconnu" instead of an amount, a wanted zero says so with no shame:
 // no silent cell, ever.
-export function costCellOf(row) {
+export function costCellOf(row: ModelCostRow) {
   if (row.pricing === 'inconnu') return 'tarif inconnu';
   if (row.pricing === 'zero-voulu') return '0,00 $ — non facturable';
   return formatUsdExact(row.costUsd);
 }
 
-function headerRow(labels) {
+function headerRow(labels: string[]) {
   const tr = document.createElement('tr');
   for (const label of labels) {
     const th = document.createElement('th');
@@ -37,7 +107,7 @@ function headerRow(labels) {
   return tr;
 }
 
-function cellRow(cells, rawModelId) {
+function cellRow(cells: string[], rawModelId: string) {
   const tr = document.createElement('tr');
   cells.forEach((cell, i) => {
     const td = document.createElement('td');
@@ -48,7 +118,7 @@ function cellRow(cells, rawModelId) {
   return tr;
 }
 
-function buildCostTable(models) {
+function buildCostTable(models: ModelCostRow[]) {
   const table = document.createElement('table');
   table.className = 'analysis-table';
   table.appendChild(headerRow(COST_HEADERS));
@@ -65,14 +135,14 @@ function buildCostTable(models) {
   return table;
 }
 
-function periodsCell(history) {
+function periodsCell(history: TariffPeriod[]) {
   if (!history.length) return '—';
   return history
     .map(p => `jusqu’au ${p.until} : ${formatUsdPerMTok(p.prices.input)} entrée / ${formatUsdPerMTok(p.prices.output)} sortie`)
     .join(' ; ');
 }
 
-function buildTariffTable(priceTable) {
+function buildTariffTable(priceTable: PriceTable) {
   const table = document.createElement('table');
   table.className = 'analysis-table';
   table.appendChild(headerRow(TARIFF_HEADERS));
@@ -88,7 +158,7 @@ function buildTariffTable(priceTable) {
   return table;
 }
 
-function zeroCostList(zeroCost) {
+function zeroCostList(zeroCost: ZeroCostEntry[]) {
   const ul = document.createElement('ul');
   ul.className = 'pricing-zero-cost';
   for (const z of zeroCost) {
@@ -99,7 +169,7 @@ function zeroCostList(zeroCost) {
   return ul;
 }
 
-function buildProvenanceBlock(provenance) {
+function buildProvenanceBlock(provenance: Provenance) {
   const wrap = document.createElement('div');
   for (const s of provenance.sections) {
     const title = document.createElement('div');
@@ -118,7 +188,7 @@ function buildProvenanceBlock(provenance) {
   return wrap;
 }
 
-const blockTitle = text => {
+const blockTitle = (text: string) => {
   const div = document.createElement('div');
   div.className = 'advisor-basis-title';
   div.textContent = text;
@@ -127,11 +197,14 @@ const blockTitle = text => {
 
 function render() {
   const state = getState();
-  const summaryEl = document.getElementById('pricing-summary');
-  const body = document.getElementById('pricing-body');
+  const summaryEl = document.getElementById('pricing-summary')!;
+  const body = document.getElementById('pricing-body')!;
 
   if (state.error) { summaryEl.textContent = `Analyse indisponible : ${state.error}`; return; }
-  const { modelCosts, pricing } = state;
+  // state.modelCosts/state.pricing restent `unknown` cote magasin (store.ts) :
+  // ce module est celui qui sait lire leur forme reelle.
+  const modelCosts = state.modelCosts as ModelCostsPayload | null;
+  const pricing = state.pricing as PricingPayload | null;
   if (!modelCosts || !pricing) return;
 
   const { totals } = modelCosts;
@@ -161,17 +234,17 @@ function render() {
 }
 
 export function initPricing() {
-  const panel = document.getElementById('pricing-overlay');
+  const panel = document.getElementById('pricing-overlay')!;
   subscribe(() => { if (panel.classList.contains('visible')) render(); });
 
-  initPeriodSelector(document.getElementById('pricing-period'), () => loadPricing(api));
+  initPeriodSelector(document.getElementById('pricing-period')!, () => loadPricing(api));
 
-  document.getElementById('btn-pricing').addEventListener('click', () => {
+  document.getElementById('btn-pricing')!.addEventListener('click', () => {
     panel.classList.toggle('visible');
     if (panel.classList.contains('visible')) loadPricing(api);
   });
 
-  document.getElementById('pricing-close').addEventListener('click', () => {
+  document.getElementById('pricing-close')!.addEventListener('click', () => {
     panel.classList.remove('visible');
   });
 }
