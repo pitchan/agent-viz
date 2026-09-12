@@ -21,11 +21,9 @@ export interface RecommendationEvidence {
   duplicateBytes?: number;
 }
 
-// Une recommandation telle que le classement serveur la rend (ranking.ts,
-// RankedRecommendation) — jamais importee de src/server/ (frontiere
-// navigateur/Node, doc/36 §2). `status`/`statusAt`/`statusReason` restent
-// facultatifs : decisions-view.ts (lot A) en fait circuler un sous-ensemble
-// reduit a {id, title} vers `decisionLine`.
+// Une recommandation telle que le classement serveur la rend — jamais
+// importee de src/server/ (frontiere navigateur/Node, doc/36 §2).
+// status/statusAt/statusReason facultatifs : decisions-view.ts n'en lit qu'un sous-ensemble.
 export interface Recommendation {
   id: number;
   title: string;
@@ -70,14 +68,14 @@ export interface Summary {
 }
 
 // Le message de progression SSE (`analysisScan`) — mêmes cinq champs que
-// ScanEventMessage (store.ts, non exporté) ; dupliqué ici faute d'export
-// partagé, voir le rapport de tâche.
+// ScanEventMessage (store.ts, non exportée) ; son seul producteur
+// (store.ts, applyScanEvent) les écrit tous à chaque fois.
 export interface ScanProgress {
   phase: string;
-  total?: number;
-  scanned?: number;
-  skipped?: number;
-  failed?: number;
+  total: number;
+  scanned: number;
+  skipped: number;
+  failed: number;
 }
 
 export function formatUsd(n: number) {
@@ -175,11 +173,9 @@ const DECISION_WATCH: Record<string, string> = {
   ignored: 'reviendra si le coût regrossit de moitié',
 };
 
-// Le seul appelant reel (decisions-view.ts, lot A) passe un
-// DecidedRecommendation {id, title} — cette forme les reprend a l'identique
-// pour que TypeScript reconnaisse le meme objet, plus les trois champs que
-// decisionLine lit reellement, tous facultatifs (DecidedRecommendation ne
-// les porte pas dans SA vue locale, meme si l'objet reel les a).
+// Le seul appelant reel passe un DecidedRecommendation {id, title}
+// (decisions-view.ts) — repris a l'identique, plus les trois champs que
+// decisionLine lit, facultatifs comme dans la vue locale de cet appelant.
 interface DecisionFields {
   id: number;
   title: string;

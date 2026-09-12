@@ -41,9 +41,9 @@ function el(tag: string, className?: string | null, text?: string): HTMLElement 
 // Les trois intentions (doc/44) : chaque bouton répond à « Que fais-tu de ce
 // conseil ? » dans les mots de l'utilisateur, et sa conséquence est écrite
 // dessous — le contrat au moment du clic, pas dans un mode d'emploi ailleurs.
+
 // Cles litterales, pas Record<string, string> : `status` (plus bas) ne vaut
-// jamais que 'accepted' ou 'ignored', et l'indexation par une clef connue
-// evite le `| undefined` d'une signature d'index generique.
+// jamais que 'accepted' ou 'ignored' — l'indexation par une clef connue.
 const CHOICE_CAPTIONS = {
   accepted: 'La carte part au journal. Si le coût regrossit malgré tout, elle reviendra te demander si le geste a vraiment pris.',
   ignored: 'Revient d’elle-même si le coût regrossit de moitié.',
@@ -185,25 +185,14 @@ async function loadFailures() {
         // L'etat vrai d'abord, le message ensuite : recharge PUIS pose le
         // motif d'interruption — l'ordre inverse le faisait effacer par le
         // chemin de succes du rechargement (revue finale doc/32).
-        (err: unknown) => loadFailures().finally(() => {
-          erreur.textContent = `Acquittement interrompu : ${err instanceof Error ? err.message : String(err)}`;
+        err => loadFailures().finally(() => {
+          erreur.textContent = `Acquittement interrompu : ${(err as Error).message}`;
         }),
       ),
     });
   } catch (err) {
-    erreur.textContent = `Pannes indisponibles : ${err instanceof Error ? err.message : String(err)}`;
+    erreur.textContent = `Pannes indisponibles : ${(err as Error).message}`;
   }
-}
-
-// La charge de l'evenement DOM local qui rediffuse le SSE `analysisScan`
-// (viz-network.ts) — memes cinq champs que ScanEventMessage (store.ts, non
-// exporte), toujours tous presents sur ce message-la.
-interface ScanEventDetail {
-  phase: string;
-  total: number;
-  scanned: number;
-  skipped: number;
-  failed: number;
 }
 
 export function initAdvisor() {
@@ -251,7 +240,7 @@ export function initAdvisor() {
   // The scan broadcasts its progress on the existing SSE stream; reload when
   // it finishes so the page never shows advice from before the rescan.
   window.addEventListener('agentviz:analysisScan', e => {
-    const detail = (e as CustomEvent<ScanEventDetail>).detail;
+    const detail = (e as CustomEvent<ScanProgress>).detail;
     applyScanEvent(detail);
     if (detail.phase === 'done' && panel.classList.contains('visible')) {
       loadAdvisor(api);

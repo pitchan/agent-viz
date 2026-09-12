@@ -11,11 +11,13 @@ import { getState, subscribe, loadAnalysis, loadSession, setIncludeMachine } fro
 import { formatUsd, formatTokens, formatBytes, formatDuration, basisLabel, periodHeader, type Summary } from './format.ts';
 import { initPeriodSelector } from './period-selector.ts';
 
-// Une ligne de GET /analysis/sessions.
+// Une ligne de GET /analysis/sessions — projectPath/project calqués sur
+// SessionListRow (service.ts, jamais importé : frontière navigateur/Node).
+// `null` = ligne antérieure à M1.1, jamais une valeur devinée.
 interface SessionSummaryRow {
   id: string;
-  projectPath?: string | null;
-  project?: string;
+  projectPath: string | null;
+  project: string | null;
   modelMain?: string | null;
   costComplete?: boolean;
   costUsd: number;
@@ -60,7 +62,7 @@ export function sessionRow(session: SessionSummaryRow) {
     session.id.slice(0, 8),
     // Le vrai chemin de travail quand le service a su le lire ; le slug encodé
     // par Claude Code sinon — jamais une cellule vide.
-    session.projectPath || session.project || '',
+    session.projectPath || session.project,
     session.modelMain || '—',
     session.costComplete ? formatUsd(session.costUsd) : `${formatUsd(session.costUsd)} (partiel)`,
     formatTokens(session.netTokens),

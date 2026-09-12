@@ -15,30 +15,8 @@ import {
   state, vis,
   hexAlpha, roundRect, traceHexagon, traceDiamond, truncate, esc,
   formatTokens, tokenContext, agentIdFromNode,
+  type VizNode, type VisNode,
 } from './viz-state.ts';
-
-// Le noeud et la vis-node tels que les dessinateurs les lisent — le sous-
-// ensemble de ce que viz-layout.ts (fourre-tout, hors lot) construit sur
-// state.nodes/vis.nodes.
-interface DrawerNode {
-  id: string;
-  status: string;
-  color: string;
-  label: string;
-  sub: string;
-  duration: string | null;
-  isParallel?: boolean;
-  isIsolated?: boolean;
-  children: { status: string }[];
-}
-
-interface DrawerVisNode {
-  x: number;
-  y: number;
-  scale: number;
-  opacity: number;
-  glowPhase: number;
-}
 
 // ─── Glow sprites (pre-rendered radial gradients, cached per color) ───────
 const GLOW_SPRITE_SIZE = 128;
@@ -77,7 +55,7 @@ function sessionContextSize() {
   return tokenContext(state.tokens.main);
 }
 
-export function drawSessionNode(ctx: CanvasRenderingContext2D, n: DrawerNode, vn: DrawerVisNode) {
+export function drawSessionNode(ctx: CanvasRenderingContext2D, n: VizNode, vn: VisNode) {
   const r = SESSION_R * vn.scale;
   const isSelected = state.selected === n.id;
   const isHovered = vis.hoveredNode === n.id;
@@ -143,7 +121,7 @@ export function drawSessionNode(ctx: CanvasRenderingContext2D, n: DrawerNode, vn
 // Overlay markers for agent flags — dashed ring when isolated (worktree),
 // concentric ring when running as part of a parallel batch. Kept out of
 // drawAgentNode so the base renderer stays untouched by this concern.
-function drawAgentDecorations(ctx: CanvasRenderingContext2D, n: DrawerNode, vn: DrawerVisNode, r: number) {
+function drawAgentDecorations(ctx: CanvasRenderingContext2D, n: VizNode, vn: VisNode, r: number) {
   if (n.isParallel) {
     ctx.save();
     ctx.setLineDash([]);
@@ -167,7 +145,7 @@ function drawAgentDecorations(ctx: CanvasRenderingContext2D, n: DrawerNode, vn: 
   }
 }
 
-export function drawAgentNode(ctx: CanvasRenderingContext2D, n: DrawerNode, vn: DrawerVisNode) {
+export function drawAgentNode(ctx: CanvasRenderingContext2D, n: VizNode, vn: VisNode) {
   const r = AGENT_R * vn.scale;
   const isSelected = state.selected === n.id;
   const isHovered = vis.hoveredNode === n.id;
@@ -245,7 +223,7 @@ export function drawAgentNode(ctx: CanvasRenderingContext2D, n: DrawerNode, vn: 
   ctx.restore();
 }
 
-export function drawToolNode(ctx: CanvasRenderingContext2D, n: DrawerNode, vn: DrawerVisNode) {
+export function drawToolNode(ctx: CanvasRenderingContext2D, n: VizNode, vn: VisNode) {
   const w = TOOL_W * vn.scale;
   const h = TOOL_H * vn.scale;
   const isSelected = state.selected === n.id;
@@ -307,7 +285,7 @@ export function drawToolNode(ctx: CanvasRenderingContext2D, n: DrawerNode, vn: D
   ctx.restore();
 }
 
-export function drawMcpNode(ctx: CanvasRenderingContext2D, n: DrawerNode, vn: DrawerVisNode) {
+export function drawMcpNode(ctx: CanvasRenderingContext2D, n: VizNode, vn: VisNode) {
   const r = MCP_R * vn.scale;
   const isSelected = state.selected === n.id;
   const isHovered = vis.hoveredNode === n.id;
@@ -364,7 +342,7 @@ export function drawMcpNode(ctx: CanvasRenderingContext2D, n: DrawerNode, vn: Dr
   ctx.restore();
 }
 
-export function drawSkillNode(ctx: CanvasRenderingContext2D, n: DrawerNode, vn: DrawerVisNode) {
+export function drawSkillNode(ctx: CanvasRenderingContext2D, n: VizNode, vn: VisNode) {
   const r = SKILL_R * vn.scale;
   const isSelected = state.selected === n.id;
   const isHovered = vis.hoveredNode === n.id;

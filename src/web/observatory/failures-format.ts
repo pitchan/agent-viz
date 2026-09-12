@@ -11,11 +11,6 @@
 // src/web/observatory/analysis-view.js, dont la part testable est exportee nue
 // et la part DOM ne l'est pas.
 
-// Une alerte telle que le journal la rend (GET /alerts) — pas TrackedAlert
-// (ce que le lecteur du chien de garde SUIT, viz-watchdog-client.ts) ni
-// AlertContent (ce que la mise en forme temps reel LIT, viz-alert-format.ts) :
-// un troisieme jeu de champs, propre au journal, avec ses propres extras
-// (cwd, count, patternId, toolName) que les deux autres n'ont pas.
 export interface JournalOccurrence {
   ts?: number;
   failed?: boolean;
@@ -26,6 +21,9 @@ export interface JournalTool {
   subject?: string;
 }
 
+// Une alerte telle que le journal la rend (GET /alerts) — pas TrackedAlert
+// (viz-watchdog-client.ts) ni AlertContent (viz-alert-format.ts) : un
+// troisieme jeu de champs, avec ses propres extras (cwd, count, patternId).
 export interface JournalAlert {
   id: string;
   type: string;

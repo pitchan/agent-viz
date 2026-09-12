@@ -83,7 +83,7 @@ function remedeNode(remede: NonNullable<Remedy>) {
     // Le typage DOM declare `writeText` toujours present ; en pratique absent
     // hors contexte securise ou navigateur ancien, d'ou la garde — que tsc
     // juge donc a tort toujours vraie.
-    // @ts-expect-error TS2774 — le typage DOM ne modelise pas cette absence reelle
+    // @ts-expect-error TS2774
     const ecrire = globalThis.navigator?.clipboard?.writeText
       ? navigator.clipboard.writeText(remede.extrait)
       : Promise.reject(new Error('presse-papier indisponible'));

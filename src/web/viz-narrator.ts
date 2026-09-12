@@ -6,32 +6,13 @@
 // without triggering any side effect (no setInterval at import time).
 
 import { formatDuration } from './viz-duration.ts';
+import type { VizNode, TimelineEntry } from './viz-state.ts';
 
-// La forme du noeud et de la vis-node telle que ce module PUR la lit — il ne
-// recoit jamais `state`/`vis` par import (pas de cycle avec viz-layout.ts),
-// seulement en parametres, structurellement compatibles avec les objets
-// reels de viz-state.ts.
-interface NarratorNode {
-  id: string;
-  type: string;
-  parentId: string | null;
-  status: string;
-  label: string;
-  sub: string;
-  startTime: string | null;
-  endTime: string | null;
-}
-
-interface NarratorTimelineEntry {
-  nodeId: string;
-  type: string;
-  label: string;
-  sub: string;
-}
-
+// Ce module PUR ne recoit jamais `state`/`vis` par import (pas de cycle avec
+// viz-layout.ts) : seulement en parametres, ci-dessous.
 interface NarratorState {
-  nodes: Map<string, NarratorNode>;
-  timelineEntries: NarratorTimelineEntry[];
+  nodes: Map<string, VizNode>;
+  timelineEntries: TimelineEntry[];
   toolsCompleted: number;
 }
 
@@ -51,11 +32,13 @@ export function commonPathPrefix(paths: string[] | null | undefined) {
     return segs;
   });
   let i = 0;
+  // paths.length >= 2 (garde ci-dessus) : dirSegs a toujours au moins deux
+  // entrees, l'index 0 et tout `k < dirSegs.length` existent reellement.
   outer: while (true) {
-    const seg = dirSegs[0]?.[i];
+    const seg = dirSegs[0]![i];
     if (seg === undefined) break;
     for (let k = 1; k < dirSegs.length; k++) {
-      if (dirSegs[k]?.[i] !== seg) break outer;
+      if (dirSegs[k]![i] !== seg) break outer;
     }
     i++;
   }
@@ -107,7 +90,7 @@ export function composeNarrator(state: NarratorState, vis: NarratorVis, now: num
 
 // ─── Internal helpers ─────────────────────────────────────────────────────
 function computePrimary(state: NarratorState, vis: NarratorVis, now: number) {
-  const mainRunning: NarratorNode[] = [];
+  const mainRunning: VizNode[] = [];
   for (const id of vis.runningNodes) {
     const n = state.nodes.get(id);
     if (!n) continue;
@@ -160,7 +143,7 @@ function computeIdleSeconds(state: NarratorState, now: number) {
 
 function computeRecent(state: NarratorState, vis: NarratorVis, now: number) {
   const entries = state.timelineEntries;
-  let lastError: NarratorNode | null = null, lastDone: NarratorNode | null = null;
+  let lastError: VizNode | null = null, lastDone: VizNode | null = null;
   for (let i = entries.length - 1; i >= 0 && i >= entries.length - 50; i--) {
     const n = state.nodes.get(entries[i]!.nodeId);
     if (!n || !n.endTime) continue;
@@ -180,7 +163,7 @@ function computeRecent(state: NarratorState, vis: NarratorVis, now: number) {
   return null;
 }
 
-function aggregateRunning(tools: NarratorNode[]) {
+function aggregateRunning(tools: VizNode[]) {
   if (tools.length === 1) return tools[0]!.label;
   const counts = new Map<string, number>();
   for (const t of tools) counts.set(t.label, (counts.get(t.label) || 0) + 1);

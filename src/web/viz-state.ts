@@ -37,10 +37,9 @@ export const LERP_EPS_SCALE = 0.005;
 // Pulse-only animation throttle (running nodes glow at 20 fps).
 export const PULSE_FRAME_MS = 1000 / 20;
 
-// Un seau de jetons tel que le serveur l'envoie (SSE `tokens` ou GET /tokens) —
-// cumulatif + dernier message + dérivé du tarif (src/server/tokens.js).
-// `costComplete`/`unknownModels` portent la réserve C4 (voir costCompleteness
-// plus bas) : absents sur un seau d'un serveur antérieur, ce qui vaut complet.
+// Un seau de jetons tel que le serveur l'envoie (SSE `tokens` ou GET /tokens).
+// `costComplete`/`unknownModels` portent la réserve C4 (costCompleteness plus
+// bas) : absents sur un seau d'un serveur antérieur, ce qui vaut complet.
 export interface TokenBucket {
   in?: number;
   out?: number;
@@ -56,11 +55,82 @@ export interface TokenBucket {
   unknownModels?: string[];
 }
 
+// Un nœud du graphe (state.nodes) — construit par viz-layout.ts, lu par
+// viz-drawers.ts et viz-narrator.ts. `_visible` n'existe que sur un nœud
+// posé par le layout orbital ; absent avant le premier passage.
+export interface VizNode {
+  id: string;
+  type: string;
+  label: string;
+  sub: string;
+  color: string;
+  children: VizNode[];
+  parentId: string | null;
+  data: unknown;
+  status: string;
+  x: number;
+  y: number;
+  duration: string | null;
+  startTime: string | null;
+  endTime: string | null;
+  isIsolated: boolean;
+  isParallel: boolean;
+  _visible?: boolean;
+}
+
+// La position animée d'un nœud (vis.nodes) — lerpée vers sa cible à chaque
+// frame (viz-canvas.ts), lue par les dessinateurs pour le rendu courant.
+export interface VisNode {
+  id: string;
+  x: number;
+  y: number;
+  targetX: number;
+  targetY: number;
+  opacity: number;
+  targetOpacity: number;
+  scale: number;
+  targetScale: number;
+  glowPhase: number;
+}
+
+// Une paire {noeud, position animée} — la forme des cinq seaux de dessin
+// (vis.drawXxxNodes), triés par type pour que le rendu n'ait pas à filtrer.
+export interface DrawBucketEntry {
+  n: VizNode;
+  vn: VisNode;
+}
+
+// Une particule (vis.particles) — un trait lumineux d'un parent vers un
+// enfant actif. `x`/`y` n'existent qu'après le premier pas d'animation.
+export interface Particle {
+  sx: number;
+  sy: number;
+  tx: number;
+  ty: number;
+  progress: number;
+  speed: number;
+  size: number;
+  color: string;
+  opacity: number;
+  x?: number;
+  y?: number;
+}
+
+// Une entrée du fil (state.timelineEntries) — un événement affiché dans le
+// panneau Feed, avec de quoi remonter au nœud d'origine.
+export interface TimelineEntry {
+  ts: string;
+  nodeId: string;
+  type: string;
+  label: string;
+  sub: string;
+}
+
 // ─── App state ────────────────────────────────────────────────────────────
 export const state = {
-  eventSeq: 0, offset: 0, nodes: new Map(), selected: null as string | null,
+  eventSeq: 0, offset: 0, nodes: new Map<string, VizNode>(), selected: null as string | null,
   toolsCompleted: 0, filter: '', autoFit: true,
-  timelineEntries: [] as { ts: string; nodeId: string; type: string; label: string; sub: string }[],
+  timelineEntries: [] as TimelineEntry[],
   startTimes: new Map<string, string>(),
   _lastServerId: null as string | null,
   // Token usage — populated by SSE `tokens` events.
@@ -82,8 +152,8 @@ export const state = {
 
 // Visual/animation state.
 export const vis = {
-  nodes: new Map(),
-  particles: [],
+  nodes: new Map<string, VisNode>(),
+  particles: [] as Particle[],
   camera: { x: 0, y: 0, zoom: 1, targetX: 0, targetY: 0, targetZoom: 1 },
   time: 0,
   hoveredNode: null as string | null,
@@ -91,12 +161,12 @@ export const vis = {
   pulseTimer: null as ReturnType<typeof setTimeout> | null,
   dirty: true,
   activeAnimations: 0,
-  drawSessionNodes: [],
-  drawAgentNodes: [],
-  drawToolNodes: [],
-  drawSkillNodes: [],
-  drawMcpNodes: [],
-  runningNodes: new Set(),
+  drawSessionNodes: [] as DrawBucketEntry[],
+  drawAgentNodes: [] as DrawBucketEntry[],
+  drawToolNodes: [] as DrawBucketEntry[],
+  drawSkillNodes: [] as DrawBucketEntry[],
+  drawMcpNodes: [] as DrawBucketEntry[],
+  runningNodes: new Set<string>(),
   avgFrameMs: 8,
   _particleSkipToggle: false,
 };
