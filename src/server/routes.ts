@@ -5,15 +5,6 @@
 // a new endpoint is one line in ROUTES; security checks are co-located with
 // the route declaration so they can't be forgotten.
 
-// `@types/node` en 20.x ne déclare pas `stripTypeScriptTypes` : Node l'expose
-// bel et bien à l'exécution, ce bloc ajoute seulement le type qui manque.
-declare module 'node:module' {
-  export function stripTypeScriptTypes(
-    source: string,
-    options: { mode: 'strip' | 'transform' },
-  ): string;
-}
-
 import fs from 'node:fs';
 const fsp = fs.promises;
 import path from 'node:path';

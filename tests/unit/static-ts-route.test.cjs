@@ -1,10 +1,8 @@
 'use strict';
-// Ce que ce fichier protège : un `.ts` servi au navigateur garde EXACTEMENT
-// les lignes de la source sur disque (les piles d'erreur du navigateur
-// pointent juste), et une syntaxe que Node ne sait pas effacer se dit — nom
-// du fichier, code d'erreur — au lieu de disparaître en 404 ou en page blanche.
+// Ce que ce fichier protège : un `.ts` servi garde EXACTEMENT les lignes de
+// la source (piles d'erreur justes), et une syntaxe que Node ne sait pas
+// effacer se dit — fichier, code d'erreur — jamais un 404 muet ou une page blanche.
 
-// ── Le bac à sable, posé AVANT le premier require de `src/server/**` ─────────
 // Même piège, même parade que dans version-route.test.cjs : charger
 // `src/server/routes` charge `session-index`, qui crée
 // `os.tmpdir()/agent-events` dès sa lecture.
