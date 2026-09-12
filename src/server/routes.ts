@@ -5,9 +5,19 @@
 // a new endpoint is one line in ROUTES; security checks are co-located with
 // the route declaration so they can't be forgotten.
 
+// `@types/node` en 20.x ne déclare pas `stripTypeScriptTypes` : Node l'expose
+// bel et bien à l'exécution, ce bloc ajoute seulement le type qui manque.
+declare module 'node:module' {
+  export function stripTypeScriptTypes(
+    source: string,
+    options: { mode: 'strip' | 'transform' },
+  ): string;
+}
+
 import fs from 'node:fs';
 const fsp = fs.promises;
 import path from 'node:path';
+import { stripTypeScriptTypes } from 'node:module';
 import type { IncomingMessage, ServerResponse, Server } from 'node:http';
 
 import {
@@ -114,8 +124,37 @@ function shutdownHandler(_req: IncomingMessage, res: ServerResponse): void {
 const STATIC_MIME: Record<string, string> = {
   '.js': 'application/javascript; charset=utf-8',
   '.mjs': 'application/javascript; charset=utf-8',
+  '.ts': 'application/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
 };
+
+// Distingue un retrait de types raté d'un fichier absent : `staticHandler`
+// répond 500 avec le nom du fichier pour l'un, 404 muet (comportement déjà
+// en place) pour l'autre.
+class TypeStripError extends Error {}
+
+// Lit un fichier statique et retire ses types s'il finit en `.ts`, avant que
+// quiconque le serve. Prend un chemin absolu, pas une requête, pour être
+// testée sans passer par la garde de confinement de `staticHandler`.
+async function readStaticFile(absPath: string): Promise<{ mime: string; body: Buffer }> {
+  const data = await fsp.readFile(absPath);
+  const ext = path.extname(absPath).toLowerCase();
+  const mime = STATIC_MIME[ext] || 'application/octet-stream';
+  if (ext !== '.ts') return { mime, body: data };
+  try {
+    // Mode `strip`, jamais `transform` : les positions ligne pour ligne et
+    // colonne pour colonne restent celles de la source, donc aucune carte de
+    // source n'est nécessaire pour que les piles d'erreur du navigateur pointent juste.
+    const stripped = stripTypeScriptTypes(data.toString('utf8'), { mode: 'strip' });
+    return { mime, body: Buffer.from(stripped, 'utf8') };
+  } catch (err: unknown) {
+    const code = (err as { code?: string } | undefined)?.code ?? 'ERR_INCONNU';
+    const message = err instanceof Error ? err.message : String(err);
+    throw new TypeStripError(
+      `retrait des types impossible pour « ${absPath} » [${code}] : ${message}`,
+    );
+  }
+}
 
 async function staticHandler(_req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
   // No directory traversal: strip ".." segments before resolving.
@@ -126,11 +165,16 @@ async function staticHandler(_req: IncomingMessage, res: ServerResponse, url: UR
     res.writeHead(404); res.end('Not found'); return;
   }
   try {
-    const data = await fsp.readFile(p);
-    const mime = STATIC_MIME[path.extname(p).toLowerCase()] || 'application/octet-stream';
+    const { mime, body } = await readStaticFile(p);
     res.writeHead(200, { 'Content-Type': mime });
-    res.end(data);
-  } catch {
+    res.end(body);
+  } catch (err) {
+    // Un défaut d'outillage se dit : il ne se déguise pas en 404.
+    if (err instanceof TypeStripError) {
+      res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end(err.message);
+      return;
+    }
     res.writeHead(404);
     res.end('Not found');
   }
@@ -373,4 +417,4 @@ async function dispatch(req: IncomingMessage, res: ServerResponse): Promise<void
   return route.handler(req, res, url);
 }
 
-export { dispatch, setServer, ROUTES };
+export { dispatch, setServer, ROUTES, readStaticFile };
