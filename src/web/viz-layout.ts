@@ -10,20 +10,19 @@ import {
   type VizNode, type VisNode, type DrawBucketEntry,
 } from './viz-state.ts';
 import { markNarratorDirty } from './viz-narrator.ts';
-import { toolSubject, type ToolInput } from '../engine/core/tool-subject.ts';
+import { toolSubject, type ToolCallEvent, type ToolInput } from '../engine/core/tool-subject.ts';
 import { formatDuration } from './viz-duration.ts';
 import { recordError, recordSuccess } from './viz-errors.ts';
 
 // L'evenement hook tel que ce module le lit : les champs de ToolCallEvent
 // (moteur, deja type) plus ceux que la carte du graphe consomme. Tous
 // facultatifs — l'objet arrive du flux SSE ou d'une ligne de journal rejouee.
-export interface HookEvent {
+export interface HookEvent extends ToolCallEvent {
   hook_event_name?: string;
   session_id?: string;
   agent_id?: string;
   agent_type?: string;
   subagent_type?: string;
-  tool_name?: string;
   tool_use_id?: string;
   // `isolation` s'ajoute a ToolInput : seul le graphe s'en sert, pour la
   // pastille « worktree » d'un sous-agent isole.

@@ -22,9 +22,9 @@ import {
 // ─── Canvas setup ─────────────────────────────────────────────────────────
 // Les trois elements sont declares dans index.html, et le script de module qui
 // charge ce fichier vient apres eux : ils existent des la premiere ligne.
-// `getContext('2d')` d'un canevas ne rend null qu'apres un contexte d'un AUTRE
-// type sur le meme element, ce que personne ne demande ici.
 const canvas = document.getElementById('canvas') as HTMLCanvasElement;
+// `getContext('2d')` ne rend null qu'apres un contexte d'un AUTRE type sur le
+// meme element, ce que personne ne demande ici.
 const ctx = canvas.getContext('2d')!;
 const tooltipEl = document.getElementById('node-tooltip')!;
 

@@ -548,11 +548,9 @@ function updateLiveDurations() {
 // Ack button. New alerts also trigger a desktop Notification (permission is
 // requested lazily on the first incoming alert; silent fallback if denied).
 
-// Une alerte telle que la LIGNE l'affiche. Trois jeux de champs decrivent
-// aujourd'hui le meme objet : `TrackedAlert` (les quatre champs dont le
-// lecteur decide), `AlertContent` (ce que le formateur lit) et le jeu que
-// `pricingDriftAlert` ajoute. L'objet qui circule les porte tous ; seule leur
-// declaration est separee, et c'est ce recoupement qui la repare ici.
+// Une alerte telle que la LIGNE l'affiche. Trois declarations decrivent le
+// meme objet — `TrackedAlert`, `AlertContent`, et ce que `pricingDriftAlert`
+// ajoute ; l'objet qui circule les porte toutes, ce recoupement le dit.
 type DisplayedAlert = TrackedAlert & AlertContent & { sessionId?: string; toolName?: string };
 
 interface WatchdogEls {
