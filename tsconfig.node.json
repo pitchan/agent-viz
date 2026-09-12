@@ -13,7 +13,11 @@
     "outDir": "dist/engine",
     "types": ["node"],
     "allowImportingTsExtensions": true,
-    "rewriteRelativeImportExtensions": true
+    "rewriteRelativeImportExtensions": true,
+    // Refuse toute syntaxe que Node ne sait pas effacer a la requete (enum,
+    // propriete de constructeur, …) : premier filet pour un `.ts` qui part au
+    // navigateur, avant meme que le retrait de types s'execute.
+    "erasableSyntaxOnly": true
   },
   // Ce projet sert au TYPECHECK, pas a l emission : `npm run typecheck:engine` le lance
   // avec --noEmit. L emission passe par tsconfig.node.build.json, qui configure l include
@@ -26,5 +30,9 @@
   // suffit a deplacer toutes les sorties.
   // ETAPE 4 (2026-08-14) : rootDir pose dans tsconfig.node.build.json
   // (les tests/** et vitest.config.mts d ici interdisent un rootDir src sur CE projet).
-  "include": ["src/server/**/*.ts", "src/engine/**/*.ts", "tests/**/*.ts", "vitest.config.mts"]
+  "include": ["src/server/**/*.ts", "src/engine/**/*.ts", "tests/**/*.ts", "vitest.config.mts"],
+  // `tests/fixtures/` est une donnee d'entree pour des tests d'execution, jamais
+  // du code a typer : `unsupported-enum.ts` y viole erasableSyntaxOnly EXPRES,
+  // pour eprouver le refus de Node a la requete, pas celui de tsc a la compilation.
+  "exclude": ["tests/fixtures"]
 }

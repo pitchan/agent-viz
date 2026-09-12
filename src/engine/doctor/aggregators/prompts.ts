@@ -50,7 +50,14 @@ export class PromptsAggregator {
   private mapShapedCount = 0;
   private readonly corpus: PromptsStats['corpus'] = [];
 
-  constructor(private readonly maxPrompts: number) {}
+  private readonly maxPrompts: number;
+
+  // Champ déclaré puis affecté : une propriété de constructeur n'est pas une
+  // syntaxe effaçable, `erasableSyntaxOnly` la refuse (elle génère une
+  // affectation, pas seulement un type).
+  constructor(maxPrompts: number) {
+    this.maxPrompts = maxPrompts;
+  }
 
   addPrompt(evt: UserPromptEvent): void {
     if (isNoisePrompt(evt.text)) return;
