@@ -123,7 +123,7 @@ export const loadPricing = (api: ApiClient) => run(async () => {
 // After a status change the server decides what the list becomes — the page
 // never patches a recommendation locally, or the +50 % and freshness rules
 // would be re-implemented in two places.
-export const changeStatus = (api: ApiClient, id: string | number, status: string, reason?: string) => run(async () => {
+export const changeStatus = (api: ApiClient, id: number, status: string, reason?: string) => run(async () => {
   await api.setRecommendationStatus(id, status, reason);
   return { recommendations: await api.fetchRecommendations() };
 });

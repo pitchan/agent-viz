@@ -46,17 +46,17 @@ import { fetchAlerts, acknowledgeAlert as postAcknowledgement } from './observat
 // Une alerte telle que ce lecteur la fait circuler : le journal du serveur en
 // porte davantage (message, sujet, occurrences...), mais ce fichier ne
 // regarde jamais que ces quatre champs pour decider ce qui reste a l'ecran.
-export interface Alert {
+export interface TrackedAlert {
   id: string;
   createdAt: number;
   standing?: boolean;
   acknowledged?: boolean;
 }
 
-type AlertListener = (alerts: Alert[]) => void;
+type AlertListener = (alerts: TrackedAlert[]) => void;
 
 const listeners = new Set<AlertListener>();
-const externalAlerts = new Map<string, Alert>();
+const externalAlerts = new Map<string, TrackedAlert>();
 
 // id → the most recent journal entry carrying that id. The journal's key is
 // the PAIR (id, createdAt) and it legitimately holds several incidents under
@@ -64,7 +64,7 @@ const externalAlerts = new Map<string, Alert>();
 // speaks about the present, so of those it keeps the latest; indexing by id
 // and letting the last one written win would silence a live loop behind a
 // finished one, because the journal answers newest-first.
-let serverAlerts = new Map<string, Alert>();
+let serverAlerts = new Map<string, TrackedAlert>();
 // What the server still judges live. Kept as a set of ids, never as alerts:
 // the alert itself comes from the journal, with its `acknowledged` recomputed
 // there, and a second copy would be a second truth for one fact.
@@ -82,7 +82,7 @@ let firstRead = true;
 // A separator is indispensable, and it is the journal's own: glued together,
 // ('a1', 2) and ('a', 12) both give 'a12'. NUL can appear neither in an id nor
 // in a number, and ids already carry punctuation (loop:s1:Bash).
-const keyOf = (a: Alert) => `${a.id}\u0000${a.createdAt}`;
+const keyOf = (a: TrackedAlert) => `${a.id}\u0000${a.createdAt}`;
 
 // Les cles serveur vivantes au moment de la DERNIERE notification — donc ce
 // que l'interface montre en ce moment. C'est a CET etat-la qu'un rechargement
@@ -93,14 +93,14 @@ const keyOf = (a: Alert) => `${a.id}\u0000${a.createdAt}`;
 // (vecu sur capture : cloche a « 1 », « No active alerts »).
 let shownKeys = new Set<string>();
 
-function notify(newAlerts: Alert[]) {
+function notify(newAlerts: TrackedAlert[]) {
   shownKeys = new Set(liveServerAlerts().map(keyOf));
   for (const fn of listeners) fn(newAlerts);
 }
 
 // Is this journal entry something the badge should be lit about right now?
 // The alert declares which kind it is; nothing here sniffs its type.
-function isLive(alert: Alert, now: number): boolean {
+function isLive(alert: TrackedAlert, now: number): boolean {
   if (alert.standing) return activeIds.has(alert.id);
   return isFresh(alert, now);
 }
@@ -168,7 +168,7 @@ export async function refreshAlerts() {
 
 // Pushed by the SSE stream the moment the server records something, so the
 // badge does not wait for the next poll.
-export function applyServerAlert(alert: Alert | null | undefined): void {
+export function applyServerAlert(alert: TrackedAlert | null | undefined): void {
   if (!alert || !alert.id) return;
   const held = serverAlerts.get(alert.id);
   // Same rule as the refresh: of two incidents sharing an id, the latest one
@@ -185,7 +185,7 @@ export function applyServerAlert(alert: Alert | null | undefined): void {
   notify(isLive(alert, _now()) ? [alert] : []);
 }
 
-export function raiseExternalAlert(alert: Alert): void {
+export function raiseExternalAlert(alert: TrackedAlert): void {
   const existing = externalAlerts.get(alert.id);
   if (existing && !existing.acknowledged) return;
   const fresh = { ...alert, acknowledged: false };

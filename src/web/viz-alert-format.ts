@@ -27,7 +27,7 @@ interface AlertToolCall {
 // La forme uniforme que le detecteur du moteur garantit : `occurrences` et
 // `tools` sont toujours des tableaux (vides si non pertinents pour ce type
 // d'alerte), jamais absents — voir le commentaire de tete du fichier.
-export interface Alert {
+export interface AlertContent {
   type: string;
   message: string;
   subject?: string;
@@ -62,7 +62,7 @@ export function alertActor({ agentId, agentType }: { agentId?: string; agentType
 
 // Cle dynamique (`alert.type`) : seuls `loop` et `stuck` detaillent, les
 // autres types d'alerte retombent sur `alertDetailLines` -> `[]`.
-const DETAIL_LINES: Record<string, ((a: Alert) => string[]) | undefined> = {
+const DETAIL_LINES: Record<string, ((a: AlertContent) => string[]) | undefined> = {
   loop: (a) => {
     // The alert keeps every occurrence — it is the record, and `count` has to
     // stay exact. The cap belongs here, at the display. Nothing else bounds
@@ -93,14 +93,14 @@ const DETAIL_LINES: Record<string, ((a: Alert) => string[]) | undefined> = {
   },
 };
 
-export function alertDetailLines(alert: Alert): string[] {
+export function alertDetailLines(alert: AlertContent): string[] {
   const build = DETAIL_LINES[alert.type];
   return build ? build(alert) : [];
 }
 
 // The body the OS toast shows. Playwright cannot see the bubble, so this is
 // the part of the notification that gets proved by test rather than by eye.
-export function notificationPayload(alert: Alert): { title: string; body: string } {
+export function notificationPayload(alert: AlertContent): { title: string; body: string } {
   const lines = [alert.message];
   if (alert.subject) lines.push(truncate(alert.subject));
   lines.push(...alertDetailLines(alert));

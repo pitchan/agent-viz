@@ -29,7 +29,7 @@ async function postJson(url: string, body?: unknown, fetchImpl: typeof fetch = f
 }
 
 // La fenêtre 7/30/90 et le bascule humain/machine, partagées par chaque appel
-// paginé ci-dessous — le serveur borne et défaut la fenêtre de son côté.
+// fenêtré ci-dessous — le serveur borne et défaut la fenêtre de son côté.
 export interface WindowOpts {
   days?: number;
   includeMachine?: boolean;
@@ -70,9 +70,9 @@ export const fetchConfigAudit = () => getJson('/config/audit');
 export const fetchRecommendations = () => getJson('/recommendations');
 // La raison n'accompagne qu'un arbitrage (doc/42) ; absente, l'URL reste
 // celle des statuts historiques.
-// `id` est l'identifiant numerique d'une recommandation (voir decisions-view.ts) ;
-// encodeURIComponent accepte aussi bien un number qu'une string.
-export const setRecommendationStatus = (id: string | number, status: string, reason?: string) =>
+// `id` est l'identifiant numerique d'une recommandation (voir decisions-view.ts et
+// le Number(...) de advisor-view.ts, seul autre appelant reel).
+export const setRecommendationStatus = (id: number, status: string, reason?: string) =>
   postJson(`/recommendations/${encodeURIComponent(id)}?status=${encodeURIComponent(status)}`
     + (reason ? `&reason=${encodeURIComponent(reason)}` : ''));
 
