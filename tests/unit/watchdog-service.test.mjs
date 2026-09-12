@@ -491,7 +491,7 @@ test('index: un module de detection introuvable degrade, il ne tue pas le serveu
   fs.writeFileSync(path.join(dir, `${SID}.jsonl`), flot());
   const { valeur, dits } = await enEcoutant(() => idx.initWatchdog({
     journalPath: tmpFile(), now: HORLOGE,
-    loadModule: async () => { throw new Error("Cannot find module 'viz-watchdog.mjs'"); },
+    loadModule: async () => { throw new Error("Cannot find module 'detector.js'"); },
   }));
   // Une promesse rejetee et non attrapee tue le processus sous Node 24 : le
   // chien de garde est un supplement, il ne doit pas emporter le serveur.

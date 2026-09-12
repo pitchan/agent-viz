@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { REMEDES, remedyFor } from '../../src/web/observatory/remedies.js';
-import { PATTERNS } from '../../src/web/viz-invocation-patterns.mjs';
+import { PATTERNS } from '../../src/engine/watchdog/invocation-patterns.ts';
 
 const alertants = PATTERNS.filter(p => p.workstationSetting).map(p => p.id).sort();
 

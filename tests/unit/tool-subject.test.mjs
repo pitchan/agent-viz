@@ -1,4 +1,4 @@
-// Unit tests for src/web/viz-tool-subject.mjs — the shared "what does this tool
+// Unit tests for src/engine/core/tool-subject.ts — the shared "what does this tool
 // call act on?" rule.
 //
 // Two consumers need the same rule but not the same length: the feed shows a
@@ -7,7 +7,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { toolSubject } from '../../src/web/viz-tool-subject.mjs';
+import { toolSubject } from '../../src/engine/core/tool-subject.ts';
 
 test('Bash: returns the full command, untruncated', () => {
   const long = 'npm run build -- --workspace=netgain --silent && node scripts/verify.js --strict';

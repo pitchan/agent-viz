@@ -4,9 +4,11 @@
 // thing about the same alert, and only one of the two can be inspected by a
 // browser test — so the wording lives here, where a unit test can pin it.
 //
-// Formatting reads the uniform alert shape from viz-watchdog.mjs: `occurrences`
-// and `tools` are always arrays, so a detail-line builder can be looked up by
-// alert type instead of sniffing which fields happen to be present.
+// Formatting reads the uniform alert shape from the engine's detector:
+// `occurrences` and `tools` are always arrays, so a detail-line builder can be
+// looked up by alert type instead of sniffing which fields happen to be present.
+
+import { clockTime } from '../engine/core/clock-time.ts';
 
 // A command has no natural length limit and an alert has to fit in a panel.
 // Cut visibly — a silently truncated command reads as a different command.
@@ -18,10 +20,6 @@ const SUBJECT_MAX = 200;
 // for an item in a list is much smaller than for a lone subject.
 const LIST_SUBJECT_MAX = 40;
 const LIST_MAX = 5;
-
-export function clockTime(ms) {
-  return new Date(ms).toTimeString().slice(0, 8);
-}
 
 export function truncate(text, max = SUBJECT_MAX) {
   const s = String(text);

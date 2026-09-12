@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { failureLine, projectLabel, failuresSummary, groupKey, groupAlerts, causeLabel, episodeLabel, panelAlerts } from '../../src/web/observatory/failures-format.js';
-import { _DETECTOR_TYPES } from '../../src/web/viz-watchdog.mjs';
+import { _DETECTOR_TYPES } from '../../src/engine/watchdog/detector.ts';
 
 const base = {
   type: 'loop', toolName: 'Bash', count: 4, subject: 'npm run build',

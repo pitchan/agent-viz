@@ -16,7 +16,7 @@ const BUDGET = 450; // lignes (au sens wc -l : nombre de \n)
 // Assiette du 2026-08-19 (fichiers > 450 lignes ce jour-là), une raison par entrée.
 const ASSUMED = new Map([
   ['src/web/viz-ui.js',           'fourre-tout identifié — découpage décidé post-étape 5 (2026-08-19)'],
-  ['src/web/viz-watchdog.mjs',    'registre DETECTORS cohésif : la taille = le nombre de détecteurs'],
+  ['src/engine/watchdog/detector.ts', 'registre DETECTORS cohésif : la taille = le nombre de détecteurs'],
   ['src/web/viz-layout.js',       'deux métiers (état + géométrie) — découpage décidé post-étape 5 (2026-08-19)'],
   ['src/web/viz-canvas.js',       'dessin du nœud — responsabilité établie (docs/audit-qualite-code.md § sain)'],
   ['src/server/transcript.ts',    'assiette 2026-08-19 — dette constatée, non auditée'],

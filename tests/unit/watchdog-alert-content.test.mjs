@@ -7,7 +7,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createWatchdog } from '../../src/web/viz-watchdog.mjs';
+import { createWatchdog } from '../../src/engine/watchdog/detector.ts';
 
 const T = 1_700_000_000_000;
 const iso = ms => new Date(ms).toISOString();

@@ -1,4 +1,4 @@
-// viz-tool-subject.mjs — "what does this tool call act on?", in one place.
+// tool-subject.ts — "what does this tool call act on?", in one place.
 //
 // Pure module: no DOM, no fs. A declarative table maps a tool name to the
 // input field that identifies the call, so adding a tool is one entry rather
@@ -9,11 +9,32 @@
 // has to show the command the agent actually ran — so the cut belongs to the
 // caller, not here.
 
-function basename(p) {
-  return String(p).split(/[/\\]/).pop();
+// La forme du champ hook que ce fichier lit reellement : chaque outil ne
+// porte qu'un sous-ensemble de ces champs a la fois, jamais tous. Exportee :
+// le detecteur du moteur en a besoin pour typer `tool_input` sur son propre
+// evenement, sans redefinir la meme forme une seconde fois.
+export interface ToolInput {
+  command?: string;
+  file_path?: string;
+  pattern?: string;
+  description?: string;
+  skill?: string;
 }
 
-const TOOL_SUBJECT = {
+export interface ToolCallEvent {
+  tool_name?: string;
+  tool_input?: ToolInput;
+}
+
+function basename(p: string): string {
+  // `split` sur un motif non vide rend toujours au moins un element : le
+  // repli `?? p` ne joue jamais en pratique, il satisfait seulement le type.
+  return p.split(/[/\\]/).pop() ?? p;
+}
+
+type SubjectPicker = (ti: ToolInput) => string | undefined;
+
+const TOOL_SUBJECT: Record<string, SubjectPicker> = {
   Bash:  ti => ti.command,
   // Same field as Bash, and its absence here cost real information: every
   // PowerShell alert (retryStorm, stuck, badInvocation) rendered without its
@@ -28,10 +49,10 @@ const TOOL_SUBJECT = {
   Skill: ti => ti.skill,
 };
 
-export function toolSubject(evt) {
+export function toolSubject(evt: ToolCallEvent): string {
   const ti = evt.tool_input;
   if (!ti) return '';
-  const pick = TOOL_SUBJECT[evt.tool_name];
+  const pick = evt.tool_name ? TOOL_SUBJECT[evt.tool_name] : undefined;
   if (!pick) return '';
   return pick(ti) || '';
 }

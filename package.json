@@ -21,6 +21,8 @@
     "bin/",
     "dist/server/",
     "src/web/",
+    "src/engine/core/tool-subject.ts",
+    "src/engine/core/clock-time.ts",
     "dist/engine/",
     "docs/netgain.md",
     "index.html",

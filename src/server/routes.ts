@@ -147,16 +147,12 @@ async function readStaticFile(absPath: string): Promise<{ mime: string; body: Bu
   }
 }
 
-async function staticHandler(_req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
-  // No directory traversal: strip ".." segments before resolving.
-  const safe = url.pathname.replace(/\.\.+/g, '');
-  const p = path.join(PROJECT_ROOT, safe);
-  const root = path.join(PROJECT_ROOT, 'src', 'web');
-  if (!(p.startsWith(root + path.sep) || p === root)) {
-    res.writeHead(404); res.end('Not found'); return;
-  }
+// Sert un fichier deja resolu en chemin absolu de confiance : les deux
+// appelants (prefixe confine, liste blanche exacte) ont chacun leur propre
+// facon de decider CE chemin ; celui-ci ne fait plus que repondre.
+async function respondStaticFile(res: ServerResponse, absPath: string): Promise<void> {
   try {
-    const { mime, body } = await readStaticFile(p);
+    const { mime, body } = await readStaticFile(absPath);
     res.writeHead(200, { 'Content-Type': mime });
     res.end(body);
   } catch (err) {
@@ -169,6 +165,24 @@ async function staticHandler(_req: IncomingMessage, res: ServerResponse, url: UR
     res.writeHead(404);
     res.end('Not found');
   }
+}
+
+async function staticHandler(_req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
+  // No directory traversal: strip ".." segments before resolving.
+  const safe = url.pathname.replace(/\.\.+/g, '');
+  const p = path.join(PROJECT_ROOT, safe);
+  const root = path.join(PROJECT_ROOT, 'src', 'web');
+  if (!(p.startsWith(root + path.sep) || p === root)) {
+    res.writeHead(404); res.end('Not found'); return;
+  }
+  await respondStaticFile(res, p);
+}
+
+// Deux primitives du moteur sont servies au navigateur (tool-subject,
+// clock-time) : la table ROUTES les nomme par CHEMIN EXACT, jamais par
+// prefixe — un prefixe ouvrirait tout `src/engine/` au navigateur.
+async function engineStaticHandler(_req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
+  await respondStaticFile(res, path.join(PROJECT_ROOT, url.pathname));
 }
 
 // Read once at boot, deliberately: the number must describe the code that IS
@@ -357,6 +371,8 @@ const ROUTES: Route[] = [
   { method: 'POST', path: '/notify',     handler: notifyHandler },
   { method: 'POST', path: '/shutdown',   handler: shutdownHandler, sameOrigin: true },
   { method: 'GET',  prefix: '/src/web/', handler: staticHandler },
+  { method: 'GET',  path: '/src/engine/core/tool-subject.ts', handler: engineStaticHandler },
+  { method: 'GET',  path: '/src/engine/core/clock-time.ts',   handler: engineStaticHandler },
   { method: 'GET',  path: '/',           handler: indexHandler },
   { method: 'GET',  path: '/index.html', handler: indexHandler },
   { method: 'GET',  path: '/version',    handler: versionHandler },

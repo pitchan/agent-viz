@@ -1,4 +1,4 @@
-// viz-watchdog.mjs — toxic-pattern detection on the live event stream.
+// detector.ts — toxic-pattern detection on the live event stream.
 //
 // Pure module: no DOM, no SSE, no fs. Clock is injected. Four detectors
 // in a declarative table (loop / retryStorm / stuck / badInvocation) — adding
@@ -10,9 +10,25 @@
 // already-active, non-acknowledged alert with the same signature won't
 // re-fire; once acknowledged, it can fire again on a fresh trigger.
 
-import { toolSubject } from './viz-tool-subject.mjs';
-import { clockTime } from './viz-alert-format.mjs';
-import { classify, PATTERNS } from './viz-invocation-patterns.mjs';
+import { toolSubject } from '../core/tool-subject.ts';
+import type { ToolCallEvent, ToolInput } from '../core/tool-subject.ts';
+import { clockTime } from '../core/clock-time.ts';
+import { classify, PATTERNS } from './invocation-patterns.ts';
+
+// La forme du champ hook que ce detecteur lit reellement, au-dela de ce que
+// `toolSubject` regarde deja (tool_name, tool_input) : rien de plus, ce
+// fichier ne pretend pas decrire tout evenement hook possible.
+interface WatchdogEvent extends ToolCallEvent {
+  session_id?: string;
+  hook_event_name?: string;
+  tool_use_id?: string;
+  is_interrupt?: boolean;
+  agent_id?: string;
+  agent_type?: string;
+  cwd?: string;
+  _ts?: string;
+  error?: unknown;
+}
 
 // The one filter `badInvocation` applies, derived from the table instead of
 // restated here. `classify` answers WHAT a message is; only the table knows
@@ -28,13 +44,31 @@ const WORKSTATION_SETTINGS = new Set(
   PATTERNS.filter(p => p.workstationSetting).map(p => p.id),
 );
 
-const DEFAULTS = {
+interface LoopThresholds { windowMs: number; count: number; }
+interface RetryStormThresholds { count: number; }
+interface StuckThresholds { silenceMs: number; abandonedMs: number; }
+
+interface Thresholds {
+  loop: LoopThresholds;
+  retryStorm: RetryStormThresholds;
+  stuck: StuckThresholds;
+}
+
+// Ce que l'appelant peut fournir : chaque bloc est partiel, `mergeThresholds`
+// comble le reste depuis DEFAULTS.
+interface ThresholdsInput {
+  loop?: Partial<LoopThresholds>;
+  retryStorm?: Partial<RetryStormThresholds>;
+  stuck?: Partial<StuckThresholds>;
+}
+
+const DEFAULTS: Thresholds = {
   loop:       { windowMs: 60_000,      count: 4 },
   retryStorm: { count: 3 },
   stuck:      { silenceMs: 3 * 60_000, abandonedMs: 30 * 60_000 },
 };
 
-function mergeThresholds(given) {
+function mergeThresholds(given: ThresholdsInput): Thresholds {
   return {
     loop:       { ...DEFAULTS.loop,       ...given.loop },
     retryStorm: { ...DEFAULTS.retryStorm, ...given.retryStorm },
@@ -46,8 +80,8 @@ function mergeThresholds(given) {
 // stamps `_ts` on every event it writes; anything without one is being fed to
 // us live by a caller that isn't the file replay, so "now" is the honest
 // answer for it.
-function eventTime(evt, now) {
-  const parsed = Date.parse(evt._ts);
+function eventTime(evt: WatchdogEvent, now: () => number): number {
+  const parsed = Date.parse(evt._ts ?? '');
   return Number.isFinite(parsed) ? parsed : now();
 }
 
@@ -55,13 +89,46 @@ function eventTime(evt, now) {
 // alert's identity is. Two subagents failing on the same tool are two storms,
 // and one of them succeeding must not close the other's series — which matters
 // twice over now that the counter also decides when the dedup lock is released.
-function failureKey(agentId, toolName) {
+function failureKey(agentId: string | undefined, toolName: string | undefined): string {
   return `${agentId || ''}:${toolName}`;
 }
 
-function hashInput(toolInput) {
-  if (toolInput === undefined || toolInput === null) return '';
+function hashInput(toolInput: ToolInput | undefined): string {
+  // `== null` couvre `undefined` ET `null` : la comparaison stricte aux deux
+  // ferait dire a tsc que l'une des deux ne peut jamais etre vraie.
+  if (toolInput == null) return '';
   return JSON.stringify(toolInput);
+}
+
+interface CallOccurrence {
+  ts: number;
+  toolUseId: string;
+  failed: boolean | null;
+}
+
+interface LastFailureSig {
+  sig: string | null;
+  ts: number;
+}
+
+interface RunningTool {
+  toolUseId: string;
+  toolName: string;
+  subject: string;
+  startedAt: number;
+  agentId: string;
+  agentType: string;
+}
+
+interface SessionBuffer {
+  calls: Map<string, CallOccurrence[]>;
+  sigOfCall: Map<string, string>;
+  failures: Map<string, number>;
+  lastFailureSig: Map<string, LastFailureSig>;
+  badInvocations: Map<string, number>;
+  running: Map<string, RunningTool>;
+  lastEventAt: number | null;
+  cwd: string;
 }
 
 // Per-session bookkeeping. One bucket holds the state every detector needs,
@@ -69,7 +136,7 @@ function hashInput(toolInput) {
 // written by `loop` and read by `retryStorm`, which needs to know what a
 // failure was about when the failure event itself doesn't say. That read is a
 // fallback and stays read-only; every other field has exactly one writer.
-function emptyBuffer() {
+function emptyBuffer(): SessionBuffer {
   return {
     // Per signature, the calls still inside loop's window. A shared
     // fixed-size buffer could not do this job: ten interleaved calls from
@@ -94,17 +161,24 @@ function emptyBuffer() {
 // Drop what has left loop's window. Nothing is bounded by a count any more —
 // only by time, which is the only bound loop's rule actually names. Both maps
 // are pruned together, so neither can outlive the window it describes.
-function pruneCalls(buf, windowStart) {
+function pruneCalls(buf: SessionBuffer, windowStart: number): void {
   for (const [sig, occ] of buf.calls) {
-    while (occ.length && occ[0].ts < windowStart) {
-      const gone = occ.shift();
+    // `occ.length` garantit l'index 0 : noUncheckedIndexedAccess ne le voit
+    // pas depuis une condition de boucle, d'ou les `!` ci-dessous.
+    while (occ.length && occ[0]!.ts < windowStart) {
+      const gone = occ.shift()!;
       if (gone.toolUseId) buf.sigOfCall.delete(gone.toolUseId);
     }
     if (occ.length === 0) buf.calls.delete(sig);
   }
 }
 
-function getSessionBuffer(state, sid) {
+interface WatchdogState {
+  sessions: Map<string, SessionBuffer>;
+  activeAlerts: Map<string, Alert>;
+}
+
+function getSessionBuffer(state: WatchdogState, sid: string): SessionBuffer {
   let buf = state.sessions.get(sid);
   if (!buf) { buf = emptyBuffer(); state.sessions.set(sid, buf); }
   return buf;
@@ -113,7 +187,7 @@ function getSessionBuffer(state, sid) {
 // Who ran this call. Subagent events carry agent_id/agent_type; main-thread
 // events carry neither, and '' is the honest value for "the main thread" —
 // not a placeholder name the panel would have to decode.
-function actor(evt) {
+function actor(evt: WatchdogEvent): { agentId: string; agentType: string } {
   return { agentId: evt.agent_id || '', agentType: evt.agent_type || '' };
 }
 
@@ -145,11 +219,53 @@ function actor(evt) {
 // to lie about `toolName` to get the id it needs. `badInvocation` watches a
 // workstation setting: the same setting met through two different tools is one
 // setting to fix, so its discriminator is the pattern, not the tool.
+export type AlertType = 'loop' | 'retryStorm' | 'stuck' | 'badInvocation';
+
+// La forme uniforme que le commentaire ci-dessus decrit — un seul type pour
+// les quatre detecteurs, jamais une union par type d'alerte : c'est ce qui
+// laisse un consommateur lire n'importe quel champ sans sniffer `type` d'abord.
+export interface Alert {
+  id: string;
+  type: AlertType;
+  sessionId: string;
+  toolName: string;
+  count: number;
+  createdAt: number;
+  message: string;
+  agentId: string;
+  agentType: string;
+  subject: string;
+  occurrences: CallOccurrence[];
+  tools: RunningTool[];
+  cwd: string;
+  standing: boolean;
+  patternId: string;
+  acknowledged: boolean;
+}
+
+interface MakeAlertInput {
+  type: AlertType;
+  sessionId: string;
+  toolName?: string;
+  count: number;
+  createdAt: number;
+  message: string;
+  agentId?: string;
+  agentType?: string;
+  subject?: string;
+  occurrences?: CallOccurrence[];
+  tools?: RunningTool[];
+  cwd?: string;
+  standing?: boolean;
+  patternId?: string;
+  discriminator?: string;
+}
+
 function makeAlert({
   type, sessionId, toolName = '', count, createdAt, message,
   agentId = '', agentType = '', subject = '', occurrences = [], tools = [],
   cwd = '', standing = false, patternId = '', discriminator = toolName,
-}) {
+}: MakeAlertInput): Alert {
   const scope = agentId ? `${sessionId}:${agentId}` : sessionId;
   return {
     id: discriminator ? `${type}:${scope}:${discriminator}` : `${type}:${scope}`,
@@ -186,7 +302,7 @@ function makeAlert({
 // not seen and cannot see, in the one tool whose job is to not over-claim. A
 // count with a visible denominator says exactly as much as we know: three of
 // the four came back failing, and the reader can see that four were counted.
-function failureSuffix(occurrences) {
+function failureSuffix(occurrences: CallOccurrence[]): string {
   const failed = occurrences.filter(o => o.failed === true);
   if (failed.length === 0) return '';
   return ` — ${failed.length} of ${occurrences.length} failing`;
@@ -199,7 +315,7 @@ function failureSuffix(occurrences) {
 // without it. Returns null when we cannot tell, and null is never treated as a
 // repeat: not knowing what a call was is no reason to claim it repeated the
 // last one.
-function failureSignature(buf, evt) {
+function failureSignature(buf: SessionBuffer, evt: WatchdogEvent): string | null {
   if (evt.tool_input !== undefined) {
     return `${evt.agent_id || ''}:${evt.tool_name}:${hashInput(evt.tool_input)}`;
   }
@@ -207,7 +323,24 @@ function failureSignature(buf, evt) {
   return buf.sigOfCall.get(evt.tool_use_id) ?? null;
 }
 
-const DETECTORS = {
+interface WatchdogContext {
+  state: WatchdogState;
+  thresholds: Thresholds;
+  now: () => number;
+  canObserve: () => boolean;
+}
+
+// Contrat des quatre detecteurs : chaque membre est optionnel, un detecteur ne
+// declare que les hooks dont sa regle a besoin (voir le commentaire de
+// contrat juste au-dessus de DETECTORS).
+interface Detector {
+  onEvent?(ctx: WatchdogContext, evt: WatchdogEvent, ts: number): Alert | null;
+  onTick?(ctx: WatchdogContext, now: number): Alert[];
+  isStale?(ctx: WatchdogContext, alert: Alert, now: number): boolean;
+  isPastEpisode?(ctx: WatchdogContext, alert: Alert, at: number): boolean;
+}
+
+const DETECTORS: Record<AlertType, Detector> = {
   loop: {
     // "Has a new loop begun?" The window IS the definition of an episode: once
     // it has closed, four fresh repeats are a new loop and deserve to be told,
@@ -221,10 +354,10 @@ const DETECTORS = {
     // screen. The window bounds an episode, not how long its report is worth
     // reading. Retiring on it would make a loop unacknowledgeable after sixty
     // seconds — see `isStale` on stuck for the hook that does withdraw.
-    isPastEpisode(ctx, alert, ts) {
+    isPastEpisode(ctx: WatchdogContext, alert: Alert, ts: number): boolean {
       return (ts - alert.createdAt) > ctx.thresholds.loop.windowMs;
     },
-    onEvent(ctx, evt, ts) {
+    onEvent(ctx: WatchdogContext, evt: WatchdogEvent, ts: number): Alert | null {
       const sid = evt.session_id;
       if (!sid || !evt.tool_name) return null;
       const buf = getSessionBuffer(ctx.state, sid);
@@ -263,7 +396,8 @@ const DETECTORS = {
         // A snapshot, never the live array: the alert is a photograph, and the
         // outcomes written onto `occ` after this moment must not rewrite it.
         const occurrences = occ.map(e => ({ ts: e.ts, toolUseId: e.toolUseId, failed: e.failed }));
-        const spanSecs = Math.round((ts - occurrences[0].ts) / 1000);
+        // `occ.length >= ctx.thresholds.loop.count` (>= 1) garantit l'index 0.
+        const spanSecs = Math.round((ts - occurrences[0]!.ts) / 1000);
         return makeAlert({
           type: 'loop', sessionId: sid, toolName: evt.tool_name,
           count: occurrences.length, createdAt: ts, ...who,
@@ -304,12 +438,12 @@ const DETECTORS = {
     // alert exists (raising it is what set the counter, and only a success ever
     // rewrites it, to zero), and the safe direction anyway: an unknown state
     // must never hold a lock.
-    isPastEpisode(ctx, alert) {
+    isPastEpisode(ctx: WatchdogContext, alert: Alert): boolean {
       const buf = ctx.state.sessions.get(alert.sessionId);
       if (!buf) return true;
       return (buf.failures.get(failureKey(alert.agentId, alert.toolName)) || 0) <= alert.count;
     },
-    onEvent(ctx, evt, ts) {
+    onEvent(ctx: WatchdogContext, evt: WatchdogEvent, ts: number): Alert | null {
       const sid = evt.session_id;
       if (!sid || !evt.tool_name) return null;
       const buf = getSessionBuffer(ctx.state, sid);
@@ -386,7 +520,7 @@ const DETECTORS = {
   //     book-keeping that makes "stuck" answerable).
   //   - onTick reads that state at wall-clock intervals.
   stuck: {
-    onEvent(ctx, evt, ts) {
+    onEvent(ctx: WatchdogContext, evt: WatchdogEvent, ts: number): Alert | null {
       const sid = evt.session_id;
       if (!sid) return null;
       const buf = getSessionBuffer(ctx.state, sid);
@@ -412,13 +546,13 @@ const DETECTORS = {
       }
       return null;
     },
-    onTick(ctx, tickNow) {
+    onTick(ctx: WatchdogContext, tickNow: number): Alert[] {
       // Absence of events is only evidence when we would have received them.
       // The page closes the stream whenever the tab is hidden and loses it
       // whenever the server goes away; counting either as agent silence
       // invents a stall out of our own blindness.
       if (!ctx.canObserve()) return [];
-      const alerts = [];
+      const alerts: Alert[] = [];
       for (const [sid, buf] of ctx.state.sessions) {
         if (buf.running.size === 0) continue;
         if (buf.lastEventAt == null) continue;
@@ -445,7 +579,7 @@ const DETECTORS = {
     },
     // "Is this still true?" — stuck is the one condition that can un-happen
     // on its own, so it is the one that has to be able to withdraw its alert.
-    isStale(ctx, alert, now) {
+    isStale(ctx: WatchdogContext, alert: Alert, now: number): boolean {
       // Blind means we learn nothing — neither that it is still stuck nor
       // that it recovered. Losing the sensor is not evidence the alarm
       // cleared, so the last thing we actually saw stands until we can look
@@ -480,7 +614,7 @@ const DETECTORS = {
   // grounds to withdraw the report; and a missing setting is one thing to fix,
   // so it deserves one alert until somebody has read it.
   badInvocation: {
-    onEvent(ctx, evt, ts) {
+    onEvent(ctx: WatchdogContext, evt: WatchdogEvent, ts: number): Alert | null {
       if (evt.hook_event_name !== 'PostToolUseFailure') return null;
       // BEFORE anything else, counter included. A human pressing Escape ends
       // the call before it could say anything about the way it was written, so
@@ -546,7 +680,7 @@ const DETECTORS = {
 //
 // A detector that declares neither hook keeps its alert until it is
 // acknowledged — the safe default, and what loop and retryStorm did before.
-function startsNewEpisode(ctx, alert, at) {
+function startsNewEpisode(ctx: WatchdogContext, alert: Alert, at: number): boolean {
   const det = DETECTORS[alert.type];
   return !!(det && typeof det.isPastEpisode === 'function' && det.isPastEpisode(ctx, alert, at));
 }
@@ -564,18 +698,26 @@ function startsNewEpisode(ctx, alert, at) {
 // caller's business — the browser knows about its stream and its tab, this
 // module does not. Defaults to true so a caller that always has the data
 // (a server-side consumer, a test) needs no ceremony.
-export function createWatchdog({ now = () => Date.now(), thresholds = {}, canObserve = () => true } = {}) {
-  const state = {
+export interface CreateWatchdogOptions {
+  now?: () => number;
+  thresholds?: ThresholdsInput;
+  canObserve?: () => boolean;
+}
+
+export function createWatchdog({
+  now = () => Date.now(), thresholds = {}, canObserve = () => true,
+}: CreateWatchdogOptions = {}) {
+  const state: WatchdogState = {
     sessions: new Map(),     // sid → buffer
     activeAlerts: new Map(), // alert.id → alert
   };
-  const ctx = { state, thresholds: mergeThresholds(thresholds), now, canObserve };
+  const ctx: WatchdogContext = { state, thresholds: mergeThresholds(thresholds), now, canObserve };
 
   // `at` is the reference time for judging whether the alert already in the
   // registry still owns its identity — event time on the event path, wall clock
   // on the tick path. Never the moment we happen to be running: replaying a
   // file must give the same result as living through it.
-  function emitIfNew(alert, at) {
+  function emitIfNew(alert: Alert | null, at: number): Alert | null {
     if (!alert) return null;
     const existing = state.activeAlerts.get(alert.id);
     if (existing && !existing.acknowledged && !startsNewEpisode(ctx, existing, at)) return null;
@@ -593,9 +735,9 @@ export function createWatchdog({ now = () => Date.now(), thresholds = {}, canObs
     // The dedup lock is judged in the event's own time, not ours. A start-up
     // sweep replays a whole file without a single tick in between, so this is
     // the only place that can tell an episode from the one before it.
-    processEvent(evt) {
+    processEvent(evt: WatchdogEvent): { newAlerts: Alert[] } {
       const ts = eventTime(evt, now);
-      const newAlerts = [];
+      const newAlerts: Alert[] = [];
       for (const det of Object.values(DETECTORS)) {
         if (typeof det.onEvent !== 'function') continue;
         const a = emitIfNew(det.onEvent(ctx, evt, ts), ts);
@@ -606,8 +748,8 @@ export function createWatchdog({ now = () => Date.now(), thresholds = {}, canObs
     // Retire before detecting. An alert whose condition has lapsed must leave
     // the registry first, or the dedup rule would let it block the fresh alert
     // that replaces it.
-    tick() {
-      const newAlerts = [];
+    tick(): { newAlerts: Alert[] } {
+      const newAlerts: Alert[] = [];
       const tickNow = now();
       // Only what a detector says has CEASED leaves the screen. The dedup
       // lock is not consulted here: an episode being over is a reason to let
@@ -628,12 +770,12 @@ export function createWatchdog({ now = () => Date.now(), thresholds = {}, canObs
       }
       return { newAlerts };
     },
-    acknowledge(alertId) {
+    acknowledge(alertId: string): void {
       const a = state.activeAlerts.get(alertId);
       if (a) a.acknowledged = true;
     },
-    getActiveAlerts() {
-      const out = [];
+    getActiveAlerts(): Alert[] {
+      const out: Alert[] = [];
       for (const a of state.activeAlerts.values()) if (!a.acknowledged) out.push(a);
       return out;
     },

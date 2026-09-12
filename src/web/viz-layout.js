@@ -9,7 +9,7 @@ import {
   state, vis, markDirty, parseMcpName,
 } from './viz-state.js';
 import { markNarratorDirty } from './viz-narrator.js';
-import { toolSubject } from './viz-tool-subject.mjs';
+import { toolSubject } from '../engine/core/tool-subject.ts';
 import { formatDuration } from './viz-duration.mjs';
 import { recordError, recordSuccess } from './viz-errors.mjs';
 
@@ -364,8 +364,8 @@ export function calcDuration(start, end) {
 }
 
 // Feed label: the shared subject rule, cut to the width the feed column can
-// show. The rule itself lives in viz-tool-subject.mjs — the watchdog needs the
-// same answer at a different length.
+// show. The rule itself lives in the engine's tool-subject.ts — the watchdog
+// needs the same answer at a different length.
 export function formatToolSub(evt) {
   return toolSubject(evt).slice(0, 45);
 }

@@ -5,11 +5,9 @@
 // Ne connait ni fichier (c'est journal.js), ni HTTP (ce sont les routes), ni
 // dossier d'evenements (c'est catch-up.js).
 //
-// Le module de detection est un module ESM servi au navigateur. Il est charge
-// par import() sur une URL de fichier — meme patron que
-// src/server/observatory/engine.js. `src/web/` designe
-// desormais du code servi au navigateur ET charge par le serveur, ce qui evite
-// d'en tenir deux copies.
+// Le detecteur est servi au navigateur ET charge par le serveur, ce qui evite
+// d'en tenir deux copies — via import() sur une URL de fichier compilee, car
+// TypeScript ne resout pas un chemin calcule statiquement (WatchdogInstance).
 
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -23,8 +21,12 @@ type Journal = ReturnType<typeof createJournal>;
 // champs que journal.ts porte deja.
 type Alert = Parameters<Journal['append']>[0];
 
+// Vise TOUJOURS le detecteur COMPILE, meme quand ce fichier-ci tourne encore
+// en source (les tests l'importent en `.ts` directement) : meme convention
+// que src/server/observatory/engine.ts, trois niveaux pour sortir de l'arbre
+// courant (src/ ou dist/, meme profondeur) et retomber sur dist/ explicitement.
 const WATCHDOG_MODULE = pathToFileURL(
-  path.join(import.meta.dirname, '..', '..', '..', 'src', 'web', 'viz-watchdog.mjs'),
+  path.join(import.meta.dirname, '..', '..', '..', 'dist', 'engine', 'watchdog', 'detector.js'),
 ).href;
 
 async function createWatchdogService({
@@ -98,13 +100,9 @@ async function createWatchdogService({
   };
 }
 
-// Le detecteur est un module ESM externe (`src/web/viz-watchdog.mjs`, hors
-// lot, jamais type par ce projet) charge par un `import()` sur un chemin
-// CALCULE : TypeScript ne peut pas resoudre ses exports statiquement, et rend
-// `any` implicite — admis (doc/36 § Etape 4, meme regle que les six fichiers
-// de traversee du moteur). Cette interface locale n'engage donc que la forme
-// que CE fichier appelle sur l'instance rendue, rien de plus ; elle ne pretend
-// pas decrire tout `viz-watchdog.mjs`.
+// Le detecteur (`src/engine/watchdog/detector.ts`) vit dans ce projet et est
+// type ; seul ce chemin CALCULE echappe a la resolution statique de tsc, d'ou
+// l'interface locale, qui ne decrit que ce que CE fichier appelle.
 interface WatchdogInstance {
   processEvent(evt: Record<string, unknown>): { newAlerts: Alert[] };
   tick(): { newAlerts: Alert[] };

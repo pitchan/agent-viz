@@ -5,12 +5,14 @@
 // (le graphe n'affiche que les dix derniers outils, le flux n'en garde que
 // soixante lignes en DOM), donc ce qui n'est pas dit ici n'est dit nulle part.
 //
-// `clockTime` et `truncate` viennent de viz-alert-format : ce sont les memes
-// regles generiques, et deux copies divergeraient. L'heure est LOCALE, comme
-// celle des alertes — c'est l'heure a laquelle l'utilisateur a vu passer
-// l'echec, pas celle du fichier.
+// `clockTime` vient du moteur (partagee avec le detecteur cote serveur) et
+// `truncate` de viz-alert-format : ce sont les memes regles generiques, et
+// deux copies divergeraient. L'heure est LOCALE, comme celle des alertes —
+// c'est l'heure a laquelle l'utilisateur a vu passer l'echec, pas celle du
+// fichier.
 
-import { clockTime, truncate } from './viz-alert-format.mjs';
+import { clockTime } from '../engine/core/clock-time.ts';
+import { truncate } from './viz-alert-format.mjs';
 
 // Un message d'erreur n'a pas de longueur naturelle (une trace de pile peut
 // faire des kilo-octets) et le volet a une largeur fixe. On coupe VISIBLEMENT :

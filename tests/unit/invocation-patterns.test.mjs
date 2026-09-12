@@ -1,4 +1,4 @@
-// Tests unitaires de src/web/viz-invocation-patterns.mjs — la table de motifs
+// Tests unitaires de src/engine/watchdog/invocation-patterns.ts — la table de motifs
 // qui distingue « l'agent n'a pas su appeler » de « la commande a répondu non ».
 //
 // La table vient d'un relevé sur 370 sessions et 587 échecs réels (doc/27 du
@@ -24,7 +24,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { classify, PATTERNS } from '../../src/web/viz-invocation-patterns.mjs';
+import { classify, PATTERNS } from '../../src/engine/watchdog/invocation-patterns.ts';
 
 // ─── Échantillons, un par motif, dans l'ordre de la table ──────────────────
 //

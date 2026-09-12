@@ -1,4 +1,4 @@
-// viz-invocation-patterns.mjs — recognising, from the shape of its message, an
+// invocation-patterns.ts — recognising, from the shape of its message, an
 // error that comes from HOW something was called rather than from what it did.
 //
 // Pure module: no DOM, no fs, no clock, no state, no dependencies. Give it a
@@ -139,7 +139,16 @@
  * mutable, it also handed `PATTERNS.unshift(…)` to any importer, and the order
  * of this table is half of what the module guarantees.
  */
-export const PATTERNS = Object.freeze([
+export type PatternClass = 'invocation' | 'verdict' | 'environment' | 'harness';
+
+export interface InvocationPattern {
+  id: string;
+  class: PatternClass;
+  workstationSetting: boolean;
+  re: RegExp;
+}
+
+export const PATTERNS: readonly Readonly<InvocationPattern>[] = Object.freeze(([
   // ── LAYER 1 — the harness refused the call. Nothing to advise, and nothing
   // a program's report ever quotes: these are the harness talking about
   // itself, in messages no tool output contains.
@@ -339,15 +348,19 @@ export const PATTERNS = Object.freeze([
   // patterns this entry takes everything and the detector goes mute.
   { id: 'vrd-exit-code-bare', class: 'verdict', workstationSetting: false,
     re: /^\s*Exit code \d+/ },
-].map(Object.freeze));
+] satisfies InvocationPattern[]).map(p => Object.freeze(p)));
+
+export interface ClassifyResult {
+  id: string;
+  class: PatternClass;
+}
 
 /**
  * A string → a category, or `null` when no pattern recognises it.
  *
- * @param {unknown} text the `error` field of a PostToolUseFailure
- * @returns {{ id: string, class: string } | null}
+ * @param text the `error` field of a PostToolUseFailure
  */
-export function classify(text) {
+export function classify(text: unknown): ClassifyResult | null {
   // This guard is not defensive handling of an impossible case: `error` is a
   // hook field, not a value this module builds. It can be absent, empty, or
   // not a string at all. That is the real contract of the input, and a
