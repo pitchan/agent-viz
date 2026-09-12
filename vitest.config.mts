@@ -15,7 +15,7 @@ export default defineConfig({
     // `environment.config.build.dynamicImportVarsOptions` meme hors d'un
     // vrai build (verifie a la lecture de node_modules/vite/dist/node/chunks/config.js).
     // Trois fichiers sont exclus de sa transformation : celui dont le
-    // cache-buster dans la query string (`?t=${T}-${Math.random()}`) n est
+    // cache-buster dans la query string (`?t=${T}-${Math.random().toString(36).slice(2)}`) n est
     // pas un motif que ce plugin sait resoudre, et les DEUX du sauvetage D13,
     // dont le `?neuf=${++serie}` est un specificateur variable que ce plugin
     // ne sait pas davantage resoudre (« Unknown variable dynamic import »,

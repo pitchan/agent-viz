@@ -5,14 +5,5 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
-  "include": ["src/engine/**/*.ts", "src/server/**/*.ts"],
-  // `exclude` est remplace, pas fusionne, par l'extends : le outDir herite
-  // (dist/engine, celui du projet de typecheck) ne protege pas CE projet,
-  // dont la sortie reelle est `dist` (rootDir src + outDir dist).
-  "exclude": [
-    "node_modules",
-    "bower_components",
-    "jspm_packages",
-    "dist"
-  ]
+  "include": ["src/engine/**/*.ts", "src/server/**/*.ts"]
 }
