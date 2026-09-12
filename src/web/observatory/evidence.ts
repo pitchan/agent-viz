@@ -44,9 +44,9 @@ const R1_DIAGNOSED_SHORT = {
 
 /** Ligne facultative : sous un dominant « sans marqueur » (poids des vieux
  * journaux), les attributions de première main de la fenêtre restent dites. */
-function diagnosedDetailLine(markerTokens) {
+function diagnosedDetailLine(markerTokens: Record<string, number>) {
   const cells = Object.entries(R1_DIAGNOSED_SHORT)
-    .map(([key, label]) => [label, markerTokens[key] ?? 0])
+    .map(([key, label]): [string, number] => [label, markerTokens[key] ?? 0])
     .filter(([, tokens]) => tokens > 0)
     .sort((a, b) => b[1] - a[1]);
   if (cells.length === 0) return [];
@@ -55,8 +55,33 @@ function diagnosedDetailLine(markerTokens) {
     + `(${cells.map(([label, tokens]) => `${label} ${formatTokens(tokens)}`).join(' · ')})`];
 }
 
-const EVIDENCE_BY_RULE = {
-  R1: e => [
+interface R1Evidence {
+  prefixChangeTokens: number;
+  dominantMarker: keyof typeof R1_MARKER_LABEL;
+  markerTokens: Record<string, number>;
+  dominantDepth: keyof typeof R1_DEPTH_LABEL;
+  depthTokens: Record<string, number>;
+  shareOfNetPercent: number;
+  noMarkerDetailTokens?: { earlyMcp: number };
+}
+interface R2Evidence { loadedSessions: number; usedSessions: number }
+interface R3Evidence { count: number; bytes: number; shareOfToolBytesPercent: number }
+interface R4Evidence { duplicateBytes: number; duplicateCount: number; shareOfReadBytesPercent: number }
+interface R5Evidence { compactions: number; reprocessedTokens: number; compactionsWithoutTokenCount: number }
+interface R6Evidence { spawns: number; medianDurationSeconds: number; subagentTokens: number }
+interface R7Evidence {
+  sessionsNoVerification: number;
+  sessionsWithTail: number;
+  filesUnverifiedBySession: number;
+  tokensAfterLastVerification: number;
+  excludedPendingRescan: number;
+}
+
+// Chaque règle a sa propre forme de preuve (R1..R7 ci-dessus), associée ici à
+// son formateur par un identifiant dynamique (`rec.ruleId`) : aucun paramètre
+// commun n'est sain sans la redécrire. `any` reste local à cette table.
+const EVIDENCE_BY_RULE: Record<string, ((e: any) => string[]) | undefined> = {
+  R1: (e: R1Evidence) => [
     `${formatTokens(e.prefixChangeTokens)} jetons de préfixe reconstruit`,
     `marqueur dominant : ${R1_MARKER_LABEL[e.dominantMarker]} (${formatTokens(e.markerTokens[e.dominantMarker])} jetons)`,
     ...(e.dominantMarker === 'noMarker' ? diagnosedDetailLine(e.markerTokens) : []),
@@ -69,21 +94,21 @@ const EVIDENCE_BY_RULE = {
       + ' — cause probable (étude : corrélation ×6,3 sur 1 700 sessions)',
     ] : []),
   ],
-  R2: e => [
+  R2: (e: R2Evidence) => [
     `chargé dans ${e.loadedSessions} sessions, appelé dans ${e.usedSessions}`,
     'configuration actuelle appliquée à la période (photo, pas historique)',
   ],
-  R3: e => [
+  R3: (e: R3Evidence) => [
     `${e.count} occurrences`,
     `${formatBytes(e.bytes)} de sortie`,
     `${Math.round(e.shareOfToolBytesPercent)} % des sorties d’outils de la période`,
   ],
-  R4: e => [
+  R4: (e: R4Evidence) => [
     `${formatBytes(e.duplicateBytes)} relus par un autre agent`,
     `${e.duplicateCount} relectures`,
     `${Math.round(e.shareOfReadBytesPercent)} % du volume lu`,
   ],
-  R5: e => {
+  R5: (e: R5Evidence) => {
     const lines = [`${e.compactions} compactions`, `${formatTokens(e.reprocessedTokens)} jetons re-traités`];
     // A compaction whose volume is unknown is said so, never folded in as zero.
     if (e.compactionsWithoutTokenCount > 0) {
@@ -92,14 +117,14 @@ const EVIDENCE_BY_RULE = {
     }
     return lines;
   },
-  R6: e => [
+  R6: (e: R6Evidence) => [
     `${e.spawns} sous-agents lancés`,
     `sessions de ${e.medianDurationSeconds} s (médiane)`,
     `${formatTokens(e.subagentTokens)} jetons de sous-agents`,
   ],
   // R7 (doc/41) : des faits « dans la session » — une vérification lancée hors
   // session (CI, terminal humain) est invisible, la formulation le dit.
-  R7: e => {
+  R7: (e: R7Evidence) => {
     const lines = [
       `${e.sessionsNoVerification} session${e.sessionsNoVerification > 1 ? 's' : ''} modifiant des fichiers sans aucune vérification lancée`,
       // « close » est tombé (revue doc/41) : la règle ne teste jamais la fin de
@@ -124,7 +149,7 @@ const EVIDENCE_BY_RULE = {
   },
 };
 
-export function evidenceLines(rec) {
+export function evidenceLines(rec: { ruleId: string; evidence: { sessions: unknown[] } }): string[] {
   const count = rec.evidence.sessions.length;
   const head = `${count} session${count > 1 ? 's' : ''} concernée${count > 1 ? 's' : ''}`;
   const detail = EVIDENCE_BY_RULE[rec.ruleId];

@@ -5,7 +5,7 @@ import { getState, setPeriodDays, subscribe } from './store.ts';
 export const WINDOW_DAYS = [7, 30, 90];
 
 /** Renders the selector into `node`; calls `onChange()` after each switch. */
-export function initPeriodSelector(node, onChange) {
+export function initPeriodSelector(node: HTMLElement, onChange: () => void): void {
   const render = () => {
     node.innerHTML = '';
     const { periodDays } = getState();

@@ -43,8 +43,20 @@ import { isFresh } from './viz-alert-freshness.ts';
 // l'écran d'abord, puis consigne ; celui de l'API ne fait que poster.
 import { fetchAlerts, acknowledgeAlert as postAcknowledgement } from './observatory/api.ts';
 
-const listeners = new Set();
-const externalAlerts = new Map();
+// Une alerte telle que ce lecteur la fait circuler : le journal du serveur en
+// porte davantage (message, sujet, occurrences...), mais ce fichier ne
+// regarde jamais que ces quatre champs pour decider ce qui reste a l'ecran.
+export interface Alert {
+  id: string;
+  createdAt: number;
+  standing?: boolean;
+  acknowledged?: boolean;
+}
+
+type AlertListener = (alerts: Alert[]) => void;
+
+const listeners = new Set<AlertListener>();
+const externalAlerts = new Map<string, Alert>();
 
 // id → the most recent journal entry carrying that id. The journal's key is
 // the PAIR (id, createdAt) and it legitimately holds several incidents under
@@ -52,14 +64,14 @@ const externalAlerts = new Map();
 // speaks about the present, so of those it keeps the latest; indexing by id
 // and letting the last one written win would silence a live loop behind a
 // finished one, because the journal answers newest-first.
-let serverAlerts = new Map();
+let serverAlerts = new Map<string, Alert>();
 // What the server still judges live. Kept as a set of ids, never as alerts:
 // the alert itself comes from the journal, with its `acknowledged` recomputed
 // there, and a second copy would be a second truth for one fact.
-let activeIds = new Set();
+let activeIds = new Set<string>();
 
-let _fetch = (...args) => fetch(...args);
-let _now = () => Date.now();
+let _fetch: typeof fetch = (...args: Parameters<typeof fetch>) => fetch(...args);
+let _now: () => number = () => Date.now();
 // Has the journal been read once? The first read is the page catching up on a
 // record that already existed, so nothing in it "just happened" — see the
 // announce rule in refreshAlerts.
@@ -70,7 +82,7 @@ let firstRead = true;
 // A separator is indispensable, and it is the journal's own: glued together,
 // ('a1', 2) and ('a', 12) both give 'a12'. NUL can appear neither in an id nor
 // in a number, and ids already carry punctuation (loop:s1:Bash).
-const keyOf = a => `${a.id}\u0000${a.createdAt}`;
+const keyOf = (a: Alert) => `${a.id}\u0000${a.createdAt}`;
 
 // Les cles serveur vivantes au moment de la DERNIERE notification — donc ce
 // que l'interface montre en ce moment. C'est a CET etat-la qu'un rechargement
@@ -79,16 +91,16 @@ const keyOf = a => `${a.id}\u0000${a.createdAt}`;
 // rechargements manquait deja des DEUX cotes de la comparaison, aucun retrait
 // n'etait signale, et la cloche restait allumee a vie sur un volet vide
 // (vecu sur capture : cloche a « 1 », « No active alerts »).
-let shownKeys = new Set();
+let shownKeys = new Set<string>();
 
-function notify(newAlerts) {
+function notify(newAlerts: Alert[]) {
   shownKeys = new Set(liveServerAlerts().map(keyOf));
   for (const fn of listeners) fn(newAlerts);
 }
 
 // Is this journal entry something the badge should be lit about right now?
 // The alert declares which kind it is; nothing here sniffs its type.
-function isLive(alert, now) {
+function isLive(alert: Alert, now: number): boolean {
   if (alert.standing) return activeIds.has(alert.id);
   return isFresh(alert, now);
 }
@@ -156,7 +168,7 @@ export async function refreshAlerts() {
 
 // Pushed by the SSE stream the moment the server records something, so the
 // badge does not wait for the next poll.
-export function applyServerAlert(alert) {
+export function applyServerAlert(alert: Alert | null | undefined): void {
   if (!alert || !alert.id) return;
   const held = serverAlerts.get(alert.id);
   // Same rule as the refresh: of two incidents sharing an id, the latest one
@@ -173,7 +185,7 @@ export function applyServerAlert(alert) {
   notify(isLive(alert, _now()) ? [alert] : []);
 }
 
-export function raiseExternalAlert(alert) {
+export function raiseExternalAlert(alert: Alert): void {
   const existing = externalAlerts.get(alert.id);
   if (existing && !existing.acknowledged) return;
   const fresh = { ...alert, acknowledged: false };
@@ -201,7 +213,7 @@ export function raiseExternalAlert(alert) {
 // acknowledges nothing, and acknowledgements are not deduplicated the way
 // alerts are. Hence also the guard below — we never post an id we were not
 // served.
-export async function acknowledgeAlert(id, createdAt) {
+export async function acknowledgeAlert(id: string, createdAt: number): Promise<void> {
   const external = externalAlerts.get(id);
   if (external) { external.acknowledged = true; notify([]); return; }
   const held = serverAlerts.get(id);
@@ -239,12 +251,14 @@ export async function acknowledgeAlert(id, createdAt) {
 // getActiveAlerts(); use the argument only to decide what deserves a desktop
 // notification. Named for the change, not the arrival: a listener that assumed
 // a non-empty array is exactly the bug this signal exists to prevent.
-export function onAlertsChanged(fn) {
+export function onAlertsChanged(fn: AlertListener): () => void {
   listeners.add(fn);
   return () => listeners.delete(fn);
 }
 
-export async function initAlertReader({ fetchImpl, now } = {}) {
+export async function initAlertReader(
+  { fetchImpl, now }: { fetchImpl?: typeof fetch; now?: () => number } = {},
+): Promise<void> {
   if (fetchImpl) _fetch = fetchImpl;
   if (now) _now = now;
   await refreshAlerts();

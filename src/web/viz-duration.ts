@@ -12,7 +12,7 @@
 // du tout dans le fil. Un module qui choisirait ce mot imposerait la même
 // phrase à trois écrans qui n'ont pas les mêmes contraintes de place.
 
-export function formatDuration(ms) {
+export function formatDuration(ms: number): string | null {
   // Une horloge qui recule (correction NTP entre deux événements) donne un
   // écart négatif ; une date illisible donne NaN. Ni l'un ni l'autre n'est une
   // durée, et les écrire produisait « -5000ms » ou « NaNm ».

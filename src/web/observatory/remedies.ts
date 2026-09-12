@@ -9,9 +9,14 @@
 //
 // Module pur : ni DOM, ni reseau, ni import — une table et une fonction.
 
-const CLAUDE_MD = titre => `## ${titre}\n`;
+const CLAUDE_MD = (titre: string) => `## ${titre}\n`;
 
-export const REMEDES = {
+// Le remede d'un motif : une consigne a lire, l'extrait pret a coller dans un
+// CLAUDE.md. `null` est une reponse a part entiere — voir le commentaire de
+// tete du fichier.
+export type Remedy = { consigne: string; extrait: string } | null;
+
+export const REMEDES: Record<string, Remedy> = {
   'inv-bash-windows-path-unquoted': {
     consigne: 'Sous l’outil Bash, écrire les chemins Windows entre guillemets doubles et avec des barres obliques — les antislashes nus sont avalés par le shell POSIX.',
     extrait: CLAUDE_MD('Chemins Windows sous l’outil Bash')
@@ -66,7 +71,7 @@ export const REMEDES = {
   'inv-ps-argument-exception': null,
 };
 
-export function remedyFor(alert) {
+export function remedyFor(alert: { type: string; patternId?: string }): Remedy {
   if (alert.type !== 'badInvocation') return null;
-  return REMEDES[alert.patternId] ?? null;
+  return REMEDES[alert.patternId ?? ''] ?? null;
 }

@@ -10,15 +10,22 @@
 
 import { decisionLine } from './format.ts';
 
-function el(tag, className, text) {
+// Le sous-ensemble d'une recommandation decidee que ce fichier lit ; le reste
+// (statut, raison, date) est l'affaire de decisionLine, dans format.ts.
+interface DecidedRecommendation {
+  id: number;
+  title: string;
+}
+
+function el(tag: string, className?: string, text?: string): HTMLElement {
   const node = document.createElement(tag);
   if (className) node.className = className;
   if (text !== undefined) node.textContent = text;
   return node;
 }
 
-function button(className, label) {
-  const btn = el('button', className, label);
+function button(className: string, label?: string): HTMLButtonElement {
+  const btn = el('button', className, label) as HTMLButtonElement;
   btn.type = 'button';
   return btn;
 }
@@ -28,7 +35,7 @@ function button(className, label) {
 // section quand il n'y a rien — un tiroir vide se lirait comme une panne.
 // Le journal mêle les trois décisions (adopté, en veille, refusé) : une seule
 // destination pour « où est passée ma carte ? », et un Réactiver partout.
-export function renderDecisions(node, decided) {
+export function renderDecisions(node: HTMLElement, decided: DecidedRecommendation[]): void {
   if (decided.length === 0) return;
   const section = el('details', 'advisor-decisions');
   section.appendChild(el('summary', 'advisor-decisions-summary',
@@ -51,11 +58,11 @@ export function renderDecisions(node, decided) {
 // « Non merci » déplie un champ raison + « Consigner » ; la raison est
 // exigée non blanche ici même — le serveur la refuse de toute façon (400),
 // autant ne jamais l'envoyer.
-export function refusalControls(onRefuse) {
+export function refusalControls(onRefuse: (value: string) => void): HTMLElement {
   const wrap = el('div', 'advisor-refuse');
   const toggle = button('obs-btn', 'Non merci');
   const form = el('div', 'advisor-refuse-form');
-  const reason = el('input', 'advisor-refuse-reason');
+  const reason = el('input', 'advisor-refuse-reason') as HTMLInputElement;
   reason.type = 'text';
   reason.setAttribute('placeholder', 'Pourquoi ? (une ligne)');
   const submit = button('obs-btn', 'Consigner');

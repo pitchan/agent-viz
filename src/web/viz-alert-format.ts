@@ -10,6 +10,33 @@
 
 import { clockTime } from '../engine/core/clock-time.ts';
 
+// Une occurrence repetee (motif `loop`) : juste l'horodatage, affiche brut.
+interface AlertOccurrence {
+  ts: number;
+}
+
+// Un appel d'outil porte par une alerte `stuck`. `agentId` distingue le fil
+// principal (absent) d'un sous-agent, `subject` vient deja tronque a la source.
+interface AlertToolCall {
+  startedAt: number;
+  toolName: string;
+  subject?: string;
+  agentId?: string;
+}
+
+// La forme uniforme que le detecteur du moteur garantit : `occurrences` et
+// `tools` sont toujours des tableaux (vides si non pertinents pour ce type
+// d'alerte), jamais absents — voir le commentaire de tete du fichier.
+export interface Alert {
+  type: string;
+  message: string;
+  subject?: string;
+  agentId?: string;
+  agentType?: string;
+  occurrences: AlertOccurrence[];
+  tools: AlertToolCall[];
+}
+
 // A command has no natural length limit and an alert has to fit in a panel.
 // Cut visibly — a silently truncated command reads as a different command.
 const SUBJECT_MAX = 200;
@@ -21,19 +48,21 @@ const SUBJECT_MAX = 200;
 const LIST_SUBJECT_MAX = 40;
 const LIST_MAX = 5;
 
-export function truncate(text, max = SUBJECT_MAX) {
+export function truncate(text: unknown, max = SUBJECT_MAX): string {
   const s = String(text);
   return s.length <= max ? s : `${s.slice(0, max - 1)}…`;
 }
 
 // '' is what the watchdog stores for the main thread, and that is a real
 // answer, not a missing one.
-export function alertActor({ agentId, agentType }) {
+export function alertActor({ agentId, agentType }: { agentId?: string; agentType?: string }): string {
   if (!agentId) return 'main thread';
   return `${agentType || 'Agent'} ${agentId.slice(0, 8)}`;
 }
 
-const DETAIL_LINES = {
+// Cle dynamique (`alert.type`) : seuls `loop` et `stuck` detaillent, les
+// autres types d'alerte retombent sur `alertDetailLines` -> `[]`.
+const DETAIL_LINES: Record<string, ((a: Alert) => string[]) | undefined> = {
   loop: (a) => {
     // The alert keeps every occurrence — it is the record, and `count` has to
     // stay exact. The cap belongs here, at the display. Nothing else bounds
@@ -64,14 +93,14 @@ const DETAIL_LINES = {
   },
 };
 
-export function alertDetailLines(alert) {
+export function alertDetailLines(alert: Alert): string[] {
   const build = DETAIL_LINES[alert.type];
   return build ? build(alert) : [];
 }
 
 // The body the OS toast shows. Playwright cannot see the bubble, so this is
 // the part of the notification that gets proved by test rather than by eye.
-export function notificationPayload(alert) {
+export function notificationPayload(alert: Alert): { title: string; body: string } {
   const lines = [alert.message];
   if (alert.subject) lines.push(truncate(alert.subject));
   lines.push(...alertDetailLines(alert));

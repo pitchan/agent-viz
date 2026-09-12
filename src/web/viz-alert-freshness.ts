@@ -12,7 +12,14 @@
 
 export const FRESHNESS_MS = 2 * 60_000;
 
-export function isFresh(alert, now, freshnessMs = FRESHNESS_MS) {
+// Ce que le lecteur du watchdog fait circuler : une alerte de STATE (`standing`)
+// ou une alerte datee (`createdAt`), jamais les deux a la fois par contrat.
+export interface FreshnessAlert {
+  standing?: boolean;
+  createdAt: number;
+}
+
+export function isFresh(alert: FreshnessAlert, now: number, freshnessMs = FRESHNESS_MS): boolean {
   // A standing alert describes a STATE, not a moment. `stuck` says "nothing
   // has happened since 16:22" — that stays true, and stays worth showing,
   // however long ago it started; ageing it out would hide a session that is

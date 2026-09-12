@@ -11,7 +11,7 @@
 
 // The label is the fix for the anonymous dot: a light that says LIVE needs no
 // tooltip to be understood, the tooltip only adds the "of what".
-export function connectionPresentation(connected) {
+export function connectionPresentation(connected: boolean) {
   return connected
     ? { label: 'LIVE', title: 'Receiving live events from the agent-viz daemon' }
     : { label: 'OFFLINE', title: 'Lost contact with the daemon — reconnecting automatically' };
@@ -20,7 +20,7 @@ export function connectionPresentation(connected) {
 // The bell is a button in both states, and only the tooltip can say so when
 // there is nothing to show — which is precisely when the old green dot read
 // as dead weight.
-export function watchdogPresentation(activeCount) {
+export function watchdogPresentation(activeCount: number) {
   if (activeCount > 0) {
     const s = activeCount > 1 ? 's' : '';
     return {
@@ -51,7 +51,7 @@ export function watchdogPresentation(activeCount) {
 // - calm: errors happened, the session has moved on since.
 // The registry states facts; deciding which facts deserve red happens here,
 // where a unit test can pin it.
-export function errorsPresentation({ total, hasRepeat, lastFailed }) {
+export function errorsPresentation({ total, hasRepeat, lastFailed }: { total: number; hasRepeat: boolean; lastFailed: boolean }) {
   const plural = total === 1 ? 'error' : 'errors';
   const alarm = total > 0 && (hasRepeat || lastFailed);
   // One explanation fits the tooltip; repetition is the more diagnostic sign

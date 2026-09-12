@@ -26,7 +26,18 @@ export const MESSAGE_MAX = 220;
 // annoncait donc une ligne cliquable qui ne menait nulle part (defaut trouve au
 // navigateur, pas a la lecture). Ce module ne connait pas le graphe ; seul
 // l'appelant sait si le noeud existe encore, et il le dit.
-export function errorRow(rec, hasNode = false) {
+// Le sous-ensemble d'une ligne du registre (viz-errors.ts) que l'affichage lit.
+interface ErrorLike {
+  toolName?: string;
+  subject?: string;
+  message?: string;
+  ts: string;
+  nodeId?: string | null;
+  count?: number;
+  successesSince?: number;
+}
+
+export function errorRow(rec: ErrorLike, hasNode = false) {
   const reachable = Boolean(rec.nodeId) && Boolean(hasNode);
   const count = rec.count || 1;
   const since = rec.successesSince || 0;
@@ -34,7 +45,9 @@ export function errorRow(rec, hasNode = false) {
     tool: rec.toolName || '',
     subject: rec.subject || '',
     message: truncate(rec.message || '', MESSAGE_MAX),
-    time: clockTime(rec.ts),
+    // clockTime attend un epoch (contrat moteur) ; le registre du navigateur
+    // date en ISO — conversion locale, sans toucher au module partage.
+    time: clockTime(new Date(rec.ts).getTime()),
     nodeId: rec.nodeId || null,
     reachable,
     // « ×3 » seulement a partir de deux : un ×1 n'apprend rien et alourdit la
@@ -55,7 +68,7 @@ export function errorRow(rec, hasNode = false) {
 // Le titre repond a la question posee devant l'ecran : « une erreur, oui,
 // mais de quoi ? ». Le bandeau ne montre qu'une session a la fois, et le volet
 // doit le dire — sinon le chiffre reste aussi flottant qu'avant.
-export function errorsPanelTitle(sessionId, count) {
+export function errorsPanelTitle(sessionId: string | null | undefined, count: number) {
   const s = count === 1 ? '' : 's';
   const tete = `${count} error${s}`;
   // Au tout premier chargement, avant le moindre evenement, l'onglet ne sait

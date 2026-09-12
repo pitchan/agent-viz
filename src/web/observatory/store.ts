@@ -4,7 +4,25 @@
 // arrives as a parameter so this module is testable without a server. Same
 // role as viz-state.js for the canvas view, scoped to the observatory.
 
-const EMPTY = () => ({
+// Les payloads serveur (summary, recommendations, sessions, modelCosts,
+// pricing) restent `unknown` : ce fichier les fait circuler sans jamais lire
+// leur forme interne — c'est l'affaire des vues qui les affichent.
+export interface ObservatoryState {
+  summary: unknown;
+  recommendations: unknown;
+  sessions: unknown[];
+  selectedSession: unknown;
+  scan: ScanEventMessage | null;
+  scanJustFinished: boolean;
+  loading: boolean;
+  error: string | null;
+  periodDays: number;
+  includeMachine: boolean;
+  modelCosts: unknown;
+  pricing: unknown;
+}
+
+const EMPTY = (): ObservatoryState => ({
   summary: null,
   recommendations: { groups: [], stale: [], decided: [] },
   sessions: [],
@@ -19,14 +37,18 @@ const EMPTY = () => ({
   pricing: null,
 });
 
-let state = EMPTY();
-const listeners = new Set();
+// Le client HTTP tel que les vues l'importent (`import * as api from './api.ts'`) —
+// reference son type sans en dupliquer la forme.
+type ApiClient = typeof import('./api.ts');
+
+let state: ObservatoryState = EMPTY();
+const listeners = new Set<(state: ObservatoryState) => void>();
 
 export function getState() {
   return state;
 }
 
-export function subscribe(fn) {
+export function subscribe(fn: (state: ObservatoryState) => void) {
   listeners.add(fn);
   return () => listeners.delete(fn);
 }
@@ -40,7 +62,7 @@ function notify() {
   for (const fn of listeners) fn(state);
 }
 
-function patch(changes) {
+function patch(changes: Partial<ObservatoryState>) {
   state = { ...state, ...changes };
   notify();
 }
@@ -48,21 +70,24 @@ function patch(changes) {
 // Every loader shares the same shape: announce loading, run, record the exact
 // error on failure. Duplicating it in each loader is where inconsistent error
 // handling creeps in.
-async function run(work) {
+async function run(work: () => Promise<Partial<ObservatoryState>>) {
   patch({ loading: true, error: null });
   try {
     patch({ ...await work(), loading: false });
   } catch (err) {
-    patch({ loading: false, error: err.message });
+    // Les echecs reels de ce fichier sont toujours des Error (getJson/postJson
+    // n'en levent pas d'autre sorte) ; la garde couvre le seul cas ou ce ne
+    // serait pas vrai, sans en faire une hypothese muette.
+    patch({ loading: false, error: err instanceof Error ? err.message : String(err) });
   }
 }
 
 // The window and the human/machine toggle are shared by both pages — a
 // single logical selector, not one per view (period-selector.js renders it).
-export const setPeriodDays = days => patch({ periodDays: days });
-export const setIncludeMachine = flag => patch({ includeMachine: flag });
+export const setPeriodDays = (days: number) => patch({ periodDays: days });
+export const setIncludeMachine = (flag: boolean) => patch({ includeMachine: flag });
 
-export const loadAdvisor = api => run(async () => {
+export const loadAdvisor = (api: ApiClient) => run(async () => {
   const { periodDays, includeMachine } = getState();
   const [summary, recommendations] = await Promise.all([
     api.fetchSummary({ days: periodDays, includeMachine }),
@@ -73,7 +98,7 @@ export const loadAdvisor = api => run(async () => {
 
 // The summary rides along so the Sessions page can announce the same basis
 // (human/machine, period) as the Advice page, without a second round trip.
-export const loadAnalysis = api => run(async () => {
+export const loadAnalysis = (api: ApiClient) => run(async () => {
   const { periodDays, includeMachine } = getState();
   const [sessions, summary] = await Promise.all([
     api.fetchSessions({ days: periodDays, includeMachine }),
@@ -82,11 +107,11 @@ export const loadAnalysis = api => run(async () => {
   return { sessions, summary };
 });
 
-export const loadSession = (api, id) => run(async () => ({ selectedSession: await api.fetchSession(id) }));
+export const loadSession = (api: ApiClient, id: string) => run(async () => ({ selectedSession: await api.fetchSession(id) }));
 
 // The pricing panel loads its two halves together: the windowed per-model
 // breakdown, and the window-independent tariff sheet + provenance.
-export const loadPricing = api => run(async () => {
+export const loadPricing = (api: ApiClient) => run(async () => {
   const { periodDays, includeMachine } = getState();
   const [modelCosts, pricing] = await Promise.all([
     api.fetchModelCosts({ days: periodDays, includeMachine }),
@@ -98,12 +123,20 @@ export const loadPricing = api => run(async () => {
 // After a status change the server decides what the list becomes — the page
 // never patches a recommendation locally, or the +50 % and freshness rules
 // would be re-implemented in two places.
-export const changeStatus = (api, id, status, reason) => run(async () => {
+export const changeStatus = (api: ApiClient, id: string | number, status: string, reason?: string) => run(async () => {
   await api.setRecommendationStatus(id, status, reason);
   return { recommendations: await api.fetchRecommendations() };
 });
 
-export function applyScanEvent(msg) {
+interface ScanEventMessage {
+  phase: string;
+  total: number;
+  scanned: number;
+  skipped: number;
+  failed: number;
+}
+
+export function applyScanEvent(msg: ScanEventMessage) {
   patch({
     scan: { phase: msg.phase, total: msg.total, scanned: msg.scanned, skipped: msg.skipped, failed: msg.failed },
     scanJustFinished: msg.phase === 'done',

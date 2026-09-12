@@ -7,7 +7,7 @@
 // module ne doit pas dépendre en dur du `fetch` global pour autant (CLAUDE.md
 // § D). Seules les deux routes du journal des pannes la propagent — les autres
 // n'ont qu'un appelant, leur en donner une serait de la surface morte.
-async function getJson(url, fetchImpl = fetch) {
+async function getJson(url: string, fetchImpl: typeof fetch = fetch) {
   const res = await fetchImpl(url);
   const body = await res.json().catch(() => null);
   if (!res.ok) {
@@ -18,7 +18,7 @@ async function getJson(url, fetchImpl = fetch) {
   return body;
 }
 
-async function postJson(url, body, fetchImpl = fetch) {
+async function postJson(url: string, body?: unknown, fetchImpl: typeof fetch = fetch) {
   const opts = body === undefined
     ? { method: 'POST' }
     : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
@@ -28,35 +28,40 @@ async function postJson(url, body, fetchImpl = fetch) {
   return payload;
 }
 
-// The 7/30/90 window and the human/machine toggle, shared by every windowed
-// call below — the server clamps and defaults the window on its own.
-const windowParams = ({ days, includeMachine } = {}) => {
+// La fenêtre 7/30/90 et le bascule humain/machine, partagées par chaque appel
+// paginé ci-dessous — le serveur borne et défaut la fenêtre de son côté.
+export interface WindowOpts {
+  days?: number;
+  includeMachine?: boolean;
+}
+
+const windowParams = ({ days, includeMachine }: WindowOpts = {}) => {
   const params = new URLSearchParams();
   if (days) params.set('days', String(days));
   if (includeMachine) params.set('includeMachine', '1');
   return params;
 };
 
-export function fetchSummary(opts = {}) {
+export function fetchSummary(opts: WindowOpts = {}) {
   const q = windowParams(opts).toString();
   return getJson(`/analysis/summary${q ? `?${q}` : ''}`);
 }
 
-export function fetchSessions({ project, days, includeMachine } = {}) {
+export function fetchSessions({ project, days, includeMachine }: WindowOpts & { project?: string } = {}) {
   const params = windowParams({ days, includeMachine });
   if (project) params.set('project', project);
   const q = params.toString();
   return getJson(`/analysis/sessions${q ? `?${q}` : ''}`);
 }
 
-export const fetchSession = id => getJson(`/analysis/session/${encodeURIComponent(id)}`);
+export const fetchSession = (id: string) => getJson(`/analysis/session/${encodeURIComponent(id)}`);
 
-export function requestScan(opts = {}) {
+export function requestScan(opts: WindowOpts = {}) {
   const q = windowParams(opts).toString();
   return postJson(`/analysis/scan${q ? `?${q}` : ''}`);
 }
 
-export function requestPurge(opts = {}) {
+export function requestPurge(opts: WindowOpts = {}) {
   const q = windowParams(opts).toString();
   return postJson(`/analysis/purge${q ? `?${q}` : ''}`);
 }
@@ -65,11 +70,13 @@ export const fetchConfigAudit = () => getJson('/config/audit');
 export const fetchRecommendations = () => getJson('/recommendations');
 // La raison n'accompagne qu'un arbitrage (doc/42) ; absente, l'URL reste
 // celle des statuts historiques.
-export const setRecommendationStatus = (id, status, reason) =>
+// `id` est l'identifiant numerique d'une recommandation (voir decisions-view.ts) ;
+// encodeURIComponent accepte aussi bien un number qu'une string.
+export const setRecommendationStatus = (id: string | number, status: string, reason?: string) =>
   postJson(`/recommendations/${encodeURIComponent(id)}?status=${encodeURIComponent(status)}`
     + (reason ? `&reason=${encodeURIComponent(reason)}` : ''));
 
-export function fetchModelCosts(opts = {}) {
+export function fetchModelCosts(opts: WindowOpts = {}) {
   const q = windowParams(opts).toString();
   return getJson(`/analysis/models${q ? `?${q}` : ''}`);
 }
@@ -79,7 +86,7 @@ export const fetchPricing = () => getJson('/pricing');
 // Le journal des pannes. Meme fenetre que les conseils : la page n'a qu'une
 // seule notion de periode, et le serveur retombe seul sur son defaut hors de la
 // table 7/30/90.
-export function fetchAlerts(opts = {}, fetchImpl = fetch) {
+export function fetchAlerts(opts: WindowOpts = {}, fetchImpl: typeof fetch = fetch) {
   const q = windowParams(opts).toString();
   return getJson(`/alerts${q ? `?${q}` : ''}`, fetchImpl);
 }
@@ -87,5 +94,5 @@ export function fetchAlerts(opts = {}, fetchImpl = fetch) {
 // L'acquittement d'UNE alerte du journal. La route est unitaire et validante
 // (id chaine non vide, createdAt en millisecondes epoch) : le groupe s'acquitte
 // en serie cote appelant, jamais par une route de lot qui n'existe pas.
-export const acknowledgeAlert = ({ id, createdAt }, fetchImpl = fetch) =>
+export const acknowledgeAlert = ({ id, createdAt }: { id: string; createdAt: number }, fetchImpl: typeof fetch = fetch) =>
   postJson('/alerts/ack', { id, createdAt }, fetchImpl);
