@@ -34,11 +34,11 @@
 // résultat est un accusé de départ et non un verdict — celui-là n'est pas
 // enregistré du tout (doc/41, D4 : une fausse preuve se paie).
 
-import type { NormalizedEvent } from '../../core/events.js';
-import { addUsage, emptyUsageBucket, isDedupableMsgId } from '../../core/usage.js';
-import { netTokens } from './tokens.js';
-import { classifyVerification } from '../verification-commands.js';
-import type { VerificationKind } from '../verification-commands.js';
+import type { NormalizedEvent } from '../../core/events.ts';
+import { addUsage, emptyUsageBucket, isDedupableMsgId } from '../../core/usage.ts';
+import { netTokens } from './tokens.ts';
+import { classifyVerification } from '../verification-commands.ts';
+import type { VerificationKind } from '../verification-commands.ts';
 
 type AssistantEvent = Extract<NormalizedEvent, { kind: 'assistant' }>;
 type ToolResultEvent = Extract<NormalizedEvent, { kind: 'tool_result' }>;

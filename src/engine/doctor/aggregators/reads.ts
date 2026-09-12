@@ -1,4 +1,4 @@
-import type { NormalizedEvent, ToolUseRef } from '../../core/events.js';
+import type { NormalizedEvent, ToolUseRef } from '../../core/events.ts';
 
 type ToolResultEvent = Extract<NormalizedEvent, { kind: 'tool_result' }>;
 

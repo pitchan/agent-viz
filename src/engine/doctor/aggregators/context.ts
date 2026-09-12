@@ -1,7 +1,7 @@
 import { statSync } from 'node:fs';
 import path from 'node:path';
-import type { NormalizedEvent } from '../../core/events.js';
-import { isNoisePrompt } from './prompts.js';
+import type { NormalizedEvent } from '../../core/events.ts';
+import { isNoisePrompt } from './prompts.ts';
 
 type AssistantEvent = Extract<NormalizedEvent, { kind: 'assistant' }>;
 type CompactEvent = Extract<NormalizedEvent, { kind: 'compact' }>;

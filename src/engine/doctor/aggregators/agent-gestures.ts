@@ -1,6 +1,6 @@
-import type { ToolUseRef } from '../../core/events.js';
-import { detectGraphSignal } from '../detector.js';
-import { SPAWN_TOOL_NAMES } from './subagents.js';
+import type { ToolUseRef } from '../../core/events.ts';
+import { detectGraphSignal } from '../detector.ts';
+import { SPAWN_TOOL_NAMES } from './subagents.ts';
 
 /**
  * Détecteur DÉTERMINISTE des gestes de graphe de l'AGENT (plan comportement-agent) —

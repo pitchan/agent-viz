@@ -1,8 +1,8 @@
-import type { NormalizedEvent } from '../../core/events.js';
-import { computeCost, pricingKindOf } from '../../core/pricing.js';
-import type { PricingKind } from '../../core/pricing.js';
-import { addUsage, emptyUsageBucket, isDedupableMsgId, sumUsageInto } from '../../core/usage.js';
-import type { UsageBucket } from '../../core/usage.js';
+import type { NormalizedEvent } from '../../core/events.ts';
+import { computeCost, pricingKindOf } from '../../core/pricing.ts';
+import type { PricingKind } from '../../core/pricing.ts';
+import { addUsage, emptyUsageBucket, isDedupableMsgId, sumUsageInto } from '../../core/usage.ts';
+import type { UsageBucket } from '../../core/usage.ts';
 
 type AssistantEvent = Extract<NormalizedEvent, { kind: 'assistant' }>;
 

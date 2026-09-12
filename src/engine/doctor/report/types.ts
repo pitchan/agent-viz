@@ -1,12 +1,12 @@
-import type { ContextStats } from '../aggregators/context.js';
-import type { PromptsStats } from '../aggregators/prompts.js';
-import type { ReadStats } from '../aggregators/reads.js';
-import type { SessionKind } from '../aggregators/session-kind.js';
-import type { SubagentStats } from '../aggregators/subagents.js';
-import type { TokensResult } from '../aggregators/tokens.js';
-import type { ToolResultStats } from '../aggregators/tool-results.js';
-import type { TurnsStats } from '../aggregators/turns.js';
-import type { VerificationStats } from '../aggregators/verification.js';
+import type { ContextStats } from '../aggregators/context.ts';
+import type { PromptsStats } from '../aggregators/prompts.ts';
+import type { ReadStats } from '../aggregators/reads.ts';
+import type { SessionKind } from '../aggregators/session-kind.ts';
+import type { SubagentStats } from '../aggregators/subagents.ts';
+import type { TokensResult } from '../aggregators/tokens.ts';
+import type { ToolResultStats } from '../aggregators/tool-results.ts';
+import type { TurnsStats } from '../aggregators/turns.ts';
+import type { VerificationStats } from '../aggregators/verification.ts';
 
 /** Le contrat de sortie --json : des FAITS mesurés, jamais un gain projeté. */
 export interface SessionReport {

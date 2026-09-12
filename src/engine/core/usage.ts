@@ -1,4 +1,4 @@
-import type { RawUsage } from './events.js';
+import type { RawUsage } from './events.ts';
 
 /** Les six champs bruts d'usage. Rien d'autre : ni « dernier message », ni prix,
  *  ni modèle — ce sont des concernes d'appelants, pas de l'accumulation. */

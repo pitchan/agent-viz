@@ -1,4 +1,4 @@
-import type { RawUsage } from './events.js';
+import type { RawUsage } from './events.ts';
 
 export interface ModelPrices {
   input: number;

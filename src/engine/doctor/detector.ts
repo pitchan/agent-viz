@@ -1,4 +1,4 @@
-import { isNoisePrompt } from './aggregators/prompts.js';
+import { isNoisePrompt } from './aggregators/prompts.ts';
 
 /**
  * Détecteur DÉTERMINISTE (0 appel modèle) de signal de graphe d'imports —

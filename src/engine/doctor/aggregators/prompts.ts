@@ -1,4 +1,4 @@
-import type { NormalizedEvent } from '../../core/events.js';
+import type { NormalizedEvent } from '../../core/events.ts';
 
 type UserPromptEvent = Extract<NormalizedEvent, { kind: 'user_prompt' }>;
 

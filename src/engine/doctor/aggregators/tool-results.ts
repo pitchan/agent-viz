@@ -1,5 +1,5 @@
-import type { NormalizedEvent, ToolUseRef } from '../../core/events.js';
-import { familyOf, recognizeCommand } from './recognizers.js';
+import type { NormalizedEvent, ToolUseRef } from '../../core/events.ts';
+import { familyOf, recognizeCommand } from './recognizers.ts';
 
 type ToolResultEvent = Extract<NormalizedEvent, { kind: 'tool_result' }>;
 

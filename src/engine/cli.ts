@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { parseCliArgs, UsageError } from './cli-args.js';
-import { readPackageVersion } from './version.js';
+import { parseCliArgs, UsageError } from './cli-args.ts';
+import { readPackageVersion } from './version.ts';
 
 const HELP = `netgain — mesurer net, jamais brut (local-only, lecture seule)
 
@@ -41,7 +41,7 @@ async function main(): Promise<number> {
       return 0;
     }
     case 'doctor': {
-      const { runDoctorCli } = await import('./doctor/index.js');
+      const { runDoctorCli } = await import('./doctor/index.ts');
       return runDoctorCli(cli.doctor);
     }
   }

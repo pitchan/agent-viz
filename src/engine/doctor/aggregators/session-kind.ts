@@ -18,8 +18,8 @@
  * tranche en dernier ressort. Le bruit du harnais (isNoisePrompt : tags XML,
  * commandes locales) n'ouvre jamais de tour — cohérent avec PromptsAggregator.
  */
-import type { NormalizedEvent } from '../../core/events.js';
-import { isNoisePrompt } from './prompts.js';
+import type { NormalizedEvent } from '../../core/events.ts';
+import { isNoisePrompt } from './prompts.ts';
 
 type UserPromptEvent = Extract<NormalizedEvent, { kind: 'user_prompt' }>;
 

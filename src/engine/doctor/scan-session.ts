@@ -1,18 +1,18 @@
 import { readFile } from 'node:fs/promises';
-import type { SessionRef } from '../core/discovery.js';
-import { extractLineMeta, normalizeEvent } from '../core/events.js';
-import { iterJsonlLines } from '../core/jsonl.js';
-import { ContextAggregator } from './aggregators/context.js';
-import { SessionClock } from './aggregators/clock.js';
-import { PromptsAggregator } from './aggregators/prompts.js';
-import { ReadsAggregator } from './aggregators/reads.js';
-import { SessionKindAggregator } from './aggregators/session-kind.js';
-import { SubagentsAggregator } from './aggregators/subagents.js';
-import { netTokens, TokensAggregator } from './aggregators/tokens.js';
-import { ToolResultsAggregator } from './aggregators/tool-results.js';
-import { TurnsAggregator } from './aggregators/turns.js';
-import { VerificationAggregator } from './aggregators/verification.js';
-import type { SessionReport } from './report/types.js';
+import type { SessionRef } from '../core/discovery.ts';
+import { extractLineMeta, normalizeEvent } from '../core/events.ts';
+import { iterJsonlLines } from '../core/jsonl.ts';
+import { ContextAggregator } from './aggregators/context.ts';
+import { SessionClock } from './aggregators/clock.ts';
+import { PromptsAggregator } from './aggregators/prompts.ts';
+import { ReadsAggregator } from './aggregators/reads.ts';
+import { SessionKindAggregator } from './aggregators/session-kind.ts';
+import { SubagentsAggregator } from './aggregators/subagents.ts';
+import { netTokens, TokensAggregator } from './aggregators/tokens.ts';
+import { ToolResultsAggregator } from './aggregators/tool-results.ts';
+import { TurnsAggregator } from './aggregators/turns.ts';
+import { VerificationAggregator } from './aggregators/verification.ts';
+import type { SessionReport } from './report/types.ts';
 
 /**
  * Une passe streaming sur le transcript principal + une par sous-agent.

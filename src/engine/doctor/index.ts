@@ -1,11 +1,11 @@
-import type { DoctorCliOptions } from '../cli-args.js';
-import { resolveClaudeDir } from '../core/claude-dir.js';
-import { discoverSessions, parseSince } from '../core/discovery.js';
-import { findClaudeMdFiles } from './aggregators/context.js';
-import { stableStringify } from './report/json.js';
-import { renderReport } from './report/terminal.js';
-import type { AggregateTotals, DoctorReport, ProjectReport, SessionReport } from './report/types.js';
-import { scanSession } from './scan-session.js';
+import type { DoctorCliOptions } from '../cli-args.ts';
+import { resolveClaudeDir } from '../core/claude-dir.ts';
+import { discoverSessions, parseSince } from '../core/discovery.ts';
+import { findClaudeMdFiles } from './aggregators/context.ts';
+import { stableStringify } from './report/json.ts';
+import { renderReport } from './report/terminal.ts';
+import type { AggregateTotals, DoctorReport, ProjectReport, SessionReport } from './report/types.ts';
+import { scanSession } from './scan-session.ts';
 
 export interface DoctorOptions {
   claudeDir: string;
@@ -147,9 +147,9 @@ export async function runDoctorCli(cli: DoctorCliOptions): Promise<number> {
  * runDoctor rescanne tout à chaque appel ; l'incrémentalité se décide côté
  * appelant, session par session, d'où l'export direct de scanSession.
  */
-export { netTokens } from './aggregators/tokens.js';
-export { scanSession } from './scan-session.js';
-export type { NoMarkerDetail } from './aggregators/context.js';
-export type { SessionKind } from './aggregators/session-kind.js';
-export type { TokenBucket, TokensResult } from './aggregators/tokens.js';
-export type { AggregateTotals, DoctorReport, ProjectReport, SessionReport } from './report/types.js';
+export { netTokens } from './aggregators/tokens.ts';
+export { scanSession } from './scan-session.ts';
+export type { NoMarkerDetail } from './aggregators/context.ts';
+export type { SessionKind } from './aggregators/session-kind.ts';
+export type { TokenBucket, TokensResult } from './aggregators/tokens.ts';
+export type { AggregateTotals, DoctorReport, ProjectReport, SessionReport } from './report/types.ts';

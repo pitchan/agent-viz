@@ -1,7 +1,7 @@
-import type { NormalizedEvent, RawUsage, ToolUseRef } from '../../core/events.js';
-import { detectGraphSignal, type GraphSignal } from '../detector.js';
-import { detectAgentGesture, type AgentGestureKind } from './agent-gestures.js';
-import { isNoisePrompt } from './prompts.js';
+import type { NormalizedEvent, RawUsage, ToolUseRef } from '../../core/events.ts';
+import { detectGraphSignal, type GraphSignal } from '../detector.ts';
+import { detectAgentGesture, type AgentGestureKind } from './agent-gestures.ts';
+import { isNoisePrompt } from './prompts.ts';
 
 type AssistantEvent = Extract<NormalizedEvent, { kind: 'assistant' }>;
 type UserPromptEvent = Extract<NormalizedEvent, { kind: 'user_prompt' }>;

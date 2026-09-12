@@ -1,4 +1,4 @@
-import { emptyChurnCauses, emptyPauseBuckets, emptyPrefixBreakdown } from '../aggregators/context.js';
+import { emptyChurnCauses, emptyPauseBuckets, emptyPrefixBreakdown } from '../aggregators/context.ts';
 import type {
   BreakDepth,
   CacheWrites,
@@ -9,10 +9,10 @@ import type {
   PauseTtl,
   PrefixBreakdown,
   PrefixMarker,
-} from '../aggregators/context.js';
-import { emptyReadCases } from '../aggregators/reads.js';
-import type { ReadCase, ReadStats } from '../aggregators/reads.js';
-import type { DoctorReport } from './types.js';
+} from '../aggregators/context.ts';
+import { emptyReadCases } from '../aggregators/reads.ts';
+import type { ReadCase, ReadStats } from '../aggregators/reads.ts';
+import type { DoctorReport } from './types.ts';
 
 function fmtInt(n: number): string {
   return n.toLocaleString('fr-FR');
