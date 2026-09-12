@@ -5,12 +5,10 @@
 // Ne connait ni fichier (c'est journal.js), ni HTTP (ce sont les routes), ni
 // dossier d'evenements (c'est catch-up.js).
 //
-// Le detecteur est servi au navigateur ET charge par le serveur, ce qui evite
-// d'en tenir deux copies — via import() sur une URL de fichier compilee, car
-// TypeScript ne resout pas un chemin calcule statiquement (WatchdogInstance).
+// Le detecteur est servi au navigateur ET charge par le serveur : un import()
+// dynamique sur un specificateur relatif STATIQUE, que tsc resout et reecrit
+// comme un import ordinaire (source .ts en test, compile .js en production).
 
-import path from 'node:path';
-import { pathToFileURL } from 'node:url';
 import type { createJournal } from './journal.ts';
 
 // Le journal reel, importe en TYPE seulement : sa forme vit dans journal.ts,
@@ -21,19 +19,15 @@ type Journal = ReturnType<typeof createJournal>;
 // champs que journal.ts porte deja.
 type Alert = Parameters<Journal['append']>[0];
 
-// Vise TOUJOURS le detecteur COMPILE, meme quand ce fichier-ci tourne encore
-// en source (les tests l'importent en `.ts` directement) : meme convention
-// que src/server/observatory/engine.ts, trois niveaux pour sortir de l'arbre
-// courant (src/ ou dist/, meme profondeur) et retomber sur dist/ explicitement.
-const WATCHDOG_MODULE = pathToFileURL(
-  path.join(import.meta.dirname, '..', '..', '..', 'dist', 'engine', 'watchdog', 'detector.js'),
-).href;
-
 async function createWatchdogService({
   journal,
   now = () => Date.now(),
   isCatchingUp = () => false,
-  loadModule = () => import(WATCHDOG_MODULE),
+  // Le detecteur reel prend des types plus etroits que cette promesse : elle
+  // reste large parce que CE fichier recoit lui-meme des entrees non fiables
+  // (voir le commentaire de WatchdogInstance) — cadree ici, a la resolution.
+  loadModule = () => import('../../engine/watchdog/detector.ts') as unknown as
+    Promise<{ createWatchdog: (opts: unknown) => WatchdogInstance }>,
 }: {
   journal: Journal;
   now?: () => number;
@@ -100,9 +94,9 @@ async function createWatchdogService({
   };
 }
 
-// Le detecteur (`src/engine/watchdog/detector.ts`) vit dans ce projet et est
-// type ; seul ce chemin CALCULE echappe a la resolution statique de tsc, d'ou
-// l'interface locale, qui ne decrit que ce que CE fichier appelle.
+// Reste locale : `onEvent` recoit un `Record<string, unknown>` brut
+// (event-reader.ts n'en sait pas plus), plus large que le `WatchdogEvent`
+// du detecteur — decrit seulement ce que CE fichier appelle.
 interface WatchdogInstance {
   processEvent(evt: Record<string, unknown>): { newAlerts: Alert[] };
   tick(): { newAlerts: Alert[] };
@@ -110,4 +104,4 @@ interface WatchdogInstance {
   getActiveAlerts(): Alert[];
 }
 
-export { createWatchdogService, WATCHDOG_MODULE };
+export { createWatchdogService };

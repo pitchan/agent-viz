@@ -31,8 +31,16 @@
   // ETAPE 4 (2026-08-14) : rootDir pose dans tsconfig.node.build.json
   // (les tests/** et vitest.config.mts d ici interdisent un rootDir src sur CE projet).
   "include": ["src/server/**/*.ts", "src/engine/**/*.ts", "tests/**/*.ts", "vitest.config.mts"],
-  // `tests/fixtures/` est une donnee d'entree pour des tests d'execution, jamais
-  // du code a typer : `unsupported-enum.ts` y viole erasableSyntaxOnly EXPRES,
-  // pour eprouver le refus de Node a la requete, pas celui de tsc a la compilation.
-  "exclude": ["tests/fixtures"]
+  // Un `exclude` explicite REMPLACE le defaut de tsc au lieu de s'y ajouter :
+  // les trois dossiers par defaut et le outDir reviennent ici en dur, pour que
+  // l'`include` elargi de la tache suivante ne les perde pas en silence.
+  // `unsupported-enum.ts` seul est exclu : la fixture voisine (valid-sample.ts)
+  // reste du TypeScript valide et garde son typecheck.
+  "exclude": [
+    "node_modules",
+    "bower_components",
+    "jspm_packages",
+    "dist/engine",
+    "tests/fixtures/static-ts/unsupported-enum.ts"
+  ]
 }

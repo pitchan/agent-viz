@@ -26,10 +26,12 @@ export interface ToolCallEvent {
   tool_input?: ToolInput;
 }
 
-function basename(p: string): string {
-  // `split` sur un motif non vide rend toujours au moins un element : le
-  // repli `?? p` ne joue jamais en pratique, il satisfait seulement le type.
-  return p.split(/[/\\]/).pop() ?? p;
+function basename(p: unknown): string {
+  // `String(p)` d'abord : `p` est un champ de hook, pas une valeur que ce
+  // module construit — absent, vide ou hors-string sont des entrees reelles,
+  // jamais une raison de lever (meme contrat que `classify` du voisin).
+  const s = String(p);
+  return s.split(/[/\\]/).pop() ?? s;
 }
 
 type SubjectPicker = (ti: ToolInput) => string | undefined;

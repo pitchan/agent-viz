@@ -34,7 +34,7 @@ process.env.USERPROFILE = BAC;
 process.env.HOME = BAC;
 
 const { createJournal, DEFAULT_PATH } = await import('../../src/server/watchdog/journal.ts');
-const { createWatchdogService, WATCHDOG_MODULE } = await import('../../src/server/watchdog/service.ts');
+const { createWatchdogService } = await import('../../src/server/watchdog/service.ts');
 const { sseClients } = await import('../../src/server/sse.ts');
 const { DIR, sessionIndex } = await import('../../src/server/session-index.ts');
 const {
@@ -163,7 +163,7 @@ function fichierDeSession(nom, contenu) {
 // priver de detecteur tous les autres tests, qui partagent la meme instance —
 // celle qu `event-reader` a chargee et qu'aucun vidage de cache n'atteint.
 const moduleQuiLeveSurMarqueur = async () => {
-  const vrai = await import(WATCHDOG_MODULE);
+  const vrai = await import('../../src/engine/watchdog/detector.ts');
   return {
     createWatchdog(opts) {
       const wd = vrai.createWatchdog(opts);
