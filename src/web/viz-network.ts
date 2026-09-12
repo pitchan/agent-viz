@@ -1,4 +1,4 @@
-// viz-network.js — SSE, poll fallback, sessions API, visibility pause.
+// viz-network.ts — SSE, poll fallback, sessions API, visibility pause.
 //
 // Owns the server connection (EventSource + poll loop), the current session
 // selection, and the pause/resume lifecycle. Events come in here, are handed

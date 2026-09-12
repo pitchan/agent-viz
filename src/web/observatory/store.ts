@@ -1,4 +1,4 @@
-// store.js — shared state for both observatory pages, with subscription.
+// store.ts — shared state for both observatory pages, with subscription.
 //
 // The two views read from here and never fetch on their own; the HTTP client
 // arrives as a parameter so this module is testable without a server. Same

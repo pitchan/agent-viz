@@ -1,4 +1,4 @@
-// evidence.js — turns each rule's measured numbers into French sentences.
+// evidence.ts — turns each rule's measured numbers into French sentences.
 //
 // One entry per rule, in a table: a rule missing from here would display a
 // recommendation with no figures, which the founding rule forbids. Kept apart

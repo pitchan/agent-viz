@@ -44,7 +44,10 @@ test('.ts valide : Content-Type JS, corps compilable, meme nombre de lignes que 
     source.split('\n').length,
     'le corps servi n a pas le meme nombre de lignes que la source : les numeros de ligne des erreurs navigateur mentiraient',
   );
-  const compilable = path.join(BAC, 'stripped.js');
+  // .mjs et non .js : sans package.json dans le bac, Node 24 classe un .js
+  // par detection et ne verifie RIEN si le corps ressemble a un module ES
+  // (import/export) — un .js rendrait toujours exit 0 ici.
+  const compilable = path.join(BAC, 'stripped.mjs');
   fs.writeFileSync(compilable, body);
   assert.doesNotThrow(
     () => execFileSync(process.execPath, ['--check', compilable], { stdio: 'pipe' }),

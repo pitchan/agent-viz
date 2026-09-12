@@ -1,4 +1,4 @@
-// analysis-view.js — "Sessions analysées" page: the SQLite-backed table with a
+// analysis-view.ts — "Sessions analysées" page: the SQLite-backed table with a
 // per-session drill-down.
 //
 // Distinct from the real-time /sessions list, which enumerates event files in

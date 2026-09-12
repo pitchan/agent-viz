@@ -1,4 +1,4 @@
-// failures-view.js — le bloc « Pannes » en accordeon par cause (doc/32).
+// failures-view.ts — le bloc « Pannes » en accordeon par cause (doc/32).
 //
 // Rendu et interactions LOCALES seulement : depli d'une commande longue, retour
 // de copie. Aucun acces reseau — l'acquittement sort d'ici comme une INTENTION

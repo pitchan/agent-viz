@@ -1,4 +1,4 @@
-// viz-duration.mjs — combien de temps ça a duré, écrit pour être lu d'un coup
+// viz-duration.ts — combien de temps ça a duré, écrit pour être lu d'un coup
 // d'œil dans une carte, un fil ou une phrase de narrateur.
 //
 // Trois fichiers portaient cette même arithmétique (constat C8) : deux seuils,

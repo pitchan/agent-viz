@@ -1,4 +1,4 @@
-// format.js — display helpers for the observatory pages.
+// format.ts — display helpers for the observatory pages.
 //
 // Pure functions only, no DOM at import time, so they can be unit-tested.
 // formatTokens is NOT redefined here: viz-state.js already owns it and is

@@ -1,4 +1,4 @@
-// viz-topbar-status.mjs — what the topbar's health witnesses say, in one place.
+// viz-topbar-status.ts — what the topbar's health witnesses say, in one place.
 //
 // Pure module: no DOM. The connection light and the watchdog bell used to be
 // two identical green dots — one informational, one a button — with nothing to

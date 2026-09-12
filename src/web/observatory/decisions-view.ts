@@ -1,4 +1,4 @@
-// decisions-view.js — la section « Décisions rendues » (le journal, doc/44)
+// decisions-view.ts — la section « Décisions rendues » (le journal, doc/44)
 // et le contrôle « Non merci » d'une carte active.
 //
 // Rendering only, comme failures-view.js : le classement décide ce qui est au

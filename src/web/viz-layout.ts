@@ -1,4 +1,4 @@
-// viz-layout.js — node mutation, event ingestion, orbital layout, GC.
+// viz-layout.ts — node mutation, event ingestion, orbital layout, GC.
 //
 // Converts raw hook events into the node graph (state.nodes), keeps the vis
 // layer in sync (ensureVisNode + draw buckets), runs incremental orbital

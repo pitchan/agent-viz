@@ -1,4 +1,4 @@
-// viz-alert-freshness.mjs — how recent an alert has to be to still be worth
+// viz-alert-freshness.ts — how recent an alert has to be to still be worth
 // interrupting someone for.
 //
 // This is a DISPLAY rule and it is deliberately not in viz-watchdog.mjs. The

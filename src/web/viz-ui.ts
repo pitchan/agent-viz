@@ -1,4 +1,4 @@
-// viz-ui.js — feed panel, detail popup, stats, fitView, toolbar, keyboard,
+// viz-ui.ts — feed panel, detail popup, stats, fitView, toolbar, keyboard,
 // live durations ticker. All DOM-side presentation concerns.
 //
 // Wires itself into viz-canvas (pointer-click callbacks) and viz-layout

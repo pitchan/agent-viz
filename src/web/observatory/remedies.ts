@@ -1,8 +1,8 @@
-// remedies.js — le remede pret a l'emploi de chaque motif alertant, en un seul
+// remedies.ts — le remede pret a l'emploi de chaque motif alertant, en un seul
 // endroit.
 //
 // Contrat (doc/32) : chaque motif alertant (`workstationSetting: true` dans
-// src/web/viz-invocation-patterns.mjs) a une entree EXPLICITE ici. `null` est une
+// src/engine/watchdog/invocation-patterns.ts) a une entree EXPLICITE ici. `null` est une
 // reponse : « aucun remede honnete » — le filet en est l'exemple oblige, sa
 // cause n'etant pas caracterisee (doc/30). Un motif absent de la table est un
 // oubli, et le test le dit. Jamais de conseil invente.

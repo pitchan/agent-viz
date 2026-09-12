@@ -1,4 +1,4 @@
-// failures-format.js — comment une panne se dit en francais, en un seul
+// failures-format.ts — comment une panne se dit en francais, en un seul
 // endroit.
 //
 // La phrase se compose des CHAMPS de l'alerte, jamais de son `message`
@@ -46,7 +46,7 @@ export interface AlertGroup {
   unacked: number;
 }
 
-// Meme convention que src/server/observatory/project-label.js : la lettre de
+// Meme convention que src/server/observatory/project-label.ts : la lettre de
 // lecteur en majuscule, parce que Windows ignore la casse et que le libelle ne
 // doit pas suivre celle du terminal qui a lance la derniere session. Le module
 // serveur n'est pas reutilisable ici — il prend des sessions,
@@ -57,7 +57,7 @@ export function projectLabel(cwd: string | null | undefined): string {
 }
 
 // `occurrences` et `tools` sont TOUJOURS des tableaux chez le detecteur (voir
-// l'en-tete de src/web/viz-watchdog.mjs). Mais ces alertes-ci ne viennent pas du
+// src/engine/watchdog/detector.ts, au-dessus de makeAlert). Mais ces alertes-ci ne viennent pas du
 // detecteur : elles reviennent du journal, qui de leur forme ne connait que
 // `id` et `createdAt` et laisse passer tout le reste sans le regarder. Une
 // ligne abimee mais encore analysable arrive donc ici telle quelle.
@@ -119,7 +119,7 @@ const MOTIFS: Record<string, string> = {
   'inv-ps-argument-exception': 'un argument que la commande PowerShell a refusé',
 };
 
-// La table des motifs (src/web/viz-invocation-patterns.mjs) grandit a chaque cas
+// La table des motifs (src/engine/watchdog/invocation-patterns.ts) grandit a chaque cas
 // rencontre, et elle n'a aucune raison d'attendre ce fichier-ci pour le faire.
 // Un motif encore inconnu doit donc dire ce qu'on sait vraiment — qu'il y a un
 // reglage a poser — plutot que de laisser un trou dans la phrase. Meme parti

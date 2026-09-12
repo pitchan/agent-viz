@@ -1,4 +1,4 @@
-// advisor-view.js — "Conseils" page.
+// advisor-view.ts — "Conseils" page.
 //
 // Rendering only: ranking is done server-side, wording by evidence.js, numbers
 // by format.js, state by store.js. One block per cost basis, each saying it is

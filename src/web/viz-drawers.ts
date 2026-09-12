@@ -1,4 +1,4 @@
-// viz-drawers.js — pure node drawers + glow sprite cache.
+// viz-drawers.ts — pure node drawers + glow sprite cache.
 //
 // Each drawXxxNode(ctx, n, vn) renders a single node onto the supplied 2D
 // context. Drawers are pure-ish: they read state/vis (selection, hover,

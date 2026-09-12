@@ -27,9 +27,8 @@
   // avec juste vitest.config.mts dans l include (src/engine seul -> dist/engine/cli.js
   // normal ; + vitest.config.mts OU + tests/**/*.ts -> dist/engine/src/engine/cli.js
   // deplace). Ce projet n a pas de rootDir : N IMPORTE QUELLE entree hors src/engine
-  // suffit a deplacer toutes les sorties.
-  // ETAPE 4 (2026-08-14) : rootDir pose dans tsconfig.build.json
-  // (les tests/** et vitest.config.mts d ici interdisent un rootDir src sur CE projet).
+  // suffit a deplacer toutes les sorties (tests/** et vitest.config.mts l interdisent
+  // ici ; rootDir vit dans tsconfig.build.json a la place).
   "include": ["src/server/**/*.ts", "src/engine/**/*.ts", "src/web/**/*.ts", "tests/**/*.ts", "vitest.config.mts"],
   // Un `exclude` explicite REMPLACE le defaut de tsc au lieu de s'y ajouter :
   // les trois dossiers par defaut et le outDir reviennent ici en dur, pour que

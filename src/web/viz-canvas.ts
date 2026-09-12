@@ -1,4 +1,4 @@
-// viz-canvas.js — DOM canvas, camera, hit-testing, particles, rAF loop.
+// viz-canvas.ts — DOM canvas, camera, hit-testing, particles, rAF loop.
 //
 // Owns the <canvas>, ctx, DPR-aware sizing, pan/zoom, hit-test, particle
 // system, grid background, and the main `tick` render driver. Per-node

@@ -56,6 +56,15 @@ test('la liste blanche sert exactement 29 fichiers (27 modules + 2 primitives du
   assert.equal(SERVED.length, 29);
 });
 
+test('aucune route du moteur ne declare de prefixe : le filtre ci-dessus ne saute rien', () => {
+  // Le filtre d'enginePrimitives() ne lit que route.path : une route ecrite
+  // avec route.prefix passerait au travers en silence et ouvrirait tout
+  // src/engine/ au navigateur sans que le compte SERVED.length ne bouge.
+  assert.equal(
+    ROUTES.filter(r => typeof r.prefix === 'string' && r.prefix.startsWith('/src/engine')).length, 0,
+    'la liste blanche du moteur nomme des chemins exacts : aucun prefixe.');
+});
+
 for (const abs of SERVED) {
   const rel = path.relative(ROOT, abs).replaceAll('\\', '/');
   test(`${rel} : stripTypeScriptTypes puis node --check`, async () => {
@@ -75,7 +84,10 @@ for (const abs of SERVED) {
       + 'les piles d\'erreur du navigateur mentiraient sur le numéro de ligne.',
     );
 
-    const compile = path.join(BAC, `check-${SERVED.indexOf(abs)}.js`);
+    // .mjs et non .js : sans package.json dans le bac, Node 24 classe un
+    // .js par detection et ne verifie RIEN si le corps ressemble a un
+    // module ES (import/export) — un .js rendrait toujours exit 0 ici.
+    const compile = path.join(BAC, `check-${SERVED.indexOf(abs)}.mjs`);
     writeFileSync(compile, body);
     try {
       execFileSync(process.execPath, ['--check', compile], { stdio: 'pipe' });

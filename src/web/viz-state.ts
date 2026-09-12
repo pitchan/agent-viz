@@ -1,4 +1,4 @@
-// viz-state.js — constants, shared state, helpers, render scheduler.
+// viz-state.ts — constants, shared state, helpers, render scheduler.
 //
 // All mutable app state lives here (state, vis). Other modules import these
 // live object references and mutate them directly. Primitive consts and

@@ -1,4 +1,4 @@
-// pricing-view.js — « Jetons & tarifs » page: the per-model cost breakdown,
+// pricing-view.ts — « Jetons & tarifs » page: the per-model cost breakdown,
 // the applied tariff sheet, and the provenance notice.
 //
 // Rendering only, on the analysis-view.js model: state comes from store.js,

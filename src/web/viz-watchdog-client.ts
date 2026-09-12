@@ -1,4 +1,4 @@
-// viz-watchdog-client.js — the browser side of the watchdog: a reader, not a
+// viz-watchdog-client.ts — the browser side of the watchdog: a reader, not a
 // detector.
 //
 // Detection and memory live on the server (src/server/watchdog/): it sees

@@ -249,7 +249,7 @@ export const PATTERNS: readonly Readonly<InvocationPattern>[] = Object.freeze(([
   //
   // That version marked it `workstationSetting: false`, claiming it was
   // "classified and counted, never said". It counted nothing: the detector's
-  // filter (`viz-watchdog.mjs:495`) returns BEFORE the counter at :502-503,
+  // filter (`detector.ts:632`) returns BEFORE the counter at :639-640,
   // so a non-alerting pattern is classified and then thrown away. Counting is
   // a side effect of alerting, not a channel of its own. And before the split
   // EVERY stamped `unexpected EOF` rang, so alerting on `eval:` and `-c:`

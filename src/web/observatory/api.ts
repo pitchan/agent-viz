@@ -1,4 +1,4 @@
-// api.js — the observatory's HTTP client. Its only job is to talk to the
+// api.ts — the observatory's HTTP client. Its only job is to talk to the
 // server and turn a failure into a readable error; it holds no state and
 // formats nothing.
 

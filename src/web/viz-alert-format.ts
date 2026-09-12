@@ -1,4 +1,4 @@
-// viz-alert-format.mjs — how an alert is worded, in one place.
+// viz-alert-format.ts — how an alert is worded, in one place.
 //
 // Pure module: no DOM. The alerts popup and the OS notification say the same
 // thing about the same alert, and only one of the two can be inspected by a

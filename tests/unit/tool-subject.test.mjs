@@ -59,3 +59,10 @@ test('missing tool_input → empty string', () => {
 test('known tool with the identifying field missing → empty string', () => {
   assert.equal(toolSubject({ tool_name: 'Bash', tool_input: { description: 'no command here' } }), '');
 });
+
+// tool_input vient d'un hook, pas de ce module : file_path peut arriver hors
+// chaine. Verrouille la coercition `String()` de basename() — un typage seul
+// ne peut pas la tenir, un JSON de hook n'est pas contraint par TypeScript.
+test('Read: un file_path hors chaîne ne fait pas lever', () => {
+  assert.equal(toolSubject({ tool_name: 'Read', tool_input: { file_path: 42 } }), '42');
+});

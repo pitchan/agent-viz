@@ -1,4 +1,4 @@
-// viz-narrator.js — Live narrator: heuristic + dirty/render driver.
+// viz-narrator.ts — Live narrator: heuristic + dirty/render driver.
 //
 // Pure decision module. Given state + vis + now, returns the one-line caption
 // to display under the topbar. No DOM, no fetch — render is plugged in via

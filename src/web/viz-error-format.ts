@@ -1,4 +1,4 @@
-// viz-error-format.mjs — comment une erreur d'outil se dit, en un seul endroit.
+// viz-error-format.ts — comment une erreur d'outil se dit, en un seul endroit.
 //
 // Module pur : pas de DOM. Meme raison d'etre que viz-alert-format pour les
 // alertes — le volet des erreurs est la SEULE porte d'entree vers un echec
