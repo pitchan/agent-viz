@@ -202,7 +202,8 @@ One repository, **one package**: `@vcueto/agent-viz`. The analysis engine is not
 package — its TypeScript source lives in `src/engine/` and its build output, `dist/engine/`,
 ships inside the published tarball. Since the 2026-08 tree merge there is a single `src/`:
 `src/server/` (the daemon, ESM since step 3 of the migration), `src/engine/` (the engine,
-TypeScript ESM) and `src/web/` (the browser bundle, served as-is).
+TypeScript ESM) and `src/web/` (the browser code, TypeScript since step 5 — served straight
+from source, types stripped at request time; there is no `dist/web/`).
 
 The root package is ESM (`{"type":"module"}`), so `src/engine/` needs no subtree marker of
 its own: no `package.json` twin to keep versioned, none written by the build.

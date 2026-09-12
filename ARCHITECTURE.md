@@ -128,11 +128,12 @@ l'étape 3, un marqueur `{"type": "module"}` versionné rendait ce sous-arbre ES
 
 ### 2.3 Le navigateur
 
-**27 fichiers** — 20 `.js`, 6 `.mjs`, `viz.css`. ES modules, servis tels quels
-en HTTP depuis `src/web/` (`src/server/routes.ts:311`).
+**28 fichiers** — 27 `.ts`, `viz.css`. ES modules, servis en JavaScript, les
+types retirés à la requête (`node:module.stripTypeScriptTypes`, mode `strip`),
+en HTTP depuis `src/web/` (`src/server/routes.ts:373`).
 
 ```
-find src/web -type f | wc -l          → 27      (20 js · 6 mjs · 1 css)
+find src/web -type f | wc -l          → 28      (27 ts · 1 css)
 ```
 
 **Le 28ᵉ était le marqueur, et il a disparu à l'étape 3.** Ce répertoire portait
@@ -150,17 +151,19 @@ src/web/observatory/   les trois vues d'analyse : conseils, sessions, tarifs
 ```
 
 **L'URL suit le disque** : la racine statique est `src/web/` et le préfixe servi
-est `/src/web/` (`routes.ts:311` et l'entrée `prefix` de `ROUTES`). Une table de
-correspondance URL→disque aurait été un mécanisme neuf ; l'étape 5 rebasculera
-cette URL vers `dist/web/`.
+est `/src/web/` (`routes.ts:373` et l'entrée `prefix` de `ROUTES`). Une table de
+correspondance URL→disque aurait été un mécanisme neuf ; l'étape 5 n'en crée
+pas — elle sert la source `.ts` directement, les types retirés à la requête.
+**Il n'existe aucun `dist/web/`, et ce chantier n'en crée pas** : c'est la cible
+abandonnée (doc/48).
 
 Il ne parle au serveur que par le réseau, et depuis **trois fichiers** :
 
 | Fichier | Ce qu'il ouvre |
 |---|---|
-| `src/web/viz-network.js` | le flux SSE `/stream` (l. 87) et les appels du temps réel |
-| `src/web/observatory/api.js` | le client HTTP des trois vues d'analyse |
-| `src/web/viz-watchdog-client.js` | les alertes de surveillance |
+| `src/web/viz-network.ts` | le flux SSE `/stream` (l. 111) et les appels du temps réel |
+| `src/web/observatory/api.ts` | le client HTTP des trois vues d'analyse |
+| `src/web/viz-watchdog-client.ts` | les alertes de surveillance |
 
 Aucun autre module n'ouvre le réseau. **Cette frontière-là piège la mesure trois
 fois**, et les trois pièges valent d'être écrits parce qu'ils reviendront à
@@ -172,10 +175,10 @@ grep -rl "fetch" src/web/     → 7 fichiers
 
 | Les 7 fichiers | Ce qu'ils font réellement |
 |---|---|
-| `viz-network.js`, `viz-watchdog-client.js` | appellent `fetch` / `EventSource` — les seuls que `grep "fetch("` trouve |
-| `observatory/api.js` | reçoit `fetchImpl = fetch` en **paramètre par défaut**, par injection ; `grep "fetch("` le manque |
-| `observatory/store.js`, `observatory/advisor-view.js` | appellent des méthodes **nommées** `api.fetchSummary`, `api.fetchAlerts`… sur le client injecté : ils ne sortent pas, ils délèguent |
-| `viz-layout.js`, `viz-narrator.js` | ne portent le mot que dans un commentaire, qui dit qu'ils n'en font justement pas |
+| `viz-network.ts`, `viz-watchdog-client.ts` | appellent `fetch` / `EventSource` — les seuls que `grep "fetch("` trouve |
+| `observatory/api.ts` | reçoit `fetchImpl = fetch` en **paramètre par défaut**, par injection ; `grep "fetch("` le manque |
+| `observatory/store.ts`, `observatory/advisor-view.ts` | appellent des méthodes **nommées** `api.fetchSummary`, `api.fetchAlerts`… sur le client injecté : ils ne sortent pas, ils délèguent |
+| `viz-layout.ts`, `viz-narrator.ts` | ne portent le mot que dans un commentaire, qui dit qu'ils n'en font justement pas |
 
 Trois fichiers sortent, quatre ressemblent à des sortants. Un contrôle de
 frontière écrit contre le mot `fetch` se trompe donc dans les deux sens à la
@@ -183,8 +186,8 @@ fois.
 
 **Deux** sorties non-réseau existent par ailleurs, et aucune ne contredit la
 table du § 1 — ce sont des API du navigateur, pas du disque :
-`observatory/failures-view.js:84` (`navigator.clipboard.writeText`) et
-`viz-ui.js:565-572`, qui demande la permission puis lève une **notification
+`observatory/failures-view.ts:88` (`navigator.clipboard.writeText`) et
+`viz-ui.ts:768-777`, qui demande la permission puis lève une **notification
 système** (`new Notification(...)`). La seconde sort de la page plus visiblement
 que la première.
 
@@ -197,9 +200,19 @@ Une phrase, et c'est le seul invariant structurel du produit :
 > **Le serveur appelle le moteur. Le navigateur ne parle qu'HTTP. Le moteur
 > ignore les deux autres.**
 
-Un sens unique, jamais de retour. Trois commandes l'établissent, et **chacune
-vient avec son contrôle négatif** — parce qu'une commande dont la sortie vide est
-la preuve doit d'abord prouver qu'elle *sait* ne pas être vide :
+Un sens unique, jamais de retour, **sur le réseau** — et ça, l'étape 5 n'y
+change rien. Elle change en revanche le **graphe d'import** : quatre fichiers
+de `src/web/` importent désormais deux fichiers du moteur par leur chemin
+relatif (`clockTime` et `toolSubject`, § 2.3, § 6). Ce n'est pas une fuite —
+le navigateur les reçoit par la **même route HTTP** que ses propres modules,
+jamais par un chargeur Node : la liste blanche du serveur ne nomme que ces
+deux chemins exacts (`src/server/routes.ts`, gestionnaire
+`engineStaticHandler`). L'invariant réseau tient ; l'invariant d'import, lui,
+se contrôle désormais à deux exceptions nommées près, pas à zéro.
+
+Trois règles l'établissent, et **chacune vient avec son contrôle négatif** —
+parce qu'une commande dont la sortie vide est la preuve doit d'abord prouver
+qu'elle *sait* ne pas être vide :
 
 ```sh
 # 1. Le moteur n'atteint pas le produit.
@@ -207,10 +220,15 @@ grep -rEn "from ['\"].*(\.\./)+(src/)?(server|web)/" src/engine/      # → vide
 echo "import x from '../../server/usage.js'" \
   | grep -En "from ['\"].*(\.\./)+(src/)?(server|web)/"              # → 1 ligne
 
-# 2. Le navigateur n'importe ni le serveur ni le moteur.
-grep -rEn "^[[:space:]]*(import|export).*from ['\"].*(server|engine)/" src/web/
-echo "import { addUsage } from '../../dist/engine/core/usage.js'" \
-  | grep -En "^[[:space:]]*(import|export).*from ['\"].*(server|engine)/"
+# 2. Le navigateur n'importe jamais le serveur, et du moteur seulement les
+#    deux primitives de la liste blanche. `-a` est nécessaire : sans lui,
+#    grep traite viz-errors.ts (un octet nul volontaire) comme un fichier
+#    binaire et tait sa ligne.
+grep -arEn "^[[:space:]]*(import|export).*from ['\"].*(server|engine)/" src/web/ \
+  | grep -vE "engine/core/(clock-time|tool-subject)\.ts"             # → vide
+printf "import { x } from '../../engine/doctor/x.ts';\n" \
+  | grep -En "^[[:space:]]*(import|export).*from ['\"].*(server|engine)/" \
+  | grep -vE "engine/core/(clock-time|tool-subject)\.ts"             # → 1 ligne
 
 # 3. Le navigateur n'importe aucune API Node.
 grep -rEn "^[[:space:]]*import .* from ['\"]node:" src/web/          # → vide
@@ -218,40 +236,51 @@ echo "import fs from 'node:fs'" \
   | grep -En "^[[:space:]]*import .* from ['\"]node:"                # → 1 ligne
 ```
 
-Les six ont été **rejouées le 2026-08-13**, à l'issue de l'étape 3, et voici
-leurs six sorties — la règle survit donc au changement de régime de modules, ce
-qui n'allait pas de soi : c'est l'étape qui a réécrit les 52 fichiers du serveur.
+Les six ont été **rejouées le 2026-09-12**, à l'issue de l'étape 5, et voici
+leurs six sorties :
 
 ```
-1a  grep -rEn … src/engine/                          → (vide)      exit 1
-1b  echo "import x from '../../server/usage.js'" …   → 1:import x… exit 0
-2a  grep -rEn … src/web/                             → (vide)      exit 1
-2b  echo "import { addUsage } from '../../dist/…" …  → 1:import {… exit 0
-3a  grep -rEn … src/web/                             → (vide)      exit 1
-3b  echo "import fs from 'node:fs'" …                → 1:import fs… exit 0
+1a  grep -rEn … src/engine/                             → (vide)      exit 1
+1b  echo "import x from '../../server/usage.js'" …      → 1:import x… exit 0
+2a  grep -arEn … src/web/ | grep -v …liste blanche…      → (vide)      exit 1
+2b  printf "import { x } from '…/engine/doctor/x.ts'" …  → 1:import {… exit 0
+3a  grep -rEn … src/web/                                 → (vide)      exit 1
+3b  echo "import fs from 'node:fs'" …                    → 1:import fs… exit 0
 ```
 
-Les trois de gauche rendent vide (`exit 1`), les trois contrôles négatifs rendent
-chacun leur ligne (`exit 0`). **Un zéro n'a de valeur que flanqué du un qui
-prouve que la commande sait le quitter.**
+**La ligne 2a n'est vide qu'APRÈS le filtre.** Sans lui, la même commande rend
+quatre lignes — `viz-alert-format.ts:11`, `viz-error-format.ts:14`,
+`viz-errors.ts:35`, `viz-layout.ts:13` — toutes vers
+`../engine/core/clock-time.ts` ou `../engine/core/tool-subject.ts`, et aucune
+autre. C'est la liste blanche du § 2.3 relue depuis le graphe d'import plutôt
+qu'affirmée ; le contrôle négatif 2b prouve qu'un import d'un **troisième**
+fichier du moteur, lui, resterait visible après le même filtre.
 
-**Ce que ces trois commandes NE regardent PAS.** Elles portent sur des
-**instructions d'import statiques**, et c'est délibéré (le § suivant dit pourquoi
-un contrôle textuel se trompe). Mais une commande dont on ignore la portée finit
-par servir de preuve de ce qu'elle ne regarde pas, donc :
+Les trois lignes « a » rendent vide (`exit 1`), les trois contrôles négatifs
+rendent chacun leur ligne (`exit 0`). **Un zéro n'a de valeur que flanqué du un
+qui prouve que la commande sait le quitter.**
 
-- **la règle n° 2 laisse échapper l'`import()` dynamique** —
-  `const m = await import('../server/usage.js')` ne porte pas de `from` ;
+**Ce que ces trois règles NE regardent PAS.** Elles portent sur des
+**instructions d'import statiques**, et c'est délibéré (le paragraphe suivant
+dit pourquoi un contrôle textuel se trompe dans les deux sens). Mais une
+commande dont on ignore la portée finit par servir de preuve de ce qu'elle ne
+regarde pas, donc :
+
+- **la règle n° 2 laisse échapper l'`import()` dynamique — sauf le seul cas
+  qui existe aujourd'hui, et qui ne compte pas.** `observatory/advisor-view.ts`
+  et `observatory/store.ts` écrivent `type ApiClient = typeof import('./api.ts')` :
+  une requête de **type**, effacée en entier au retrait des types (vérifié :
+  la sortie de `stripTypeScriptTypes` sur ces deux fichiers ne contient plus
+  aucun `import(`). Un **vrai** `import()` dynamique —
+  `const m = await import('../server/usage.js')` — resterait invisible à la
+  règle, lui, parce qu'il ne porte pas de `from` ;
 - **la règle n° 3 ne voit que `import X from 'node:…'`** — `import 'node:fs'`,
   `require('node:fs')` et `await import('node:fs')` lui échappent tous les trois.
 
-Les deux angles morts sont **sans victime aujourd'hui**, vérifié en exécutant —
-et les commandes sont écrites hors tableau, pour la raison dite juste après :
+Le second angle mort est **sans victime aujourd'hui**, vérifié en exécutant —
+et sa commande est écrite hors tableau, pour la raison dite juste après :
 
 ```sh
-grep -rn "import(" src/web/                                              # → vide, exit 1
-echo "const m = await import('../server/usage.js')" | grep -n "import("  # → 1 ligne
-
 grep -rnE "(^|[^A-Za-z0-9_])(import|require)[[:space:]]*\(?[[:space:]]*['\"]node:" src/web/
                                                                          # → vide, exit 1
 printf "import 'node:fs'\nrequire('node:path')\nawait import('node:os')\n" \
@@ -259,9 +288,15 @@ printf "import 'node:fs'\nrequire('node:path')\nawait import('node:os')\n" \
                                                                          # → 3 lignes
 ```
 
-**Zéro victime n'est pas zéro risque.** Ces deux formes sont exactement ce qu'une
-règle de lint typée attrapera à l'étape 7, et c'est une des raisons pour
-lesquelles elle est prévue (§ 10).
+**Zéro victime n'est pas zéro risque.** Ces deux formes sont exactement ce
+qu'une règle de lint typée attrapera à l'étape 7, et c'est une des raisons pour
+lesquelles elle est prévue (§ 10). **Une troisième forme s'y ajoute depuis
+l'étape 5** : `tsc`, sous un projet unique où `src/web/` reçoit les types de
+Node (`"types": ["node"]`), n'interdit plus un `import fs from 'node:fs'`
+**direct** dans le navigateur — mesuré, la phrase qui suivait ici (« le
+compilateur refusera ») est devenue fausse le jour où les deux arbres ont
+rejoint un seul `tsconfig.json`. C'est la règle de lint de l'étape 7 qui devra
+tenir ce cas-là, pas seulement le cas transitif qu'elle devait déjà couvrir.
 
 Le déplacement a d'ailleurs **changé la forme** de la deuxième : avant, le moteur
 s'atteignait par `../netgain/dist/`, un segment que `(\.\./)*(lib|netgain)/`
@@ -277,12 +312,22 @@ vide se lisait comme une preuve. Le fait affirmé était vrai — mais par accid
 et la commande censée l'établir était incapable d'échouer.
 
 **Le troisième cas mérite en plus son paragraphe, parce qu'un contrôle naïf se
-trompe dans l'autre sens.** `grep -rn "node:" src/web/` rend **une** ligne,
-`viz-invocation-patterns.mjs:193`, et ce n'est **pas** un import : c'est une
-expression régulière qui reconnaît `node:internal/` dans le texte d'une trace
-d'erreur affichée à l'écran. Un contrôle qui chercherait la chaîne `node:` le
-signalerait à tort, et serait désactivé au premier faux positif. Le contrôle
-juste porte sur les **instructions d'import**, pas sur le texte des fichiers.
+trompe dans l'autre sens — et le sens dans lequel il se trompe a changé avec le
+langage.** Avant l'étape 5, `grep -rn "node:" src/web/` rendait une ligne,
+`viz-invocation-patterns.mjs:193` : une expression régulière reconnaissant
+`node:internal/` dans le texte d'une trace d'erreur affichée à l'écran — et ce
+fichier a depuis quitté `src/web/` pour le moteur (§ 2.3, § 6). **Aujourd'hui
+la même commande rend sept lignes, et aucune n'est un import** : ce sont des
+paramètres TypeScript nommés `node`, annotés par leur type —
+`node: HTMLElement` dans `advisor-view.ts` (deux fois), `confirm-button.ts`,
+`decisions-view.ts`, `failures-view.ts`, `period-selector.ts`, et
+`node: VizNode` dans `viz-layout.ts`. `node` comme nom de paramètre (un nœud du
+DOM ou du graphe) est un choix ordinaire ; le `:` qui le suit est la syntaxe de
+type elle-même. Un contrôle qui chercherait la chaîne `node:` mentirait donc
+sept fois au lieu d'une, pour une raison sans rapport avec la précédente. Le
+contrôle juste porte sur les **instructions d'import**, pas sur le texte des
+fichiers — et le passage à TypeScript en est un argument de plus, pas
+seulement une note d'histoire.
 
 **Aujourd'hui, rien ne tient cette règle mécaniquement.** Elle est vraie parce
 qu'elle a été mesurée, pas parce qu'un outil la refuserait. Il n'existe aucune
@@ -394,8 +439,8 @@ Claude Code / Copilot CLI
         ├─ écrit  ${tmpdir}/agent-events/<session>.jsonl     (dossier : hook.ts:25
         │                                                     écriture : hook.ts:82)
         └─ POST /notify au démon, sans attendre la réponse
-              └─ le démon diffuse en SSE sur /stream          (routes.ts:314)
-                    └─ la page se met à jour                  (viz-network.js:87)
+              └─ le démon diffuse en SSE sur /stream          (routes.ts:379)
+                    └─ la page se met à jour                  (viz-network.ts:111)
 ```
 
 Chaud, éphémère, purgé toutes les heures (`src/server/server.ts:116`). Le crochet
@@ -556,7 +601,9 @@ grammaticalement vraie.
 `tests/repo/stale-path-citations.test.mjs` : les trois racines étant mortes, leur
 simple apparition dans un commentaire ou dans la documentation est un rouge,
 sauf entrée nommée dans sa liste blanche. Le moteur gagne un fichier
-(`install/rupture.ts`, l'étape 2), le reste est inchangé.
+(`install/rupture.ts`, l'étape 2). Le navigateur passe de `20 .js + 6 .mjs`
+à **27 `.ts`** à l'étape 5 (§ 2.3) — un fichier de plus qu'au 2026-08-13, sans
+rapport avec le changement de langage. Le serveur, lui, est inchangé.
 
 ---
 
@@ -709,11 +756,14 @@ est la référence :
    les 11 noms écrits à la main deviendront l'affaire du compilateur, **et le
    douzième cessera d'être un angle mort** : `CLAUDE_DIR_ENV` étant une chaîne,
    seul un compilateur peut le vérifier.
-3. **La règle du § 3 cessera d'être une simple mesure.** Deux mécanismes s'en
-   chargeront, et aucun ne couvre l'autre : le compilateur, qui refusera un
+3. **La règle du § 3 ne sera tenue mécaniquement qu'à l'étape 7, et par un seul
+   mécanisme.** Ce document prévoyait ici que le compilateur refuserait un
    `import` d'API Node **direct** dans le navigateur en ne lui donnant pas les
-   types de Node ; et une règle de lint, qui seule voit le cas **transitif** —
-   un module partagé, pur aujourd'hui, qui gagnerait un `node:` demain.
+   types de Node : faux depuis l'étape 5, où `src/web/` partage le seul
+   `tsconfig.json` du projet et reçoit `"types": ["node"]` avec le reste (§ 3).
+   La règle de lint de l'étape 7 devra donc tenir **les deux cas**, direct et
+   **transitif** — un module partagé, pur aujourd'hui, qui gagnerait un
+   `node:` demain — puisque le compilateur n'en tient plus aucun.
 
 **Deux points seulement exposent cette fusion à l'extérieur, et le second est
 neuf.** Le premier est celui des chemins absolus du § 6, ci-dessous. Le second

@@ -38,7 +38,7 @@ lecteur peut vérifier.
 | `doc/12` | Design « Observatoire » (M1) — spec validée le 2026-07-27 | §7 : les seuils de R2 (50 % / 10 %), R5 (≥ 2) et R6 (5 min, 30 %). Les changer, c'est changer la spec | `src/server/observatory/rules/thresholds.ts` — chaque seuil déclare son origine (`'spec'` ou `'calibration'`) ; `tests/unit/observatory-rules-cost.test.cjs` épingle les valeurs |
 | `doc/27` | Calibration du détecteur d'erreurs d'invocation — relevé du 2026-08-08 : 370 sessions, 8 projets, 24 182 appels d'outil, 587 échecs réels | Les 37 expressions de la table de motifs, et pour chacune ses occurrences **et** ses faux positifs | `tests/unit/invocation-patterns.test.mjs` § 8 — les 37 expressions y sont recopiées une fois, extraites de son bloc `FAILURE_PATTERNS` ; ce fichier tient le rôle de témoin |
 | `doc/30` | Un motif qui mélangeait deux causes — arbitrage utilisateur du 2026-08-08, sur relevé | La scission de `inv-bash-unbalanced-quote` en deux motifs, chacun nommant sa cause | `tests/unit/invocation-patterns.test.mjs` § 8, bloc du **second** relevé — tenu séparé du premier, pour ne pas mentir sur la provenance |
-| `doc/32` | Refonte de la page Conseils — validé le 2026-08-09, amendé le même jour | L'accordéon par cause, la commande consignée, les remèdes : la forme de la page et ce qu'elle promet | `src/web/observatory/` (`advisor-view.js`, `failures-view.js`, `failures-format.js`, `remedies.js`) et leurs tests |
+| `doc/32` | Refonte de la page Conseils — validé le 2026-08-09, amendé le même jour | L'accordéon par cause, la commande consignée, les remèdes : la forme de la page et ce qu'elle promet | `src/web/observatory/` (`advisor-view.ts`, `failures-view.ts`, `failures-format.ts`, `remedies.ts`) et leurs tests |
 | `doc/34` | Design de l'audit de qualité de code — 2026-08-10 | Les rangs P0–P3, le budget de faux positifs assumé, la règle « un détecteur se contrôle avant d'être cru » | `docs/audit-qualite-code.md` (verdict, annexe méthode) et `docs/audit/scripts/` |
 | `doc/35` | Plan de l'audit, en 11 tâches — 2026-08-10 | La convention de comptage des lignes et des jetons du périmètre audité | `docs/audit/scripts/lib/tokens.mjs`, `docs/audit/scripts/lib/source-files.mjs` |
 | `doc/41` | Design « dette de trajectoire » (volet 1) et sa sonde de calibration — relevé du 2026-08-17 : 96 sessions, 4 projets éditants | Les deux seuils de R7 (`minEditsAfterLastVerification` = 1, `minSessions` = 3), la distribution de la queue d'éditions et la raison du relèvement de `minSessions` de 2 à 3 | `src/server/observatory/rules/thresholds.ts` — l'en-tête recopie la mesure et le raisonnement, comme pour R1 ; `tests/unit/observatory-rules-cost.test.cjs` épingle les deux valeurs |
@@ -57,9 +57,11 @@ donnée n'aurait de toute façon pas été rejouable en publiant le document.
 ## Deux limites, nommées plutôt que tues
 
 - **Le paquet npm ne contient de `docs/` que `docs/netgain.md`.** `package.json` (`files`)
-  n'embarque que `bin/`, `src/server/`, `src/web/`, `dist/engine/`, `docs/netgain.md` et trois
-  fichiers racine — choix antérieur à ce fichier, révisé à l'étape 2 seulement pour suivre le
-  déplacement. Un lecteur qui n'a que le paquet installé a le commentaire, qui porte la
+  n'embarque que `bin/`, `dist/server/`, `src/web/`, les deux primitives du moteur servies au
+  navigateur (`src/engine/core/tool-subject.ts`, `src/engine/core/clock-time.ts`),
+  `dist/engine/`, `docs/netgain.md` et trois fichiers racine — choix antérieur à ce fichier,
+  révisé à l'étape 2 pour suivre le déplacement, puis à l'étape 5 pour les deux primitives.
+  Un lecteur qui n'a que le paquet installé a le commentaire, qui porte la
   substance ; l'adresse, elle, vit dans le dépôt. Le filet de `tests/repo/` mesure les
   citations **contre le dépôt**, et c'est ce qu'il annonce.
 - **Ce fichier ne surveille pas la forme courte.** `doc/NN` ne prétend pas être un chemin :

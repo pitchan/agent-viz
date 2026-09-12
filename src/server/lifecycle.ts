@@ -10,6 +10,10 @@ import { spawn } from 'node:child_process';
 const PID_FILE = path.join(os.tmpdir(), 'agent-viz.pid');
 const LOG_FILE = path.join(os.tmpdir(), 'agent-viz.log');
 const SERVER_SCRIPT = path.join(import.meta.dirname, 'server.js');
+// Le retrait des types avertit une fois par processus, au premier `.ts`
+// servi : avalé en tâche de fond (stdio vers le fichier de log), visible en
+// avant-plan sans ce drapeau.
+const NODE_FLAGS = ['--disable-warning=ExperimentalWarning'];
 
 interface PidRecord {
   pid: number;
@@ -96,7 +100,7 @@ async function spawnDetached(port: number): Promise<number> {
   const out = fs.openSync(LOG_FILE, 'a');
   const err = fs.openSync(LOG_FILE, 'a');
   const env = { ...process.env, PORT: String(port) };
-  const child = spawn(process.execPath, [SERVER_SCRIPT], {
+  const child = spawn(process.execPath, [...NODE_FLAGS, SERVER_SCRIPT], {
     detached: true,
     stdio: ['ignore', out, err],
     env,
@@ -112,7 +116,7 @@ async function spawnDetached(port: number): Promise<number> {
 // Run the server attached to current process (foreground mode). Inherits stdio.
 function spawnForeground(port: number): Promise<number> {
   const env = { ...process.env, PORT: String(port) };
-  const child = spawn(process.execPath, [SERVER_SCRIPT], {
+  const child = spawn(process.execPath, [...NODE_FLAGS, SERVER_SCRIPT], {
     stdio: 'inherit',
     env,
   });
