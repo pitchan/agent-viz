@@ -35,7 +35,7 @@ function nouvelleRacine() {
   const racine = fs.mkdtempSync(path.join(os.tmpdir(), PREFIXE));
   fs.mkdirSync(path.join(racine, 'bin'), { recursive: true });
   fs.copyFileSync(BIN_REEL, path.join(racine, 'bin', 'agent-viz.js'));
-  fs.writeFileSync(path.join(racine, 'package.json'), JSON.stringify({ name: 'sonde-build-guard', version: '0.0.0' }));
+  fs.writeFileSync(path.join(racine, 'package.json'), JSON.stringify({ name: 'sonde-build-guard', version: '0.0.0', type: 'module' }));
   return racine;
 }
 
