@@ -28,7 +28,7 @@
 // bouchons n'a pas d'équivalent ES natif : `vi.resetModules()` + `vi.doMock()`
 // + `await import()` est le seul remède à propriété prouvée identique — une
 // instance neuve par appel, et les cinq voisins remplacés AVANT le chargement.
-// Le prix, assumé et écrit : ses 6 tests quittent la sémantique de référence de
+// Le prix, écrit ici : ses 6 tests quittent la sémantique de référence de
 // `node --test`.
 import { test, vi } from 'vitest';
 import assert from 'node:assert';
@@ -109,7 +109,7 @@ test('sans rien de posé, c’est <home>/.claude', async () => {
 // posée, le fichier est écrit DANS le dossier de configuration ; non posée, à
 // côté du home. Le produit le cherchait au home dans les deux cas : c'est ce qui
 // fait disparaître R2 du protocole de contrôle (USERPROFILE jetable +
-// CLAUDE_CONFIG_DIR réel), un coût noté comme « assumé » alors qu'il était ce
+// CLAUDE_CONFIG_DIR réel), un coût noté comme « choisi » alors qu'il était ce
 // défaut-ci.
 test('CLAUDE_CONFIG_DIR déplace AUSSI .claude.json — dans le dossier, pas au home', async () => {
   assert.strictEqual(
