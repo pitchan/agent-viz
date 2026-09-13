@@ -87,11 +87,12 @@ choix qui laisse invariantes les **cinq** traversées `__dirname` de
 cran, et l'arithmétique de `..` est la classe d'échec silencieuse.
 
 **Ces cinq traversées `__dirname` n'ont rien à voir avec les six traversées DE
-FRONTIÈRE serveur → moteur que l'étape 6 a retirées (§ 4)**, et le voisinage des
+FRONTIÈRE serveur → moteur que l'étape 6 a retirées** : les cinq ponts de
+`src/server/` et l'`import()` dynamique d'`observatory/engine.ts`. Le voisinage des
 deux chiffres a déjà produit une erreur : une rédaction antérieure écrivait « six
 traversées `__dirname` (§ 4) », où un six périmé se lisait comme corroboré par un
 six juste. Ce sont deux objets différents — ici, **du calcul de chemin relatif au
-fichier** ; là-bas, **des appels du serveur vers le build du moteur**. Le compte,
+fichier** ; là, **des appels du serveur vers le build du moteur**. Le compte,
 mesuré sur l'état d'avant le déplacement :
 
 ```
@@ -300,7 +301,7 @@ tenir ce cas-là, pas seulement le cas transitif qu'elle devait déjà couvrir.
 
 Le déplacement a d'ailleurs **changé la forme** de la deuxième : avant, le moteur
 s'atteignait par `../netgain/dist/`, un segment que `(\.\./)*(lib|netgain)/`
-attrapait. Aujourd'hui le serveur l'atteint par sa source, `../engine/core/…` —
+attrapait. Aujourd'hui il s'atteint par sa source, `../engine/core/…` —
 l'ancien motif serait **muet**, et muet n'est pas la même chose que vrai.
 
 **Pourquoi les contrôles négatifs sont écrits là plutôt que sous-entendus.** La
@@ -345,7 +346,7 @@ Extrait de la sortie :
 ```
 git grep -nE "from '(\.\./)+engine/" -- src/server
   src/server/tokens.ts:21:import { addUsage, emptyUsageBucket, finiteCount, isDedupableMsgId } from '../engine/core/usage.ts';
-  src/server/observatory/engine.ts:18:import { discoverSessions, parseSince, priceTable } from '../../engine/core/index.ts';
+  src/server/observatory/engine.ts:16:import { discoverSessions, parseSince, priceTable } from '../../engine/core/index.ts';
   src/server/transcript.ts:13:import { decodeJsonlLine } from '../engine/core/jsonl.ts';
 ```
 
@@ -373,9 +374,9 @@ est `tests/unit/observatory-engine-contract.test.cjs`.
 | Situation | Ce que fait la garde |
 |---|---|
 | un fichier compilé requis manque (`REQUIRED_DIST_FILES` : les modules des commandes sous `dist/server/`, `dist/engine/core/index.js`, `dist/engine/doctor/index.js`) | arrête, `exit 1`. Dans un dépôt de développement (`src/server/` présent), le message nomme `npm run build` ; sur un paquet installé, une réinstallation |
-| un `.ts` de `src/engine/` ou de `src/server/` est plus récent que le témoin `dist/tsconfig.build.tsbuildinfo` | avertit sur la sortie d'erreur, et la commande continue |
-| le témoin est absent | avertit qu'elle ne peut pas juger de la fraîcheur, et la commande continue |
-| la commande est `hook` | ne fait que le contrôle des fichiers manquants : aucun avertissement de fraîcheur |
+| dépôt de développement, un `.ts` de `src/engine/` ou de `src/server/` est plus récent que le témoin `dist/tsconfig.build.tsbuildinfo` | avertit sur la sortie d'erreur, et la commande continue |
+| dépôt de développement, le témoin est absent | avertit qu'elle ne peut pas juger de la fraîcheur, et la commande continue |
+| paquet installé (pas de `src/server/`), ou commande `hook` | ne fait que le contrôle des fichiers manquants : aucun avertissement de fraîcheur |
 
 **Ce que la garde ne voit pas : l'issue du build.** Elle compare des présences
 et des dates. Un `npm run build` en erreur se voit à sa propre sortie — les
@@ -511,12 +512,12 @@ appris à les recoudre plutôt qu'à les dupliquer.
 
 ## 7. Ce qui est source, ce qui est dérivé
 
-Aucun de ces trois artefacts n'est une source de vérité. Aucun n'est versionné.
+Aucun de ces artefacts n'est une source de vérité. Aucun n'est versionné.
 Les supprimer est toujours sans danger.
 
 | Artefact | Produit par | Reconstruit par |
 |---|---|---|
-| `dist/engine/` | `npm run build` (nettoyage puis `tsc`) | `npm run build` |
+| `dist/server/` et `dist/engine/` | `npm run build` (nettoyage des deux, puis `tsc -b`) | `npm run build` |
 | `~/.agent-viz/observatory.db` | les scans | le scan suivant |
 | `${tmpdir}/agent-events/*.jsonl` | le hook | la session suivante |
 
@@ -526,14 +527,15 @@ source. La garde de `bin/agent-viz.js` le rappelle (§ 4) : elle arrête sur un
 fichier compilé manquant, et avertit quand une source `.ts` est plus récente que
 le dernier build.
 
-**Le nettoyage en tête de `build` est neuf, et il a remplacé un geste inverse.**
+**Le nettoyage en tête de `build` a remplacé un geste inverse.**
 Jusqu'à l'étape 3, le build **écrivait** un fichier dans `dist/engine/` — le
 marqueur `{"type": "module"}` que la racine CommonJS rendait nécessaire — et il
 ne nettoyait rien. La racine devenue ESM, ce marqueur n'a plus d'objet ; mais
 `tsc` ne vide jamais son `outDir`, si bien que le résidu serait resté sur les
 postes qui l'avaient déjà construit, et serait parti dans le tarball **en
-silence, `exit=0`** (mesuré). Le `build` efface donc `dist/engine` avant de
-compiler. C'est un **changement de comportement observable**, déclaré comme tel :
+silence, `exit=0`** (mesuré). Le `build` efface donc `dist/engine` et
+`dist/server` avant de compiler (`package.json`, script `build`). C'est un
+**changement de comportement observable**, déclaré comme tel :
 `prepare` exécute `build` chez qui installe depuis un dépôt git.
 
 ---
@@ -653,13 +655,13 @@ grep -rlE "(require\(|from )['\"]node:test['\"]" tests | wc -l   → 93
 ```
 
 Le test du pont a la propriété amusante de passer par ce qu'il teste dès qu'on
-l'exécute sous vitest. Six des sept lignes non nulles sont nées du chantier de
-migration : le décompte du pont **grandit à chaque fichier `node:test` neuf, et
-baisse quand un fichier change de dialecte** — c'est pour ça qu'il est écrit en
+l'exécute sous vitest. Le décompte du pont **grandit à chaque fichier `node:test`
+neuf, et baisse quand un fichier change de dialecte ou quitte l'arbre** — c'est pour ça qu'il est écrit en
 addition plutôt qu'en ordinal, un ordinal ne survivant pas au fichier suivant.
 *L'étape 3 en est la démonstration : elle ajoute trois fichiers, en retire un du
-pont sans le supprimer, et en supprime un autre — quatre mouvements pour un
-total inchangé. Un ordinal, ou un total recopié, n'aurait rien vu.*
+pont sans le supprimer, et en supprime un autre — pour un seul fichier de plus au
+total (74 à `v0.14.0`, 75 à `v0.15.0`). Un ordinal, ou un total recopié, n'aurait
+rien vu.*
 
 Le pont est en trois fichiers, et sa forme n'est pas un choix esthétique — elle
 est imposée par le fait qu'**une seule couture ne suffit pas** :
@@ -671,8 +673,9 @@ est imposée par le fait qu'**une seule couture ne suffit pas** :
 | `node-test-alias.mjs` | couture n° 2 : cible d'un `resolve.alias` de `vitest.config.mts` — atteint les `import … from 'node:test'` des fichiers ESM |
 
 La seconde ne remplace pas la première, elle s'y ajoute : la résolution ESM ne
-passe pas par le hook CommonJS. Un pont amputé de l'une des deux laisse un
-tiers du filet non exécuté **sans le dire** — c'est mesuré, pas supposé.
+passe pas par le hook CommonJS. Un pont amputé de l'une des deux laisse non
+exécutés, **sans le dire**, les fichiers du régime qu'elle atteint — c'est mesuré,
+pas supposé.
 
 Le pont **refuse en se nommant** les **15 API** qu'il sait ne pas implémenter
 (`NON_IMPLEMENTE_MODULE` et `NON_IMPLEMENTE_CONTEXTE` dans `create-bridge.mjs`) :
@@ -732,8 +735,8 @@ Trois choses en découlent, et ce document en est la référence :
 
 1. **Les responsabilités du § 1 ne changent pas.** Seule la table du § 8 change.
    C'est la raison pour laquelle ce document est écrit ainsi.
-2. **Les six traversées de frontière ont perdu leur objet à l'étape 6, et pas
-   avant.** L'étape 3 avait fait tomber la moitié CommonJS de leur raison d'être
+2. **Les six traversées de frontière serveur → moteur — cinq ponts et un
+   `import()` dynamique — ont perdu leur objet à l'étape 6, et pas avant.** L'étape 3 avait fait tomber la moitié CommonJS de leur raison d'être
    sans les faire tomber elles : elles franchissaient alors la frontière *source →
    build*. L'écart était annoncé à l'envers ici même — *« l'interrupteur du régime
    de modules fait disparaître les cinq ponts »*. L'étape 6 les a retirées :
@@ -750,18 +753,15 @@ Trois choses en découlent, et ce document en est la référence :
    **transitif** — un module partagé, pur aujourd'hui, qui gagnerait un
    `node:` demain — puisque le compilateur n'en tient plus aucun.
 
-**Deux points seulement exposent cette fusion à l'extérieur, et le second est
-neuf.** Le premier est celui des chemins absolus du § 6, ci-dessous. Le second
-est ce que rend `main` à un appelant CommonJS depuis l'étape 3 — un espace de
-noms figé au lieu de `module.exports` (§ 6). Les chemins absolus ne sont pas
-exposés de la même façon selon le hook :
+**Deux points exposent cette fusion à l'extérieur**, tous deux décrits au § 6 :
 
-- le hook du **moteur** porte toujours un chemin absolu — il casse à coup sûr ;
-- le hook **agent-viz** ne casse que s'il a été posé en mode `absolute` ; en
-  mode `npx`, sa ligne ne nomme aucun chemin et survit au déplacement.
+- ce que rend `main` à un appelant CommonJS depuis l'étape 3 : un espace de noms
+  figé au lieu de `module.exports` ;
+- un chemin absolu écrit chez l'utilisateur. Le hook **agent-viz** posé en mode
+  `absolute` nomme `bin/agent-viz.js`, qui n'a pas bougé ; en mode `npx`, sa ligne
+  ne nomme aucun chemin. Une configuration du hook du **moteur** écrite avant la
+  fusion reste orpheline : l'outil qui la réparait a disparu avec l'étape 6 bis.
 
-Dans les deux cas où la panne survient, elle est **bruyante** : le hook
-agent-viz échoue en nommant le module introuvable, et le processus MCP sort en
-erreur `MODULE_NOT_FOUND`. Ce que ce dépôt n'établit pas, et qu'il ne faut donc
-pas promettre, c'est **sous quelle forme le client MCP remonte cet échec à
-l'utilisateur** : rien ici ne le teste. La réparation, elle, est une commande.
+Ce que ce dépôt n'établit pas : **sous quelle forme Claude Code ou Copilot CLI
+remontent à l'utilisateur l'échec d'un hook** dont la commande ne trouve plus son
+fichier. Rien ici ne le teste.

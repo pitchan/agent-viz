@@ -145,25 +145,13 @@ function accumulateUsage(
   bucket.lastIn = finiteCount(raw.input_tokens);
   bucket.lastCacheCreate = finiteCount(raw.cache_creation_input_tokens);
   bucket.lastCacheRead = finiteCount(raw.cache_read_input_tokens);
-  // Champs dérivés du tarif. Le coût s'accumule message par message : une
-  // session qui change de modèle en vol (principal = Opus, sous-agent = Haiku)
-  // totalise correctement. `at` (horodatage du message) choisit le barème en
-  // vigueur À CETTE DATE — les tarifs changent (Sonnet 5 jusqu'au 2026-08-31).
-  //
-  // La formule et la qualification du tarif viennent du moteur. `pricingKindOf`
-  // nomme TROIS cas, chacun avec sa conduite :
-  //   'tarife'     → on compte, et le modèle devient celui de la pastille, avec sa
-  //                  fenêtre de contexte ;
-  //   'zero-voulu' → `<synthetic>`, Ollama local : 0 $ VOULU, total COMPLET, jamais le
-  //                  modèle affiché (un artefact du harnais, pas le modèle au travail) ;
-  //   'inconnu'    → rien à compter : on le NOMME, le total devient incomplet, et
-  //                  `lastModel` est posé, sans quoi une session hors table masque la pastille.
-  // Le cas ne se déduit ni d'un montant nul (un modèle tarifé sans jeton coûte 0 $), ni de
-  // `getPrice`, réservé aux MÉTADONNÉES d'affichage : un désaccord entre la carte du serveur
-  // et la table du moteur deviendrait silencieux.
+  // Le coût s'accumule message par message, au barème en vigueur à la date `at` du message.
+  // La nature du tarif vient de `pricingKindOf` : ni un montant nul (un modèle tarifé sans
+  // jeton coûte 0 $) ni `getPrice`, réservé aux métadonnées d'affichage, ne la disent.
   if (model) {
     const canonique = normalizeModel(model);
     const nature = pricingKindOf(model, at ?? undefined);
+    // Inconnu : on NOMME le modèle et marque le total incomplet ; `lastModel` garde la pastille.
     if (nature === 'inconnu') {
       if (canonique !== null) {
         bucket.lastModel = canonique;
@@ -171,11 +159,12 @@ function accumulateUsage(
       }
       bucket.costComplete = false;
     } else {
-      // `usd` est fini par construction : computeCost passe chaque champ brut
-      // par `finiteCount` avant de multiplier, donc seul le tarif inconnu
-      // (déjà écarté ici) rend `null` — `?? 0` ne traite que ce cas-là.
+      // Tarifé ou zéro voulu (`<synthetic>`, Ollama local) : le montant compte, le total reste complet.
+      // `usd` est fini (chaque champ passe par `finiteCount`) et `null` seulement pour un tarif
+      // inconnu, écarté ci-dessus : `?? 0` ne traite que ce cas.
       const cost = computeCost(raw, model, at ?? undefined).usd;
       bucket.costUsd += cost ?? 0;
+      // Seul un modèle tarifé devient celui de la pastille : `<synthetic>` est un artefact du harnais.
       if (nature === 'tarife') {
         bucket.lastModel = canonique;
         const price = getPrice(model, at ?? undefined);

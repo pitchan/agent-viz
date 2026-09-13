@@ -24,7 +24,9 @@
 //   - une affectation sur un objet existant (`obj.nom = () => {}`) ;
 //   - un nom calculé par une expression (`{ [x]: … }`) ou un gabarit avec substitution :
 //     la valeur n'existe qu'à l'exécution ;
-//   - une métaprogrammation (`Object.defineProperty`, `Proxy`).
+//   - une métaprogrammation (`Object.defineProperty`, `Proxy`) ;
+//   - une primitive du moteur écrite autrement qu'en `export function` (`export const f = () => …`) :
+//     la liste ne lit que les `export function`, elle en sort sans que rien ne rougisse.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';

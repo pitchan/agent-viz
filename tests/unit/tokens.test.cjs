@@ -183,14 +183,9 @@ test('accumulateUsage with different msgIds cumulates normally', () => {
 });
 
 // ---------------------------------------------------------------------------
-// C3 (docs/audit-qualite-code.md) — l'accumulation vient désormais de la
-// primitive commune du moteur (src/engine/core/usage.ts), importée directement
-// par tokens.ts.
-//
-// Ces tests existent parce que la migration a changé du comportement SANS
-// qu'aucun test d'au-dessus ne vire au rouge : le filet ne couvrait ni la
-// ventilation de cache, ni les gardes, ni l'identifiant vide. Un changement sans
-// filet est un changement qu'on ne saura pas défendre au prochain passage.
+// L'accumulation vient de la primitive du moteur (src/engine/core/usage.ts), que
+// tokens.ts importe. Ces tests tiennent ce qu'elle change pour le serveur : la
+// ventilation de cache, les gardes de champ, l'identifiant vide.
 //
 // Une définition locale d'`emptyUsageBucket` dans `src/server/` fait rougir
 // `tests/repo/no-local-engine-primitives.test.mjs`.

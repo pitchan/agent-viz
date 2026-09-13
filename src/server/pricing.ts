@@ -1,10 +1,7 @@
 'use strict';
-// Anthropic model pricing — the ENGINE's embedded table (netgain priceTable)
-// prices the whole product: server.ts fills
-// the in-memory map from the engine at boot. The static FALLBACK below is its
-// proven mirror (tests/unit/pricing-engine-mirror.test.cjs) and applies before
-// the engine loads or when it is absent. LiteLLM never writes prices:
-// it is a daily drift WATCHDOG (see litellmDrift).
+// Anthropic model pricing: the engine's embedded table (priceTable) prices the whole
+// product, copied into the in-memory map by server.ts at boot. FALLBACK, its tested
+// mirror, prices until that table lands. LiteLLM only reports drift (see litellmDrift).
 //
 // SRP: this module's only job is `model id -> { input, output, cacheCreate,
 // cacheRead, maxInput, label, history? }`. No I/O leakage to consumers — they

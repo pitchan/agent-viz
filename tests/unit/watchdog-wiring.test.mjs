@@ -695,11 +695,9 @@ function decouperAppel(source, nom) {
   return null;
 }
 
-// Calcule DANS le test, jamais au chargement du module. Au chargement, un
-// simple reformatage de `src/server/server.ts` — `startWatchdog(\n  {` — ferait
-// exploser les vingt et un tests de ce fichier au lieu des deux que ce contrat
-// concerne, et aucun message ne dirait pourquoi. Un garde-fou qui brule le
-// fichier entier sur son propre faux positif est un mauvais garde-fou.
+// Calcule DANS le test, jamais au chargement du module : au chargement, un simple
+// reformatage de `src/server/server.ts` (`startWatchdog(\n  {`) ferait echouer tout le
+// fichier au lieu des seuls tests de ce contrat, sans message qui dise pourquoi.
 function appelSurveille() {
   const appel = decouperAppel(SOURCE_SERVEUR, 'startWatchdog');
   assert.ok(appel, 'appel `startWatchdog({` introuvable dans src/server/server.ts — reformatage ?');
