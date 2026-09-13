@@ -192,9 +192,7 @@ test('accumulateUsage with different msgIds cumulates normally', () => {
 // ventilation de cache, ni les gardes, ni l'identifiant vide. Un changement sans
 // filet est un changement qu'on ne saura pas défendre au prochain passage.
 //
-// Sans pont, aucun fichier de `src/server/` ne peut plus recopier
-// `emptyUsageBucket` : il ne reste qu'un import, vérifié par
-// `npm run typecheck` et gardé par
+// Une définition locale d'`emptyUsageBucket` dans `src/server/` fait rougir
 // `tests/repo/no-local-engine-primitives.test.mjs`.
 // ---------------------------------------------------------------------------
 
@@ -355,7 +353,7 @@ test('C4 — la complétude traverse l\'enveloppe SSE', () => {
 
 // Un message malformé sur un modèle tarifé ne doit pas empoisonner
 // bucket.costUsd pour le reste de la session (branche distincte du modèle
-// inconnu couvert par C4 ci-dessus) : costComplete reste vrai, costUsd fini.
+// inconnu, testé ci-dessus) : costComplete reste vrai, costUsd fini.
 test('un message malformé (input_tokens: 1e999) entre deux messages sains ne poisonne pas costUsd', () => {
   const b = newBucket();
   const sain = { input_tokens: 1000, output_tokens: 500 };

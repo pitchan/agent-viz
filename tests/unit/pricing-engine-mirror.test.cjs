@@ -1,8 +1,7 @@
 'use strict';
-// UNIFICATION (2026-08-05): one price table for the whole product. The static
-// FALLBACK is the offline mirror of the engine's embedded table — this file
-// turns the "they are identical" guarantee from a manual check into a test
-// that breaks. Requires the npm-linked engine, like the contract test.
+// One price table for the whole product: the static FALLBACK is the offline
+// mirror of the engine's embedded table, and this file turns "they are
+// identical" from a manual check into a test that breaks.
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');

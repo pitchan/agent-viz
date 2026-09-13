@@ -11,10 +11,9 @@ import path from 'node:path';
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const BIN_REEL = path.join(ROOT, 'bin', 'agent-viz.js');
 const PREFIXE = 'agent-viz-buildguard-';
-// Nom de commande inconnu : `ensureBuildIsFresh` tourne avant le `switch`
-// quel que soit `cmd`, et l'inconnu tombe dans le `default:` du dispatcher,
-// qui n'importe plus rien sous dist/server — seule la garde peut donc
-// expliquer ce qui precede cette ligne dans la sortie.
+// Commande inconnue : `ensureBuildIsFresh` tourne avant le `switch`, et le `default:`
+// du dispatcher n'importe rien sous dist/ — seule la garde peut donc expliquer
+// ce qui precede « Unknown command » dans la sortie.
 const SONDE = 'sonde-inexistante';
 
 const T_VIEUX = new Date('2000-01-01T00:00:00Z');
@@ -46,10 +45,9 @@ function ecrireDepotDev(racine) {
   fs.mkdirSync(path.join(racine, 'src', 'server'), { recursive: true });
 }
 
-// Ecrit les six fichiers compiles requis sous `dist/`, sauf ceux listes dans
-// `omettre` (chemins relatifs, ex. 'engine/doctor/index.js'). `hookContent`
-// remplace le contenu par defaut de dist/server/hook.js, pour la commande
-// `hook` qui, seule parmi les six, est vraiment chargee par les tests ici.
+// Ecrit sous `dist/` les fichiers compiles requis, sauf ceux de `omettre` (ex.
+// 'engine/doctor/index.js'). `hookContent` remplace dist/server/hook.js : la
+// commande `hook` est la seule que ces tests chargent vraiment.
 function ecrireDist(racine, { omettre = [], hookContent } = {}) {
   for (const segs of REQUIS) {
     const rel = segs.join('/');

@@ -624,7 +624,7 @@ test('demarrage: un battement qui leve ne tue pas le demon, et se dit une fois',
 });
 
 test('demarrage: ce que le serveur oublie de fournir se dit a voix haute', async () => {
-  // `src/server/server.js` est le seul appelant de production, et le seul fichier
+  // `src/server/server.ts` est le seul appelant de production, et le seul fichier
   // qu aucun test ne peut charger. Ce qu il oublie ici, rien d autre ne peut le
   // dire — et un `liveFrom` oublie ne casse rien de visible : il remet les deux
   // chemins a lire les memes octets, et le produit annonce des boucles qui n ont
@@ -652,20 +652,17 @@ test('demarrage: ce que le serveur oublie de fournir se dit a voix haute', async
   assert.doesNotMatch(complet.dits, /sans frontiere|sans canal/);
 });
 
-// ─── Le dernier maillon : ce que `src/server/server.js` passe reellement ─────
+// ─── Le dernier maillon : ce que `src/server/server.ts` passe reellement ─────
 //
-// Ces deux tests lisent `src/server/server.js` comme du TEXTE, et c'est delibere. Ne
+// Ces deux tests lisent `src/server/server.ts` comme du TEXTE, et c'est delibere. Ne
 // pas les « ameliorer » en `require` : ce fichier est un point d'entree, le
 // charger lie le port 3333 et tue le serveur agent-viz de la machine — sur
 // celle-ci, l'instrument de mesure du projet. L'objection « aucun test ne peut
-// charger server.js » est vraie du CHARGEMENT, pas de la lecture.
+// charger server.ts » est vraie du CHARGEMENT, pas de la lecture.
 //
-// Et il faut bien quelque chose ici, parce que le guet de type de
-// `startWatchdog` ne couvre que l'OUBLI. Le REMPLACEMENT lui echappe :
-// `broadcastAlert: broadcastSSE` est bien une fonction, elle passe la garde, et
-// les alertes partiraient sur le flux sous la forme `{type:'stuck', …}` au lieu
-// de `{type:'alert', alert}` — que le client de la tache 9 ignorerait en
-// silence. C'est la moitie dangereuse : muette jusqu'a la tache 9.
+// Le guet de type de `startWatchdog` ne couvre que l'OUBLI. Le REMPLACEMENT lui echappe :
+// `broadcastAlert: broadcastSSE` passe la garde, et les alertes partent en `{type:'stuck', …}`
+// au lieu de `{type:'alert', alert}`, que le client (`src/web/viz-network.ts`) ne lit pas comme une alerte.
 //
 // Le prix est choisi : reformater ces lignes fait rougir ces tests. C'est le but.
 const SOURCE_SERVEUR = fs.readFileSync(
@@ -682,7 +679,7 @@ const SOURCE_SERVEUR = fs.readFileSync(
 // ECRITE DANS l'appel — un `// TODO: passer { dir depuis la config` — ferait
 // deborder la tranche et rouvrirait exactement le faux vert qu'elle ferme ; un
 // `}` dans une chaine la tronquerait et ferait rougir du code sain. Il n'y a
-// rien de tel dans `src/server/server.js` aujourd'hui, donc elle tient. Ecrire un vrai
+// rien de tel dans `src/server/server.ts` aujourd'hui, donc elle tient. Ecrire un vrai
 // analyseur pour garder trois lignes serait disproportionne : c'est un
 // compromis, pas une garantie, et le voila dit.
 //
@@ -699,13 +696,13 @@ function decouperAppel(source, nom) {
 }
 
 // Calcule DANS le test, jamais au chargement du module. Au chargement, un
-// simple reformatage de `src/server/server.js` — `startWatchdog(\n  {` — ferait
+// simple reformatage de `src/server/server.ts` — `startWatchdog(\n  {` — ferait
 // exploser les vingt et un tests de ce fichier au lieu des deux que ce contrat
 // concerne, et aucun message ne dirait pourquoi. Un garde-fou qui brule le
 // fichier entier sur son propre faux positif est un mauvais garde-fou.
 function appelSurveille() {
   const appel = decouperAppel(SOURCE_SERVEUR, 'startWatchdog');
-  assert.ok(appel, 'appel `startWatchdog({` introuvable dans src/server/server.js — reformatage ?');
+  assert.ok(appel, 'appel `startWatchdog({` introuvable dans src/server/server.ts — reformatage ?');
   return appel;
 }
 
@@ -726,12 +723,9 @@ test('serveur: l enveloppe SSE est composee ici, et le canal n est pas broadcast
   // `alert` n y est lie a rien, chaque alerte leve un ReferenceError, et les
   // `try/catch` de `feedWatchdog` et du battement l avalent.
   //
-  // Et le raccourci se verifie DANS LES DEUX SENS, d ou le `(?<=\1)` : le
-  // raccourci `{ …, alert }` n est licite que si le parametre s appelle
-  // `alert`. Sans cette moitie, `a => broadcastSSE({ type: 'alert', a })`
-  // passait aussi — le renvoi arriere etait satisfait, mais l enveloppe emise
-  // etait `{type:'alert', a:{…}}` et le client de la tache 9 y lirait
-  // `msg.alert === undefined`. La meme classe muette, prise par l autre bout.
+  // Le raccourci se verifie DANS LES DEUX SENS, d ou le `(?<=\1)` : `{ …, alert }` n est licite
+  // que si le parametre s appelle `alert`. Sans cette moitie, `a => broadcastSSE({ type: 'alert', a })`
+  // passe et emet `{type:'alert', a:{…}}`, ou le client du navigateur lit `msg.alert === undefined`.
   assert.match(
     appelSurveille(),
     /broadcastAlert:\s*(\w+)\s*=>\s*broadcastSSE\(\{\s*type:\s*'alert',\s*(?:alert(?<=\1)|alert:\s*\1)\s*\}\)/,

@@ -137,15 +137,9 @@ test('computeCost reports an unknown model as unpriced, never as a zero', () => 
   assert.equal(cost.model, 'claude-unknown-future-model');
 });
 
-// SUPPRIMÉ LE 2026-08-11 PAR C4 : « computeCost accepts a resolved price object
-// directly (avoids double lookup) ». La double signature
-// `computeCost(usage, priceObj)` n'existe plus — elle était l'optimisation qui
-// FABRIQUAIT le constat, puisque c'est en passant un objet que `tokens.js`
-// contournait toute la branche « modèle inconnu ». Le seul appelant de
-// production résout maintenant les métadonnées d'affichage par `getPrice` et
-// le montant par le contrat du moteur ; la consultation de table
-// supplémentaire est un coût choisi, sur un chemin déjà amorti par une diffusion
-// différée de 250 ms.
+// `computeCost` prend un identifiant de modèle, jamais un objet de prix résolu :
+// un objet contournerait la branche « modèle inconnu », et le total se lirait
+// complet sans l'être.
 
 test('litellmDrift rejects __proto__ / constructor / prototype keys and never pollutes', () => {
   const { _internals } = require('../../src/server/pricing.ts');

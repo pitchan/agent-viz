@@ -1,23 +1,18 @@
 'use strict';
 // Anthropic model pricing — the ENGINE's embedded table (netgain priceTable)
-// prices the whole product since the 2026-08-05 unification: server.js fills
+// prices the whole product: server.ts fills
 // the in-memory map from the engine at boot. The static FALLBACK below is its
 // proven mirror (tests/unit/pricing-engine-mirror.test.cjs) and applies before
-// the engine loads or when it is absent. LiteLLM never writes prices anymore:
+// the engine loads or when it is absent. LiteLLM never writes prices:
 // it is a daily drift WATCHDOG (see litellmDrift).
 //
 // SRP: this module's only job is `model id -> { input, output, cacheCreate,
 // cacheRead, maxInput, label, history? }`. No I/O leakage to consumers — they
 // call getPrice() and don't know the source.
 //
-// C4 (2026-08-11): the COST FORMULA and the model-id NORMALIZATION no longer
-// live here. Both were twins of the engine's, and the differential probe found
-// them diverged — this module's normalization knew regional routing prefixes
-// and the bare `-vN` suffix while the engine's did not, so the engine reported
-// "partial cost" on an id this side priced without reserve. One definition
-// now, in TypeScript, imported directly from the engine. What remains here
-// is what only the server owns: the in-memory price map, the display metadata
-// (`label`, `maxInput`) and the LiteLLM watchdog.
+// The COST FORMULA and the model-id NORMALIZATION live in the engine and are
+// imported from it: two copies diverge silently. What remains here is what only
+// the server owns: the in-memory price map, display metadata and the LiteLLM watchdog.
 
 import https from 'node:https';
 import { computeCost, normalizeModel } from '../engine/core/pricing.ts';
@@ -48,7 +43,7 @@ interface PriceEntry extends ModelPrices {
 // token. This is the proven offline mirror of the engine's embedded table
 // (tests/unit/pricing-engine-mirror.test.cjs keeps the two in lockstep) — it
 // covers the BOOT WINDOW only: `applyEnginePrices` is wired asynchronously in
-// src/server/server.js, so a few messages can be priced before the engine table
+// src/server/server.ts, so a few messages can be priced before the engine table
 // lands. This module makes no promise about the engine being absent from the
 // build — that is not its job. Numbers
 // must be kept aligned with Anthropic's public rate card. Each entry carries
@@ -106,17 +101,9 @@ function getPrice(id: string | null | undefined, at?: string): PriceEntry | null
   return current;
 }
 
-// C4 (2026-08-11): computeCost is GONE from this module. It was a twin of the
-// engine's formula, and the two had already diverged (`cache_creation: null`
-// threw on one side and not the other). Its unknown-model branch — the `0` and
-// the `[pricing] unknown model …` warning that the audit sheet quoted as the
-// server's behaviour — was never reached in production: the only caller,
-// tokens.js, passed a resolved price OBJECT, and the branch was guarded by
-// `typeof modelOrPrice === 'string'`. Callers now use the engine contract
-// `{ usd, known, model }`, imported straight from the engine: `known: false`
-// means the tariff is unknown and the total is incomplete, and that fact
-// travels all the way to the real-time pill instead of dying in a log nobody
-// reads.
+// No cost formula here: callers use the engine's `computeCost` contract
+// `{ usd, known, model }`. `known: false` means the tariff is unknown and the
+// total incomplete, and that fact travels to the real-time pill.
 
 // Derive a human label ("Opus 4.7", "Fable 5") from a canonical id when
 // LiteLLM doesn't already provide one (it doesn't expose a "label" field).
@@ -330,10 +317,9 @@ function applyEnginePrices(table: PriceTable): void {
   prices = next;
 }
 
-// C4 : ni `computeCost` ni `normalizeId` ne sortent plus d'ici. La formule et
-// la normalisation ont UNE définition, dans le moteur ; qui en a besoin
-// l'importe directement et l'appelle par son nom du moteur, `normalizeModel`
-// — un seul nom dans le produit, comme `CLAUDE_CONFIG_DIR` après C5.
+// Ni `computeCost` ni `normalizeModel` ne sortent d'ici : la formule et la
+// normalisation ont UNE définition, dans le moteur, et qui en a besoin l'importe
+// sous son nom du moteur.
 // Exposed for tests:
 const _internals = { litellmDrift, FORBIDDEN_KEYS, MAX_BODY_BYTES };
 

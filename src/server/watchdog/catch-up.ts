@@ -101,11 +101,9 @@ async function catchUpFromDisk(
     // fichier. `subarray` borne d'elle-meme si le fichier a retreci entre-temps.
     const text = (limite === null ? octets : octets.subarray(0, limite)).toString('utf8');
     for (const line of text.split('\n')) {
-      // C2 : le verdict sur une ligne vient de la primitive commune du moteur,
-      // il n'est plus reimplemente ici — la garde sur la ligne blanche non plus,
-      // qui faisait double emploi avec le `null` que la primitive rend deja.
-      // Consequence voulue : une ligne prefixee d'un BOM est desormais decodee
-      // au lieu d'etre perdue en silence, ici comme sur le chemin vif.
+      // Le verdict sur une ligne vient de la primitive du moteur, qui rend deja `null`
+      // sur une ligne blanche : une ligne prefixee d'un BOM est decodee ici comme sur
+      // le chemin vif.
       //
       // Un echec de decodage reste MUET, et c'est une exception deliberee a la
       // regle « casser bruyamment ». `limite` est toujours une TAILLE de fichier

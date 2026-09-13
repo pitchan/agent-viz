@@ -11,14 +11,9 @@
 // qu'il n'y en a eu — dans un journal en ajout seul, donc pour de bon.
 
 // ── Le bac a sable, pose AVANT le premier require de `src/server/**` ─────────
-// Meme piege, meme parade que dans watchdog-wiring.test.mjs, et il est ACTIF :
-// charger `src/server/routes` charge `session-index`, qui cree
-// `os.tmpdir()/agent-events` des sa lecture ; un journal sans chemin explicite
-// vit dans `os.homedir()/.agent-viz`. Sur cette machine ce sont le vrai dossier
-// d'evenements et la vraie memoire des pannes de l'utilisateur — un test de la
-// tache 6 y a lu 747 evenements reels avant correction. `os.tmpdir()` et
-// `os.homedir()` relisent l'environnement a chaque appel, donc les detourner
-// ici suffit, et `node --test` donne un processus par fichier.
+// Meme parade que watchdog-wiring.test.mjs : `src/server/routes` cree `os.tmpdir()/agent-events`
+// des sa lecture, et un journal sans chemin vit dans `os.homedir()/.agent-viz`, les vrais dossiers de
+// l'utilisateur. Les deux relisent l'environnement a chaque appel : les detourner ici suffit.
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -169,13 +164,9 @@ test('le serveur les sert vraiment : la table de routage les porte', async () =>
 test('traduction seulement : la route ne peut atteindre aucun autre module', () => {
   const source = fs.readFileSync(
     path.join(__dirname, '..', '..', 'src', 'server', 'watchdog', 'routes.ts'), 'utf8');
-  // Ce module n'a besoin d'AUCUNE dependance, et c'est ce qui le rend incapable
-  // de rejouer le balayage de demarrage : sans acces au module de cablage, il
-  // ne peut pas l'appeler. Rejoue depuis une requete, ce balayage relit ce dont
-  // `unwatchSession` vient de retirer la frontiere et le detecteur compte deux
-  // fois — trois appels annonces comme quatre, une ligne fausse et DURABLE dans
-  // un journal en ajout seul (mesure de la revue de la tache 7, voir le PIEGE
-  // en bas de src/server/watchdog/index.js).
+  // Sans AUCUNE dependance, ce module ne peut pas rejouer le balayage de demarrage. Rejoue depuis une
+  // requete, ce balayage recompte des appels dont la frontiere vient d'etre retiree et ecrit une ligne
+  // fausse et DURABLE dans un journal en ajout seul (voir le PIEGE de src/server/watchdog/index.ts).
   //
   // Les DEUX formes, et la seconde n est pas theorique : les gestionnaires sont
   // deja `async`, donc `await import('../watchdog')` y est licite et atteint
@@ -255,11 +246,9 @@ test('GET /alerts: la table 7/30/90 passe telle quelle', async () => {
 });
 
 test('GET /alerts: une fenetre illisible retombe sur 30, jamais sur du vide', async () => {
-  // Mesure de la revue de la tache 5 : `readAll` n'a AUCUNE garde, son defaut
-  // `= 30` ne joue que sur `undefined`, et tout le reste fait un plancher `NaN`
-  // — donc zero alerte, en silence. Sur un panneau de chien de garde, « vide
-  // sans un mot » est indiscernable de « tout va bien » : c'est le pire mode de
-  // panne possible.
+  // `readAll` n'a AUCUNE garde : son defaut `= 30` ne joue que sur `undefined`, tout le reste donne
+  // un plancher `NaN`, donc zero alerte en silence. Sur un panneau de chien de garde, « vide sans un
+  // mot » est indiscernable de « tout va bien ».
   const cas = [
     ['', 'la chaine vide'],
     ['abc', 'un mot'],
@@ -336,10 +325,9 @@ test('POST /alerts/ack: la garde sur createdAt est celle du journal, ni plus ni 
 });
 
 test('POST /alerts/ack refuse un id qui n est pas une clef, et n acquitte rien', async () => {
-  // Mesure de la revue de la tache 5 : `estClef` ne teste que `id != null`.
-  // Toutes ces valeurs ecrivent une ligne d'acquittement sur le disque, sans
-  // plainte et SANS deduplication — trois `?id=` font trois lignes — et le
-  // rechargement les relit a chaque demarrage, ou elles pesent 90 jours.
+  // `estClef` ne teste de l'id que `id != null` : sans garde de la route, chacune de ces valeurs
+  // ecrirait une ligne d'acquittement, SANS deduplication, que chaque demarrage relirait
+  // pendant 90 jours.
   const cas = [
     [undefined, 'absent'],
     [null, 'null'],

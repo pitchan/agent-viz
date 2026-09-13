@@ -136,9 +136,6 @@ test('une variable VIDE retombe sur le home', async () => {
   );
 });
 
-// Le point de C5 : les deux moitiés lisent au MÊME ENDROIT — les six tests
-// ci-dessus le verrouillent par le comportement réel d'`observatory/index.ts`.
-// Sans pont, aucun fichier de `src/server/` ne peut plus recopier
-// `resolveClaudeDir` ou `resolveClaudeJsonPath` : il ne reste qu'un import,
-// vérifié par `npm run typecheck` et gardé par
-// `tests/repo/no-local-engine-primitives.test.mjs`.
+// Les deux moitiés lisent au MÊME ENDROIT : les tests ci-dessus le verrouillent par le
+// comportement réel d'`observatory/index.ts`. Une définition locale de `resolveClaudeDir`
+// ou de `resolveClaudeJsonPath` dans `src/server/` fait rougir `no-local-engine-primitives.test.mjs`.

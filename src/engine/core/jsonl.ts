@@ -20,13 +20,9 @@ export type JsonlLine = { ok: true; value: unknown } | { ok: false; rawLength: n
  * l'espace fine U+2009, le séparateur de ligne U+2028 —, là où `JSON.parse`
  * seul les refuse. Vérifié en exécutant sur les cinq formes.
  *
- * C'est une PROPRIÉTÉ VOULUE, pas un effet de bord toléré. L'arbitrage
- * d'origine disait « le BOM » ; la mécanique donne tout
- * le blanc, et c'est la mécanique qui est gardée. La restreindre demanderait
- * d'écrire à la main un sous-ensemble de ce que `trim()` fait déjà — du code en
- * plus, une expression régulière maison à maintenir, pour rendre le lecteur
- * MOINS tolérant sur des fichiers écrits par un tiers. Rejeter une ligne qu'on
- * savait lire est précisément la perte silencieuse que C1 a coûtée.
+ * C'est une PROPRIÉTÉ VOULUE : la restreindre demanderait une expression régulière
+ * maison, un sous-ensemble de ce que `trim()` fait déjà, pour rendre le lecteur MOINS
+ * tolérant sur des fichiers écrits par un tiers — et rejeter une ligne lisible est une perte silencieuse.
  *
  * POURQUOI IL N'Y A PAS DE RETRAIT EXPLICITE DU BOM ICI. La version précédente
  * de ce module portait un retrait conditionnel « seulement sur la première

@@ -1,4 +1,4 @@
-// Garde-fou de taille de fichier (doc/43 du dépôt privé, décision du 2026-08-19).
+// Garde-fou de taille de fichier.
 // Le seuil ne mesure PAS la responsabilité unique — la liste ASSUMED en répond,
 // avec une raison écrite par entrée. Deux règles font du test un cliquet :
 //   1. un fichier de src/ au-dessus du budget et absent d'ASSUMED → échec ;
@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const BUDGET = 450; // lignes (au sens wc -l : nombre de \n)
 
-// Assiette du 2026-08-19 (fichiers > 450 lignes ce jour-là), une raison par entrée.
+// Les fichiers de src/ admis au-dessus du budget, une raison écrite par entrée.
 const ASSUMED = new Map([
   ['src/web/viz-ui.ts',           'fourre-tout identifié — découpage décidé post-étape 5 (2026-08-19)'],
   ['src/engine/watchdog/detector.ts', 'registre DETECTORS cohésif : la taille = le nombre de détecteurs'],

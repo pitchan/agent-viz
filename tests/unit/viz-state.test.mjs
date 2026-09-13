@@ -41,13 +41,13 @@ test('state.tokens.transcriptMissing defaults to false', () => {
 });
 
 test('tokenContext: Infinity on one field does not poison the sum (finiteCount guard)', () => {
-  // Arrange — the field that used to overflow the old `|| 0` guard.
+  // Arrange — Infinity passes an `|| 0` guard untouched.
   const t = { lastIn: Infinity, lastCacheCreate: 1, lastCacheRead: 1 };
 
   // Act
   const r = tokenContext(t);
 
-  // Assert — with the old `(t.lastIn || 0) + ...` guard this rendered Infinity.
+  // Assert — a `(t.lastIn || 0) + ...` guard would render Infinity here.
   assert.equal(r, 2);
 });
 

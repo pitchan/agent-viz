@@ -6,11 +6,9 @@
 // build output ships inside this very package (see `files` in package.json), so
 // any install that has the product has the engine.
 //
-// A missing engine does NOT surface here. The import below is static: if the
-// compiled engine is absent, loading THIS module throws at import time, which
-// kills startup in whichever module imports it first — before any advisor
-// page or canvas view runs. `bin/agent-viz.js` names that failure earlier
-// (`ensureBuildIsFresh`), before `dist/server/` is even loaded.
+// The import below is static: a missing compiled engine fails the load of this
+// module itself. `bin/agent-viz.js` stops earlier on any missing compiled file
+// (`ensureBuildIsFresh`) and names the fix.
 
 import path from 'node:path';
 import { readFileSync } from 'node:fs';
@@ -41,9 +39,8 @@ let _error: string | null = null;
 let _pending: Promise<Engine> | null = null;
 
 // The injection seam the rest of the observatory depends on: callers receive
-// the engine as a value, never reach into `../../engine/` themselves. The
-// engine functions are already resolved above (static import); the async
-// work left here is reading the product's own version to stamp onto it.
+// the engine as a value and never reach into `../../engine/` themselves. The
+// only async work is reading the product's version to stamp onto it.
 async function loadEngine(): Promise<Engine> {
   if (_engine) return _engine;
   if (!_pending) {
@@ -77,9 +74,9 @@ async function loadEngine(): Promise<Engine> {
   return _pending;
 }
 
-// Last known load outcome, without triggering a load. A missing/broken
-// engine no longer reaches here (see the header): the only realistic failure
-// left is the package.json read above.
+// Last known load outcome, without triggering a load. The only failure it can
+// report is the package.json read above: a missing engine stops
+// `bin/agent-viz.js` before this module loads (see the header).
 function engineStatus(): EngineStatus {
   return { ok: _engine !== null, error: _error };
 }

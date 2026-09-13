@@ -1,65 +1,32 @@
-// Le graphe d'imports que le navigateur finit par charger, tenu a sa frontiere.
+// Le graphe d'imports que le navigateur charge, tenu a sa frontiere. Le serveur sert
+// `src/web/` depuis la source, types retires a la requete (`readStaticFile`) : dans un
+// seul projet TypeScript, seul un test qui marche le graphe voit un module Node atteint par transitivite.
 //
-// Le serveur sert `src/web/` DEPUIS LA SOURCE : il retire les types a la
-// requete (`readStaticFile`, src/server/routes.ts). Depuis que tout tient dans
-// un seul projet TypeScript, plus rien n'empeche un module de `src/web/`
-// d'atteindre un module Node PAR TRANSITIVITE — le compilateur ne voit plus
-// deux mondes, et une regle ESLint ne franchit jamais un import. Ce test, si :
-// il marche le graphe.
+// Regles, chacune nommant le fichier et le specificateur fautif :
+//   R0  un `import()` a specificateur calcule arrete la marche, et elle le dit ;
+//   R1  aucun specificateur non relatif (ni `node:`, ni paquet nu) : le navigateur ne le resout pas ;
+//   R2  tout specificateur relatif finit en `.ts` : le serveur ne sert que la source `.ts` ;
+//   R3  la cible existe : une cible introuvable sautee rendrait un faux vert ;
+//   R4  tout module atteint hors `src/web/` est servi par `ROUTES`, lue dans `src/server/routes.ts`.
 //
-// Les quatre regles, chacune nommant le fichier ET le specificateur fautif :
-//   R1  aucun specificateur non relatif atteignable (donc aucun `node:`, aucun
-//       paquet nu) : le navigateur ne sait pas le resoudre ;
-//   R2  tout specificateur relatif finit en `.ts` : le serveur sert des `.ts`,
-//       un `.js` designerait un fichier qui n'est pas sur le disque ;
-//   R3  la cible existe. Une cible introuvable SAUTEE rendrait un faux vert :
-//       le graphe s'arreterait avant le module Node qu'il cherche.
-//   R4  tout module atteint hors `src/web/` est servi par la table de routes,
-//       LUE dans `src/server/routes.ts`. Une seconde liste recopiee ici
-//       pourrait diverger de la vraie table sans que rien ne le dise.
-// Et R0 : un `import()` dynamique a specificateur calcule arrete la marche —
-// elle le DIT au lieu de le deviner.
+// Type ou valeur, mesure sur `stripTypeScriptTypes` en mode `strip`, celui du serveur :
+//   import type { X } from './m.ts';     ->  ligne blanchie, le fichier n'est pas demande
+//   import { type X } from './m.ts';     ->  import {        } from './m.ts';   demande
+//   import { v, type X } from './m.ts';  ->  import { v,      } from './m.ts';   demande
+// Les deux dernieres formes sont des aretes de VALEUR : `tool-subject.ts` n'est atteint que
+// par elles (`viz-errors.ts`, `viz-layout.ts`), et le test d'assiette le verrait.
 //
-// ─── Type ou valeur : la distinction qui decide de tout ────────────────────
-// Mesure sur `node:module.stripTypeScriptTypes`, le retrait que le serveur
-// applique lui-meme (mode `strip`) :
+// Analyse SYNTAXIQUE (API de `typescript`) : une expression reguliere lirait comme un
+// `import(` le motif francais `/\bqui\s+import(e|ent)\b/i` de `src/engine/doctor/detector.ts`.
 //
-//   import type { X } from './m.ts';     ->  (ligne entierement blanchie)
-//   import { type X } from './m.ts';     ->  import {        } from './m.ts';
-//   import { v, type X } from './m.ts';  ->  import { v,      } from './m.ts';
-//
-// La premiere forme efface la ligne : le navigateur ne demande jamais le
-// fichier. Les deux autres LAISSENT l'import : le navigateur VA CHERCHER le
-// fichier. Elles sont donc des aretes de VALEUR ici. Deux modules de
-// `src/web/` emploient deja la seconde (`viz-errors.ts`, `viz-layout.ts`), et
-// ce sont les SEULES aretes par lesquelles `tool-subject.ts` est atteint :
-// classer ces formes « type » ferait tomber l'assiette du moteur a un seul
-// module — c'est le test d'assiette qui le verrait.
-//
-// L'analyse est SYNTAXIQUE (API du compilateur `typescript`, deja en
-// dependance de developpement), jamais par expression reguliere : un motif
-// compte `import(` dans l'expression reguliere francaise
-// `/\bqui\s+import(e|ent)\b/i` de `src/engine/doctor/detector.ts` comme un
-// import dynamique.
-//
-// ─── CE QUE CE FILET NE PROUVE PAS ─────────────────────────────────────────
-//   1. Que les modules atteints TOURNENT dans un navigateur. Il ne lit que des
-//      imports : une API Node atteinte sans import (`process.env`,
-//      `globalThis.require`) lui echappe entierement.
-//   2. Que la table de routes ne s'ouvre pas trop. R4 demande qu'un module
-//      atteint SOIT servi ; elle ne dit rien de ce qui est servi EN PLUS. Un
-//      prefixe qui recouvre `/src/engine/` — par le bas (`/src/engine/core/`)
-//      comme par le haut (`/src/`) — rendrait R4 verte en ouvrant tout le
-//      moteur au navigateur. C'est `served-ts-strip-check.test.mjs` qui
-//      interdit ces prefixes, dans les deux sens.
-//   3. Que le corps servi compile : c'est `served-ts-strip-check.test.mjs`.
-//   4. Que le graphe est complet si un `import()` a specificateur calcule
-//      apparait : R0 signale l'angle mort, il ne le comble pas.
-//   5. Que le PAQUET PUBLIE emporte ce que R4 declare servi. R4 garantit le
-//      serveur de developpement. Le champ `files` de `package.json` recopie a
-//      la main les fichiers du moteur embarques : c'est une troisieme liste, et
-//      rien ne la croise avec la table de routes. Mesure : une route du moteur
-//      ajoutee sans toucher `files` laisse `package-entrypoints.test.mjs` vert.
+// Ce que ce filet ne prouve pas :
+//   - que les modules atteints tournent dans un navigateur : une API Node atteinte sans
+//     import (`process.env`, `globalThis.require`) lui echappe ;
+//   - que la table de routes ne s'ouvre pas trop (un prefixe qui recouvre `/src/engine/`)
+//     ni que le corps servi compile : c'est `served-ts-strip-check.test.mjs` ;
+//   - que le graphe est complet quand R0 signale un `import()` calcule ;
+//   - que le paquet publie emporte ce que R4 declare servi : c'est
+//     `package-entrypoints.test.mjs`, qui croise les routes du moteur avec `files`.
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire, stripTypeScriptTypes } from 'node:module';

@@ -6,10 +6,9 @@ import type { UsageBucket } from '../../core/usage.ts';
 
 type AssistantEvent = Extract<NormalizedEvent, { kind: 'assistant' }>;
 
-// C3 : l'accumulation des six champs bruts, la fusion de deux seaux et la règle
-// de déduplication vivent désormais dans `core/usage.ts` — une seule définition,
-// partagée avec le serveur par un pont. Ce qui reste ici est ce qui n'appartient
-// qu'au moteur : la ventilation par modèle et le coût daté.
+// L'accumulation des six champs bruts, la fusion de deux seaux et la règle de
+// déduplication ont une seule définition, `core/usage.ts`, que le serveur importe
+// aussi. Reste ici ce qui n'appartient qu'au moteur : ventilation par modèle, coût daté.
 export type TokenBucket = UsageBucket;
 export const emptyBucket = emptyUsageBucket;
 

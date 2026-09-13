@@ -14,12 +14,12 @@ import { decodeJsonlLine } from '../engine/core/jsonl.ts';
 import { ensureTokens, scheduleTokensBroadcast, tokenSum } from './tokens.ts';
 import { broadcastSessionsChanged } from './sse.ts';
 import { getAdapter } from './transcript-adapters/index.ts';
-// Type partagé du contrat de Liskov des adaptateurs (index.ts, hors lot mais
-// même lot 8) : ce que `parseUsageLine`/`discoverPath` attendent réellement
-// pour `rec`. Emprunté par nom plutôt que redéclaré localement.
+// Type partagé du contrat de Liskov des adaptateurs : ce que
+// `parseUsageLine`/`discoverPath` attendent réellement pour `rec`. Emprunté par
+// nom plutôt que redéclaré localement.
 import type { UsageRecord } from './transcript-adapters/claude.ts';
-// Ruling R8 (doc/36 §4.1) : `import type` seul, pour typer localement ce que
-// `rec.tokens.main` porte réellement — voir `TokenState` ci-dessous.
+// `import type` seul, pour typer localement ce que `rec.tokens.main` porte
+// réellement — voir `TokenState` ci-dessous.
 import type { UsageBucket } from '../engine/core/usage.ts';
 
 // La tranche `rec.transcript` telle que CE fichier la construit et la lit

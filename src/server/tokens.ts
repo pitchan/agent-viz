@@ -65,12 +65,9 @@ function newBucket(): Bucket {
     ...emptyUsageBucket(),
     lastIn: 0, lastCacheCreate: 0, lastCacheRead: 0,
     lastModel: null, contextMax: 0, costUsd: 0,
-    // C4 : la COMPLÉTUDE du coût, portée par le seau lui-même donc présente
-    // telle quelle dans l'enveloppe SSE. `costUsd` n'est pas un montant faux,
-    // c'est une BORNE INFÉRIEURE exacte : la somme des messages dont le tarif
-    // est connu. `costComplete: false` dit que le vrai coût est AU-DESSUS, et
-    // `unknownModels` dit lesquels manquent. Un tableau, pas un Set :
-    // JSON.stringify sérialise un Set en `{}` (cf. `_seenMsgIds`).
+    // Complétude du coût, portée par le seau donc par l'enveloppe SSE : `costUsd` est une
+    // BORNE INFÉRIEURE exacte, `costComplete: false` dit que le vrai coût est AU-DESSUS et
+    // `unknownModels` dit lesquels manquent (un tableau : un Set sérialise en `{}`).
     costComplete: true, unknownModels: [],
     // Set of Anthropic message ids already accumulated. Claude Code writes one
     // JSONL line per content block (thinking, text, tool_use) but every line
@@ -153,31 +150,17 @@ function accumulateUsage(
   // totalise correctement. `at` (horodatage du message) choisit le barème en
   // vigueur À CETTE DATE — les tarifs changent (Sonnet 5 jusqu'au 2026-08-31).
   //
-  // C4 : la formule ET la qualification du tarif viennent du moteur, seule
-  // autorité tarifaire du produit. `pricingKindOf` nomme les TROIS cas, et
-  // chacun appelle une conduite différente :
-  //
-  //   'tarife'      → on compte, et le modèle devient celui qu'affiche la
-  //                   pastille, avec sa fenêtre de contexte.
-  //   'zero-voulu'  → `<synthetic>`, Ollama local : 0 $ VOULU, le total reste
-  //                   COMPLET. Ne devient PAS le modèle affiché — c'est un
-  //                   artefact du harnais, pas le modèle au travail, et il
-  //                   apparaît 80 fois sur les 833 transcriptions de la
-  //                   machine de mesure, entrelacé dans des sessions normales.
-  //   'inconnu'     → rien à compter, mais on le NOMME et on marque le total
-  //                   incomplet. C'est ce que le serveur taisait : le message
-  //                   était purement IGNORÉ et le montant restait net de toute
-  //                   réserve. Il pose quand même `lastModel`, sans quoi une
-  //                   session n'employant que des modèles hors table masquait
-  //                   la pastille entièrement — ni coût, ni contexte, ni
-  //                   modèle à l'écran.
-  //
-  // Le cas ne se DÉDUIT pas d'un montant nul : un modèle tarifé n'ayant produit
-  // aucun jeton coûte 0 $ lui aussi. Et il ne se déduit pas non plus de
-  // `getPrice`, qui ne sert plus qu'aux MÉTADONNÉES d'affichage : faire
-  // dépendre le montant de l'accord entre la carte du serveur et la table du
-  // moteur rendrait un désaccord silencieux, ce que C4 vient précisément de
-  // fermer ailleurs.
+  // La formule et la qualification du tarif viennent du moteur. `pricingKindOf`
+  // nomme TROIS cas, chacun avec sa conduite :
+  //   'tarife'     → on compte, et le modèle devient celui de la pastille, avec sa
+  //                  fenêtre de contexte ;
+  //   'zero-voulu' → `<synthetic>`, Ollama local : 0 $ VOULU, total COMPLET, jamais le
+  //                  modèle affiché (un artefact du harnais, pas le modèle au travail) ;
+  //   'inconnu'    → rien à compter : on le NOMME, le total devient incomplet, et
+  //                  `lastModel` est posé, sans quoi une session hors table masque la pastille.
+  // Le cas ne se déduit ni d'un montant nul (un modèle tarifé sans jeton coûte 0 $), ni de
+  // `getPrice`, réservé aux MÉTADONNÉES d'affichage : un désaccord entre la carte du serveur
+  // et la table du moteur deviendrait silencieux.
   if (model) {
     const canonique = normalizeModel(model);
     const nature = pricingKindOf(model, at ?? undefined);

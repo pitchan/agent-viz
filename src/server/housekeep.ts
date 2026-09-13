@@ -59,11 +59,9 @@ async function compactSession(fp: string): Promise<void> {
   // Build summary from the full history before we throw away old lines.
   const summary: SessionSummary = { id, compactedAt: new Date().toISOString(), totalEvents: allLines.length, tools: [], prompt: rec.promptCache || null };
   for (const line of allLines) {
-    // C2 : le verdict sur une ligne vient de la primitive commune du moteur, il
-    // n'est plus réimplémenté ici. Conséquence voulue : une ligne préfixée d'un
-    // BOM est désormais décodée au lieu d'être perdue, où qu'elle se trouve dans
-    // le fichier — avant, seule celle en toute première position survivait, et
-    // par accident, parce que le `content.trim()` ci-dessus la nettoyait.
+    // Le verdict sur une ligne vient de la primitive du moteur : une ligne préfixée
+    // d'un BOM est décodée où qu'elle se trouve, et pas seulement en tête du fichier,
+    // là où `content.trim()` ci-dessus la nettoie.
     const verdict = decodeJsonlLine(line);
     if (!verdict || !verdict.ok) continue;
     const evt = verdict.value;

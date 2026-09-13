@@ -341,7 +341,7 @@ describe('computeCost — cache_creation non exploitable (C4)', () => {
 // computeCost garde chaque champ brut par `finiteCount` : un champ non fini
 // (NaN, Infinity, une chaîne) coûte zéro, comme il compte zéro jeton dans
 // usage.ts — jamais une conversion implicite qui facture un texte.
-describe('computeCost — champ brut non fini : coûte zéro comme il compte zéro (5 bis)', () => {
+describe('computeCost — champ brut non fini : coûte zéro comme il compte zéro', () => {
   const model = 'claude-opus-4-8';
   const resteValide = {
     output_tokens: 2000,
@@ -385,7 +385,7 @@ describe('computeCost — champ brut non fini : coûte zéro comme il compte zé
 // cache_creation_input_tokens n'est lu que quand l'objet cache_creation est
 // absent (tout part alors au tarif 5m) : cette voie a sa propre garde à
 // prouver, le describe ci-dessus ne l'atteint jamais.
-describe('computeCost — cache_creation_input_tokens non fini SANS objet cache_creation (5 bis)', () => {
+describe('computeCost — cache_creation_input_tokens non fini SANS objet cache_creation', () => {
   const model = 'claude-opus-4-8';
   const reference = computeCost({ input_tokens: 10, output_tokens: 20 }, model).usd as number;
 

@@ -1,9 +1,6 @@
-// Couture d'installation du pont. Ce fichier fait le monkey-patching que la
-// regle D du CLAUDE.md racine proscrit ailleurs : c'est le seul endroit ou il
-// est inevitable — on ne peut pas injecter dans `require('node:test')` des 42
-// fichiers de tests sans y toucher, et y toucher est precisement ce que
-// l'etape 1 interdit. L'ecart est donc voulu et confine a ce fichier ; toute
-// la logique vit dans la fabrique, qui est pure et testee.
+// Couture d'installation du pont : le monkey-patching que la regle D du CLAUDE.md
+// racine proscrit ailleurs est ici le seul moyen d'atteindre les `require('node:test')`
+// des tests CommonJS sans les modifier. Toute la logique vit dans la fabrique, pure et testee.
 import Module from 'node:module';
 import { test, afterAll, beforeEach, vi } from 'vitest';
 import { createBridge } from './create-bridge.mjs';

@@ -461,7 +461,7 @@ const REQUIRED_DIST_FILES = [
   ['engine', 'doctor', 'index.js'],
 ].map(segs => path.join(PKG_ROOT, 'dist', ...segs));
 
-// Une seule garde avant le branchement : dix sites plus bas chargent dist/*.js.
+// Une seule garde avant le branchement : les commandes plus bas chargent dist/*.js.
 // Fichier compile absent = fatal, rien ne peut tourner. Source .ts plus recente que
 // le temoin de tsc -b = avertissement : la commande servirait l'ancien code sans un mot.
 function ensureBuildIsFresh(cmd) {

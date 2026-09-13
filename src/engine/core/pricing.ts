@@ -86,12 +86,9 @@ function priceAt(model: string, at: string): ModelPrices | undefined {
  * Ramène un id modèle à sa forme canonique : retire suffixe [1m]/[200k],
  * préfixes de transport et de routage régional, versions -vN[:M] et dates.
  *
- * C4 (2026-08-11) — définition UNIQUE de la normalisation du produit : le
- * serveur (`src/server/pricing.js`) la consomme désormais par un pont au lieu
- * de porter la sienne. La sonde différentielle avait montré que les deux
- * jumelles avaient divergé — l'ancienne forme d'ici ne connaissait ni les
- * routeurs régionaux ni le suffixe `-vN` seul, si bien que le moteur annonçait
- * « coût partiel » sur un identifiant que le serveur tarifait sans réserve.
+ * Définition UNIQUE de la normalisation du produit : le serveur
+ * (`src/server/pricing.ts`) l'importe. Deux copies divergent en silence, et le
+ * moteur annonce alors « coût partiel » sur un identifiant que le serveur tarife.
  *
  * Les préfixes s'EMPILENT (`bedrock/anthropic.…`) : une alternance appliquée
  * une seule fois n'en retirait qu'un et laissait l'identifiant inconnu. D'où
