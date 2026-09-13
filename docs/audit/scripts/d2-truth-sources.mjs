@@ -12,7 +12,7 @@
 // construction, puisque les clés diffèrent. Ce constat appartient à la matrice
 // de D7.
 //
-// LIMITE VOULUE : extraction par expression rationnelle sur des littéraux
+// LIMITE CONNUE : extraction par expression rationnelle sur des littéraux
 // d'objet à un niveau d'imbrication. Une table construite par calcul échappe à
 // la mesure ; aucune n'existe dans ce dépôt au commit audité.
 //

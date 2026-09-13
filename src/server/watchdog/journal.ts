@@ -312,7 +312,7 @@ function createJournal({ filePath = DEFAULT_PATH, now = Date.now }: { filePath?:
     // n'existe aucune file de reprise — mais parce que rendre false laisserait
     // le panneau allume sur une alerte que l'utilisateur vient d'eteindre : il
     // recliquerait, sans fin, sur un disque qui ne repond pas. Le prix est
-    // un choix, et il est nomme : cet acquittement-la sera perdu au redemarrage.
+    // connu et il est nomme : cet acquittement-la sera perdu au redemarrage.
     // Seule une cle inutilisable est un refus — celle-la, meme un disque en
     // pleine forme ne la retrouverait pas, et l'appelant doit pouvoir ne rien
     // conclure d'un acquittement qui n'a pas eu lieu.
@@ -355,7 +355,7 @@ function createJournal({ filePath = DEFAULT_PATH, now = Date.now }: { filePath?:
     // La fenetre se mesure sur l'heure de l'evenement. Pas de borne haute :
     // `createdAt` vient du hook, pas du serveur, et jeter un fait parce qu'il
     // est date du futur perdrait justement la panne qu'on cherche a consigner.
-    // Le prix est choisi et il n'est pas nul. Quelques minutes d'avance :
+    // Le prix est connu et il n'est pas nul. Quelques minutes d'avance :
     // l'alerte remonte en tete, ce qui se voit et se comprend. Un an d'avance :
     // elle ne sortira JAMAIS de la fenetre ni de la retention, et restera
     // epinglee en tete du panneau a vie, sans qu'aucun acquittement ne la

@@ -109,8 +109,8 @@ test('sans rien de posé, c’est <home>/.claude', async () => {
 // posée, le fichier est écrit DANS le dossier de configuration ; non posée, à
 // côté du home. Le produit le cherchait au home dans les deux cas : c'est ce qui
 // fait disparaître R2 du protocole de contrôle (USERPROFILE jetable +
-// CLAUDE_CONFIG_DIR réel), un coût noté comme « choisi » alors qu'il était ce
-// défaut-ci.
+// CLAUDE_CONFIG_DIR réel), un coût accepté d'avance dans la recette, alors qu'il
+// était ce défaut-ci.
 test('CLAUDE_CONFIG_DIR déplace AUSSI .claude.json — dans le dossier, pas au home', async () => {
   assert.strictEqual(
     (await resoudreAvec({ CLAUDE_CONFIG_DIR: AILLEURS, NETGAIN_CLAUDE_DIR: undefined })).claudeJsonPath,

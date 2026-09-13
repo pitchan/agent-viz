@@ -9,7 +9,7 @@
 // Fusion inter-agents par horodatage au bilan : scanSession lit le transcript
 // principal PUIS chaque sous-agent, l'ordre de lecture n'est donc pas l'ordre
 // du temps. Un événement sans horodatage exploitable est compté (`unordered`),
-// jamais classé au hasard. Limite v1 voulue : un fichier modifié par commande
+// jamais classé au hasard. Limite connue : un fichier modifié par commande
 // shell (sed, redirection) est invisible — seuls Edit/Write/MultiEdit/
 // NotebookEdit comptent comme éditions.
 //
@@ -83,7 +83,7 @@ const FILES_CAP = 20;
 // La CLASSIFICATION, elle, reçoit toujours la commande entière — le classifieur
 // tolère déjà ces préfixes, seul le stockage est nettoyé.
 //
-// Deux conséquences voulues, pour qu'elles ne se relisent pas comme des
+// Deux conséquences, nommées ici pour qu'elles ne se relisent pas comme des
 // défauts. `\S*` et non `\S+` : `FOO=` (valeur vide) était déjà retiré par la
 // forme ancrée, et le passer à `\S+` aurait été une régression. Et un drapeau
 // long à valeur (`--reporter=json`) est retiré lui aussi, ne laissant que

@@ -78,8 +78,8 @@ describe('resolveClaudeDir', () => {
 // Le produit, lui, cherchait ce fichier au home DANS TOUS LES CAS
 // (src/server/observatory/index.js:34). Ce n'est pas une hypothese : c'est ce
 // qui fait disparaitre la carte R2 sous le protocole de controle du depot, ou
-// USERPROFILE est jetable et CLAUDE_CONFIG_DIR reel — cout mis sur le compte du
-// protocole dans cette recette, alors que c'etait ce defaut-ci.
+// USERPROFILE est jetable et CLAUDE_CONFIG_DIR reel — cout accepte d'avance dans
+// cette recette, alors que c'etait ce defaut-ci.
 describe('resolveClaudeJsonPath', () => {
   test('sans variable, le fichier est A COTE du dossier, pas dedans', () => {
     // Le piege exact : `path.join(resolveClaudeDir(), '.claude.json')` donnerait

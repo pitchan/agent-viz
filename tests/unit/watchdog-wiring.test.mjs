@@ -664,7 +664,7 @@ test('demarrage: ce que le serveur oublie de fournir se dit a voix haute', async
 // `broadcastAlert: broadcastSSE` passe la garde, et les alertes partent en `{type:'stuck', …}`
 // au lieu de `{type:'alert', alert}`, que le client (`src/web/viz-network.ts`) ne lit pas comme une alerte.
 //
-// Le prix est choisi : reformater ces lignes fait rougir ces tests. C'est le but.
+// Le prix est connu : reformater ces lignes fait rougir ces tests. C'est le but.
 const SOURCE_SERVEUR = fs.readFileSync(
   path.join(import.meta.dirname, '..', '..', 'src', 'server', 'server.ts'), 'utf8');
 

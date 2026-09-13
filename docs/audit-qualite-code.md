@@ -675,7 +675,7 @@ lue au même endroit par les deux chemins de code.
 > raccourci évident `join(resolveClaudeDir(), '.claude.json')` se trompe dans le
 > cas par défaut. Conséquence concrète : ce défaut est ce qui faisait disparaître
 > la carte R2 du protocole de contrôle de l'instrument (USERPROFILE jetable +
-> `CLAUDE_CONFIG_DIR` réel) — un coût mis sur le compte du protocole dans la recette, alors
+> `CLAUDE_CONFIG_DIR` réel) — un coût accepté d'avance dans la recette, alors
 > qu'il était ce défaut-ci. **Cela invalide au passage la ligne de « Constats »
 > qui range `.claude.json` parmi les cinq `chemin-litteral` de D2 « qui
 > s'accordent partout, sans divergence à trancher, pas un défaut cousin de C5 » :
@@ -1126,7 +1126,7 @@ commentaire porte directement, pas ce chemin mort. `spec` renvoie à doc/12
 `seuil-de-regle` n'est ressorti de D2 — cohérent avec des seuils déjà
 centralisés en un seul fichier plutôt que recopiés ailleurs.
 
-### La découverte de sessions : deux stratégies opposées, voulues
+### La découverte de sessions : deux stratégies opposées, choisies
 
 `docs/audit/resultats/d7.json`, geste `decouverte-de-sessions`,
 `verdict: "strategies-opposees"` — **pas** `"duplique"`. Le serveur reçoit
@@ -1305,7 +1305,7 @@ Recopiées sans reformulation depuis l'en-tête de chaque script cité.
 
 **`lib/tokens.mjs`** (alimente D1 et D5) :
 
-> LIMITE VOULUE (doc/34), toujours vraie : découpage par expression
+> LIMITE CONNUE (doc/34), toujours vraie : découpage par expression
 > rationnelle, pas par analyseur syntaxique — les identifiants sont conservés
 > tels quels, donc un clone dont les variables ont été renommées n'est PAS
 > détecté.
@@ -1345,7 +1345,7 @@ Recopiées sans reformulation depuis l'en-tête de chaque script cité.
 
 **`d1-clones.mjs`** :
 
-> LIMITES VOULUES : ne voit ni les clones à identifiants renommés (les
+> LIMITES CONNUES : ne voit ni les clones à identifiants renommés (les
 > identifiants ne sont pas neutralisés), ni les clones INTRA-fichier (un
 > groupe exige au moins deux fichiers distincts), ni les clones qui
 > traversent les langages — c'est le rôle de D7.
@@ -1357,7 +1357,7 @@ Recopiées sans reformulation depuis l'en-tête de chaque script cité.
 > construction, puisque les clés diffèrent. Ce constat appartient à la
 > matrice de D7.
 >
-> LIMITE VOULUE : extraction par expression rationnelle sur des littéraux
+> LIMITE CONNUE : extraction par expression rationnelle sur des littéraux
 > d'objet à un niveau d'imbrication. Une table construite par calcul échappe
 > à la mesure ; aucune n'existe dans ce dépôt au commit audité.
 >
@@ -1389,7 +1389,7 @@ rendu Markdown en fermant la portée de code trop tôt. Le texte est identique
 au caractère près à celui du fichier source ; seul le délimiteur Markdown
 qui l'entoure a été élargi à deux guillemets obliques.*
 
-> LIMITE VOULUE : ces motifs sont syntaxiques. Un formatage écrit autrement
+> LIMITE CONNUE : ces motifs sont syntaxiques. Un formatage écrit autrement
 > (Intl, bibliothèque tierce) passerait au travers — aucun n'existe dans ce
 > dépôt au commit audité, et c'est précisément ce que dit le constat sur les
 > conventions numériques.

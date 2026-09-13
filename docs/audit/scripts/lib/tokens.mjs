@@ -1,6 +1,6 @@
 // Découpage en jetons : commentaires retirés, chaînes et nombres neutralisés.
 //
-// LIMITE VOULUE (doc/34), toujours vraie : découpage par expression
+// LIMITE CONNUE (doc/34), toujours vraie : découpage par expression
 // rationnelle, pas par analyseur syntaxique — les identifiants sont conservés
 // tels quels, donc un clone dont les variables ont été renommées n'est PAS
 // détecté.
