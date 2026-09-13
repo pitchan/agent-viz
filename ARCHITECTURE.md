@@ -50,7 +50,7 @@ changer, pas le même langage, et pas la même bibliothèque disponible :
 
 | Unité | Ce dont elle est seule responsable | Ce qu'elle ne fait jamais |
 |---|---|---|
-| **serveur** | capter les crochets, tenir le démon, servir HTTP et SSE, orchestrer les scans, tenir la base dérivée | lire un transcript ligne à ligne, calculer un prix, dessiner |
+| **serveur** | capter les hooks, tenir le démon, servir HTTP et SSE, orchestrer les scans, tenir la base dérivée | lire un transcript ligne à ligne, calculer un prix, dessiner |
 | **moteur** | lire les transcripts, découvrir les sessions, agréger les jetons, tarifer, appliquer les règles de diagnostic | connaître le démon, connaître une page, ouvrir un socket HTTP entrant |
 | **navigateur** | rendre, tenir l'état de page, réagir | toucher au disque, ouvrir un fichier, importer un module `node:` |
 
@@ -65,7 +65,7 @@ l'avertissement du § 8.
 
 ### 2.1 Le serveur
 
-**55 fichiers** dans `src/server/`, plus le binaire, **ES modules** — la racine
+`src/server/` et le binaire sont des **ES modules** — la racine
 porte `"type": "module"` **depuis l'étape 3 de la migration**. Elle a porté
 `"type": "commonjs"` jusque-là, et c'est cette ligne unique qui commandait le
 régime des deux arbres à la fois.
@@ -87,12 +87,12 @@ choix qui laisse invariantes les **cinq** traversées `__dirname` de
 cran, et l'arithmétique de `..` est la classe d'échec silencieuse.
 
 **Ces cinq traversées `__dirname` n'ont rien à voir avec les six traversées DE
-FRONTIÈRE du § 4**, et le voisinage des deux chiffres a déjà produit une erreur :
-une rédaction antérieure écrivait « six traversées `__dirname` (§ 4) », où un six
-périmé se lisait comme corroboré par un six juste. Ce sont deux objets
-différents — ici, **du calcul de chemin relatif au fichier** ; là-bas, **des
-appels du serveur CommonJS vers le moteur ESM**. Le compte, mesuré sur l'état
-d'avant le déplacement :
+FRONTIÈRE serveur → moteur que l'étape 6 a retirées (§ 4)**, et le voisinage des
+deux chiffres a déjà produit une erreur : une rédaction antérieure écrivait « six
+traversées `__dirname` (§ 4) », où un six périmé se lisait comme corroboré par un
+six juste. Ce sont deux objets différents — ici, **du calcul de chemin relatif au
+fichier** ; là-bas, **des appels du serveur vers le build du moteur**. Le compte,
+mesuré sur l'état d'avant le déplacement :
 
 ```
 git grep -n "__dirname" 7474f41 -- lib/server
@@ -111,8 +111,8 @@ le précédent que [CLAUDE.md](./CLAUDE.md) cite pour le principe ouvert/fermé.
 
 ### 2.2 Le moteur
 
-**45 fichiers** TypeScript `strict`, ES modules, compilés par `tsc` vers
-`dist/engine/`.
+TypeScript `strict`, ES modules, compilés par `tsc` vers `dist/engine/`, dans le
+même build que le serveur (§ 4).
 
 ```
 src/engine/core/       lecture JSONL, découverte de sessions, usage, tarifs
@@ -300,9 +300,8 @@ tenir ce cas-là, pas seulement le cas transitif qu'elle devait déjà couvrir.
 
 Le déplacement a d'ailleurs **changé la forme** de la deuxième : avant, le moteur
 s'atteignait par `../netgain/dist/`, un segment que `(\.\./)*(lib|netgain)/`
-attrapait. Aujourd'hui il s'atteint par `../../dist/engine/`, où `dist/` s'insère
-entre les `../` et le nom de l'unité — l'ancien motif serait **muet**, et muet
-n'est pas la même chose que vrai.
+attrapait. Aujourd'hui le serveur l'atteint par sa source, `../engine/core/…` —
+l'ancien motif serait **muet**, et muet n'est pas la même chose que vrai.
 
 **Pourquoi les contrôles négatifs sont écrits là plutôt que sous-entendus.** La
 première rédaction de cette section portait un motif `(lib\|netgain)` sous
@@ -336,93 +335,62 @@ qui le comblera.
 
 ---
 
-## 4. Les traversées de frontière, mesurées
+## 4. La frontière serveur → moteur
 
-**Depuis l'étape 3, les deux unités ont le même régime de modules** — ES modules
-des deux côtés. On pourrait croire que la frontière disparaît avec lui : elle ne
-disparaît pas, elle **change de nature**. Ce que le serveur atteint n'est pas
-`src/engine/`, c'est `dist/engine/` : la frontière n'est plus *CommonJS contre
-ES modules*, elle est **source contre build**. Chaque appel du serveur vers le
-moteur paie donc toujours un droit de passage, et ce droit reste écrit en
-**six fichiers**, par **deux mécanismes distincts**. Leur retrait est daté :
-c'est l'étape 6, quand le serveur importera la source compilée directement.
-
-*Ce que la bascule a changé dans ces six fichiers est plus mince qu'on ne
-l'attendrait* : la primitive charge désormais par un `require` fabriqué
-(`createRequire(import.meta.url)`) au lieu du `require` ambiant. Elle reste
-**synchrone**, ce qui est la propriété qui compte — un `import()` aurait
-contaminé d'`await` les quatre ré-exports et leurs appelants.
-
-### 4.1 Par `require` synchrone — 5 fichiers, 199 lignes
-
-> **Corrigé le 2026-08-27.** Ce titre annonçait « 173 lignes » — un chiffre resté
-> de l'étape 3, quand la table portait l'en-tête « Lignes » (toutes lignes) sur
-> les cinq fichiers `.js` : 68 + 39 + 25 + 22 + 19 = 173. La table a été refaite
-> à l'étape 4 (bascule `.ts`) avec un nouvel en-tête, « Lignes non vides », et de
-> nouvelles valeurs ; le titre, lui, n'a jamais suivi. Les valeurs par fichier
-> ci-dessous sont justes (recomptées par `grep -cve '^[[:space:]]*$'` et par
-> `awk 'NF>0'`, résultats identiques) — c'est leur somme au titre qui était
-> périmée de deux conventions et d'une migration.
+**Le serveur importe la source du moteur**, par des `import` statiques aux
+chemins relatifs en `.ts`. Il n'y a ni pont, ni chargeur, ni liste de noms écrite
+à la main : un nom qui disparaît du moteur est une erreur de `npm run typecheck`.
+Extrait de la sortie :
 
 ```
-grep -rln "engine-require\|requireEngineModule" src/server
+git grep -nE "from '(\.\./)+engine/" -- src/server
+  src/server/tokens.ts:21:import { addUsage, emptyUsageBucket, finiteCount, isDedupableMsgId } from '../engine/core/usage.ts';
+  src/server/observatory/engine.ts:18:import { discoverSessions, parseSince, priceTable } from '../../engine/core/index.ts';
+  src/server/transcript.ts:13:import { decodeJsonlLine } from '../engine/core/jsonl.ts';
 ```
 
-Les deux motifs sont nécessaires, et c'est une leçon plutôt qu'un détail :
-chercher le seul nom de fichier rend les quatre **consommateurs** et manque la
-**primitive**, qui ne se nomme pas elle-même. Un inventaire de frontière écrit
-contre le premier motif serait faux d'un fichier sans avoir l'air incomplet.
+Une primitive du moteur n'a qu'une définition : un fichier de `src/server/` qui
+en redéfinit une localement fait rougir `tests/repo/no-local-engine-primitives.test.mjs`.
 
-| Fichier | Lignes non vides | Rôle |
-|---|---|---|
-| `src/server/engine-require.ts` | 72 | **la primitive** : calcule `dist/engine`, charge, et nomme deux pannes distinctes — *build manquant* et *build périmé* |
-| `src/server/pricing-engine.ts` | 43 | ré-export : `computeCost`, `normalizeModel`, `pricingKindOf` |
-| `src/server/usage.ts` | 33 | ré-export : `addUsage`, `emptyUsageBucket`, `finiteCount`, `isDedupableMsgId`, `sumUsageInto` |
-| `src/server/claude-dir.ts` | 30 | ré-export : `resolveClaudeDir`, `resolveClaudeJsonPath`, `CLAUDE_DIR_ENV` |
-| `src/server/jsonl.ts` | 21 | ré-export : `decodeJsonlLine` |
+`src/server/observatory/engine.ts` est l'adaptateur qui injecte le moteur dans
+l'observatoire : les règles et l'orchestration le reçoivent en paramètre, ce qui
+les rend testables sans lui. Il exporte aussi `FIXTURE_CLAUDE_DIR`, un chemin vers
+`tests/fixtures/observatory/` : du code de production désigne un répertoire que le
+paquet publié ne contient pas (`tests/` est hors de `files`). Son seul consommateur
+est `tests/unit/observatory-engine-contract.test.cjs`.
 
-Les quatre modules de ré-export sortent 12 noms du moteur, mais n'en déclarent
-que **11** au contrôle de la primitive. C'est une approximation manuelle d'un
-contrôle de types : si le moteur renomme une de ces 11 fonctions, c'est cette
-liste écrite en dur qui lève, et non le compilateur.
+**Un seul build produit les deux arbres compilés.** `npm run build` efface
+`dist/engine` et `dist/server`, puis lance `tsc -b tsconfig.build.json` —
+`rootDir` `src`, `outDir` `dist`, `include` `src/engine/**/*.ts` et
+`src/server/**/*.ts`. Les imports en `.ts` sortent en `.js`
+(`rewriteRelativeImportExtensions`, dans `tsconfig.json`) :
+`dist/server/tokens.js` importe `../engine/core/usage.js`. Le binaire charge
+`dist/`, jamais la source.
 
-**Le douzième nom est le trou, et il est structurel.** `claude-dir.ts:35`
-ré-exporte `CLAUDE_DIR_ENV` sans le faire vérifier, et il ne *peut* pas le faire
-vérifier : `engine-require.ts:67` ne sait contrôler que des fonctions —
-`noms.filter(nom => typeof module[nom] !== 'function')`. Or `CLAUDE_DIR_ENV` est
-une **chaîne** (`src/engine/core/claude-dir.ts:9`). L'inscrire dans la liste
-ferait lever le contrôle en permanence ; l'en laisser dehors le rend invisible.
-Si le moteur le renommait, il deviendrait `undefined` en silence chez tous ses
-consommateurs — exactement le mode de panne que la primitive existe pour
-supprimer.
+**Une garde dans le binaire le rappelle** : `ensureBuildIsFresh`
+(`bin/agent-viz.js`), appelée avant l'aiguillage des commandes.
 
-### 4.2 Par `import()` dynamique — 1 fichier
+| Situation | Ce que fait la garde |
+|---|---|
+| un fichier compilé requis manque (`REQUIRED_DIST_FILES` : les modules des commandes sous `dist/server/`, `dist/engine/core/index.js`, `dist/engine/doctor/index.js`) | arrête, `exit 1`. Dans un dépôt de développement (`src/server/` présent), le message nomme `npm run build` ; sur un paquet installé, une réinstallation |
+| un `.ts` de `src/engine/` ou de `src/server/` est plus récent que le témoin `dist/tsconfig.build.tsbuildinfo` | avertit sur la sortie d'erreur, et la commande continue |
+| le témoin est absent | avertit qu'elle ne peut pas juger de la fraîcheur, et la commande continue |
+| la commande est `hook` | ne fait que le contrôle des fichiers manquants : aucun avertissement de fraîcheur |
 
-`src/server/observatory/engine.ts` calcule lui aussi le chemin de `dist/engine`
-(l. 47) et charge le moteur par `import()` (l. 66-67), **sans passer par la
-primitive**. Ce n'est pas un ré-export : c'est l'adaptateur qui injecte le moteur
-dans l'observatoire, et tout ce qui est en aval le reçoit en paramètre — ce qui
-rend les règles testables sans le moteur.
+**Ce que la garde ne voit pas : l'issue du build.** Elle compare des présences
+et des dates. Un `npm run build` en erreur se voit à sa propre sortie — les
+erreurs de `tsc` et un code de sortie non nul —, jamais à la garde.
+`tests/repo/build-guards.test.mjs` rejoue ces situations sur un arbre synthétique
+hors du dépôt.
 
-Une conséquence pratique, à connaître avant de vérifier quoi que ce soit sur
-cette frontière : **un contrôle qui ne compte que les ré-exports laisse cette
-traversée-là invisible.** Les deux mécanismes se vérifient séparément ou pas du
-tout.
+**La frontière du navigateur est tenue par trois filets de dépôt**, qui lisent
+la table `ROUTES` de `src/server/routes.ts` au lieu d'en recopier une :
 
-**Les deux mécanismes n'ont pas non plus la même robustesse**, et l'écart va dans
-le sens qu'on n'attend pas. La primitive vérifie ses noms (11 sur 12, § 4.1) et
-nomme un build périmé. `observatory/engine.ts`, lui, `import()` puis lit **cinq**
-exports **directement, sans aucun contrôle** — `core.discoverSessions` (l. 75),
-`core.parseSince` (76), `doctor.scanSession` (77), `doctor.netTokens` (78),
-`core.priceTable` (82) : un export disparu ne s'y annonce pas, il devient
-`undefined` et échoue plus loin.
-
-Un dernier détail sur ce fichier, parce qu'il est vrai et qu'il n'est pas
-joli : il déclare `FIXTURE_CLAUDE_DIR` (l. 46), un chemin vers
-`tests/fixtures/observatory/`, et l'exporte (l. 104). Du code de production
-désigne donc un répertoire que le paquet publié ne contient pas — `tests/` est
-hors de `files`. Son seul consommateur est
-`tests/unit/observatory-engine-contract.test.cjs`.
+| Filet | Ce qu'il tient |
+|---|---|
+| `tests/repo/served-web-graph.test.mjs` | le graphe d'imports atteignable depuis `src/web/` : uniquement des chemins relatifs en `.ts` qui existent, et chaque module atteint hors de `src/web/` servi par `ROUTES` |
+| `tests/repo/served-ts-strip-check.test.mjs` | chaque fichier servi, types retirés par le même chemin que la requête HTTP, passe `node --check` ; aucun préfixe de route ne recouvre `/src/engine/` |
+| `tests/repo/package-entrypoints.test.mjs` | chaque route `/src/engine/…` figure dans le champ `files` de `package.json`, donc dans le paquet publié |
 
 ---
 
@@ -435,7 +403,7 @@ la principale façon de se tromper sur ce produit.
 
 ```
 Claude Code / Copilot CLI
-   └─ le crochet lance `agent-viz hook`
+   └─ le hook lance `agent-viz hook`
         ├─ écrit  ${tmpdir}/agent-events/<session>.jsonl     (dossier : hook.ts:25
         │                                                     écriture : hook.ts:82)
         └─ POST /notify au démon, sans attendre la réponse
@@ -443,7 +411,7 @@ Claude Code / Copilot CLI
                     └─ la page se met à jour                  (viz-network.ts:111)
 ```
 
-Chaud, éphémère, purgé toutes les heures (`src/server/server.ts:116`). Le crochet
+Chaud, éphémère, purgé toutes les heures (`src/server/server.ts:116`). Le hook
 **n'attend jamais** le démon : un démon éteint ne ralentit pas la session de
 l'utilisateur.
 
@@ -467,7 +435,7 @@ supprimer ne perd que les statuts posés à la main sur les recommandations.
 
 ## 6. Les points d'entrée
 
-Ils se comptent en deux temps, et les confondre fait manquer un crochet.
+Ils se comptent en deux temps, et les confondre fait manquer un hook.
 
 **Ce que le paquet déclare** — `package.json` :
 
@@ -501,19 +469,19 @@ n'est pas tourner, et c'est pourquoi chaque étape de la migration se termine
 encore par `node bin/agent-viz.js --version`, `node dist/engine/cli.js --version`
 et `npm pack --dry-run --ignore-scripts`.
 
-**Ce que l'agent invoque tout seul** — un crochet, sur un seul binaire :
+**Ce que l'agent invoque tout seul** — un hook, sur un seul binaire :
 
-| Crochet | Commande inscrite | Événement |
+| Hook | Commande inscrite | Événement |
 |---|---|---|
 | agent-viz | `node "<abs>/bin/agent-viz.js" hook --source=claude\|copilot` **ou** `npx --yes @vcueto/agent-viz@X.Y.Z hook --source=…` | les événements Claude / Copilot |
 
-Le crochet agent-viz a **deux modes**, et la différence compte : si la racine du
+Le hook agent-viz a **deux modes**, et la différence compte : si la racine du
 paquet est un cache `npx` éphémère, la commande écrite ne contient **aucun
 chemin** (`src/server/install-hooks.ts:333-358`). L'installation globale ou
 locale produit la forme absolue ; `npx` produit la forme portable.
 
-**`bin/agent-viz.js` n'ayant pas bougé à l'étape 2, le crochet agent-viz en mode
-`absolute` a survécu au déplacement** — c'est le crochet du **moteur** qui a
+**`bin/agent-viz.js` n'ayant pas bougé à l'étape 2, le hook agent-viz en mode
+`absolute` a survécu au déplacement** — c'est le hook du **moteur** qui a
 cassé, et lui seul. Le mécanisme qui le nommait et le réparait (`netgain
 status` / `netgain on`) a disparu avec l'étape 6 bis (2026-09, doc/36) : une
 configuration écrite avant la fusion et jamais réparée entre-temps reste
@@ -550,12 +518,13 @@ Les supprimer est toujours sans danger.
 |---|---|---|
 | `dist/engine/` | `npm run build` (nettoyage puis `tsc`) | `npm run build` |
 | `~/.agent-viz/observatory.db` | les scans | le scan suivant |
-| `${tmpdir}/agent-events/*.jsonl` | le crochet | la session suivante |
+| `${tmpdir}/agent-events/*.jsonl` | le hook | la session suivante |
 
-Corollaire pour qui développe : **après avoir modifié le moteur, il faut
-reconstruire.** Le serveur charge `dist/engine/`, pas la source. C'est
-exactement le mode de panne que `engine-require.ts` nomme *build périmé* — et
-c'est pour ne pas avoir à le deviner qu'il porte deux messages distincts.
+Corollaire pour qui développe : **après avoir modifié le serveur ou le moteur, il
+faut reconstruire.** Le binaire charge `dist/server/` et `dist/engine/`, pas la
+source. La garde de `bin/agent-viz.js` le rappelle (§ 4) : elle arrête sur un
+fichier compilé manquant, et avertit quand une source `.ts` est plus récente que
+le dernier build.
 
 **Le nettoyage en tête de `build` est neuf, et il a remplacé un geste inverse.**
 Jusqu'à l'étape 3, le build **écrivait** un fichier dans `dist/engine/` — le
@@ -657,8 +626,8 @@ manquante est ci-dessous, relevée après coup et non réécrite) :
              (ligne omise en son temps — c'est elle qui laissait l'addition à 75)
 +2  volet 1  observatory-rules-r7.test.cjs        la 7e règle de conseil
              verification-commands.test.mjs       le classifieur, sous les DEUX exécuteurs
-±0  volet 1  verification.test.ts naît hors du pont : il tient à l'API vitest, faute
-             de pouvoir charger les SOURCES du moteur sous `node --test` (§ ci-dessous)
+±0  volet 1  verification.test.ts naît hors du pont : il tenait alors à l'API vitest,
+             faute de pouvoir charger les SOURCES du moteur sous `node --test`
 ――
 78
 +6  18/08    error-format.test.mjs · errors-register.test.mjs · version-route.test.cjs
@@ -698,11 +667,11 @@ est imposée par le fait qu'**une seule couture ne suffit pas** :
 | Fichier | Rôle |
 |---|---|
 | `create-bridge.mjs` | la **fabrique pure** : reçoit ses primitives par injection, se teste seule, ne connaît ni vitest ni `node:module` |
-| `install.mjs` | couture n° 1 : détourne `Module._load` — atteint les `require('node:test')` des **40** fichiers CommonJS |
-| `node-test-alias.mjs` | couture n° 2 : cible d'un `resolve.alias` de `vitest.config.mts` — atteint les `import … from 'node:test'` des **38** fichiers ESM |
+| `install.mjs` | couture n° 1 : détourne `Module._load` — atteint les `require('node:test')` des fichiers CommonJS |
+| `node-test-alias.mjs` | couture n° 2 : cible d'un `resolve.alias` de `vitest.config.mts` — atteint les `import … from 'node:test'` des fichiers ESM |
 
 La seconde ne remplace pas la première, elle s'y ajoute : la résolution ESM ne
-passe pas par le crochet CommonJS. Un pont amputé de l'une des deux laisse un
+passe pas par le hook CommonJS. Un pont amputé de l'une des deux laisse un
 tiers du filet non exécuté **sans le dire** — c'est mesuré, pas supposé.
 
 Le pont **refuse en se nommant** les **15 API** qu'il sait ne pas implémenter
@@ -713,29 +682,28 @@ générale : il n'y a pas de `Proxy`, donc une API de `node:test` hors de cette
 liste vaudrait `undefined` sans se signaler. Étendre le filet, c'est allonger ces
 deux listes.
 
-`npm run test:node` exécute les mêmes **865** tests en `node:test` **nativement**,
+`npm run test:node` exécute les mêmes tests `node:test` **nativement**,
 sous `node --test`. Ce n'est pas une redondance : c'est la **sémantique de référence**
 à laquelle le pont est comparé. Si plus rien ne l'exerçait, elle pourrait cesser
 de passer sans que rien ne l'annonce. La publication lance les deux.
 
-**Ce que la sémantique de référence NE PEUT PAS atteindre, et pourquoi ce n'est
-pas un oubli.** Un test qui charge une **source** de `src/engine/` ne peut pas
-être écrit en `node:test` : il ne tournerait que sous le pont. La raison est dans
-les spécificateurs, pas dans le test. `src/engine/**` nomme ses voisins en `.js`
-(**111** occurrences, **0** en `.ts` — l'exact inverse de `src/server/**`, qui
-est à 147 `.ts` et 0 `.js`, `allowImportingTsExtensions` aidant). Or
-`src/engine/core/usage.js` **n'existe pas sur le disque** : seul le résolveur de
-vitest recolle un spécificateur `.js` sur le `.ts` voisin. `node --test` rend
-`ERR_MODULE_NOT_FOUND` — mesuré le 2026-08-17 sous node v24.15.0, et reproduit
-hors dépôt sur deux fichiers nus, pour écarter toute cause locale. Le serveur,
-lui, ne charge jamais ces sources : il passe par `requireEngineModule`, qui lit
-le `dist/`. **Conséquence de rangement, pas de confort :** un test d'agrégateur
-du moteur est un `.test.ts` à l'API de vitest (`tests/doctor/verification.test.ts`),
-un test d'une fonction pure sans import peut être un `.test.mjs` et vaut alors
-sous les deux exécuteurs (`tests/doctor/verification-commands.test.mjs`).
-L'inverse — un `.test.ts` qui importe `node:test` — est un **hybride** : il se
-lit comme couvert par les deux et n'est lu que par un. Le dépôt n'en compte
-aucun (`grep -rlE "(require\(|from )['\"]node:test['\"]" tests --include="*.test.ts" | wc -l` → 0).
+**Les sources du moteur se chargent sous les deux exécuteurs.** `src/engine/**`
+nomme ses voisins en `.ts`, comme `src/server/**`, et Node 24 retire les types à
+l'import : un test `node:test` peut charger une source du moteur et tourner sous
+vitest comme sous `node --test`. `tests/unit/pricing-engine-mirror.test.cjs`
+charge `src/engine/core/pricing.ts` et passe dans les deux suites.
+
+```
+grep -rhoE "from ['\"]\.[^'\"]*\.js['\"]" src/engine | wc -l                      → 0
+echo "import x from './core/usage.js'" | grep -cE "from ['\"]\.[^'\"]*\.js['\"]"  → 1
+```
+
+Le dialecte d'un test ne dépend donc plus de ce qu'il importe, seulement de l'API
+qu'il emploie : `tests/doctor/verification.test.ts` est un `.test.ts` parce qu'il
+écrit `import { test } from 'vitest'`. L'inverse — un `.test.ts` qui importe
+`node:test` — est un **hybride** : il se lit comme couvert par les deux et n'est
+lu que par un. Le dépôt n'en compte aucun
+(`grep -rlE "(require\(|from )['\"]node:test['\"]" tests --include="*.test.ts" | wc -l` → 0).
 
 **Un garde d'environnement est posé au HARNAIS, pas dans les tests** —
 `test-support/env-guard.mjs`, première entrée des `setupFiles` de vitest et
@@ -755,25 +723,24 @@ Les deux régimes de modules d'un même paquet étaient un héritage : le produi
 le moteur ont d'abord vécu dans deux dépôts. Leur fusion en un seul paquet est
 faite ; **la fusion en un seul arbre l'est aussi depuis l'étape 2** — `src/server/`,
 `src/engine/`, `src/web/` — et **la fusion en un seul régime de modules l'est
-depuis l'étape 3** : ES modules partout, une seule ligne à la racine. Reste la
-fusion en un seul **langage** : TypeScript partout aux étapes 4 et 5, puis le
-retrait des ponts à l'étape 6 et la règle de frontière typée à l'étape 7.
+depuis l'étape 3** : ES modules partout, une seule ligne à la racine. **La fusion
+en un seul langage l'est depuis les étapes 4 et 5** — TypeScript dans tout le code
+de `src/` —, et **le retrait des ponts entre serveur et moteur depuis l'étape 6**.
+Reste la règle de frontière typée, prévue à l'étape 7.
 
-Trois choses en découlent, et elles sont annoncées ici parce que ce document en
-est la référence :
+Trois choses en découlent, et ce document en est la référence :
 
 1. **Les responsabilités du § 1 ne changent pas.** Seule la table du § 8 change.
    C'est la raison pour laquelle ce document est écrit ainsi.
-2. **Les six traversées du § 4 perdront leur objet — à l'étape 6, et pas avant.**
-   L'étape 3 a fait tomber la moitié CommonJS de leur raison d'être sans les
-   faire tomber elles : elles franchissent désormais la frontière *source →
-   build* (§ 4). C'est l'écart le plus instructif de l'étape, parce qu'il était
-   annoncé à l'envers ici même — *« l'interrupteur du régime de modules fait
-   disparaître les cinq ponts »*. Il ne l'a pas fait. Quand ils tomberont,
-   l'appel deviendra direct — `import { addUsage } from '../engine/core/usage.js'` —,
-   les 11 noms écrits à la main deviendront l'affaire du compilateur, **et le
-   douzième cessera d'être un angle mort** : `CLAUDE_DIR_ENV` étant une chaîne,
-   seul un compilateur peut le vérifier.
+2. **Les six traversées de frontière ont perdu leur objet à l'étape 6, et pas
+   avant.** L'étape 3 avait fait tomber la moitié CommonJS de leur raison d'être
+   sans les faire tomber elles : elles franchissaient alors la frontière *source →
+   build*. L'écart était annoncé à l'envers ici même — *« l'interrupteur du régime
+   de modules fait disparaître les cinq ponts »*. L'étape 6 les a retirées :
+   l'appel est direct — `import { addUsage, … } from '../engine/core/usage.ts'` —,
+   les noms importés sont l'affaire du compilateur (§ 4), et `CLAUDE_DIR_ENV`, la
+   chaîne qu'aucune liste de fonctions ne savait vérifier, n'est plus ré-exporté
+   par le serveur.
 3. **La règle du § 3 ne sera tenue mécaniquement qu'à l'étape 7, et par un seul
    mécanisme.** Ce document prévoyait ici que le compilateur refuserait un
    `import` d'API Node **direct** dans le navigateur en ne lui donnant pas les
@@ -787,13 +754,13 @@ est la référence :
 neuf.** Le premier est celui des chemins absolus du § 6, ci-dessous. Le second
 est ce que rend `main` à un appelant CommonJS depuis l'étape 3 — un espace de
 noms figé au lieu de `module.exports` (§ 6). Les chemins absolus ne sont pas
-exposés de la même façon selon le crochet :
+exposés de la même façon selon le hook :
 
-- le crochet du **moteur** porte toujours un chemin absolu — il casse à coup sûr ;
-- le crochet **agent-viz** ne casse que s'il a été posé en mode `absolute` ; en
+- le hook du **moteur** porte toujours un chemin absolu — il casse à coup sûr ;
+- le hook **agent-viz** ne casse que s'il a été posé en mode `absolute` ; en
   mode `npx`, sa ligne ne nomme aucun chemin et survit au déplacement.
 
-Dans les deux cas où la panne survient, elle est **bruyante** : le crochet
+Dans les deux cas où la panne survient, elle est **bruyante** : le hook
 agent-viz échoue en nommant le module introuvable, et le processus MCP sort en
 erreur `MODULE_NOT_FOUND`. Ce que ce dépôt n'établit pas, et qu'il ne faut donc
 pas promettre, c'est **sous quelle forme le client MCP remonte cet échec à

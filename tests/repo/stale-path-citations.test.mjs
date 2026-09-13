@@ -24,7 +24,7 @@
 // un jour une citation neuve.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync, existsSync } from 'node:fs';
+import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
@@ -159,8 +159,14 @@ function occurrences() {
   return trouvees;
 }
 
-const couvertePar = occ =>
-  LISTE_BLANCHE.find(e => e.fichier === occ.fichier && occ.texte.includes(e.fragment));
+// Les deux helpers de liste blanche, partages par les trois filets de ce fichier :
+// une occurrence est couverte par une entree de meme fichier dont le fragment est
+// dans la ligne ; une entree qui ne couvre plus rien est orpheline.
+const couvertePar = (occ, liste = LISTE_BLANCHE) =>
+  liste.find(e => e.fichier === occ.fichier && occ.texte.includes(e.fragment));
+
+const orphelinesDe = (liste, occurrencesVues) =>
+  liste.filter(e => !occurrencesVues.some(o => couvertePar(o, [e])));
 
 test('aucune adresse d avant le deplacement ne subsiste hors liste blanche', () => {
   // Arrange
@@ -187,9 +193,7 @@ test('chaque entree de la liste blanche protege encore quelque chose', () => {
   const toutes = occurrences();
 
   // Act
-  const orphelines = LISTE_BLANCHE.filter(
-    e => !toutes.some(o => o.fichier === e.fichier && o.texte.includes(e.fragment)),
-  );
+  const orphelines = orphelinesDe(LISTE_BLANCHE, toutes);
 
   // Assert
   assert.deepEqual(
@@ -261,9 +265,7 @@ test('aucune citation d un ancien nom .test.js hors liste blanche, et chaque exe
   const toutes = occurrencesTestJs();
 
   // Act \u2014 premiere garantie : aucune citation hors liste blanche.
-  const perimees = toutes.filter(
-    o => !LISTE_BLANCHE_TEST_JS.some(e => e.fichier === o.fichier && o.texte.includes(e.fragment)),
-  );
+  const perimees = toutes.filter(o => !couvertePar(o, LISTE_BLANCHE_TEST_JS));
 
   // Assert
   assert.deepEqual(
@@ -280,9 +282,7 @@ test('aucune citation d un ancien nom .test.js hors liste blanche, et chaque exe
     if (!existsSync(abs)) return true;
     return !readFileSync(abs, 'utf8').split(/\r?\n/).some(l => CITATION_TEST_JS.test(l));
   });
-  const blancheOrphelines = LISTE_BLANCHE_TEST_JS.filter(
-    e => !toutes.some(o => o.fichier === e.fichier && o.texte.includes(e.fragment)),
-  );
+  const blancheOrphelines = orphelinesDe(LISTE_BLANCHE_TEST_JS, toutes);
 
   // Assert
   assert.deepEqual(
@@ -294,5 +294,64 @@ test('aucune citation d un ancien nom .test.js hors liste blanche, et chaque exe
     blancheOrphelines.map(e => `${e.fichier} \u2192 ${e.fragment}`),
     [],
     'une entree de LISTE_BLANCHE_TEST_JS sans occurrence a survecu a ce qu elle protegeait : la retirer.',
+  );
+});
+
+// ── Les citations d un fichier `src/` absent du disque ──────────────────────
+//
+// `src/` est une racine VIVANTE : son apparition ne prouve rien, c est
+// l existence du fichier cite qui tranche. Memes helpers de liste blanche.
+const DOCUMENTS_CITANT_SRC = ['ARCHITECTURE.md', 'README.md', 'CLAUDE.md', 'docs/netgain.md'];
+
+// Garde de tete : pas de `foo-src/`. Garde de queue : `x.json` ne se lit pas `x.js`.
+const CITATION_SRC = /(?<![A-Za-z0-9_-])src\/(?:server|engine|web)\/[A-Za-z0-9_./-]*\.(?:ts|js|mjs|cjs)(?![A-Za-z0-9_])/g;
+
+// Une entree = { fichier, fragment, raison } : une sortie historique que la
+// reecrire rendrait fausse. Aucune n est citee aujourd hui.
+const LISTE_BLANCHE_SRC = [];
+
+function citationsSrc() {
+  const trouvees = [];
+  for (const rel of DOCUMENTS_CITANT_SRC) {
+    readFileSync(path.join(ROOT, rel), 'utf8').split(/\r?\n/).forEach((ligne, i) => {
+      for (const m of ligne.matchAll(CITATION_SRC)) {
+        trouvees.push({ fichier: rel, ligne: i + 1, texte: ligne, chemin: m[0] });
+      }
+    });
+  }
+  return trouvees;
+}
+
+const estFichier = rel => existsSync(path.join(ROOT, rel)) && statSync(path.join(ROOT, rel)).isFile();
+
+test('aucune citation d un fichier src/ absent du disque hors liste blanche', () => {
+  // Arrange
+  const toutes = citationsSrc();
+
+  // Act
+  const absentes = toutes.filter(o => !estFichier(o.chemin) && !couvertePar(o, LISTE_BLANCHE_SRC));
+
+  // Assert — plancher : un motif qui ne mord plus rendrait un vert sans rien lire.
+  assert.ok(toutes.length >= 10, `assiette suspecte : ${toutes.length} citations src/ vues, attendu >= 10`);
+  assert.deepEqual(
+    absentes.map(o => `${o.fichier}:${o.ligne} → ${o.chemin}`),
+    [],
+    'une citation d un fichier src/ qui n existe pas envoie le lecteur nulle part : ' +
+      'la faire suivre le code, ou l inscrire dans LISTE_BLANCHE_SRC avec sa raison.',
+  );
+});
+
+test('chaque entree de LISTE_BLANCHE_SRC protege encore une citation absente', () => {
+  // Arrange
+  const absentes = citationsSrc().filter(o => !estFichier(o.chemin));
+
+  // Act
+  const orphelines = orphelinesDe(LISTE_BLANCHE_SRC, absentes);
+
+  // Assert
+  assert.deepEqual(
+    orphelines.map(e => `${e.fichier} → ${e.fragment}`),
+    [],
+    'une entree de LISTE_BLANCHE_SRC qui ne couvre plus aucune citation absente : la retirer.',
   );
 });

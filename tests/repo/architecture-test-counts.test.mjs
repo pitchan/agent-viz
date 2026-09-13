@@ -21,19 +21,19 @@ function ligneContenant(texte, sousChaine) {
   return texte.split(/\r?\n/).find((l) => l.includes(sousChaine)) ?? null;
 }
 
-// Les deux autres nombres du paragraphe : le total de fichiers (l.614 et
-// l.617) et le compte apres la commande de l.683. Le document n'ecrit pas de
-// nombre de TESTS : il ne se derive pas du disque sans lancer la suite.
+// Les deux autres nombres du paragraphe : le total de fichiers (titre du § 9
+// et sortie vitest du § 9) et le compte rendu par la commande grep du § 9. Le
+// document n'ecrit pas de nombre de TESTS : il ne se derive pas du disque.
 export function parseComptesEtendusDoc(texte) {
-  const l614 = ligneContenant(texte, 'un seul arbre de tests');
-  const l617 = ligneContenant(texte, 'npx vitest run');
-  const l683 = ligneContenant(texte, 'tests | wc -l');
-  if (!l614 || !l617 || !l683) return null;
-  const m614 = l614.match(/dans\s+(\d+)\s+fichiers/);
-  const m617 = l617.match(/,\s*(\d+)\s*fichiers/);
-  const m683 = l683.match(/→\s*(\d+)/);
-  if (!m614 || !m617 || !m683) return null;
-  return { totalL614: Number(m614[1]), totalL617: Number(m617[1]), importsL683: Number(m683[1]) };
+  const ligneTitre = ligneContenant(texte, 'un seul arbre de tests');
+  const ligneVitest = ligneContenant(texte, 'npx vitest run');
+  const ligneGrep = ligneContenant(texte, 'tests | wc -l');
+  if (!ligneTitre || !ligneVitest || !ligneGrep) return null;
+  const mTitre = ligneTitre.match(/dans\s+(\d+)\s+fichiers/);
+  const mVitest = ligneVitest.match(/,\s*(\d+)\s*fichiers/);
+  const mGrep = ligneGrep.match(/→\s*(\d+)/);
+  if (!mTitre || !mVitest || !mGrep) return null;
+  return { totalTitre: Number(mTitre[1]), totalVitest: Number(mVitest[1]), importsGrep: Number(mGrep[1]) };
 }
 
 export function compterDisque(root) {
@@ -51,7 +51,7 @@ export function compterDisque(root) {
   return compte;
 }
 
-// Meme motif que la commande de l.683, applique au contenu de chaque fichier
+// Meme motif que la commande grep du § 9, applique au contenu de chaque fichier
 // sous `tests/` (aucun filtre d'extension : la commande n'en pose pas non
 // plus — un fichier hors dialecte connu qui importerait node:test compterait).
 export function compterImportsNodeTest(root) {
@@ -81,14 +81,14 @@ export function ecartsComptes(doc, disque) {
 
 export function ecartsComptesEtendus(doc, totalDisque, importsDisque) {
   const ecarts = [];
-  if (doc.totalL614 !== totalDisque) {
-    ecarts.push(`l.614 : ARCHITECTURE.md dit ${doc.totalL614} fichiers, le disque en a ${totalDisque}`);
+  if (doc.totalTitre !== totalDisque) {
+    ecarts.push(`titre du § 9 : ARCHITECTURE.md dit ${doc.totalTitre} fichiers, le disque en a ${totalDisque}`);
   }
-  if (doc.totalL617 !== totalDisque) {
-    ecarts.push(`l.617 : ARCHITECTURE.md dit ${doc.totalL617} fichiers, le disque en a ${totalDisque}`);
+  if (doc.totalVitest !== totalDisque) {
+    ecarts.push(`sortie vitest du § 9 : ARCHITECTURE.md dit ${doc.totalVitest} fichiers, le disque en a ${totalDisque}`);
   }
-  if (doc.importsL683 !== importsDisque) {
-    ecarts.push(`l.683 : ARCHITECTURE.md dit ${doc.importsL683}, le disque en a ${importsDisque}`);
+  if (doc.importsGrep !== importsDisque) {
+    ecarts.push(`commande grep du § 9 : ARCHITECTURE.md dit ${doc.importsGrep}, le disque en a ${importsDisque}`);
   }
   return ecarts;
 }
@@ -105,17 +105,17 @@ test('le verificateur accepte quand les trois comptes coincident', () => {
   assert.deepEqual(ecarts, []);
 });
 
-test('le verificateur etendu signale l.614, l.617 et l.683 separement, chacun nomme', () => {
-  const doc = { totalL614: 100, totalL617: 101, importsL683: 50 };
+test('le verificateur etendu signale le titre, la sortie vitest et la commande grep du § 9 separement, chacun nomme', () => {
+  const doc = { totalTitre: 100, totalVitest: 101, importsGrep: 50 };
   const ecarts = ecartsComptesEtendus(doc, 100, 93);
   assert.deepEqual(ecarts, [
-    'l.617 : ARCHITECTURE.md dit 101 fichiers, le disque en a 100',
-    'l.683 : ARCHITECTURE.md dit 50, le disque en a 93',
+    'sortie vitest du § 9 : ARCHITECTURE.md dit 101 fichiers, le disque en a 100',
+    'commande grep du § 9 : ARCHITECTURE.md dit 50, le disque en a 93',
   ]);
 });
 
 test('le verificateur etendu accepte quand les trois nombres coincident', () => {
-  const ecarts = ecartsComptesEtendus({ totalL614: 100, totalL617: 100, importsL683: 93 }, 100, 93);
+  const ecarts = ecartsComptesEtendus({ totalTitre: 100, totalVitest: 100, importsGrep: 93 }, 100, 93);
   assert.deepEqual(ecarts, []);
 });
 
@@ -129,7 +129,7 @@ const importsDisque = compterImportsNodeTest(ROOT);
 
 test('assiette : les deux tableaux se lisent, et le disque porte des fichiers de test', () => {
   assert.ok(docParse !== null, 'le motif de lecture du tableau « Dialecte » ne trouve plus rien dans ARCHITECTURE.md');
-  assert.ok(docParseEtendu !== null, 'le motif de lecture des l.614/l.617/l.683 ne trouve plus rien dans ARCHITECTURE.md');
+  assert.ok(docParseEtendu !== null, 'le motif de lecture du titre, de la sortie vitest et de la commande grep du § 9 ne trouve plus rien dans ARCHITECTURE.md');
   assert.ok(disque.cjs > 0 && disque.mjs > 0 && disque.ts > 0 && importsDisque > 0,
     `assiette suspecte : ${JSON.stringify(disque)}, imports=${importsDisque}`);
 });
@@ -143,7 +143,7 @@ test('les trois comptes de tests que porte ARCHITECTURE.md § 9 suivent le disqu
   );
 });
 
-test('le total de fichiers (l.614, l.617) et le compte d\'imports node:test (l.683) suivent le disque', () => {
+test('le total de fichiers (titre et sortie vitest du § 9) et le compte d\'imports node:test (commande grep du § 9) suivent le disque', () => {
   const ecarts = ecartsComptesEtendus(docParseEtendu, totalDisque, importsDisque);
   assert.deepEqual(
     ecarts,
