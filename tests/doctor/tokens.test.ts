@@ -201,4 +201,24 @@ describe('TokensAggregator — coût par modèle (costByModel)', () => {
     const r = agg.result();
     expect(Object.keys(r.costByModel).sort()).toEqual(Object.keys(r.perModel).sort());
   });
+
+  // Un message malformé sur un modèle tarifé ne doit poisonner ni costUsd ni
+  // costByModel pour le reste de la session : les deux restent finis, et
+  // costComplete reste vrai (ce message ne rend aucun modèle inconnu).
+  test('un message malformé (input_tokens: 1e999) entre deux sains ne poisonne ni costUsd ni costByModel', () => {
+    const agg = new TokensAggregator();
+    const sain = { input_tokens: 1000, output_tokens: 2000 };
+    agg.addAssistant(assistant({ msgId: 'm1', model: 'claude-opus-4-8', usage: sain }), 'main');
+    const coutUnSain = agg.result().costUsd;
+    agg.addAssistant(
+      assistant({ msgId: 'm2', model: 'claude-opus-4-8', usage: JSON.parse('{"input_tokens":1e999}') }),
+      'main',
+    );
+    agg.addAssistant(assistant({ msgId: 'm3', model: 'claude-opus-4-8', usage: sain }), 'main');
+    const r = agg.result();
+    expect(Number.isFinite(r.costUsd)).toBe(true);
+    expect(r.costUsd).toBeCloseTo(coutUnSain * 2, 12);
+    expect(r.costByModel['claude-opus-4-8']?.usd).toBeCloseTo(coutUnSain * 2, 12);
+    expect(r.costComplete).toBe(true);
+  });
 });

@@ -338,15 +338,9 @@ describe('computeCost — cache_creation non exploitable (C4)', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Tâche 5 bis (doc/49) — défaut observable : un champ brut non fini poison-
-// nait `usd` (Infinity/NaN) parce que `?? 0` ne remplace que null/undefined.
-// La garde attendue est `finiteCount` (core/usage.ts), déjà appliquée aux six
-// mêmes champs par `addUsage` : un champ qui compte zéro jeton doit aussi
-// coûter zéro. `"1000"` est le cas qui change vraiment de résultat : `?? 0`
-// le facturait par conversion implicite, `finiteCount` le compte (et le
-// facture) à zéro.
-// ---------------------------------------------------------------------------
+// computeCost garde chaque champ brut par `finiteCount` : un champ non fini
+// (NaN, Infinity, une chaîne) coûte zéro, comme il compte zéro jeton dans
+// usage.ts — jamais une conversion implicite qui facture un texte.
 describe('computeCost — champ brut non fini : coûte zéro comme il compte zéro (5 bis)', () => {
   const model = 'claude-opus-4-8';
   const resteValide = {
@@ -370,6 +364,8 @@ describe('computeCost — champ brut non fini : coûte zéro comme il compte zé
     expect(r.usd).toBeCloseTo(coutSansInput, 12);
   });
 
+  // Avec objet `cache_creation` présent : cache_creation_input_tokens n'est
+  // pas lu sur cette voie (voir le describe suivant pour la voie sans objet).
   test('les six champs bruts sont gardés, pas seulement input_tokens', () => {
     const r = computeCost(
       {
@@ -383,5 +379,27 @@ describe('computeCost — champ brut non fini : coûte zéro comme il compte zé
     );
     expect(r.usd).toBe(0);
     expect(r.known).toBe(true);
+  });
+});
+
+// cache_creation_input_tokens n'est lu que quand l'objet cache_creation est
+// absent (tout part alors au tarif 5m) : cette voie a sa propre garde à
+// prouver, le describe ci-dessus ne l'atteint jamais.
+describe('computeCost — cache_creation_input_tokens non fini SANS objet cache_creation (5 bis)', () => {
+  const model = 'claude-opus-4-8';
+  const reference = computeCost({ input_tokens: 10, output_tokens: 20 }, model).usd as number;
+
+  test.each([
+    ['1e999', 1e999],
+    ['NaN', NaN],
+    ['chaîne non numérique', 'x'],
+    ['chaîne numérique convertible', '1000'],
+  ])('cache_creation_input_tokens = %s : usd fini, égal au coût des champs valides', (_label, valeur) => {
+    const r = computeCost(
+      { input_tokens: 10, output_tokens: 20, cache_creation_input_tokens: valeur } as never,
+      model,
+    );
+    expect(Number.isFinite(r.usd)).toBe(true);
+    expect(r.usd).toBeCloseTo(reference, 12);
   });
 });

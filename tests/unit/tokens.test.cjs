@@ -353,13 +353,9 @@ test('C4 — la complétude traverse l\'enveloppe SSE', () => {
   assert.deepEqual(msg.main.unknownModels, ['claude-opus-6']);
 });
 
-// ---------------------------------------------------------------------------
-// Tâche 5 bis (doc/49) — défaut observable : un seul message malformé sur un
-// modèle TARIFÉ (branche différente du modèle INCONNU couvert par C4
-// ci-dessus) empoisonnait `bucket.costUsd` pour toute la session, parce que
-// `computeCost` ne gardait pas ses champs bruts. `costComplete` reste `true`
-// dans ce test : la branche fautive n'y touche jamais, avant comme après.
-// ---------------------------------------------------------------------------
+// Un message malformé sur un modèle tarifé ne doit pas empoisonner
+// bucket.costUsd pour le reste de la session (branche distincte du modèle
+// inconnu couvert par C4 ci-dessus) : costComplete reste vrai, costUsd fini.
 test('un message malformé (input_tokens: 1e999) entre deux messages sains ne poisonne pas costUsd', () => {
   const b = newBucket();
   const sain = { input_tokens: 1000, output_tokens: 500 };
