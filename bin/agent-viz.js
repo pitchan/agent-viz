@@ -431,6 +431,62 @@ async function cmdHook() {
   runHook();
 }
 
+// Mtime le plus recent parmi les `.ts` sous `dir`, recursif. 0 si `dir`
+// n'existe pas ou ne contient aucun `.ts` — un plancher neutre pour la
+// comparaison de `ensureBuildIsFresh`, jamais lu comme une vraie date.
+function newestTsMtime(dir) {
+  let max = 0;
+  let entries;
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return max; }
+  for (const entry of entries) {
+    const p = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      max = Math.max(max, newestTsMtime(p));
+    } else if (entry.isFile() && p.endsWith('.ts')) {
+      try { max = Math.max(max, fs.statSync(p).mtimeMs); } catch {}
+    }
+  }
+  return max;
+}
+
+// Les deux pannes de build, nommees ICI, une seule fois, avant que la
+// commande ne se branche — dix sites plus bas chargent `dist/server/*`
+// (cmdStart, cmdStop, cmdStatus, cmdInstallHooks, cmdUninstallHooks, cmdHook) ;
+// dix controles independants seraient dix occasions de diverger.
+//
+// 1. `dist/server/` absent : jamais construit (ou casse par un nettoyage
+//    manuel). Sans cette garde, le premier `import()` plus bas leve
+//    `Cannot find module` avec dix lignes de pile et aucune mention du
+//    remede — mesure sur ce depot. Fatal : aucun des dix sites ne peut
+//    fonctionner sans `dist/server/`.
+// 2. `dist/server/` present mais perime par rapport a la source : `tsc -b`
+//    emet meme quand il rend un exit different de zero (mesure, tsc 5.9.3),
+//    donc un build rouge ignore laisse un `dist/` incoherent qui demarre
+//    quand meme et sert l'ancien code, en silence. Un avertissement, pas un
+//    arret : le serveur reste utilisable, moins a jour.
+//    Reserve au depot de developpement — un paquet installe n'embarque pas
+//    `src/server/` (voir `files` dans package.json), donc cette branche ne
+//    s'execute jamais chez un utilisateur final.
+function ensureBuildIsFresh() {
+  const distServerDir = path.join(PKG_ROOT, 'dist', 'server');
+  if (!fs.existsSync(distServerDir)) {
+    console.error(`${c.err('✗')} agent-viz is not built: freshly cloned repo, never built. Run \`npm run build\`.`);
+    process.exit(1);
+  }
+
+  const srcServerDir = path.join(PKG_ROOT, 'src', 'server');
+  if (!fs.existsSync(srcServerDir)) return;
+
+  const witness = path.join(PKG_ROOT, 'dist', 'tsconfig.build.tsbuildinfo');
+  let witnessMtime = 0;
+  try { witnessMtime = fs.statSync(witness).mtimeMs; } catch {}
+
+  const newestSource = newestTsMtime(path.join(PKG_ROOT, 'src'));
+  if (newestSource > witnessMtime) {
+    console.error(`${c.warn('!')} build looks stale: a .ts source is newer than the last \`npm run build\`. Re-run \`npm run build\`.`);
+  }
+}
+
 // First-run welcome: npm 9+ silences install-script stdout by default
 // (foreground-scripts=false), and an increasing share of users disable
 // install scripts entirely (--ignore-scripts, pnpm 10+, Bun by default).
@@ -473,6 +529,8 @@ async function main() {
 
   const cmd = argv[0] && !argv[0].startsWith('-') ? argv[0] : 'start';
   const rest = argv[0] && !argv[0].startsWith('-') ? argv.slice(1) : argv;
+
+  ensureBuildIsFresh();
 
   switch (cmd) {
     case 'start':            return cmdStart(rest);
