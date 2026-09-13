@@ -611,10 +611,10 @@ rapport avec le changement de langage. Le serveur, lui, est inchangé.
 
 ## 9. La plomberie de test
 
-**Un seul exécuteur, un seul arbre de tests, 1 399 tests dans 118 fichiers.**
+**Un seul exécuteur, un seul arbre de tests, 1 427 tests dans 121 fichiers.**
 
 ```
-npx vitest run     → 1399 passés, 118 fichiers
+npx vitest run     → 1427 passés, 121 fichiers
 ```
 
 Les deux arbres ont fusionné à plat à l'étape 2 : `netgain/tests/` a rejoint
@@ -680,7 +680,7 @@ manquante est ci-dessous, relevée après coup et non réécrite) :
 ```
 
 ```
-grep -rlE "(require\(|from )['\"]node:test['\"]" tests | wc -l   → 78
+grep -rlE "(require\(|from )['\"]node:test['\"]" tests | wc -l   → 93
 ```
 
 Le test du pont a la propriété amusante de passer par ce qu'il teste dès qu'on

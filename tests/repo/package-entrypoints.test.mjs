@@ -174,13 +174,9 @@ test('package.json declare encore ses trois familles de points d entree', () => 
   );
 });
 
-// Le trou trouve au cadrage de la tache 6 (doc/49) : rien ne verifiait que
-// chaque route `/src/engine/...` de la table du serveur figure aussi dans
-// `files`. Les deux listes coincidaient PAR HASARD — `served-web-graph.test.mjs`
-// le note deja (§ 5 de son en-tete) : une route du moteur ajoutee sans toucher
-// `files` laissait ce fichier-ci vert. La table est LUE dans `routes.ts`,
-// jamais recopiee ici : une seconde liste pourrait diverger sans que rien ne
-// le dise, meme raison que R4 du fichier voisin.
+// Une route /src/engine/... servie mais absente de `files` ne serait pas
+// livree dans le paquet publie. `ROUTES` est lu dans `routes.ts`, jamais
+// recopie ici : une seconde liste pourrait diverger sans le dire.
 
 // Charger `routes.ts` charge `session-index.ts`, qui cree
 // `os.tmpdir()/agent-events` des sa lecture : le bac est pose avant l'import,
