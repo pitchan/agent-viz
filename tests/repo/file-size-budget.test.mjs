@@ -1,5 +1,5 @@
 // Garde-fou de taille de fichier (doc/43 du dépôt privé, décision du 2026-08-19).
-// Le seuil ne mesure PAS la responsabilité unique — la liste ASSUMED l'assume,
+// Le seuil ne mesure PAS la responsabilité unique — la liste ASSUMED en répond,
 // avec une raison écrite par entrée. Deux règles font du test un cliquet :
 //   1. un fichier de src/ au-dessus du budget et absent d'ASSUMED → échec ;
 //   2. une entrée d'ASSUMED repassée sous le budget (ou disparue) → échec
@@ -83,7 +83,7 @@ test('le vérificateur signale une entrée périmée (fichier disparu)', () => {
   assert.match(got[0], /n'existe plus/);
 });
 
-test('le vérificateur accepte un dépassement assumé et un fichier sous budget', () => {
+test('le vérificateur accepte un dépassement inscrit avec sa raison et un fichier sous budget', () => {
   const got = checkBudget(
     [{ file: 'src/big.ts', lines: 900 }, { file: 'src/ok.ts', lines: 100 }],
     450, new Map([['src/big.ts', 'raison écrite']]),
@@ -92,7 +92,7 @@ test('le vérificateur accepte un dépassement assumé et un fichier sous budget
 });
 
 // ── Le balayage réel ──
-test('src/ respecte le budget de taille de fichier (450 lignes, exceptions assumées)', () => {
+test('src/ respecte le budget de taille de fichier (450 lignes, exceptions inscrites avec leur raison)', () => {
   const violations = checkBudget(scanSrc(), BUDGET, ASSUMED);
   assert.deepEqual(violations, [], `\n${violations.join('\n')}`);
 });

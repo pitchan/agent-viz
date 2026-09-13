@@ -144,7 +144,7 @@ test('computeCost reports an unknown model as unpriced, never as a zero', () => 
 // contournait toute la branche « modèle inconnu ». Le seul appelant de
 // production résout maintenant les métadonnées d'affichage par `getPrice` et
 // le montant par le contrat du moteur ; la consultation de table
-// supplémentaire est assumée, sur un chemin déjà amorti par une diffusion
+// supplémentaire est un coût choisi, sur un chemin déjà amorti par une diffusion
 // différée de 250 ms.
 
 test('litellmDrift rejects __proto__ / constructor / prototype keys and never pollutes', () => {
@@ -302,8 +302,8 @@ test('a changed upstream tariff is REPORTED as drift, never applied to the map',
 test('un zéro VOULU est connu, et ne rend pas le total incomplet', () => {
   for (const m of ['<synthetic>', 'ministral-3:latest']) {
     const r = computeCost({ input_tokens: 1000, output_tokens: 50 }, m);
-    assert.equal(r.usd, 0, `${m} : zéro assumé`);
-    assert.equal(r.known, true, `${m} : et assumé COMME connu`);
+    assert.equal(r.usd, 0, `${m} : zéro voulu`);
+    assert.equal(r.known, true, `${m} : et rangé COMME connu`);
   }
 });
 

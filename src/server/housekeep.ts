@@ -60,7 +60,7 @@ async function compactSession(fp: string): Promise<void> {
   const summary: SessionSummary = { id, compactedAt: new Date().toISOString(), totalEvents: allLines.length, tools: [], prompt: rec.promptCache || null };
   for (const line of allLines) {
     // C2 : le verdict sur une ligne vient de la primitive commune du moteur, il
-    // n'est plus réimplémenté ici. Conséquence assumée : une ligne préfixée d'un
+    // n'est plus réimplémenté ici. Conséquence voulue : une ligne préfixée d'un
     // BOM est désormais décodée au lieu d'être perdue, où qu'elle se trouve dans
     // le fichier — avant, seule celle en toute première position survivait, et
     // par accident, parce que le `content.trim()` ci-dessus la nettoyait.

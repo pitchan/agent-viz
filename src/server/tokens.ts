@@ -159,7 +159,7 @@ function accumulateUsage(
   //
   //   'tarife'      → on compte, et le modèle devient celui qu'affiche la
   //                   pastille, avec sa fenêtre de contexte.
-  //   'zero-voulu'  → `<synthetic>`, Ollama local : 0 $ ASSUMÉ, le total reste
+  //   'zero-voulu'  → `<synthetic>`, Ollama local : 0 $ VOULU, le total reste
   //                   COMPLET. Ne devient PAS le modèle affiché — c'est un
   //                   artefact du harnais, pas le modèle au travail, et il
   //                   apparaît 80 fois sur les 833 transcriptions de la

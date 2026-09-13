@@ -642,8 +642,8 @@ const DETECTORS: Record<AlertType, Detector> = {
         type: 'badInvocation', sessionId: sid, toolName: evt.tool_name,
         count, createdAt: ts, ...actor(evt), cwd: evt.cwd || '',
         patternId: pattern.id, discriminator: pattern.id,
-        // `subject` carries the triggering command, in full (arbitrage doc/32
-        // du 2026-08-09, retention assumee) — the same field the other
+        // `subject` carries the triggering command, in full (arbitrage doc/32,
+        // retention voulue) — the same field the other
         // detectors fill, via the same `toolSubject(evt)`. A failure without
         // its command is not fixable by the person reading the alert, and
         // that is what settled it: the pattern identifier says WHAT kind of

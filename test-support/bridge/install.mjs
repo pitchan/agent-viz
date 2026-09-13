@@ -2,7 +2,7 @@
 // regle D du CLAUDE.md racine proscrit ailleurs : c'est le seul endroit ou il
 // est inevitable — on ne peut pas injecter dans `require('node:test')` des 42
 // fichiers de tests sans y toucher, et y toucher est precisement ce que
-// l'etape 1 interdit. L'ecart est donc assume et confine a ce fichier ; toute
+// l'etape 1 interdit. L'ecart est donc voulu et confine a ce fichier ; toute
 // la logique vit dans la fabrique, qui est pure et testee.
 import Module from 'node:module';
 import { test, afterAll, beforeEach, vi } from 'vitest';

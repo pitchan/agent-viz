@@ -132,7 +132,7 @@ test('CARACTÉRISATION — une ligne illisible est comptée dans totalEvents mai
   }
 });
 
-// CHANGEMENT DE COMPORTEMENT, assumé et daté — C2, 2026-08-11.
+// CHANGEMENT DE COMPORTEMENT VOULU.
 //
 // Ce test épinglait l’inverse jusqu’au passage à la primitive commune : une
 // ligne préfixée d’un BOM ailleurs qu’en tête de fichier était rejetée par le

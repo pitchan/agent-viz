@@ -66,7 +66,7 @@ describe('addUsage — un seul jeu de gardes', () => {
     expect(b.out).toBe(5);
   });
 
-  // CHANGEMENT DE COMPORTEMENT ASSUME ET DATE (2026-08-11). Avant, les DEUX
+  // CHANGEMENT DE COMPORTEMENT VOULU. Avant, les DEUX
   // cotes rendaient la chaine "0100" — verifie en executant : `0 + "100"`
   // concatene, et le seau partait en chaine pour toute la suite de la session,
   // jusque dans l'enveloppe SSE. Un nombre en chaine est une ligne malformee ;

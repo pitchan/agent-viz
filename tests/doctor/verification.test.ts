@@ -13,7 +13,7 @@
 // v24.15.0, et reproduit hors dépôt sur deux fichiers nus). Le tronc du
 // moteur n'est donc chargeable depuis ses SOURCES que par vitest — le serveur,
 // lui, passe par `requireEngineModule` et lit le `dist/`.
-// Conséquence assumée : l'extension dit le régime (ARCHITECTURE.md § 9), et
+// Conséquence voulue : l'extension dit le régime (ARCHITECTURE.md § 9), et
 // le régime possible ici est vitest. Ce fichier n'est plus un hybride.
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
@@ -277,7 +277,7 @@ test('la premiere verification, la premiere edition et les fichiers distincts so
 });
 
 // La frontiere est STRICTE (`e.t > last.t`) : a la milliseconde exacte du
-// resultat, l edition est dite COUVERTE. Sens conservateur assume — le produit
+// resultat, l edition est dite COUVERTE. Sens conservateur choisi — le produit
 // sous-declare la queue plutot que d accuser une session sur une egalite.
 test('une edition a la milliseconde exacte du dernier resultat est couverte', () => {
   // Arrange

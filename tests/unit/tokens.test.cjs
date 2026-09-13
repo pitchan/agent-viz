@@ -217,7 +217,7 @@ test('C3 — le seau porte les DEUX ventilations de cache, que seul le moteur su
   assert.equal(b.cacheCreate5m, 40);
 });
 
-// CHANGEMENT DE COMPORTEMENT ASSUMÉ ET DATÉ (2026-08-11). Avant, le serveur
+// CHANGEMENT DE COMPORTEMENT VOULU. Avant, le serveur
 // faisait `bucket.in += usage.input_tokens || 0` : un nombre en CHAÎNE donnait
 // `0 + "100"` = "0100", et le seau partait en texte pour toute la session,
 // jusque dans l'enveloppe SSE. `Infinity` — le seul poison qu'un JSON valide
@@ -306,7 +306,7 @@ test('C4 — un modèle SANS TARIF marque le coût incomplet et se nomme', () =>
 test('C4 — un ZÉRO VOULU ne rend PAS le coût incomplet', () => {
   // `<synthetic>` : 80 occurrences sur les 833 transcripts de la machine.
   // C'est le cas qui interdit de marquer l'incomplétude sur un simple test de
-  // nullité du tarif — le serveur ne savait pas distinguer « 0 $ assumé » de
+  // nullité du tarif — le serveur ne savait pas distinguer « 0 $ voulu » de
   // « tarif inconnu », et aurait signalé « partiel » sur des sessions justes.
   const b = newBucket();
   accumulateUsage(b, usage(), '<synthetic>', 'm1', AT);

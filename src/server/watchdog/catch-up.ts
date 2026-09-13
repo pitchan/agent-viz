@@ -104,7 +104,7 @@ async function catchUpFromDisk(
       // C2 : le verdict sur une ligne vient de la primitive commune du moteur,
       // il n'est plus reimplemente ici — la garde sur la ligne blanche non plus,
       // qui faisait double emploi avec le `null` que la primitive rend deja.
-      // Consequence assumee : une ligne prefixee d'un BOM est desormais decodee
+      // Consequence voulue : une ligne prefixee d'un BOM est desormais decodee
       // au lieu d'etre perdue en silence, ici comme sur le chemin vif.
       //
       // Un echec de decodage reste MUET, et c'est une exception deliberee a la

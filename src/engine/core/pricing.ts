@@ -44,7 +44,7 @@ const PRICE_HISTORY: Record<string, PricePeriod[]> = {
   ],
 };
 
-// Zéro VOULU : modèles non facturables PAR NATURE — un 0 $ assumé et commenté,
+// Zéro VOULU : modèles non facturables PAR NATURE — un 0 $ inscrit ici et commenté,
 // jamais un tarif qu'on ignore. La règle « jamais de zéro silencieux » porte
 // sur les modèles INCONNUS ; ceux-ci sont connus, à 0 $. Un nouveau modèle
 // local = une ligne ici (même philosophie que PRICE_HISTORY).
@@ -176,7 +176,7 @@ export type PricingKind = 'tarife' | 'zero-voulu' | 'inconnu';
 
 /** Comment `model` est tarifé à l'instant `at` — la contrepartie qualitative
  *  de computeCost, qui ne rend qu'un montant. Un 'zero-voulu' est un 0 $
- *  assumé (ZERO_COST) ; un 'inconnu' est un tarif qu'on ne connaît pas et
+ *  inscrit dans ZERO_COST ; un 'inconnu' est un tarif qu'on ne connaît pas et
  *  qu'on n'invente pas. */
 export function pricingKindOf(model: string | null | undefined, at?: string): PricingKind {
   const norm = normalizeModel(model);

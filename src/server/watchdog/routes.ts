@@ -87,7 +87,7 @@ function fenetreDe(url: URL): number {
 // sans ca, une valeur absente deviendrait un horodatage a l'epoque Unix au lieu
 // d'un refus franc.
 //
-// Oui, c'est une COPIE de ce que fait le journal, et c'est assume : sans
+// Oui, c'est une COPIE de ce que fait le journal, et c'est voulu : sans
 // dependance, cette frontiere ne peut pas partager sa garde. Le prix est une
 // derive possible entre les deux, et le test les tient cote a cote sur la meme
 // liste de valeurs pour que la derive rougisse.

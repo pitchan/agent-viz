@@ -11,7 +11,7 @@
 //   3. les fenêtres adjacentes sont FUSIONNÉES en un fragment maximal, sans
 //      quoi un bloc de 200 jetons ressortirait en 140 groupes redondants.
 //
-// LIMITES ASSUMÉES : ne voit ni les clones à identifiants renommés (les
+// LIMITES VOULUES : ne voit ni les clones à identifiants renommés (les
 // identifiants ne sont pas neutralisés), ni les clones INTRA-fichier (un
 // groupe exige au moins deux fichiers distincts), ni les clones qui traversent
 // les langages — c'est le rôle de D7.

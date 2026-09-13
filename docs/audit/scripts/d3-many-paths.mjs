@@ -8,7 +8,7 @@
 // locale implicite) plus les formateurs déclarés. La v1 n'en couvrait que six,
 // donc ne pouvait pas soutenir l'inventaire qu'elle annonçait.
 //
-// LIMITE ASSUMÉE : ces motifs sont syntaxiques. Un formatage écrit autrement
+// LIMITE VOULUE : ces motifs sont syntaxiques. Un formatage écrit autrement
 // (Intl, bibliothèque tierce) passerait au travers — aucun n'existe dans ce
 // dépôt au commit audité, et c'est précisément ce que dit le constat sur les
 // conventions numériques.

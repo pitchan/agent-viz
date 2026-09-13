@@ -69,7 +69,7 @@
 // constatée plus haut est confirmée, pas juste supposée.
 //
 // Ce qui reste : l'heuristique regex-vs-division reprend celle de
-// `lib/tokens.mjs` telle quelle, y compris son ambiguïté résiduelle assumée
+// `lib/tokens.mjs` telle quelle, y compris son ambiguïté résiduelle
 // sur `}` (un `/` après `}` est traité comme une regex par défaut — voir la
 // « DÉCISION ÉCRITE » de `lib/tokens.mjs` pour le détail et sa justification,
 // non répétée ici). Un risque distinct, plus grave, a aussi été soulevé par

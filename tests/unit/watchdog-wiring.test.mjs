@@ -667,7 +667,7 @@ test('demarrage: ce que le serveur oublie de fournir se dit a voix haute', async
 // de `{type:'alert', alert}` — que le client de la tache 9 ignorerait en
 // silence. C'est la moitie dangereuse : muette jusqu'a la tache 9.
 //
-// Le prix assume : reformater ces lignes fait rougir ces tests. C'est le but.
+// Le prix est choisi : reformater ces lignes fait rougir ces tests. C'est le but.
 const SOURCE_SERVEUR = fs.readFileSync(
   path.join(import.meta.dirname, '..', '..', 'src', 'server', 'server.ts'), 'utf8');
 

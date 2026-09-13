@@ -316,7 +316,7 @@ reste spécialisé et n'y est pas replié.
 > n'appartient pas à *WhiteSpace* et reste **refusé** — la tolérance est
 > exactement celle d'ECMAScript, pas « tout ce qui est invisible ».
 >
-> **Arbitrage de Vincent (2026-08-11) : assumée et écrite, pas restreinte.** La
+> **Arbitrage de Vincent (2026-08-11) : voulue et écrite, pas restreinte.** La
 > restreindre au seul BOM demanderait d'écrire à la main un sous-ensemble de ce
 > que `trim()` fait déjà — du code en plus, pour rendre le lecteur *moins*
 > tolérant sur des fichiers écrits par un tiers. Rejeter une ligne qu'on savait
@@ -550,7 +550,7 @@ montant sans réserve quand il est en réalité incomplet.
 >
 > **4. `<synthetic>` est le cas qui interdisait la correction naïve.** 80
 > occurrences sur 834 transcriptions, entrelacées dans des sessions normales. Le
-> serveur ne savait pas distinguer un **0 $ assumé** d'un **tarif inconnu** :
+> serveur ne savait pas distinguer un **0 $ voulu** d'un **tarif inconnu** :
 > marquer l'incomplétude sur un simple test de nullité du tarif aurait signalé
 > « partiel » sur des sessions parfaitement justes. C'est ce qui impose de passer
 > par `pricingKindOf` du moteur — `tarife` / `zero-voulu` / `inconnu` — et non
@@ -675,7 +675,7 @@ lue au même endroit par les deux chemins de code.
 > raccourci évident `join(resolveClaudeDir(), '.claude.json')` se trompe dans le
 > cas par défaut. Conséquence concrète : ce défaut est ce qui faisait disparaître
 > la carte R2 du protocole de contrôle de l'instrument (USERPROFILE jetable +
-> `CLAUDE_CONFIG_DIR` réel) — un coût noté « assumé » dans la recette, alors
+> `CLAUDE_CONFIG_DIR` réel) — un coût mis sur le compte du protocole dans la recette, alors
 > qu'il était ce défaut-ci. **Cela invalide au passage la ligne de « Constats »
 > qui range `.claude.json` parmi les cinq `chemin-litteral` de D2 « qui
 > s'accordent partout, sans divergence à trancher, pas un défaut cousin de C5 » :
@@ -1035,7 +1035,7 @@ n'avance sans source vérifiable.
 
 ### Le miroir tarifaire de `lib/server/pricing.js`
 
-Niveau D2 : `miroir-controle` — la copie est assumée et tenue par un test qui
+Niveau D2 : `miroir-controle` — la copie est voulue et tenue par un test qui
 casse en cas de divergence, `tests/unit/pricing-engine-mirror.test.js`,
 rejouable seul, sans tube :
 
@@ -1126,7 +1126,7 @@ commentaire porte directement, pas ce chemin mort. `spec` renvoie à doc/12
 `seuil-de-regle` n'est ressorti de D2 — cohérent avec des seuils déjà
 centralisés en un seul fichier plutôt que recopiés ailleurs.
 
-### La découverte de sessions : deux stratégies opposées, assumées
+### La découverte de sessions : deux stratégies opposées, voulues
 
 `docs/audit/resultats/d7.json`, geste `decouverte-de-sessions`,
 `verdict: "strategies-opposees"` — **pas** `"duplique"`. Le serveur reçoit
@@ -1269,7 +1269,7 @@ commit ; une couverture fraîchement recalculée). C'est précisément pour
 cette raison que `nonSuivis` fait partie de `CLES_VOLATILES` et sort de la
 comparaison de rejouabilité.*
 
-### Budget de faux positifs assumé (doc/34)
+### Budget de faux positifs décidé (doc/34)
 
 D1 groupe ses candidats de clones par empreinte 32 bits avant de les
 confirmer par comparaison exacte de la séquence de jetons — jamais par le
@@ -1305,7 +1305,7 @@ Recopiées sans reformulation depuis l'en-tête de chaque script cité.
 
 **`lib/tokens.mjs`** (alimente D1 et D5) :
 
-> LIMITE ASSUMÉE (doc/34), toujours vraie : découpage par expression
+> LIMITE VOULUE (doc/34), toujours vraie : découpage par expression
 > rationnelle, pas par analyseur syntaxique — les identifiants sont conservés
 > tels quels, donc un clone dont les variables ont été renommées n'est PAS
 > détecté.
@@ -1316,7 +1316,7 @@ Recopiées sans reformulation depuis l'en-tête de chaque script cité.
 >   1. Le cas de `}` : `{}` peut fermer un bloc — une regex suit alors
 >      presque toujours — ou un littéral objet, valeur qu'une division peut
 >      suivre. `}` n'est PAS dans la classe qui bloque la regex : par
->      défaut, un `/` après `}` est traité comme une regex. Choix assumé :
+>      défaut, un `/` après `}` est traité comme une regex. Choix revendiqué :
 >      fermer un bloc (fonction, `if`, boucle) est infiniment plus fréquent
 >      en code réel que diviser un littéral objet, et le reste du dépôt ne
 >      contient aucun cas du second type.
@@ -1345,7 +1345,7 @@ Recopiées sans reformulation depuis l'en-tête de chaque script cité.
 
 **`d1-clones.mjs`** :
 
-> LIMITES ASSUMÉES : ne voit ni les clones à identifiants renommés (les
+> LIMITES VOULUES : ne voit ni les clones à identifiants renommés (les
 > identifiants ne sont pas neutralisés), ni les clones INTRA-fichier (un
 > groupe exige au moins deux fichiers distincts), ni les clones qui
 > traversent les langages — c'est le rôle de D7.
@@ -1357,7 +1357,7 @@ Recopiées sans reformulation depuis l'en-tête de chaque script cité.
 > construction, puisque les clés diffèrent. Ce constat appartient à la
 > matrice de D7.
 >
-> LIMITE ASSUMÉE : extraction par expression rationnelle sur des littéraux
+> LIMITE VOULUE : extraction par expression rationnelle sur des littéraux
 > d'objet à un niveau d'imbrication. Une table construite par calcul échappe
 > à la mesure ; aucune n'existe dans ce dépôt au commit audité.
 >
@@ -1389,7 +1389,7 @@ rendu Markdown en fermant la portée de code trop tôt. Le texte est identique
 au caractère près à celui du fichier source ; seul le délimiteur Markdown
 qui l'entoure a été élargi à deux guillemets obliques.*
 
-> LIMITE ASSUMÉE : ces motifs sont syntaxiques. Un formatage écrit autrement
+> LIMITE VOULUE : ces motifs sont syntaxiques. Un formatage écrit autrement
 > (Intl, bibliothèque tierce) passerait au travers — aucun n'existe dans ce
 > dépôt au commit audité, et c'est précisément ce que dit le constat sur les
 > conventions numériques.
@@ -1449,7 +1449,7 @@ commentaire l'était.*
 > faire pont entre deux instructions distinctes.
 >
 > Ce qui reste : l'heuristique regex-vs-division reprend celle de
-> `lib/tokens.mjs` telle quelle, y compris son ambiguïté résiduelle assumée
+> `lib/tokens.mjs` telle quelle, y compris son ambiguïté résiduelle
 > sur `}` (un `/` après `}` est traité comme une regex par défaut — voir la
 > « DÉCISION ÉCRITE » de `lib/tokens.mjs` pour le détail et sa justification,
 > non répétée ici). Un risque distinct, plus grave, a aussi été soulevé par

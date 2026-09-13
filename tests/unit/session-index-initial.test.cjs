@@ -95,7 +95,7 @@ test('CARACTÉRISATION — _source absent laisse agentSource indéfini, jamais �
     'le commentaire du module l’exige : ne pas coercer silencieusement vers « claude »');
 });
 
-// CHANGEMENT DE COMPORTEMENT, assumé et daté — C2, 2026-08-11.
+// CHANGEMENT DE COMPORTEMENT VOULU.
 //
 // Ce test épinglait la perte : le BOM faisait échouer le `JSON.parse` local de
 // la sonde, `_source` était perdu, et seule une ligne sur `console.error` en

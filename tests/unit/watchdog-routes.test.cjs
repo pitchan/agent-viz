@@ -182,7 +182,7 @@ test('traduction seulement : la route ne peut atteindre aucun autre module', () 
   // exactement le meme module. Une garde posee sur la seule forme `require` est
   // une garde posee d un seul cote — le defaut le plus frequent de ce chantier.
   //
-  // Le prix assume, et il faut le dire : cette assertion regarde le TEXTE,
+  // Le prix est choisi, et il faut le dire : cette assertion regarde le TEXTE,
   // commentaires compris. Le jour ou ce module aura une vraie raison de
   // dependre de quelque chose, elle rougira — et ce sera une decision a
   // prendre, pas un accident.

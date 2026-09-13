@@ -1,6 +1,6 @@
 // Découpage en jetons : commentaires retirés, chaînes et nombres neutralisés.
 //
-// LIMITE ASSUMÉE (doc/34), toujours vraie : découpage par expression
+// LIMITE VOULUE (doc/34), toujours vraie : découpage par expression
 // rationnelle, pas par analyseur syntaxique — les identifiants sont conservés
 // tels quels, donc un clone dont les variables ont été renommées n'est PAS
 // détecté.
@@ -35,7 +35,7 @@
 //   1. Le cas de `}` : `{}` peut fermer un bloc — une regex suit alors
 //      presque toujours — ou un littéral objet, valeur qu'une division peut
 //      suivre. `}` n'est PAS dans la classe qui bloque la regex : par défaut,
-//      un `/` après `}` est traité comme une regex. Choix assumé : fermer un
+//      un `/` après `}` est traité comme une regex. Choix revendiqué : fermer un
 //      bloc (fonction, `if`, boucle) est infiniment plus fréquent en code
 //      réel que diviser un littéral objet, et le reste du dépôt ne contient
 //      aucun cas du second type.

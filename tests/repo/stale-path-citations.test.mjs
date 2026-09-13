@@ -121,7 +121,7 @@ const LISTE_BLANCHE = [
   { fichier: 'ARCHITECTURE.md', fragment: "`netgain/` n'existent plus", raison: '§ 8, suite de la meme phrase' },
   { fichier: 'ARCHITECTURE.md', fragment: '`netgain/tests/` a rejoint', raison: '§ 9 : la fusion a plat des deux arbres de tests' },
 
-  // FAUX POSITIF ASSUME — un `lib/` VIVANT, sous un arbre que l etape ne touche pas.
+  // FAUX POSITIF VOULU — un `lib/` VIVANT, sous un arbre que le deplacement ne touche pas.
   { fichier: 'docs/sources-externes.md', fragment: 'docs/audit/scripts/lib/', raison: '`docs/audit/scripts/lib/` existe : materiel de l audit, hors perimetre du deplacement' },
 ];
 

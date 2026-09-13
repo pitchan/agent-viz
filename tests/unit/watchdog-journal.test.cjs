@@ -412,7 +412,7 @@ test('une ligne qui n est pas un enregistrement est sautee, pas comptee perimee'
     'du bruit ne declenche pas a lui seul une reecriture du fichier');
 });
 
-// CHANGEMENT DE COMPORTEMENT, assume et date — C2, 2026-08-11.
+// CHANGEMENT DE COMPORTEMENT VOULU.
 //
 // Le decodage d'une ligne passe desormais par la primitive commune du moteur,
 // qui tolere le BOM (U+FEFF). Avant, le `JSON.parse` local de `load` rejetait

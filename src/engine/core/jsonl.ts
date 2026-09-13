@@ -20,8 +20,8 @@ export type JsonlLine = { ok: true; value: unknown } | { ok: false; rawLength: n
  * l'espace fine U+2009, le séparateur de ligne U+2028 —, là où `JSON.parse`
  * seul les refuse. Vérifié en exécutant sur les cinq formes.
  *
- * C'est une PROPRIÉTÉ ASSUMÉE, pas un effet de bord toléré (arbitrage du
- * 2026-08-11). L'arbitrage d'origine disait « le BOM » ; la mécanique donne tout
+ * C'est une PROPRIÉTÉ VOULUE, pas un effet de bord toléré. L'arbitrage
+ * d'origine disait « le BOM » ; la mécanique donne tout
  * le blanc, et c'est la mécanique qui est gardée. La restreindre demanderait
  * d'écrire à la main un sous-ensemble de ce que `trim()` fait déjà — du code en
  * plus, une expression régulière maison à maintenir, pour rendre le lecteur
