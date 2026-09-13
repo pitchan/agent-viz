@@ -39,7 +39,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 
-import { decodeJsonlLine } from '../jsonl.ts';
+import { decodeJsonlLine } from '../../engine/core/jsonl.ts';
 
 const DEFAULT_PATH = path.join(os.homedir(), '.agent-viz', 'alerts.jsonl');
 

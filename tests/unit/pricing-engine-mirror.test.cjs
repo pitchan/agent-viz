@@ -8,7 +8,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
 const { _FALLBACK, applyEnginePrices, getPrice, _setPricesForTest } = require('../../src/server/pricing.ts');
-const { computeCost } = require('../../src/server/pricing-engine.ts');
+const { computeCost } = require('../../src/engine/core/pricing.ts');
 const { loadEngine } = require('../../src/server/observatory/engine.ts');
 
 test('FALLBACK mirrors the engine table: rates, labels, context windows, dated periods', async () => {

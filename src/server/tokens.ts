@@ -17,11 +17,8 @@
 
 import { broadcastSSE } from './sse.ts';
 import { getPrice } from './pricing.ts';
-import { computeCost, normalizeModel, pricingKindOf } from './pricing-engine.ts';
-import { addUsage, emptyUsageBucket, finiteCount, isDedupableMsgId } from './usage.ts';
-// Ruling R8 (doc/36 §4.1) : `import type` seul, effacé à l'émission — même
-// doctrine que `pricing.ts`, qui n'est pas non plus l'un des cinq ponts mais
-// a besoin du vocabulaire de types du moteur.
+import { computeCost, normalizeModel, pricingKindOf } from '../engine/core/pricing.ts';
+import { addUsage, emptyUsageBucket, finiteCount, isDedupableMsgId } from '../engine/core/usage.ts';
 import type { UsageBucket } from '../engine/core/usage.ts';
 import type { RawUsage } from '../engine/core/events.ts';
 
@@ -125,8 +122,8 @@ function accumulateUsage(
   at: string | null,
 ): void {
   if (!isBucket(bucket)) return;
-  // Même frontière que `bucket` : `usage` vient d'un JSONL décodé par un
-  // pont (`decodeJsonlLine`), qui ne promet qu'un JSON valide — pas un objet.
+  // Même frontière que `bucket` : `usage` vient d'un JSONL décodé par
+  // `decodeJsonlLine`, qui ne promet qu'un JSON valide — pas un objet.
   // Un non-objet devient `{}`, ce que tous les champs optionnels de
   // `RawUsage` tolèrent déjà sans autre garde.
   const raw: RawUsage = (typeof usage === 'object' && usage !== null) ? usage as RawUsage : {};

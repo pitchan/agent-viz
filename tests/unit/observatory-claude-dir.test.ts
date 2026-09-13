@@ -143,18 +143,25 @@ test('une variable VIDE retombe sur le home', async () => {
 // ne le voie.
 //
 // Ce 7e test est le seul du fichier à n'avoir besoin d'AUCUN mécanisme
-// d'isolation, et il charge ses deux moitiés par `createRequire(import.meta.url)`
-// — jamais par `await import`. Mesuré (D13) : sous vite-node, l'import du même
-// fichier de `dist/` fabrique une SECONDE instance et l'identité
-// `resolveClaudeDir === duMoteur` casse, alors que la propriété prouvée — les
-// deux moitiés partagent LA MÊME primitive — n'a pas bougé. Seul le mécanisme
-// d'accès change (doc/36 § 1.3), et il change parce que c'est le seul qui
-// interroge le vrai chargeur, celui que le produit emploie en production.
+// d'isolation, et il charge par `createRequire(import.meta.url)` — jamais par
+// `await import`.
+//
+// Avant le retrait du pont, `../claude-dir.ts` rechargeait `dist/` par un
+// `require()` construit sur un chemin absolu : le comparer à un second
+// `require('dist/engine/core/claude-dir.js')` rendait littéralement la MÊME
+// instance, une égalité de RÉFÉRENCE. Sans pont, le serveur importe
+// directement la SOURCE du moteur, plus jamais le `dist` — mesuré, l'égalité
+// de référence entre la source et son build compilé rend désormais `false`
+// (deux exécutions de module distinctes). Ce qui reste, et qui est la même
+// propriété du point de C5, est que les deux résolvent IDENTIQUEMENT une même
+// entrée : c'est ce que ce test vérifie maintenant, par comportement plutôt
+// que par référence.
 test('le serveur passe par la primitive du moteur, pas par sa propre expression', () => {
   const requireReel = createRequire(import.meta.url);
-  const { resolveClaudeDir, CLAUDE_DIR_ENV } = requireReel('../../src/server/claude-dir.ts');
+  const { resolveClaudeDir, CLAUDE_DIR_ENV } = requireReel('../../src/engine/core/claude-dir.ts');
   assert.strictEqual(typeof resolveClaudeDir, 'function');
   assert.strictEqual(CLAUDE_DIR_ENV, 'CLAUDE_CONFIG_DIR');
-  const { resolveClaudeDir: duMoteur } = requireReel('../../dist/engine/core/claude-dir.js');
-  assert.strictEqual(resolveClaudeDir, duMoteur);
+  const { resolveClaudeDir: duBuild } = requireReel('../../dist/engine/core/claude-dir.js');
+  const entree = { env: { [CLAUDE_DIR_ENV]: AILLEURS }, home: os.homedir() };
+  assert.strictEqual(resolveClaudeDir(entree), duBuild(entree));
 });

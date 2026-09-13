@@ -7,7 +7,7 @@ import { promises as fsp } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { resolveClaudeDir, resolveClaudeJsonPath } from '../claude-dir.ts';
+import { resolveClaudeDir, resolveClaudeJsonPath } from '../../engine/core/claude-dir.ts';
 import { openStore } from './store.ts';
 import { loadEngine } from './engine.ts';
 import { collectConfigItems } from './config-audit.ts';

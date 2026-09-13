@@ -184,7 +184,8 @@ test('accumulateUsage with different msgIds cumulates normally', () => {
 
 // ---------------------------------------------------------------------------
 // C3 (docs/audit-qualite-code.md) — l'accumulation vient désormais de la
-// primitive commune du moteur (src/engine/core/usage.ts), partagée par un pont.
+// primitive commune du moteur (src/engine/core/usage.ts), importée directement
+// par tokens.ts.
 //
 // Ces tests existent parce que la migration a changé du comportement SANS
 // qu'aucun test d'au-dessus ne vire au rouge : le filet ne couvrait ni la
@@ -192,7 +193,7 @@ test('accumulateUsage with different msgIds cumulates normally', () => {
 // filet est un changement qu'on ne saura pas défendre au prochain passage.
 // ---------------------------------------------------------------------------
 
-const { emptyUsageBucket } = require('../../src/server/usage.ts');
+const { emptyUsageBucket } = require('../../src/engine/core/usage.ts');
 
 test('C3 — le seau porte les DEUX ventilations de cache, que seul le moteur suivait', () => {
   // Arrange
@@ -272,8 +273,17 @@ test('C3 — le serveur passe par la primitive du moteur, pas par sa propre addi
   // C'est qu'il compte au MÊME ENDROIT que le moteur : deux additions jumelles
   // mais séparées avaient déjà divergé sur les gardes sans que personne ne le
   // voie (constat établi par sonde différentielle, pas par lecture).
-  const duMoteur = require('../../dist/engine/core/usage.js');
-  assert.equal(emptyUsageBucket, duMoteur.emptyUsageBucket);
+  //
+  // Avant le retrait du pont, `emptyUsageBucket` ci-dessus venait de
+  // `src/server/usage.ts`, qui rechargeait `dist/` par un chemin absolu — le
+  // comparer à un second require de `dist/engine/core/usage.js` rendait la
+  // MÊME instance (égalité de référence). Sans pont, `emptyUsageBucket` vient
+  // de la SOURCE : mesuré, une égalité de référence avec le `dist` compilé
+  // rend désormais `false` (deux exécutions de module distinctes). Ce qui
+  // reste vérifiable, et qui est la même garantie, est que la source et son
+  // build produisent le même seau.
+  const duBuild = require('../../dist/engine/core/usage.js');
+  assert.deepEqual(emptyUsageBucket(), duBuild.emptyUsageBucket());
   assert.deepEqual(newBucket().cacheCreate1h, 0);
 });
 

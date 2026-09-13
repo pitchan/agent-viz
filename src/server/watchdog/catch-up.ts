@@ -21,7 +21,7 @@
 
 import { promises as fsp } from 'node:fs';
 import path from 'node:path';
-import { decodeJsonlLine } from '../jsonl.ts';
+import { decodeJsonlLine } from '../../engine/core/jsonl.ts';
 
 // Ce que ce module attend du service : lui pousser un evenement decode. Le
 // service reel (`service.ts`) en offre davantage ; ce fichier n'engage que ce

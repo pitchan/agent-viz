@@ -21,7 +21,7 @@ import {
   watchSession, unwatchSession, isWatched, resetFileOffset, deleteSession,
 } from './event-reader.ts';
 import { ensureTranscriptWatcher } from './transcript.ts';
-import { decodeJsonlLine } from './jsonl.ts';
+import { decodeJsonlLine } from '../engine/core/jsonl.ts';
 
 // Un objet exploitable par accès de champ — même garde locale que
 // session-index.ts et les adaptateurs de transcript : `decodeJsonlLine` ne

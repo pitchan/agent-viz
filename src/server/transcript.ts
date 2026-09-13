@@ -10,7 +10,7 @@ import path from 'node:path';
 
 import { sessionIndex, idFromPath } from './session-index.ts';
 import type { SessionRecord } from './session-index.ts';
-import { decodeJsonlLine } from './jsonl.ts';
+import { decodeJsonlLine } from '../engine/core/jsonl.ts';
 import { ensureTokens, scheduleTokensBroadcast, tokenSum } from './tokens.ts';
 import { broadcastSessionsChanged } from './sse.ts';
 import { getAdapter } from './transcript-adapters/index.ts';

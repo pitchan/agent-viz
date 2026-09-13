@@ -16,7 +16,8 @@
 //     `evt.data.message.message.usage`.
 
 import { ensureTokens, accumulateUsage, newBucket } from '../tokens.ts';
-import { decodeJsonlLine } from '../jsonl.ts';
+import { decodeJsonlLine } from '../../engine/core/jsonl.ts';
+import type { JsonlLine } from '../../engine/core/jsonl.ts';
 
 // Frontière avec `tokens.ts` (hors lot : sa forme complète y vit encore en
 // implicite). Ceci n'engage que ce que CE fichier lit et écrit — le seau
@@ -119,13 +120,7 @@ function parseUsageLine(line: string, rec: UsageRecord): boolean {
   // écarte sans analyser les lignes sans usage sur un chemin parcouru à chaque
   // ligne écrite.
   //
-  // Annotation à la frontière : `decodeJsonlLine` vient de `../jsonl.ts`, pas
-  // encore typé (lot 7, un des six ponts de traversée du moteur). Sa forme
-  // réelle — `{ ok: true; value: unknown } | { ok: false; rawLength: number }
-  // | null` — vit dans `src/engine/core/jsonl.ts` ; elle est recopiée ici en
-  // annotation locale plutôt qu'importée, pour ne pas faire dépendre ce
-  // fichier de l'emplacement du moteur — seul le pont le sait.
-  const verdict: { ok: true; value: unknown } | { ok: false; rawLength: number } | null = decodeJsonlLine(line);
+  const verdict: JsonlLine | null = decodeJsonlLine(line);
   if (!verdict || !verdict.ok) return false;
   const evt = verdict.value;
   if (!isRecord(evt)) return false;

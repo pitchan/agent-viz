@@ -15,16 +15,12 @@
 // them diverged — this module's normalization knew regional routing prefixes
 // and the bare `-vN` suffix while the engine's did not, so the engine reported
 // "partial cost" on an id this side priced without reserve. One definition
-// now, in TypeScript, reached through `pricing-engine.js`. What remains here
+// now, in TypeScript, imported directly from the engine. What remains here
 // is what only the server owns: the in-memory price map, the display metadata
 // (`label`, `maxInput`) and the LiteLLM watchdog.
 
 import https from 'node:https';
-import { computeCost, normalizeModel } from './pricing-engine.ts';
-// Ruling R8 (doc/36 §4.1) : `import type` seul — effacé à l'émission. Ce
-// fichier n'est pas l'un des cinq ponts (il consomme `pricing-engine.ts`, qui
-// l'est), mais la forme de la table transmise par le moteur à
-// `applyEnginePrices` n'existe que côté TypeScript.
+import { computeCost, normalizeModel } from '../engine/core/pricing.ts';
 import type { ModelPrices, PricePeriod, PriceTable } from '../engine/core/pricing.ts';
 
 const LITELLM_URL = 'https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json';
@@ -53,10 +49,8 @@ interface PriceEntry extends ModelPrices {
 // (tests/unit/pricing-engine-mirror.test.cjs keeps the two in lockstep) — it
 // covers the BOOT WINDOW only: `applyEnginePrices` is wired asynchronously in
 // src/server/server.js, so a few messages can be priced before the engine table
-// lands. It does NOT cover "the engine is absent": measured 2026-08-11, with
-// `dist/engine` moved aside the server refuses to start at all — since C2,
-// `src/server/jsonl.js` throws first. The previous wording claimed both, and
-// half of it was false. Numbers
+// lands. This module makes no promise about the engine being absent from the
+// build — that is not its job. Numbers
 // must be kept aligned with Anthropic's public rate card. Each entry carries
 // its CURRENT rates; a model whose tariff changed over time also carries its
 // dated periods in its own `history` field (see claude-sonnet-5 below).
@@ -119,9 +113,10 @@ function getPrice(id: string | null | undefined, at?: string): PriceEntry | null
 // server's behaviour — was never reached in production: the only caller,
 // tokens.js, passed a resolved price OBJECT, and the branch was guarded by
 // `typeof modelOrPrice === 'string'`. Callers now use the engine contract
-// `{ usd, known, model }` from `pricing-engine.js`: `known: false` means the
-// tariff is unknown and the total is incomplete, and that fact travels all the
-// way to the real-time pill instead of dying in a log nobody reads.
+// `{ usd, known, model }`, imported straight from the engine: `known: false`
+// means the tariff is unknown and the total is incomplete, and that fact
+// travels all the way to the real-time pill instead of dying in a log nobody
+// reads.
 
 // Derive a human label ("Opus 4.7", "Fable 5") from a canonical id when
 // LiteLLM doesn't already provide one (it doesn't expose a "label" field).
@@ -336,10 +331,9 @@ function applyEnginePrices(table: PriceTable): void {
 }
 
 // C4 : ni `computeCost` ni `normalizeId` ne sortent plus d'ici. La formule et
-// la normalisation ont UNE définition, dans le moteur ; qui en a besoin passe
-// par `pricing-engine.js` et l'appelle par son nom du moteur,
-// `normalizeModel` — un seul nom dans le produit, comme `CLAUDE_CONFIG_DIR`
-// après C5.
+// la normalisation ont UNE définition, dans le moteur ; qui en a besoin
+// l'importe directement et l'appelle par son nom du moteur, `normalizeModel`
+// — un seul nom dans le produit, comme `CLAUDE_CONFIG_DIR` après C5.
 // Exposed for tests:
 const _internals = { litellmDrift, FORBIDDEN_KEYS, MAX_BODY_BYTES };
 

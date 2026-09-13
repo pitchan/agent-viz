@@ -11,10 +11,11 @@ const {
 // MODIFIÉ LE 2026-08-11 PAR C4 — `computeCost` et la normalisation ne sortent
 // plus de `src/server/pricing.js` : elles avaient UNE jumelle dans le moteur,
 // les deux avaient divergé, et la définition unique vit désormais en
-// TypeScript. Ces filets suivent la fonction là où elle est, par le pont.
-// Le nom aussi change : `normalizeId` → `normalizeModel`, le nom du moteur —
-// un seul nom dans le produit, comme `CLAUDE_CONFIG_DIR` après C5.
-const { computeCost, normalizeModel } = require('../../src/server/pricing-engine.ts');
+// TypeScript. Ces filets suivent la fonction là où elle est, importée
+// directement du moteur. Le nom aussi change : `normalizeId` →
+// `normalizeModel`, le nom du moteur — un seul nom dans le produit, comme
+// `CLAUDE_CONFIG_DIR` après C5.
+const { computeCost, normalizeModel } = require('../../src/engine/core/pricing.ts');
 
 test('normalizeModel strips provider prefixes and date/version suffixes', () => {
   assert.equal(normalizeModel('claude-opus-4-7'), 'claude-opus-4-7');

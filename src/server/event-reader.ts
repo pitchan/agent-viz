@@ -16,7 +16,7 @@ import {
   idFromPath, touchIndex,
 } from './session-index.ts';
 import { broadcastSSE } from './sse.ts';
-import { decodeJsonlLine } from './jsonl.ts';
+import { decodeJsonlLine } from '../engine/core/jsonl.ts';
 import { clearTokensTimer } from './tokens.ts';
 import {
   ensureFirstPrompt, ensureTranscriptWatcher, closeTranscriptResources,

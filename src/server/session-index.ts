@@ -15,8 +15,8 @@ const fsp = fs.promises;
 import path from 'node:path';
 import os from 'node:os';
 
-import { decodeJsonlLine } from './jsonl.ts';
-import type { JsonlLine } from './jsonl.ts';
+import { decodeJsonlLine } from '../engine/core/jsonl.ts';
+import type { JsonlLine } from '../engine/core/jsonl.ts';
 
 const DIR = path.join(os.tmpdir(), 'agent-events');
 try { fs.mkdirSync(DIR, { recursive: true }); } catch {}
@@ -68,9 +68,10 @@ function validSessionId(sid: unknown): sid is string {
   return typeof sid === 'string' && /^[a-zA-Z0-9_-]{1,64}$/.test(sid);
 }
 
-// Un objet exploitable par accès de champ — voir le même garde-fou dans les
-// ponts du moteur : `decodeJsonlLine` ne promet qu'un JSON valide, pas un
-// objet, et `null`/`42`/`"texte"` en sont aussi.
+// Un objet exploitable par accès de champ — même garde locale que
+// event-reader.ts, housekeep.ts, transcript.ts et les adaptateurs de
+// transcript : `decodeJsonlLine` ne promet qu'un JSON valide, pas un objet,
+// et `null`/`42`/`"texte"` en sont aussi.
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
