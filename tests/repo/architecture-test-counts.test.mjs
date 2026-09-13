@@ -21,9 +21,9 @@ function ligneContenant(texte, sousChaine) {
   return texte.split(/\r?\n/).find((l) => l.includes(sousChaine)) ?? null;
 }
 
-// Les deux autres nombres du meme paragraphe : le total de fichiers (l.614
-// et l.617) et le compte apres la commande de l.683. Le nombre de TESTS
-// (1 427) n'est pas ici : il ne se derive pas sans lancer la suite.
+// Les deux autres nombres du paragraphe : le total de fichiers (l.614 et
+// l.617) et le compte apres la commande de l.683. Le document n'ecrit pas de
+// nombre de TESTS : il ne se derive pas du disque sans lancer la suite.
 export function parseComptesEtendusDoc(texte) {
   const l614 = ligneContenant(texte, 'un seul arbre de tests');
   const l617 = ligneContenant(texte, 'npx vitest run');

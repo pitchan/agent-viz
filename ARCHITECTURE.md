@@ -611,10 +611,10 @@ rapport avec le changement de langage. Le serveur, lui, est inchangé.
 
 ## 9. La plomberie de test
 
-**Un seul exécuteur, un seul arbre de tests, 1 427 tests dans 121 fichiers.**
+**Un seul exécuteur, un seul arbre de tests dans 121 fichiers.**
 
 ```
-npx vitest run     → 1427 passés, 121 fichiers
+npx vitest run     → tous passés, 121 fichiers
 ```
 
 Les deux arbres ont fusionné à plat à l'étape 2 : `netgain/tests/` a rejoint
