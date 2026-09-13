@@ -12,6 +12,7 @@ import {
   agentIdFromNode,
   type VizNode, type TokenBucket, type TimelineEntry,
 } from './viz-state.ts';
+import { finiteCount } from '../engine/core/usage.ts';
 import {
   layout, matchesFilter, markLayoutFullDirty, setFeedCursorAdjust,
 } from './viz-layout.ts';
@@ -210,8 +211,8 @@ function tokenCardsHTML(n: VizNode) {
     const cumul = { in: 0, out: 0, cacheCreate: 0, cacheRead: 0 };
     bucket = cumul;
     const add = (b: TokenBucket | null | undefined) => { if (!b) return;
-      cumul.in += b.in || 0; cumul.out += b.out || 0;
-      cumul.cacheCreate += b.cacheCreate || 0; cumul.cacheRead += b.cacheRead || 0;
+      cumul.in += finiteCount(b.in); cumul.out += finiteCount(b.out);
+      cumul.cacheCreate += finiteCount(b.cacheCreate); cumul.cacheRead += finiteCount(b.cacheRead);
       totalCost += b.costUsd || 0; };
     add(state.tokens.main);
     for (const b of state.tokens.perAgent.values()) add(b);

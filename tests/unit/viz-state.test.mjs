@@ -3,7 +3,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseMcpName, state } from '../../src/web/viz-state.ts';
+import { parseMcpName, state, tokenContext } from '../../src/web/viz-state.ts';
 
 test('parseMcpName: plugin_ prefix stripped + repeated segments dedup', () => {
   assert.deepEqual(
@@ -38,6 +38,17 @@ test('state.tokens.tokensSupported defaults to null (unknown until first SSE)', 
 test('state.tokens.transcriptMissing defaults to false', () => {
   // No "transcript not located" placeholder until the server actually says so.
   assert.equal(state.tokens.transcriptMissing, false);
+});
+
+test('tokenContext: Infinity on one field does not poison the sum (finiteCount guard)', () => {
+  // Arrange — the field that used to overflow the old `|| 0` guard.
+  const t = { lastIn: Infinity, lastCacheCreate: 1, lastCacheRead: 1 };
+
+  // Act
+  const r = tokenContext(t);
+
+  // Assert — with the old `(t.lastIn || 0) + ...` guard this rendered Infinity.
+  assert.equal(r, 2);
 });
 
 // ---------------------------------------------------------------------------

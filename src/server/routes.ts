@@ -178,8 +178,8 @@ async function staticHandler(_req: IncomingMessage, res: ServerResponse, url: UR
   await respondStaticFile(res, p);
 }
 
-// Deux primitives du moteur sont servies au navigateur (tool-subject,
-// clock-time) : la table ROUTES les nomme par CHEMIN EXACT, jamais par
+// Trois primitives du moteur sont servies au navigateur (tool-subject,
+// clock-time, usage) : la table ROUTES les nomme par CHEMIN EXACT, jamais par
 // prefixe — un prefixe ouvrirait tout `src/engine/` au navigateur.
 async function engineStaticHandler(_req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
   await respondStaticFile(res, path.join(PROJECT_ROOT, url.pathname));
@@ -373,6 +373,7 @@ const ROUTES: Route[] = [
   { method: 'GET',  prefix: '/src/web/', handler: staticHandler },
   { method: 'GET',  path: '/src/engine/core/tool-subject.ts', handler: engineStaticHandler },
   { method: 'GET',  path: '/src/engine/core/clock-time.ts',   handler: engineStaticHandler },
+  { method: 'GET',  path: '/src/engine/core/usage.ts',        handler: engineStaticHandler },
   { method: 'GET',  path: '/',           handler: indexHandler },
   { method: 'GET',  path: '/index.html', handler: indexHandler },
   { method: 'GET',  path: '/version',    handler: versionHandler },

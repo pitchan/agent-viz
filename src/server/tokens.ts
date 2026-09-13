@@ -101,7 +101,7 @@ function ensureTokens(rec: { tokens?: unknown }): void {
 
 function tokenSum(b: UsageBucket | null | undefined): number {
   if (!b) return 0;
-  return (b.in || 0) + (b.out || 0) + (b.cacheCreate || 0) + (b.cacheRead || 0);
+  return finiteCount(b.in) + finiteCount(b.out) + finiteCount(b.cacheCreate) + finiteCount(b.cacheRead);
 }
 
 /** Un seau réel, reconnu à ses champs propres — jamais un cast : la même

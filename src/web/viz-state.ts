@@ -4,6 +4,8 @@
 // live object references and mutate them directly. Primitive consts and
 // stateless helpers are also exported.
 
+import { finiteCount } from '../engine/core/usage.ts';
+
 // ─── Palette ──────────────────────────────────────────────────────────────
 export const COLORS = {
   void: '#050510',
@@ -275,14 +277,15 @@ export function formatTokens(n: number | null | undefined) {
 // Sum of the 4 cumulative counters in a token bucket. Safe on null/undefined.
 export function tokenTotal(t: TokenBucket | null | undefined) {
   if (!t) return 0;
-  return (t.in || 0) + (t.out || 0) + (t.cacheCreate || 0) + (t.cacheRead || 0);
+  return finiteCount(t.in) + finiteCount(t.out) + finiteCount(t.cacheCreate) + finiteCount(t.cacheRead);
 }
 
 // Context window size = last message's input + cache_creation + cache_read.
-// Matches Claude Code's /context semantics (not cumulative).
+// Matches Claude Code's /context semantics (not cumulative). Same guard as
+// tokenTotal; the engine has no equivalent to these three "last" fields.
 export function tokenContext(t: TokenBucket | null | undefined) {
   if (!t) return 0;
-  return (t.lastIn || 0) + (t.lastCacheCreate || 0) + (t.lastCacheRead || 0);
+  return finiteCount(t.lastIn) + finiteCount(t.lastCacheCreate) + finiteCount(t.lastCacheRead);
 }
 
 // C4 (2026-08-11) — complétude du coût, agrégée sur plusieurs seaux.
