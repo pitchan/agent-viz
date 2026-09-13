@@ -20,8 +20,9 @@
 // formes ci-dessous : ce test le laisse passer, il ne cherche que le corps
 // réimplémenté.
 //
-// SEPT FORMES essayées une par une (mutation plantée, exécutée, lue sur le
-// disque, puis annulée — voir task-3-report.md § correction round 2/5) :
+// HUIT FORMES DE DÉFINITION essayées une par une (mutation plantée, exécutée,
+// lue sur le disque, puis annulée — voir task-3-report.md § correction round
+// 2/5 et 3/5) :
 //   1. `function nom() {}`                         — FunctionDeclaration
 //   2. `const nom = () => {}` / `function(){}`       — VariableDeclaration
 //   3. `class X { nom() {} }` (et sa jumelle sur un — MethodDeclaration
@@ -31,20 +32,39 @@
 //   6. `class X { get/set nom() {} }`                — Get/SetAccessor
 //   7. `export { autreChose as nom };`               — ExportSpecifier renommé
 //   8. `let nom; nom = () => {};`                    — affectation différée
-// Les huit ont été prouvées MANQUÉES avant cet élargissement (exit 0 sur
-// chacune), puis ATTRAPÉES après (exit 1 nommant fichier + ligne).
+// La re-revue du round 2 en a rejoué six autres SANS rien trouver de manqué
+// (`async function`, fonction génératrice, méthode statique, déclaration
+// imbriquée dans un bloc) : ces formes-là sont déjà couvertes par les 8
+// ci-dessus, qui portent sur le NŒUD (FunctionDeclaration, MethodDeclaration,
+// …) et non sur ses modificateurs ni sa position dans l'arbre.
+//
+// CHACUNE DE CES HUIT FORMES ACCEPTE AUSSI UN NOM PORTÉ AUTREMENT QUE PAR UN
+// IDENTIFIANT NU — trouvé en essayant (round 3/5), pas deviné : un nom entre
+// guillemets (`{ 'nom': () => {} }`, `{ 'nom'() {} }`) est déjà connu à la
+// LECTURE, exactement comme un identifiant — seule la syntaxe qui le porte
+// change. Trois porteurs statiques couverts, sur les formes qui les acceptent
+// (propriété, méthode, champ, accesseur, export) :
+//   - chaîne littérale directe            — `'nom'` / `"nom"`
+//   - gabarit SANS substitution           — `` `nom` ``
+//   - l'un des deux entre crochets        — `['nom']` / `[\`nom\`]`
+// Un gabarit AVEC substitution (`` [`nom${x}`] ``) ou un nom calculé par une
+// expression quelconque (`[x]`) restent hors de portée : la valeur n'existe
+// qu'à l'exécution, une lecture syntaxique ne peut pas la voir — c'est la
+// même limite que documentée plus bas pour la déstructuration et
+// l'affectation sur un objet existant.
 //
 // ── Ce que ce filet ne prouve PAS ───────────────────────────────────────────
-//   - Une déstructuration depuis un objet tiers (`const { nom } = obj`) :
-//     si `obj` est un littéral défini ici, sa propre jumelle est DÉJÀ
-//     attrapée (formes 4/5) ; si `obj` vient d'ailleurs (import, paramètre),
-//     remonter jusqu'à sa définition demanderait une résolution de symboles,
-//     hors de portée d'une analyse syntaxique.
+//   - Une déstructuration (`const { nom } = obj` ou, renommée,
+//     `const { x: nom } = obj`) : elle lie un nom à une clé d'une AUTRE
+//     expression, jamais elle-même analysée — aucun corps de fonction
+//     n'existe au point de liaison, que la clé source se nomme comme la
+//     primitive ou non.
 //   - Une affectation sur un objet existant (`obj.nom = () => {}`) : le nom
-//     à gauche n'est pas un identifiant nu (forme 8 ne couvre que
-//     `nom = …`), et `obj` échappe au même argument que ci-dessus.
-//   - Un nom de propriété CALCULÉ (`{ [x]: () => {} }`) : la valeur du nom
-//     n'existe qu'à l'exécution, une lecture syntaxique ne peut pas la voir.
+//     à gauche n'est pas une cible nue (forme 8 ne couvre que `nom = …`), et
+//     `obj` échappe au même argument que la déstructuration.
+//   - Un nom de propriété CALCULÉ par une expression non littérale
+//     (`{ [x]: () => {} }`) ou un gabarit AVEC substitution : la valeur
+//     n'existe qu'à l'exécution.
 //   - Une métaprogrammation (`Object.defineProperty`, `Proxy`) : aucune
 //     occurrence dans ce dépôt, et hors de portée d'une lecture d'arbre.
 import { test } from 'node:test';
@@ -78,7 +98,20 @@ function fichiersServeur() {
 }
 
 const estFonction = (n) => !!n && (ts.isArrowFunction(n) || ts.isFunctionExpression(n));
-const nomDe = (n) => (n && ts.isIdentifier(n) ? n.text : null);
+
+// Un nom PORTÉ statiquement dans l'arbre : un identifiant, une chaîne, un
+// gabarit sans substitution, ou l'un des trois derrière un nom calculé entre
+// crochets (`[ 'nom' ]`, `[ \`nom\` ]`) — mesuré (round 3/5) : les cinq se
+// lisent tous par `.text` une fois le nœud `ComputedPropertyName` traversé.
+// `null` pour tout le reste (identifiant absent, gabarit AVEC substitution,
+// accès de propriété…) : ce sont les cas que ce filet laisse délibérément
+// passer, voir l'en-tête.
+function nomDe(n) {
+  if (!n) return null;
+  if (ts.isIdentifier(n) || ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n)) return n.text;
+  if (ts.isComputedPropertyName(n)) return nomDe(n.expression);
+  return null;
+}
 
 function definitionsLocales(abs) {
   const texte = readFileSync(abs, 'utf8');
@@ -87,47 +120,45 @@ function definitionsLocales(abs) {
   const trouvees = [];
   const marquer = (n, nom, forme) => trouvees.push({ nom, forme, ligne: ligneDe(n) });
   const visiter = (n) => {
-    if (ts.isFunctionDeclaration(n) && n.name && PRIMITIVES.has(n.name.text)) {
+    const nomCible = nomDe(n.name);
+    if (ts.isFunctionDeclaration(n) && nomCible && PRIMITIVES.has(nomCible)) {
       // Forme 1.
-      marquer(n, n.name.text, 'déclaration de fonction');
+      marquer(n, nomCible, 'déclaration de fonction');
     } else if (
-      ts.isVariableDeclaration(n) && ts.isIdentifier(n.name)
-      && PRIMITIVES.has(n.name.text) && estFonction(n.initializer)
+      ts.isVariableDeclaration(n) && nomCible && PRIMITIVES.has(nomCible) && estFonction(n.initializer)
     ) {
       // Forme 2.
-      marquer(n, n.name.text, 'constante fonction/fléchée');
+      marquer(n, nomCible, 'constante fonction/fléchée');
     } else if (
-      ts.isMethodDeclaration(n) && ts.isIdentifier(n.name) && PRIMITIVES.has(n.name.text)
+      ts.isMethodDeclaration(n) && nomCible && PRIMITIVES.has(nomCible)
     ) {
-      // Forme 3 — un seul nœud pour la méthode de classe ET la méthode
-      // raccourcie d'objet littéral, mesuré identiques par l'AST.
-      marquer(n, n.name.text, 'méthode (classe ou objet littéral)');
+      // Forme 3 — un seul nœud pour la méthode de classe (statique comprise)
+      // ET la méthode raccourcie d'objet littéral, mesuré identiques par
+      // l'AST ; `async`/générateur sont des modificateurs du MÊME nœud.
+      marquer(n, nomCible, 'méthode (classe ou objet littéral)');
     } else if (
-      ts.isPropertyAssignment(n) && ts.isIdentifier(n.name)
-      && PRIMITIVES.has(n.name.text) && estFonction(n.initializer)
+      ts.isPropertyAssignment(n) && nomCible && PRIMITIVES.has(nomCible) && estFonction(n.initializer)
     ) {
       // Forme 4.
-      marquer(n, n.name.text, 'propriété d’objet littéral, valeur fonction/fléchée');
+      marquer(n, nomCible, 'propriété d’objet littéral, valeur fonction/fléchée');
     } else if (
-      ts.isPropertyDeclaration(n) && ts.isIdentifier(n.name)
-      && PRIMITIVES.has(n.name.text) && estFonction(n.initializer)
+      ts.isPropertyDeclaration(n) && nomCible && PRIMITIVES.has(nomCible) && estFonction(n.initializer)
     ) {
       // Forme 5.
-      marquer(n, n.name.text, 'champ de classe, valeur fonction/fléchée');
+      marquer(n, nomCible, 'champ de classe, valeur fonction/fléchée');
     } else if (
-      (ts.isGetAccessor(n) || ts.isSetAccessor(n)) && ts.isIdentifier(n.name)
-      && PRIMITIVES.has(n.name.text)
+      (ts.isGetAccessor(n) || ts.isSetAccessor(n)) && nomCible && PRIMITIVES.has(nomCible)
     ) {
       // Forme 6.
-      marquer(n, n.name.text, ts.isGetAccessor(n) ? 'accesseur get' : 'accesseur set');
+      marquer(n, nomCible, ts.isGetAccessor(n) ? 'accesseur get' : 'accesseur set');
     } else if (
-      ts.isExportSpecifier(n) && PRIMITIVES.has(n.name.text)
-      && n.propertyName && n.propertyName.text !== n.name.text
+      ts.isExportSpecifier(n) && nomCible && PRIMITIVES.has(nomCible)
+      && n.propertyName && n.propertyName.text !== nomCible
     ) {
       // Forme 7 — un export RENOMMÉ vers le nom d'une primitive ; un
       // passthrough sans renommage (`export { nom }` ou `export { nom } from
       // '...'`) n'a pas de `propertyName` distinct et ne déclenche rien.
-      marquer(n, n.name.text, `ré-export renommé (depuis \`${n.propertyName.text}\`)`);
+      marquer(n, nomCible, `ré-export renommé (depuis \`${n.propertyName.text}\`)`);
     } else if (
       ts.isBinaryExpression(n) && n.operatorToken.kind === ts.SyntaxKind.EqualsToken
       && PRIMITIVES.has(nomDe(n.left)) && estFonction(n.right)
