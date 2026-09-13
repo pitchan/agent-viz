@@ -42,9 +42,10 @@
 // Ce filet n est PAS un test unitaire (il lit le vrai disque) : c est une
 // verification d hygiene du depot, d ou `tests/repo/` — meme famille que
 // `stale-path-citations.test.mjs`.
-import { test } from 'node:test';
+import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, statSync } from 'node:fs';
+import { readFileSync, statSync, mkdtempSync, rmSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
@@ -170,5 +171,67 @@ test('package.json declare encore ses trois familles de points d entree', () => 
     'un champ de point d entree disparu ne fait rougir aucun autre filet du depot : retirer ' +
       '`files` livrerait tout l arbre dans le tarball, retirer `bin` ou `main` livrerait un ' +
       'paquet sans commande ni entree de module.',
+  );
+});
+
+// Le trou trouve au cadrage de la tache 6 (doc/49) : rien ne verifiait que
+// chaque route `/src/engine/...` de la table du serveur figure aussi dans
+// `files`. Les deux listes coincidaient PAR HASARD — `served-web-graph.test.mjs`
+// le note deja (§ 5 de son en-tete) : une route du moteur ajoutee sans toucher
+// `files` laissait ce fichier-ci vert. La table est LUE dans `routes.ts`,
+// jamais recopiee ici : une seconde liste pourrait diverger sans que rien ne
+// le dise, meme raison que R4 du fichier voisin.
+
+// Charger `routes.ts` charge `session-index.ts`, qui cree
+// `os.tmpdir()/agent-events` des sa lecture : le bac est pose avant l'import,
+// meme parade que `served-web-graph.test.mjs`.
+const BAC = mkdtempSync(path.join(os.tmpdir(), 'avtest-entrypoints-'));
+process.env.TEMP = BAC;
+process.env.TMP = BAC;
+process.env.TMPDIR = BAC;
+process.env.USERPROFILE = BAC;
+process.env.HOME = BAC;
+after(() => rmSync(BAC, { recursive: true, force: true }));
+
+// Verificateur pur : `routes` sont des chemins relatifs (sans le '/' de tete,
+// la forme que `files` porte) ; `files` est l'ensemble declare par
+// `package.json`. Rend les routes absentes du manifeste, EN LES NOMMANT.
+export function routesAbsentesDuManifeste(routes, files) {
+  return routes.filter((r) => !files.has(r));
+}
+
+test('le verificateur signale une route absente du manifeste, en la nommant', () => {
+  const absentes = routesAbsentesDuManifeste(
+    ['src/engine/core/usage.ts', 'src/engine/core/clock-time.ts'],
+    new Set(['src/engine/core/usage.ts']),
+  );
+  assert.deepEqual(absentes, ['src/engine/core/clock-time.ts']);
+});
+
+test('le verificateur accepte quand toutes les routes figurent dans le manifeste', () => {
+  const absentes = routesAbsentesDuManifeste(
+    ['src/engine/core/usage.ts'],
+    new Set(['src/engine/core/usage.ts', 'dist/engine/']),
+  );
+  assert.deepEqual(absentes, []);
+});
+
+const { ROUTES } = await import('../../src/server/routes.ts');
+const routesEngine = ROUTES
+  .filter((r) => typeof r.path === 'string' && r.path.startsWith('/src/engine/'))
+  .map((r) => r.path.slice(1)); // retire le '/' de tete : `files` porte des chemins relatifs
+
+test('assiette : au moins une route /src/engine/... a verifier', () => {
+  // Un balayage qui ne voit rien passerait aussi, et ne prouverait rien.
+  assert.ok(routesEngine.length >= 1, `assiette suspecte : ${routesEngine.length} route(s) vue(s).`);
+});
+
+test('chaque route /src/engine/... du serveur figure dans `files`', () => {
+  const absentes = routesAbsentesDuManifeste(routesEngine, new Set(PKG.files ?? []));
+  assert.deepEqual(
+    absentes,
+    [],
+    'route(s) servie(s) par le serveur mais absente(s) de `files` : le paquet publie ne les ' +
+      `livrerait pas, alors que le serveur de developpement les sert : ${absentes.join(', ')}`,
   );
 });

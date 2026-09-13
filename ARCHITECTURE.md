@@ -623,8 +623,8 @@ même dossier, et c'est ce qui explique le pont ci-dessous.
 
 | Dialecte | Fichiers | Écrits en |
 |---|---|---|
-| CommonJS + ESM | 40 `.test.cjs` + 38 `.test.mjs` | `node:test` |
-| TypeScript | 45 `.test.ts` | l'API de vitest |
+| CommonJS + ESM | 42 `.test.cjs` + 51 `.test.mjs` | `node:test` |
+| TypeScript | 28 `.test.ts` | l'API de vitest |
 
 **L'extension dit désormais le régime, et c'est l'étape 3 qui l'a rendue
 nécessaire.** Sous une racine `"type": "module"`, un `.js` **est** un module ES :
@@ -636,7 +636,7 @@ par un `git mv` pur ; les **3** derniers manipulaient `require.cache`, un
 mécanisme que le régime ESM rend inerte, et ont été réécrits en même temps que
 renommés — deux en `.test.mjs`, un en `.test.ts`.
 
-**Les 78 fichiers en `node:test` passent par un pont** (`test-support/bridge/`),
+**Les 93 fichiers en `node:test` passent par un pont** (`test-support/bridge/`),
 qui rend la surface `node:test` au-dessus des primitives de vitest. **L'addition,
 écrite pour qu'on puisse la refaire — et re-dérivée à l'étape 3, où l'ancienne
 version se contredisait elle-même** (elle totalisait 74 trois lignes sous un
@@ -661,6 +661,22 @@ manquante est ci-dessous, relevée après coup et non réécrite) :
              de pouvoir charger les SOURCES du moteur sous `node --test` (§ ci-dessous)
 ――
 78
++6  18/08    error-format.test.mjs · errors-register.test.mjs · version-route.test.cjs
+             topbar-status.test.mjs · arbitration-view.test.mjs · observatory-service-status.test.cjs
++3  19/08    install-hooks-registry.test.mjs · install-hooks-scan.test.mjs · file-size-budget.test.mjs
++1  20/08    advisor-card.test.mjs
++2  étape 5 (12/09)  served-ts-strip-check.test.mjs · static-ts-route.test.cjs
+――
+90
++3  étape 6  build-guards.test.mjs · no-local-engine-primitives.test.mjs · served-web-graph.test.mjs
+-1  étape 6  engine-require.test.cjs quitte l'arbre avec la primitive qu'il testait (le pont
+             part, tâche 3 de l'étape) — comptait pour 1 dans les 40 `.test.cjs` de 778eb67
+――
+92
++1  étape 6, tâche 6  architecture-test-counts.test.mjs   ce paragraphe tient enfin ses
+                      trois comptes au disque, plutôt que de les affirmer
+――
+93
 ```
 
 ```
