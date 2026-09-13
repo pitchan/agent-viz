@@ -6,7 +6,7 @@
 // Ce que C2/C3/C4/C5 nommaient reste vrai : les deux moitiés du produit lisent
 // AU MÊME ENDROIT. Ça s'exprime maintenant comme une hygiène de source, pas
 // comme une exécution : aucun fichier de `src/server/` ne DÉFINIT localement
-// l'une des sept primitives, il les IMPORTE. Une importation ne peut pas
+// l'une des primitives du moteur, il les IMPORTE. Une importation ne peut pas
 // diverger de ce qu'elle importe ; une jumelle locale, si.
 //
 // Ce filet ne touche jamais `dist/` — l'ancienne panne (build absent ou
@@ -76,16 +76,22 @@ import path from 'node:path';
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const ts = createRequire(path.join(ROOT, 'package.json'))('typescript');
 
-// Les sept primitives que le retrait des ponts a rendues IMPORTABLES
-// directement depuis `src/engine/core/` — jsonl (C2), claude-dir (C5), usage
-// (C3). `pricing.ts` (computeCost, normalizeModel, pricingKindOf) reste hors
-// liste : `src/server/pricing.ts` PORTE une carte de prix en mémoire à lui —
-// sa présence n'est pas une jumelle, c'est son rôle propre (doc/49 brief,
-// « ce qui reste à pricing.js »).
-const PRIMITIVES = new Set([
-  'emptyUsageBucket', 'addUsage', 'finiteCount', 'isDedupableMsgId',
-  'resolveClaudeDir', 'resolveClaudeJsonPath', 'decodeJsonlLine',
-]);
+// Les primitives sont les fonctions exportées des quatre modules du moteur que le
+// serveur importe, formule de coût et normalisation comprises. La carte de prix
+// d'affichage de `src/server/pricing.ts` n'en redéfinit aucune : elle reste permise.
+const MODULES_DU_MOTEUR = ['usage.ts', 'jsonl.ts', 'claude-dir.ts', 'pricing.ts']
+  .map((nom) => path.join(ROOT, 'src', 'engine', 'core', nom));
+
+function fonctionsExportees(abs) {
+  const sf = ts.createSourceFile(abs, readFileSync(abs, 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  return sf.statements
+    .filter((s) => ts.isFunctionDeclaration(s) && s.name
+      && (s.modifiers ?? []).some((m) => m.kind === ts.SyntaxKind.ExportKeyword))
+    .map((s) => s.name.text);
+}
+
+const PRIMITIVES_PAR_MODULE = new Map(MODULES_DU_MOTEUR.map((abs) => [abs, fonctionsExportees(abs)]));
+const PRIMITIVES = new Set([...PRIMITIVES_PAR_MODULE.values()].flat());
 
 function fichiersServeur() {
   const dir = path.join(ROOT, 'src', 'server');
@@ -181,11 +187,19 @@ function toutesLesDefinitions() {
   return out;
 }
 
+test('assiette : chacun des quatre modules du moteur exporte au moins une fonction lue', () => {
+  // Un module dont aucune fonction exportée n'est lue rendrait le filet vert sans rien chercher.
+  const vides = [...PRIMITIVES_PAR_MODULE]
+    .filter(([, noms]) => noms.length === 0)
+    .map(([abs]) => path.relative(ROOT, abs).replaceAll('\\', '/'));
+  assert.deepEqual(vides, [], `ASSIETTE : aucune fonction exportée lue dans ${vides.join(', ')}`);
+});
+
 test('aucun fichier de src/server ne définit localement une primitive du moteur', () => {
   assert.deepEqual(
     toutesLesDefinitions(),
     [],
-    'C2/C3/C4/C5 : ces sept noms n’ont qu’UNE définition, dans src/engine/core/ — ' +
+    `ces primitives n’ont qu’UNE définition, dans src/engine/core/ (${[...PRIMITIVES].sort().join(', ')}) — ` +
       'un fichier de src/server/ qui en (re)définit une localement, sous quelque forme que ' +
       'ce soit, recrée la jumelle que le retrait des ponts a supprimée. Importer, ne pas réécrire.',
   );
