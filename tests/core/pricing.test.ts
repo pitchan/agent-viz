@@ -337,3 +337,51 @@ describe('computeCost — cache_creation non exploitable (C4)', () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// Tâche 5 bis (doc/49) — défaut observable : un champ brut non fini poison-
+// nait `usd` (Infinity/NaN) parce que `?? 0` ne remplace que null/undefined.
+// La garde attendue est `finiteCount` (core/usage.ts), déjà appliquée aux six
+// mêmes champs par `addUsage` : un champ qui compte zéro jeton doit aussi
+// coûter zéro. `"1000"` est le cas qui change vraiment de résultat : `?? 0`
+// le facturait par conversion implicite, `finiteCount` le compte (et le
+// facture) à zéro.
+// ---------------------------------------------------------------------------
+describe('computeCost — champ brut non fini : coûte zéro comme il compte zéro (5 bis)', () => {
+  const model = 'claude-opus-4-8';
+  const resteValide = {
+    output_tokens: 2000,
+    cache_creation_input_tokens: 10000,
+    cache_read_input_tokens: 100000,
+    cache_creation: { ephemeral_5m_input_tokens: 4000, ephemeral_1h_input_tokens: 6000 },
+  };
+  // Référence : mêmes champs valides, input_tokens à zéro — ce que doit rendre
+  // chaque cas malformé ci-dessous, puisque finiteCount les compte à zéro.
+  const coutSansInput = computeCost({ ...resteValide, input_tokens: 0 }, model).usd as number;
+
+  test.each([
+    ['1e999, lu par JSON.parse comme Infinity', 1e999],
+    ['NaN', NaN],
+    ['chaîne non numérique', 'abc'],
+    ['chaîne numérique convertible', '1000'],
+  ])('input_tokens = %s : usd fini, champs valides facturés normalement', (_label, valeur) => {
+    const r = computeCost({ ...resteValide, input_tokens: valeur } as never, model);
+    expect(Number.isFinite(r.usd)).toBe(true);
+    expect(r.usd).toBeCloseTo(coutSansInput, 12);
+  });
+
+  test('les six champs bruts sont gardés, pas seulement input_tokens', () => {
+    const r = computeCost(
+      {
+        input_tokens: 1e999,
+        output_tokens: NaN,
+        cache_creation_input_tokens: 'x',
+        cache_read_input_tokens: 1e999,
+        cache_creation: { ephemeral_5m_input_tokens: NaN, ephemeral_1h_input_tokens: 'y' },
+      } as never,
+      model,
+    );
+    expect(r.usd).toBe(0);
+    expect(r.known).toBe(true);
+  });
+});

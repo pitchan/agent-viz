@@ -352,3 +352,26 @@ test('C4 — la complétude traverse l\'enveloppe SSE', () => {
   assert.equal(msg.main.costComplete, false);
   assert.deepEqual(msg.main.unknownModels, ['claude-opus-6']);
 });
+
+// ---------------------------------------------------------------------------
+// Tâche 5 bis (doc/49) — défaut observable : un seul message malformé sur un
+// modèle TARIFÉ (branche différente du modèle INCONNU couvert par C4
+// ci-dessus) empoisonnait `bucket.costUsd` pour toute la session, parce que
+// `computeCost` ne gardait pas ses champs bruts. `costComplete` reste `true`
+// dans ce test : la branche fautive n'y touche jamais, avant comme après.
+// ---------------------------------------------------------------------------
+test('un message malformé (input_tokens: 1e999) entre deux messages sains ne poisonne pas costUsd', () => {
+  const b = newBucket();
+  const sain = { input_tokens: 1000, output_tokens: 500 };
+  accumulateUsage(b, sain, 'claude-sonnet-4-5', 'm1');
+  const coutUnSain = b.costUsd;
+  accumulateUsage(b, { input_tokens: 1e999 }, 'claude-sonnet-4-5', 'm2');
+  accumulateUsage(b, sain, 'claude-sonnet-4-5', 'm3');
+
+  assert.ok(Number.isFinite(b.costUsd), `costUsd devrait être fini, obtenu ${b.costUsd}`);
+  assert.ok(
+    Math.abs(b.costUsd - coutUnSain * 2) < 1e-9,
+    `costUsd devrait valoir le coût des deux messages sains (${coutUnSain * 2}), obtenu ${b.costUsd}`,
+  );
+  assert.equal(b.costComplete, true);
+});

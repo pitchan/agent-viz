@@ -188,11 +188,9 @@ function accumulateUsage(
       }
       bucket.costComplete = false;
     } else {
-      // `usd` est `null` seulement quand le tarif est inconnu — impossible
-      // dans cette branche (`nature !== 'inconnu'` l'a déjà écarté par la
-      // MÊME normalisation), mais les deux appels restent deux fonctions
-      // distinctes du point de vue du typeur : `?? 0` est la garde qui
-      // documente l'invariant sans jamais empoisonner le total d'un `NaN`.
+      // `usd` est fini par construction : computeCost passe chaque champ brut
+      // par `finiteCount` avant de multiplier, donc seul le tarif inconnu
+      // (déjà écarté ici) rend `null` — `?? 0` ne traite que ce cas-là.
       const cost = computeCost(raw, model, at ?? undefined).usd;
       bucket.costUsd += cost ?? 0;
       if (nature === 'tarife') {

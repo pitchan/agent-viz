@@ -1,4 +1,5 @@
 import type { RawUsage } from './events.ts';
+import { finiteCount } from './usage.ts';
 
 export interface ModelPrices {
   input: number;
@@ -149,15 +150,18 @@ export function computeCost(
   // ferait APPARAÎTRE côté serveur une panne qu'il n'avait pas.
   const u: RawUsage = isRecord(usage) ? usage : {};
   const cc = isRecord(u.cache_creation) ? u.cache_creation : undefined;
-  const ccTotal = u.cache_creation_input_tokens ?? 0;
-  const cc1h = cc?.ephemeral_1h_input_tokens ?? 0;
-  const cc5m = cc !== undefined ? (cc.ephemeral_5m_input_tokens ?? 0) : ccTotal; // sans split : tout en 5m
+  // Un champ brut non fini (NaN, Infinity, une chaîne) coûte zéro, comme il
+  // compte zéro jeton dans usage.ts : le coût lit la MÊME garde que les
+  // compteurs, jamais une conversion implicite qui facture un texte.
+  const ccTotal = finiteCount(u.cache_creation_input_tokens);
+  const cc1h = finiteCount(cc?.ephemeral_1h_input_tokens);
+  const cc5m = cc !== undefined ? finiteCount(cc.ephemeral_5m_input_tokens) : ccTotal; // sans split : tout en 5m
   const usd =
-    (u.input_tokens ?? 0) * p.input +
-    (u.output_tokens ?? 0) * p.output +
+    finiteCount(u.input_tokens) * p.input +
+    finiteCount(u.output_tokens) * p.output +
     cc5m * p.cacheCreate +
     cc1h * (p.input * 2) +
-    (u.cache_read_input_tokens ?? 0) * p.cacheRead;
+    finiteCount(u.cache_read_input_tokens) * p.cacheRead;
   return { usd, known: true, model: norm };
 }
 
