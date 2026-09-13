@@ -28,13 +28,12 @@
 // bouchons n'a pas d'équivalent ES natif : `vi.resetModules()` + `vi.doMock()`
 // + `await import()` est le seul remède à propriété prouvée identique — une
 // instance neuve par appel, et les cinq voisins remplacés AVANT le chargement.
-// Le prix, assumé et écrit : ses 7 tests quittent la sémantique de référence de
+// Le prix, assumé et écrit : ses 6 tests quittent la sémantique de référence de
 // `node --test`.
 import { test, vi } from 'vitest';
 import assert from 'node:assert';
 import path from 'node:path';
 import os from 'node:os';
-import { createRequire } from 'node:module';
 
 const CIBLE = '../../src/server/observatory/index.ts';
 
@@ -137,31 +136,9 @@ test('une variable VIDE retombe sur le home', async () => {
   );
 });
 
-// Le point de C5 : ce n'est pas « le serveur lit la bonne variable », c'est que
-// les deux moitiés lisent au MÊME ENDROIT. Deux expressions identiques mais
-// séparées avaient déjà divergé une fois (sur la chaîne vide) sans que personne
-// ne le voie.
-//
-// Ce 7e test est le seul du fichier à n'avoir besoin d'AUCUN mécanisme
-// d'isolation, et il charge par `createRequire(import.meta.url)` — jamais par
-// `await import`.
-//
-// Avant le retrait du pont, `../claude-dir.ts` rechargeait `dist/` par un
-// `require()` construit sur un chemin absolu : le comparer à un second
-// `require('dist/engine/core/claude-dir.js')` rendait littéralement la MÊME
-// instance, une égalité de RÉFÉRENCE. Sans pont, le serveur importe
-// directement la SOURCE du moteur, plus jamais le `dist` — mesuré, l'égalité
-// de référence entre la source et son build compilé rend désormais `false`
-// (deux exécutions de module distinctes). Ce qui reste, et qui est la même
-// propriété du point de C5, est que les deux résolvent IDENTIQUEMENT une même
-// entrée : c'est ce que ce test vérifie maintenant, par comportement plutôt
-// que par référence.
-test('le serveur passe par la primitive du moteur, pas par sa propre expression', () => {
-  const requireReel = createRequire(import.meta.url);
-  const { resolveClaudeDir, CLAUDE_DIR_ENV } = requireReel('../../src/engine/core/claude-dir.ts');
-  assert.strictEqual(typeof resolveClaudeDir, 'function');
-  assert.strictEqual(CLAUDE_DIR_ENV, 'CLAUDE_CONFIG_DIR');
-  const { resolveClaudeDir: duBuild } = requireReel('../../dist/engine/core/claude-dir.js');
-  const entree = { env: { [CLAUDE_DIR_ENV]: AILLEURS }, home: os.homedir() };
-  assert.strictEqual(resolveClaudeDir(entree), duBuild(entree));
-});
+// Le point de C5 : les deux moitiés lisent au MÊME ENDROIT — les six tests
+// ci-dessus le verrouillent par le comportement réel d'`observatory/index.ts`.
+// Sans pont, aucun fichier de `src/server/` ne peut plus recopier
+// `resolveClaudeDir` ou `resolveClaudeJsonPath` : il ne reste qu'un import,
+// vérifié par `npm run typecheck` et gardé par
+// `tests/repo/no-local-engine-primitives.test.mjs`.
