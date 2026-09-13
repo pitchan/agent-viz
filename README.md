@@ -23,6 +23,14 @@ Open http://localhost:3333, run Claude Code in any other terminal, watch events 
 agent-viz stop
 ```
 
+To update, reinstall and restart the dashboard:
+
+```bash
+npm install -g @vcueto/agent-viz
+agent-viz stop --keep-hooks
+agent-viz
+```
+
 ## Other ways to run it
 
 ### Try it once without installing
