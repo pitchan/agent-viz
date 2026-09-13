@@ -449,41 +449,50 @@ function newestTsMtime(dir) {
   return max;
 }
 
-// Les deux pannes de build, nommees ICI, une seule fois, avant que la
-// commande ne se branche — dix sites plus bas chargent `dist/server/*`
-// (cmdStart, cmdStop, cmdStatus, cmdInstallHooks, cmdUninstallHooks, cmdHook) ;
-// dix controles independants seraient dix occasions de diverger.
-//
-// 1. `dist/server/` absent : jamais construit (ou casse par un nettoyage
-//    manuel). Sans cette garde, le premier `import()` plus bas leve
-//    `Cannot find module` avec dix lignes de pile et aucune mention du
-//    remede — mesure sur ce depot. Fatal : aucun des dix sites ne peut
-//    fonctionner sans `dist/server/`.
-// 2. `dist/server/` present mais perime par rapport a la source : `tsc -b`
-//    emet meme quand il rend un exit different de zero (mesure, tsc 5.9.3),
-//    donc un build rouge ignore laisse un `dist/` incoherent qui demarre
-//    quand meme et sert l'ancien code, en silence. Un avertissement, pas un
-//    arret : le serveur reste utilisable, moins a jour.
-//    Reserve au depot de developpement — un paquet installe n'embarque pas
-//    `src/server/` (voir `files` dans package.json), donc cette branche ne
-//    s'execute jamais chez un utilisateur final.
-function ensureBuildIsFresh() {
-  const distServerDir = path.join(PKG_ROOT, 'dist', 'server');
-  if (!fs.existsSync(distServerDir)) {
-    console.error(`${c.err('✗')} agent-viz is not built: freshly cloned repo, never built. Run \`npm run build\`.`);
+// Fichiers reellement charges par les commandes, pas seulement le dossier
+// dist/server : un dossier present mais vide, ou dist/engine absent a cote
+// d'un dist/server intact, doivent aussi faire echouer la garde.
+const REQUIRED_DIST_FILES = [
+  ['server', 'lifecycle.js'],
+  ['server', 'install-hooks.js'],
+  ['server', 'prompt-install.js'],
+  ['server', 'hook.js'],
+  ['engine', 'core', 'index.js'],
+  ['engine', 'doctor', 'index.js'],
+].map(segs => path.join(PKG_ROOT, 'dist', ...segs));
+
+// Une seule garde avant le branchement : dix sites plus bas chargent dist/*.js.
+// Fichier compile absent = fatal, rien ne peut tourner. Source .ts plus recente que
+// le temoin de tsc -b = avertissement : la commande servirait l'ancien code sans un mot.
+function ensureBuildIsFresh(cmd) {
+  const isDevRepo = fs.existsSync(path.join(PKG_ROOT, 'src', 'server'));
+  const missing = REQUIRED_DIST_FILES.filter(f => !fs.existsSync(f));
+  if (missing.length > 0) {
+    if (isDevRepo) {
+      console.error(`${c.err('✗')} agent-viz is not built (or the build is incomplete). Run \`npm run build\`.`);
+    } else {
+      console.error(`${c.err('✗')} agent-viz's install looks damaged: some compiled files are missing. Reinstall the package.`);
+    }
     process.exit(1);
   }
 
-  const srcServerDir = path.join(PKG_ROOT, 'src', 'server');
-  if (!fs.existsSync(srcServerDir)) return;
+  if (!isDevRepo || cmd === 'hook') return;
 
   const witness = path.join(PKG_ROOT, 'dist', 'tsconfig.build.tsbuildinfo');
-  let witnessMtime = 0;
-  try { witnessMtime = fs.statSync(witness).mtimeMs; } catch {}
+  let witnessMtime;
+  try {
+    witnessMtime = fs.statSync(witness).mtimeMs;
+  } catch {
+    console.error(`${c.warn('!')} can't tell if the build is fresh: no compilation witness found (dist/tsconfig.build.tsbuildinfo is missing). Run \`npm run build\` if unsure.`);
+    return;
+  }
 
-  const newestSource = newestTsMtime(path.join(PKG_ROOT, 'src'));
+  const newestSource = Math.max(
+    newestTsMtime(path.join(PKG_ROOT, 'src', 'engine')),
+    newestTsMtime(path.join(PKG_ROOT, 'src', 'server')),
+  );
   if (newestSource > witnessMtime) {
-    console.error(`${c.warn('!')} build looks stale: a .ts source is newer than the last \`npm run build\`. Re-run \`npm run build\`.`);
+    console.error(`${c.warn('!')} a .ts source under src/engine or src/server changed after the last \`npm run build\`. Re-run it to pick up the change.`);
   }
 }
 
@@ -530,7 +539,7 @@ async function main() {
   const cmd = argv[0] && !argv[0].startsWith('-') ? argv[0] : 'start';
   const rest = argv[0] && !argv[0].startsWith('-') ? argv.slice(1) : argv;
 
-  ensureBuildIsFresh();
+  ensureBuildIsFresh(cmd);
 
   switch (cmd) {
     case 'start':            return cmdStart(rest);
