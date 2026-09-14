@@ -197,7 +197,7 @@ est apprise et documentée quatre fois côté moteur (`netgain/src/router/hook.t
 `netgain/src/install/json-file.ts:34`, ce dernier commenté littéralement
 « BOM U+FEFF (leçon v0.2.1) »). Un `grep -rl "BOM\|FEFF"` sur `netgain/tests/`
 en trouve cinq, mais un seul est étranger au sujet : `netgain/tests/doctor/session-kind.test.ts:108`
-contient un caractère `﻿` dans le TEXTE d'un prompt de test (fixture
+contient un caractère `\uFEFF` dans le TEXTE d'un prompt de test (fixture
 pour une détection de session sans marqueur humain), sans rapport avec une
 tolérance d'analyse JSON — ce n'est pas un test de la leçon BOM. Les quatre
 qui le sont : `netgain/tests/core/jsonl.test.ts`, `netgain/tests/install/json-file.test.ts`,
