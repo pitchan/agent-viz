@@ -2,7 +2,7 @@
 
 Ces règles s'appliquent aux fichiers de `tests/`. Elles s'ajoutent au `CLAUDE.md` racine, elles ne le remplacent pas.
 
-Outillage imposé : `node:test` + `node:assert/strict` — même sous vitest, qui les aliase (`test-support/bridge/`). Deux exécuteurs lisent les mêmes fichiers : `npm test` (vitest, extensions `.test.cjs`/`.test.mjs`/`.test.ts`) et `npm run test:node` (node --test, `.test.cjs`/`.test.mjs` seulement). Chaque test vit dans le sous-dossier de son domaine : `tests/unit/` pour l'unitaire pur, `tests/repo/` pour l'hygiène du dépôt, `tests/install/`, `tests/doctor/`, etc. Pas de nouvelle dépendance de test.
+Outillage imposé : `node:test` + `node:assert/strict` — même sous vitest, qui les aliase (`test-support/bridge/`). Deux exécuteurs lisent les mêmes fichiers : `npm test` (vitest, extensions `.test.cjs`/`.test.mjs`/`.test.ts`) et `npm run test:node` (node --test, `.test.cjs`/`.test.mjs` seulement). Chaque test vit dans le sous-dossier de son domaine : `tests/unit/` pour l'unitaire pur, `tests/repo/` pour l'hygiène du dépôt, `tests/e2e/` pour l'intégration, `tests/doctor/`, etc. Pas de nouvelle dépendance de test.
 
 **Jamais d'extension `.test.js`.** Aucun des deux exécuteurs ne la lit : le fichier ne tournerait jamais, et sa présence se lirait comme une couverture. Le filet `tests/repo/test-file-extensions.test.mjs` rougit si une telle extension apparaît sous `tests/`.
 
@@ -32,4 +32,4 @@ Un test ne doit casser que si **le comportement** change. S'il casse sur un refa
 
 ## 4. Ce qui n'est pas un test unitaire ici
 
-Rendu DOM, serveur démarré, vrai système de fichiers, vrai réseau. Ça relève d'un test d'intégration, pas de `tests/unit/`.
+Rendu DOM, serveur démarré, vrai système de fichiers, vrai réseau. Ça relève d'un test d'intégration, rangé dans `tests/e2e/` (suffixe `.e2e.test.*`), pas dans `tests/unit/`.

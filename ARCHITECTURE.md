@@ -665,7 +665,7 @@ manquante est ci-dessous, relevée après coup et non réécrite) :
 -1  14/09  pricing-engine-mirror.test.cjs quitte l'arbre avec la table recopiée qu'il comparait
 ――
 94
-+1  14/09  lifecycle.test.mjs   start, status et stop sur de vrais processus et des ports de test
++1  14/09  lifecycle.e2e.test.mjs   start, status et stop sur de vrais processus et des ports de test
 ――
 95
 ```
