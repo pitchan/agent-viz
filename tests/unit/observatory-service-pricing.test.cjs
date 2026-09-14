@@ -16,10 +16,10 @@ function makeService(listed) {
       countByKind: () => ({ interactive: 0, headless: 0, unknown: 0 }),
       getScanState: () => null,
     },
-    loadEngine: async () => ({
+    engine: {
       priceTable: () => ({ source: 'netgain-table-embarquee', unit: 'usd-par-jeton', entries: [], zeroCost: [] }),
       version: '0.13.0',
-    }),
+    },
     collectConfig: async () => [],
     broadcast: () => {},
     now: () => new Date('2026-08-05T12:00:00.000Z'),

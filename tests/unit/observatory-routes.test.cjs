@@ -1,6 +1,7 @@
 'use strict';
-// The ten analysis endpoints: response shapes, guards, and the missing-engine
-// path. The service is injected, so no SQLite file and no engine are needed.
+// The ten analysis endpoints: response shapes, guards, and the answer to a
+// failing service. The service is injected, so no SQLite file and no engine
+// are needed.
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -18,7 +19,7 @@ function mockRes() {
 const SERVICE = {
   summary: async () => ({ sessions: 3, netTokens: 1000, costUsd: 2, costComplete: true,
     cacheReadTokens: 500, anomalies: { parseErrors: 0, partialCostSessions: 0 },
-    lastScanAt: '2026-07-15T12:00:00.000Z', engine: { ok: true, error: null } }),
+    lastScanAt: '2026-07-15T12:00:00.000Z' }),
   sessions: async () => [{ id: 's1', project: 'F--proj', costUsd: 1 }],
   session: async id => (id === 's1' ? { id: 's1', report: { sessionId: 's1' } } : null),
   scan: async () => ({ discovered: 2, scanned: 2, skipped: 0, failed: 0 }),
@@ -202,15 +203,17 @@ test('la raison ne voyage que pour un arbitrage — nulle pour les autres statut
   assert.deepEqual(got, { id: 1, status: 'ignored', reason: null });
 });
 
-test('a missing engine answers 503 with the exact error, never an empty page', async () => {
+test('une panne du service répond 500 avec son message exact', async () => {
+  // Arrange
   const broken = {
     ...SERVICE,
-    // Message tel que Node le produit quand le moteur embarque n'a pas ete construit.
-    summary: async () => { const e = new Error("Cannot find module '/app/dist/engine/core/index.js'"); e.engineMissing = true; throw e; },
+    summary: async () => { throw new Error('database is locked'); },
   };
+  // Act
   const res = await router(broken)('GET', '/analysis/summary');
-  assert.equal(res.statusCode, 503);
-  assert.match(JSON.parse(res.body).error, /dist[\\/]engine/);
+  // Assert
+  assert.equal(res.statusCode, 500);
+  assert.deepEqual(JSON.parse(res.body), { error: 'database is locked' });
 });
 
 test('POST /analysis/purge wipes first, then starts a rebuild scan with the window', async () => {
@@ -226,17 +229,19 @@ test('POST /analysis/purge wipes first, then starts a rebuild scan with the wind
   assert.deepEqual(events, ['purge', ['scan', { days: 7 }]]);
 });
 
-test('POST /analysis/purge answers 503 and never scans when the engine is missing', async () => {
+test('une purge qui échoue répond 500 et ne lance pas de scan', async () => {
+  // Arrange
   let scanned = false;
-  const missing = new Error('netgain introuvable');
-  missing.engineMissing = true;
   const spy = {
     ...SERVICE,
-    purge: async () => { throw missing; },
+    purge: async () => { throw new Error('database is locked'); },
     scan: async () => { scanned = true; },
   };
+  // Act
   const res = await router(spy)('POST', '/analysis/purge');
-  assert.equal(res.statusCode, 503);
+  // Assert
+  assert.equal(res.statusCode, 500);
+  assert.deepEqual(JSON.parse(res.body), { error: 'database is locked' });
   assert.equal(scanned, false);
 });
 

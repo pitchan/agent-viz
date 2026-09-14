@@ -100,7 +100,7 @@ killOldServer().then(async () => {
   // Purge old/empty sessions + compact large files on boot.
   await housekeep();
   // Analysis scan: fire-and-forget so a large first scan never delays the
-  // dashboard, and a missing engine never prevents the server from starting.
+  // dashboard, and a failed scan is logged without stopping the server.
   const runAnalysisScan = () => getObservatoryService().scan()
     .catch(err => console.error('[observatory] scan failed:', err.message));
   runAnalysisScan();

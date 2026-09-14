@@ -9,7 +9,7 @@ import path from 'node:path';
 
 import { resolveClaudeDir, resolveClaudeJsonPath } from '../../engine/core/claude-dir.ts';
 import { openStore } from './store.ts';
-import { loadEngine } from './engine.ts';
+import { engine } from './engine.ts';
 import { collectConfigItems } from './config-audit.ts';
 import { createObservatoryService } from './service.ts';
 import { broadcastSSE } from '../sse.ts';
@@ -28,7 +28,7 @@ function getObservatoryService(): ReturnType<typeof createObservatoryService> {
   const claudeDir: string = resolveClaudeDir();
   _service = createObservatoryService({
     store: openStore(DB_PATH),
-    loadEngine,
+    engine,
     collectConfig: () => collectConfigItems(
       { readFile: fsp.readFile, readdir: fsp.readdir },
       // `.claude.json` suit la MÊME variable, mais pas de la même façon : posée,

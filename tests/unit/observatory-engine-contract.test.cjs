@@ -8,22 +8,18 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('path');
 
-const { loadEngine, engineStatus, FIXTURE_CLAUDE_DIR } = require('../../src/server/observatory/engine.ts');
+const { engine } = require('../../src/server/observatory/engine.ts');
 
-test('loadEngine resolves the granular netgain API', async () => {
-  const engine = await loadEngine();
+const FIXTURE_CLAUDE_DIR = path.join(__dirname, '..', 'fixtures', 'observatory');
+
+test('the engine exposes the granular netgain API', () => {
   assert.equal(typeof engine.discoverSessions, 'function');
   assert.equal(typeof engine.scanSession, 'function');
   assert.equal(typeof engine.netTokens, 'function');
-  assert.deepEqual(engineStatus(), { ok: true, error: null });
-});
-
-test('FIXTURE_CLAUDE_DIR points at the versioned observatory fixture', () => {
-  assert.equal(path.basename(FIXTURE_CLAUDE_DIR), 'observatory');
 });
 
 test('the SessionReport shape the product consumes is present and typed', async () => {
-  const { discoverSessions, scanSession, netTokens } = await loadEngine();
+  const { discoverSessions, scanSession, netTokens } = engine;
   const refs = await discoverSessions(FIXTURE_CLAUDE_DIR, {});
   const ref = refs.find(r => r.sessionId === 'sess-fixture');
   assert.ok(ref, 'fixture session must be discoverable');
@@ -108,7 +104,7 @@ test('the SessionReport shape the product consumes is present and typed', async 
 });
 
 test('a blocks-shaped prompt session is classified interactive', async () => {
-  const { discoverSessions, scanSession } = await loadEngine();
+  const { discoverSessions, scanSession } = engine;
   const refs = await discoverSessions(FIXTURE_CLAUDE_DIR, {});
   const ref = refs.find(r => r.sessionId === 'sess-fixture-interactive');
   assert.ok(ref, 'interactive fixture must be discoverable');
@@ -116,8 +112,7 @@ test('a blocks-shaped prompt session is classified interactive', async () => {
   assert.equal(r.sessionKind, 'interactive');
 });
 
-test('the engine exposes the embedded price table and its version (v0.5.0 surface)', async () => {
-  const engine = await loadEngine();
+test('the engine exposes the embedded price table and its version (v0.5.0 surface)', () => {
   const table = engine.priceTable();
   assert.equal(table.source, 'netgain-table-embarquee');
   assert.equal(table.unit, 'usd-par-jeton');
@@ -130,7 +125,7 @@ test('the engine exposes the embedded price table and its version (v0.5.0 surfac
 });
 
 test('the SessionReport carries per-model dollars (costByModel)', async () => {
-  const { discoverSessions, scanSession } = await loadEngine();
+  const { discoverSessions, scanSession } = engine;
   const refs = await discoverSessions(FIXTURE_CLAUDE_DIR, {});
   const ref = refs.find(r => r.sessionId === 'sess-fixture');
   const r = await scanSession(ref, 100);
@@ -145,8 +140,7 @@ test('the SessionReport carries per-model dollars (costByModel)', async () => {
   }
 });
 
-test('the announced price source IS the engine table source — one voice', async () => {
+test('the announced price source IS the engine table source — one voice', () => {
   const { PRICE_SOURCE } = require('../../src/server/observatory/routes.ts');
-  const engine = await loadEngine();
   assert.equal(engine.priceTable().source, PRICE_SOURCE);
 });

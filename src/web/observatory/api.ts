@@ -11,7 +11,7 @@ async function getJson(url: string, fetchImpl: typeof fetch = fetch) {
   const res = await fetchImpl(url);
   const body = await res.json().catch(() => null);
   if (!res.ok) {
-    // The server sends the exact cause (missing engine, unknown session): show
+    // The server sends the exact cause (unknown session, service failure): show
     // it rather than a generic "an error occurred".
     throw new Error(body && body.error ? body.error : `${res.status} sur ${url}`);
   }

@@ -14,7 +14,7 @@ const session = (id, over = {}) => ({
   report: { tokens: { total: { in: 100, out: 50, cacheCreate: 850, cacheRead: 9000 } }, parseErrors: 0 },
   ...over,
 });
-const CTX = { lastScanAt: '2026-07-15T12:00:00.000Z', engine: { ok: true, error: null } };
+const CTX = { lastScanAt: '2026-07-15T12:00:00.000Z' };
 
 test('totals add sessions, net tokens and cost', () => {
   const s = computeSummary([session('s1'), session('s2')], CTX);
@@ -50,16 +50,15 @@ test('an empty period returns zeros and a complete cost, never NaN', () => {
     { sessions: 0, netTokens: 0, costUsd: 0, costComplete: true });
 });
 
-test('the scan date and engine state travel with the totals', () => {
+test('the scan date travels with the totals', () => {
   const s = computeSummary([], CTX);
   assert.equal(s.lastScanAt, '2026-07-15T12:00:00.000Z');
-  assert.deepEqual(s.engine, { ok: true, error: null });
 });
 
 test('computeSummary carries the announced basis and the period untouched', () => {
   const basis = { counts: { interactive: 12, headless: 640, unknown: 3 }, includeMachine: false };
   const period = { from: '2026-07-04T00:00:00.000Z', to: '2026-08-03T00:00:00.000Z', days: 30 };
-  const out = computeSummary([], { lastScanAt: null, engine: null, basis, period });
+  const out = computeSummary([], { lastScanAt: null, basis, period });
   assert.deepEqual(out.basis, basis);
   assert.deepEqual(out.period, period);
 });

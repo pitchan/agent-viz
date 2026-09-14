@@ -7,7 +7,6 @@
 // price makes the whole total partial rather than quietly complete.
 
 import type { Session } from './rules/types.ts';
-import type { EngineStatus } from './engine.ts';
 
 // Shape of store.countByKind()'s return, duck-typed rather than imported: a
 // pure module (no I/O, no clock — see the file docstring) does not reach into
@@ -31,7 +30,6 @@ interface Period {
 
 interface SummaryOptions {
   lastScanAt: string | null;
-  engine: EngineStatus | null;
   basis?: Basis | null;
   period?: Period | null;
 }
@@ -49,14 +47,13 @@ interface Summary {
   cacheReadTokens: number;
   anomalies: SummaryAnomalies;
   lastScanAt: string | null;
-  engine: EngineStatus | null;
   basis: Basis | null;
   period: Period | null;
 }
 
 function computeSummary(
   sessions: Session[],
-  { lastScanAt, engine, basis = null, period = null }: SummaryOptions,
+  { lastScanAt, basis = null, period = null }: SummaryOptions,
 ): Summary {
   return {
     sessions: sessions.length,
@@ -69,7 +66,6 @@ function computeSummary(
       partialCostSessions: sessions.filter(s => !s.costComplete).length,
     },
     lastScanAt,
-    engine,
     basis,
     period,
   };

@@ -30,7 +30,7 @@ const WINDOW_DAYS: number[] = [7, 30, 90];
 
 interface ServiceDeps {
   store: Store;
-  loadEngine: () => Promise<Engine>;
+  engine: Engine;
   collectConfig: () => Promise<ConfigItem[]>;
   broadcast: (message: AnalysisScanMessage) => void;
   now: () => Date;
@@ -59,7 +59,7 @@ type SessionListRow = Omit<SessionRow, 'reportJson'> & { projectPath: string | n
 type SessionDetail = Omit<SessionRow, 'reportJson'> & { report: SessionReport | null };
 
 function createObservatoryService(deps: ServiceDeps) {
-  const { store, loadEngine, collectConfig, broadcast, now, claudeDir, sinceDays, scanSinceDays } = deps;
+  const { store, engine, collectConfig, broadcast, now, claudeDir, sinceDays, scanSinceDays } = deps;
 
   const clampDays = (days: number | undefined): number =>
     (days !== undefined && WINDOW_DAYS.includes(days) ? days : sinceDays);
@@ -80,23 +80,10 @@ function createObservatoryService(deps: ServiceDeps) {
   const humanSessions = (from: string) =>
     toAnalysedSessions(toAnalysable(store.listSessions({ since: from, kinds: KINDS_HUMAN })));
 
-  // A missing engine must be distinguishable from a genuine failure, so the
-  // routes can answer 503 with its exact cause instead of a blank 500.
-  async function engine(): Promise<Engine> {
-    try {
-      return await loadEngine();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      const wrapped = Object.assign(new Error(message), { engineMissing: true });
-      throw wrapped;
-    }
-  }
-
   return {
     async scan({ days }: ScanDaysOptions = {}): Promise<Awaited<ReturnType<typeof runIncrementalScan>>> {
-      const resolved = await engine();
       const outcome = await runIncrementalScan(
-        { engine: resolved, store, broadcast, now },
+        { engine, store, broadcast, now },
         { claudeDir, sinceDays: scanSinceDays, scanVersion: SCAN_VERSION });
 
       const takenAt = now().toISOString();
@@ -130,16 +117,10 @@ function createObservatoryService(deps: ServiceDeps) {
     },
 
     async purge(): Promise<void> {
-      // Refuse to wipe a base the engine cannot rebuild: surface the missing
-      // engine (503 upstream) before touching anything.
-      await engine();
       store.purge();
     },
 
     async summary({ days, includeMachine = false }: WindowOptions = {}): Promise<ReturnType<typeof computeSummary>> {
-      // Touching the engine here makes a missing package surface as an error
-      // rather than as a silently empty dashboard.
-      await engine();
       const state = store.getScanState(claudeDir);
       const d = clampDays(days);
       const from = sinceOf(d);
@@ -148,7 +129,6 @@ function createObservatoryService(deps: ServiceDeps) {
         : store.listSessions({ since: from, kinds: KINDS_HUMAN });
       return computeSummary(toAnalysedSessions(toAnalysable(rows)), {
         lastScanAt: state ? state.lastScanAt : null,
-        engine: { ok: true, error: null },
         basis: { counts: store.countByKind({ since: from }), includeMachine },
         period: { from, to: now().toISOString(), days: d },
       });
@@ -157,7 +137,6 @@ function createObservatoryService(deps: ServiceDeps) {
     async modelCosts(
       { days, includeMachine = false }: WindowOptions = {},
     ): Promise<ReturnType<typeof computeModelCosts> & { basis: WindowBasis; period: WindowPeriod }> {
-      await engine();
       const d = clampDays(days);
       const from = sinceOf(d);
       const rows = includeMachine
@@ -178,12 +157,11 @@ function createObservatoryService(deps: ServiceDeps) {
       engineVersion: string;
       scanVersion: number;
     }> {
-      const resolved = await engine();
-      const table = resolved.priceTable();
+      const table = engine.priceTable();
       return {
         priceTable: table,
-        provenance: buildProvenance({ engineVersion: resolved.version, priceSource: table.source }),
-        engineVersion: resolved.version,
+        provenance: buildProvenance({ engineVersion: engine.version, priceSource: table.source }),
+        engineVersion: engine.version,
         scanVersion: SCAN_VERSION,
       };
     },

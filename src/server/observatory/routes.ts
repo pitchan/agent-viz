@@ -22,16 +22,9 @@ function sendJson(res: ServerResponse, code: number, payload: unknown): void {
   res.end(JSON.stringify(payload));
 }
 
-// A missing engine is a 503 carrying the exact cause; anything else is a
-// genuine 500. Either way the live canvas view keeps working.
+// Any service failure answers 500 with its exact message, so the client shows
+// the real cause rather than a generic error.
 function sendError(res: ServerResponse, err: unknown): void {
-  if (err instanceof Error && 'engineMissing' in err && err.engineMissing) {
-    sendJson(res, 503, {
-      error: err.message,
-      hint: 'Moteur d’analyse indisponible — le suivi temps réel reste actif.',
-    });
-    return;
-  }
   const message = err instanceof Error ? err.message : String(err);
   console.error('[observatory] route failed:', message);
   sendJson(res, 500, { error: message });
@@ -117,9 +110,9 @@ function createObservatoryRoutes(getService: () => Service): Route[] {
     },
     {
       method: 'POST', path: '/analysis/purge', sameOrigin: true,
-      // The wipe happens before answering (503 if the engine is missing —
-      // never wipe what cannot be rebuilt); the rebuild scan then reports its
-      // progress on the SSE stream, exactly like POST /analysis/scan.
+      // The wipe happens before answering, so a failed wipe answers 500 and
+      // starts no scan; the rebuild scan then reports its progress on the SSE
+      // stream, exactly like POST /analysis/scan.
       handler: bind(async (_req, res, url, service) => {
         const days = daysOf(url);
         await service.purge();

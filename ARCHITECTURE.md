@@ -346,19 +346,22 @@ Extrait de la sortie :
 ```
 git grep -nE "from '(\.\./)+engine/" -- src/server
   src/server/tokens.ts:21:import { addUsage, emptyUsageBucket, finiteCount, isDedupableMsgId } from '../engine/core/usage.ts';
-  src/server/observatory/engine.ts:16:import { discoverSessions, parseSince, priceTable } from '../../engine/core/index.ts';
+  src/server/observatory/engine.ts:12:import { discoverSessions, parseSince, priceTable } from '../../engine/core/index.ts';
   src/server/transcript.ts:13:import { decodeJsonlLine } from '../engine/core/jsonl.ts';
 ```
 
 Une primitive du moteur n'a qu'une définition : un fichier de `src/server/` qui
 en redéfinit une localement fait rougir `tests/repo/no-local-engine-primitives.test.mjs`.
 
-`src/server/observatory/engine.ts` est l'adaptateur qui injecte le moteur dans
-l'observatoire : les règles et l'orchestration le reçoivent en paramètre, ce qui
-les rend testables sans lui. Il exporte aussi `FIXTURE_CLAUDE_DIR`, un chemin vers
-`tests/fixtures/observatory/` : du code de production désigne un répertoire que le
-paquet publié ne contient pas (`tests/` est hors de `files`). Son seul consommateur
-est `tests/unit/observatory-engine-contract.test.cjs`.
+`src/server/observatory/engine.ts` construit, au chargement du module, la valeur
+`engine` : les cinq fonctions du moteur que l'observatoire reçoit
+(`discoverSessions`, `parseSince`, `scanSession`, `netTokens`, `priceTable`) et la
+version du produit. La racine de composition `src/server/observatory/index.ts` la
+passe au service : les règles et l'orchestration la reçoivent en paramètre, ce qui
+les rend testables avec une doublure (un faux moteur écrit dans le test). Les
+imports sont statiques : un fichier compilé du moteur absent empêche ce module de
+se charger, et aucune route ne traite de moteur absent. Toute panne du service
+répond 500 avec son message exact.
 
 **Un seul build produit les deux arbres compilés.** `npm run build` efface
 `dist/engine` et `dist/server`, puis lance `tsc -b tsconfig.build.json` —

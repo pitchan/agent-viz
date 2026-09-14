@@ -45,10 +45,9 @@ const HUMAN_ROW = {
   reportJson: JSON.stringify(R1_REPORT),
 };
 
-// Real deps (service.js head): { store, loadEngine, collectConfig, broadcast,
-// now, claudeDir, sinceDays, scanSinceDays } — the engine arrives through a
-// loader function, not as a ready object, and config collection is a
-// separate collaborator from the store.
+// Real deps (service.ts head): { store, engine, collectConfig, broadcast,
+// now, claudeDir, sinceDays, scanSinceDays } — the engine arrives as a ready
+// value, and config collection is a separate collaborator from the store.
 function fakeDeps({ rows = [] } = {}) {
   const calls = { listSessions: [], discoverSince: null, upserted: null };
   const store = {
@@ -73,7 +72,7 @@ function fakeDeps({ rows = [] } = {}) {
 function serviceOf(deps) {
   // Mirror the real composition (index.js): default advice window 30, scan window 90.
   return createObservatoryService({
-    loadEngine: async () => deps.engine, store: deps.store,
+    engine: deps.engine, store: deps.store,
     collectConfig: async () => [],
     broadcast: () => {}, now: () => NOW,
     claudeDir: 'C:\\Users\\x\\.claude', sinceDays: 30, scanSinceDays: 90,

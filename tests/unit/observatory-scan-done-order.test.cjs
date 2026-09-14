@@ -24,7 +24,7 @@ test("scan broadcasts 'done' only after recommendations are stored", async () =>
     scanSession: async () => { throw new Error('not reached: no session to scan'); },
   };
   const service = createObservatoryService({
-    loadEngine: async () => engine, store,
+    engine, store,
     collectConfig: async () => [],
     broadcast: m => sequence.push(`broadcast-${m.phase}`),
     now: () => new Date('2026-08-04T10:00:00.000Z'),
