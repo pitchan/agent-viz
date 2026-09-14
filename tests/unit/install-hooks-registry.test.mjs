@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { INSTALLERS, install, uninstall } from '../../src/server/install-hooks/registry.ts';
+import { INSTALLERS, TARGETS, install, pickAgents, uninstall } from '../../src/server/install-hooks/registry.ts';
 
 // Un bac à sable qui ressemble à un projet : `resolveScope({ scope: 'project' })`
 // exige un `.git` pour trouver la racine. On n'utilise JAMAIS la portée `user`
@@ -41,7 +41,7 @@ test('le refus d\'un adaptateur ne traverse pas le registre et ne jette pas le r
   fs.writeFileSync(copilotFile, JSON.stringify({ version: 99, note: 'pas à nous' }, null, 2));
 
   // Act — les DEUX agents, Claude passe en premier dans le registre
-  const result = install({ target: 'all', scope: 'project', cwd: root, packageRoot });
+  const result = install({ target: 'both', scope: 'project', cwd: root, packageRoot });
 
   // Assert — la case fautive porte une valeur, pas une exception
   assert.equal(typeof result.copilot.error, 'string', 'copilot doit rendre { error }');
@@ -211,4 +211,54 @@ test('un 3e agent hypothétique serait affiché : le rendu ne nomme aucun agent 
       `cli.ts nomme encore result.${nom} en dur — un 3e agent ne serait pas affiché`,
     );
   }
+});
+
+test('TARGETS liste les agents du registre puis both, dans cet ordre', () => {
+  // Arrange — le registre importé ci-dessus
+  // Act
+  const cibles = TARGETS;
+  // Assert
+  assert.deepEqual(cibles, ['claude', 'copilot', 'both']);
+});
+
+// Une cible inconnue lève au lieu de retomber sur l'auto-détection : sinon une
+// faute de frappe agit sur les agents détectés, que personne n'a nommés.
+for (const cible of ['cloude', 'all', '']) {
+  test(`pickAgents lève sur la cible inconnue '${cible}'`, () => {
+    // Arrange — la cible seule, aucun fichier
+    // Act
+    const appel = () => pickAgents({ target: cible });
+    // Assert
+    assert.throws(appel, new RegExp(`unknown target '${cible}'`));
+  });
+}
+
+test('install avec une cible inconnue lève et n\'écrit aucun fichier de hooks', () => {
+  // Arrange
+  const root = sandboxProject('avtest-cible-inconnue-install-');
+  const packageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'avtest-pkg-'));
+
+  // Act
+  const appel = () => install({ target: 'cloude', scope: 'project', cwd: root, packageRoot });
+
+  // Assert
+  assert.throws(appel, /unknown target 'cloude'/);
+  assert.ok(!fs.existsSync(path.join(root, '.claude', 'settings.json')), 'aucun fichier Claude ne doit être écrit');
+  assert.ok(!fs.existsSync(path.join(root, '.github', 'hooks', 'agent-viz.json')), 'aucun fichier Copilot ne doit être écrit');
+});
+
+test('uninstall avec une cible inconnue lève et laisse en place le hook posé', () => {
+  // Arrange — un hook Claude posé dans le projet
+  const root = sandboxProject('avtest-cible-inconnue-uninstall-');
+  const packageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'avtest-pkg-'));
+  const settings = path.join(root, '.claude', 'settings.json');
+  install({ target: 'claude', scope: 'project', cwd: root, packageRoot });
+  assert.ok(INSTALLERS.claude.installedIn(settings), 'le hook Claude doit être posé avant l\'essai');
+
+  // Act
+  const appel = () => uninstall({ target: 'cloude', scope: 'project', cwd: root, packageRoot });
+
+  // Assert
+  assert.throws(appel, /unknown target 'cloude'/);
+  assert.ok(INSTALLERS.claude.installedIn(settings), 'le hook Claude doit rester posé après le refus');
 });

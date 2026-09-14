@@ -4,6 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { nouvelleRacine, lance, fichiersDe, nettoie } from '../helpers/bin-sandbox.mjs';
+import { TARGETS } from '../../src/server/install-hooks/registry.ts';
 
 const PREFIXE = 'agent-viz-aide-';
 const VERSION = '9.9.9-test';
@@ -122,6 +123,24 @@ test('contrôle inverse : sans --help, la même commande atteint la garde de bui
     const sortie = `${r.stdout}${r.stderr}`;
     assert.equal(r.status, 1, `la garde de build devrait arrêter la commande :\n${sortie}`);
     assert.ok(/reinstall/i.test(r.stderr), `le message de la garde devrait sortir sur stderr :\n${sortie}`);
+  } finally {
+    nettoie(racine);
+  }
+});
+
+// Le binaire porte sa propre copie des cibles valides : l'aide doit afficher
+// celles du registre, qui fait foi.
+test('miroir : l\'aide affiche les cibles de --target du registre', () => {
+  // Arrange
+  const racine = nouvelleRacine(PREFIXE, { version: VERSION });
+  try {
+    // Act
+    const r = lance(racine, ['--help']);
+
+    // Assert
+    assert.equal(r.status, 0, `code de sortie attendu 0, obtenu ${r.status} :\n${r.stdout}${r.stderr}`);
+    const attendu = `--target=${TARGETS.join('|')}`;
+    assert.ok(r.stdout.includes(attendu), `l'aide devrait afficher ${attendu} :\n${r.stdout}`);
   } finally {
     nettoie(racine);
   }

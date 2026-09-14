@@ -5,11 +5,11 @@
 // new adapter file, add its AGENT_CONFIG entry, and register here. Dispatchers
 // don't need to change.
 //
-// `target`: agent name | 'all' | 'both' (alias) | undefined.
+// `target`: agent name | 'both' | undefined; any other value throws.
 // undefined → auto-detect; uninstall defaults to ALL agents (don't leave hooks
 // behind if an agent got removed from PATH after install).
 // Returns { <agent>: result, ... } where each side carries the per-agent result.
-import type { AgentName, AgentOpts, Scope, AgentInstaller } from './types.ts';
+import type { AgentName, AgentOpts, Scope, AgentInstaller, Target } from './types.ts';
 import { scanInstalled } from './scopes.ts';
 import { claudeInstaller } from './claude.ts';
 import { copilotInstaller } from './copilot.ts';
@@ -26,16 +26,25 @@ export function isAgentName(v: string): v is AgentName {
   return Object.hasOwn(INSTALLERS, v);
 }
 
-// Pick which agents to act on. `target` accepts a registered agent name, 'all'
-// (or legacy 'both'), or undefined → auto-detect (fallback: first registered).
+// Les valeurs valides de `target` : un agent du registre, ou 'both' pour tous.
+// bin/agent-viz.js en garde une copie, qu'il valide avant de charger dist/ ;
+// ses tests la comparent à celle-ci.
+export const TARGETS: readonly Target[] = [...(Object.keys(INSTALLERS) as AgentName[]), 'both'];
+
+// Pick which agents to act on. `target` accepts a registered agent name,
+// 'both', or undefined → auto-detect (fallback: first registered). Any other
+// value throws: a mistyped target must not act on agents nobody named.
 export function pickAgents({ target }: { target?: string }): AgentName[] {
   const all = Object.keys(INSTALLERS) as AgentName[];
-  if (target === 'all' || target === 'both') return all;
-  if (target && isAgentName(target)) return [target];
-  const detected = all.filter(a => INSTALLERS[a].detect());
-  // `all` porte toujours 'claude' et 'copilot' (registre fixe ci-dessus) :
-  // `all[0]` existe forcément, le `!` documente cet invariant.
-  return detected.length > 0 ? detected : [all[0]!];
+  if (target === 'both') return all;
+  if (target === undefined) {
+    const detected = all.filter(a => INSTALLERS[a].detect());
+    // `all` porte toujours 'claude' et 'copilot' (registre fixe ci-dessus) :
+    // `all[0]` existe forcément, le `!` documente cet invariant.
+    return detected.length > 0 ? detected : [all[0]!];
+  }
+  if (isAgentName(target)) return [target];
+  throw new Error(`unknown target '${target}' (expected ${TARGETS.join('|')})`);
 }
 
 // Un adaptateur a le droit de REFUSER : copilot.ts refuse d'écraser un fichier
@@ -66,7 +75,8 @@ export function install(opts: AgentOpts = {}): Record<string, unknown>   { retur
 export function audit(opts: AgentOpts = {}): Record<string, unknown>     { return dispatch('audit', opts); }
 export function uninstall(opts: AgentOpts = {}): Record<string, unknown> {
   // Default to ALL registered agents (sweep), even if not currently detected.
-  const agents: AgentName[] = opts.target ? pickAgents(opts) : (Object.keys(INSTALLERS) as AgentName[]);
+  // `=== undefined` : une cible vide est une cible invalide, pas une absence de cible.
+  const agents: AgentName[] = opts.target === undefined ? (Object.keys(INSTALLERS) as AgentName[]) : pickAgents(opts);
   const out: Record<string, unknown> = {};
   for (const a of agents) {
     try { out[a] = INSTALLERS[a].uninstall(opts); }

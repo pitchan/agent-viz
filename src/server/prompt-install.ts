@@ -5,6 +5,7 @@
 
 import readline from 'node:readline';
 import { styleText } from 'node:util';
+import type { Target } from './install-hooks/types.ts';
 
 // Forme rendue par `detectAgents()` (install-hooks.ts, hors lot ce fichier-ci
 // mais même lot 8) : un booléen par agent connu, jamais plus.
@@ -43,7 +44,7 @@ interface SelectOption<T extends string> {
   label: string;
 }
 
-const TARGET_OPTIONS: SelectOption<'claude' | 'copilot' | 'both'>[] = [
+const TARGET_OPTIONS: SelectOption<Target>[] = [
   { value: 'claude',  label: 'Claude Code' },
   { value: 'copilot', label: 'Copilot CLI' },
   { value: 'both',    label: 'Both' },
@@ -165,7 +166,7 @@ async function promptInstallParams({ detected, projectRoot, io }: {
   detected: DetectedAgents;
   projectRoot: string | null;
   io: PromptIo;
-}): Promise<{ target: 'claude' | 'copilot' | 'both'; scope: 'user' | 'project' | 'local' }> {
+}): Promise<{ target: Target; scope: 'user' | 'project' | 'local' }> {
   const targetOptions = TARGET_OPTIONS.map((o) => {
     if (o.value === 'both') return o;
     return { ...o, label: `${o.label} ${detected[o.value] ? '(detected)' : '(not detected)'}` };

@@ -37,6 +37,10 @@ const c = {
   err:  (s) => styleText('red',    s),
 };
 
+// Copie de TARGETS du registre : l'analyse des options la vérifie avant de
+// charger dist/. tests/repo/cli-flags et bin-help la comparent au registre.
+const TARGETS = ['claude', 'copilot', 'both'];
+
 function help() {
   console.log(`agent-viz v${PKG_VERSION}
 
@@ -50,7 +54,7 @@ Usage:
                                    --keep-hooks       keep hooks installed (symmetric to start --no-install-hooks)
   agent-viz status               Show running state + URL.
   agent-viz install-hooks        Install hooks. Default: auto-detect (Claude + Copilot if present).
-                                   --target=claude|copilot|both   force a target
+                                   --target=${TARGETS.join('|')}   force a target
                                    --user             user-level config (~/.claude or ~/.copilot) — default
                                    --project          repo-committed config
                                    --local            repo-local gitignored config
@@ -65,6 +69,7 @@ Usage:
 
 // Les options que chaque sous-commande accepte. `hook` n'y figure pas : Claude
 // Code bloque l'outil en cours sur un code 2, et hook.ts lit seul ses arguments.
+// parseArgs ignore la clé `choices` : parseCommandOptions la vérifie après lui.
 const COMMAND_OPTIONS = {
   start: {
     port: { type: 'string' },
@@ -79,13 +84,13 @@ const COMMAND_OPTIONS = {
     project: { type: 'boolean' },
     local: { type: 'boolean' },
     check: { type: 'boolean' },
-    target: { type: 'string' },
+    target: { type: 'string', choices: TARGETS },
   },
   'uninstall-hooks': {
     user: { type: 'boolean' },
     project: { type: 'boolean' },
     local: { type: 'boolean' },
-    target: { type: 'string' },
+    target: { type: 'string', choices: TARGETS },
   },
 };
 
@@ -97,29 +102,37 @@ function wantsVersion(argv) {
   return argv.includes('--version') || argv.includes('-v');
 }
 
+function refuseOption(cmd, reason) {
+  console.error(`${c.err('✗')} ${cmd}: ${reason}`);
+  console.error("  Run 'agent-viz --help' to list the options.");
+  process.exit(2);
+}
+
 // Une option non déclarée est refusée avant tout effet : ignorée, une faute de
-// frappe comme `stop --keep-hook` retirait les hooks sans un mot.
+// frappe comme `stop --keep-hook` retirait les hooks sans un mot. Même refus pour
+// une valeur hors de `choices` : `--target=cloude` agirait sur les agents détectés.
 function parseCommandOptions(cmd, args) {
+  const options = COMMAND_OPTIONS[cmd];
+  let values;
   try {
-    return parseArgs({ args, options: COMMAND_OPTIONS[cmd], strict: true, allowPositionals: false, allowNegative: true }).values;
+    values = parseArgs({ args, options, strict: true, allowPositionals: false, allowNegative: true }).values;
   } catch (e) {
     if (!String(e.code).startsWith('ERR_PARSE_ARGS_')) throw e;
-    console.error(`${c.err('✗')} ${cmd}: ${e.message.split('. ')[0]}`);
-    console.error("  Run 'agent-viz --help' to list the options.");
-    process.exit(2);
+    refuseOption(cmd, e.message.split('. ')[0]);
   }
+  for (const [name, { choices }] of Object.entries(options)) {
+    const value = values[name];
+    if (choices && value !== undefined && !choices.includes(value)) {
+      refuseOption(cmd, `Option '--${name}' must be one of ${choices.join('|')}, got '${value}'`);
+    }
+  }
+  return values;
 }
 
 function pickScopeFlag(flags) {
   if (flags.user) return 'user';
   if (flags.project) return 'project';
   if (flags.local) return 'local';
-  return undefined;
-}
-
-function pickTargetFlag(flags) {
-  const v = flags.target;
-  if (v === 'claude' || v === 'copilot' || v === 'both') return v;
   return undefined;
 }
 
@@ -288,7 +301,7 @@ async function cmdStatus() {
 
 async function cmdInstallHooks(flags) {
   let scope = pickScopeFlag(flags);
-  let target = pickTargetFlag(flags);
+  let target = flags.target;
   const { install, audit, detectAgents, findProjectRoot } = await import(pathToFileURL(path.join(PKG_ROOT, 'dist', 'server', 'install-hooks.js')).href);
 
   // Zero-flag invocation (no scope, no target, not --check) opens an
@@ -394,7 +407,7 @@ async function cmdInstallHooks(flags) {
 
 async function cmdUninstallHooks(flags) {
   const scope = pickScopeFlag(flags);
-  const target = pickTargetFlag(flags);
+  const target = flags.target;
   const { uninstall } = await import(pathToFileURL(path.join(PKG_ROOT, 'dist', 'server', 'install-hooks.js')).href);
   const result = uninstall({ target, scope, cwd: process.cwd(), packageRoot: PKG_ROOT });
   let total = 0;

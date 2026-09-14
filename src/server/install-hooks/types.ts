@@ -3,6 +3,9 @@
 // doc/43 (dépôt privé) pour le découpage.
 
 export type AgentName = 'claude' | 'copilot';
+// Ce que `--target` et l'invite d'installation acceptent : un agent, ou 'both'
+// pour tous les agents du registre.
+export type Target = AgentName | 'both';
 export type Scope = 'user' | 'project' | 'local';
 
 export interface AgentConfigEntry {
@@ -35,7 +38,7 @@ export interface AgentOpts {
   cwd?: string;
   packageRoot?: string;
   agent?: AgentName;
-  target?: string;
+  target?: Target;
 }
 
 // L'interface du registre INSTALLERS. Les quatre premières méthodes existaient

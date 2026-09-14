@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { nouvelleRacine, ecrireDist, lance, nettoie, REQUIS } from '../helpers/bin-sandbox.mjs';
+import { TARGETS } from '../../src/server/install-hooks/registry.ts';
 
 const PREFIXE = 'agent-viz-options-';
 const HOOK_SONDE = "export function runHook() { console.log('SONDE_HOOK_OK'); }\n";
@@ -32,6 +33,14 @@ const REFUS = [
   { argv: ['stop', '--keep-hook'], nomme: '--keep-hook' },
   { argv: ['install-hooks', '--user', '--targt=copilot'], nomme: '--targt' },
   { argv: ['status', '--json'], nomme: '--json' },
+  // Une cible hors liste se refuse comme une option inconnue : acceptée, la
+  // commande agirait sur des agents que l'utilisateur n'a pas nommés.
+  { argv: ['install-hooks', '--user', '--target=cloude'], nomme: "'cloude'" },
+  { argv: ['install-hooks', '--target=cloude'], nomme: "'cloude'" },
+  { argv: ['uninstall-hooks', '--target=cloude'], nomme: "'cloude'" },
+  { argv: ['install-hooks', '--user', '--target='], nomme: '--target' },
+  { argv: ['uninstall-hooks', '--target=Claude'], nomme: "'Claude'" },
+  { argv: ['install-hooks', '--user', '--target=all'], nomme: "'all'" },
 ];
 
 for (const { argv, nomme } of REFUS) {
@@ -125,6 +134,67 @@ test('contrôle inverse : les options déclarées d\'install-hooks passent l\'an
     assert.notEqual(r.status, 2, `des options déclarées ne doivent pas être refusées :\n${sortie}`);
     assert.ok(temoinsCharges(racine).includes('CHARGE-server-install-hooks.js'),
       `install-hooks aurait dû charger install-hooks.js après l'analyse :\n${sortie}`);
+  } finally {
+    nettoie(racine);
+  }
+});
+
+// Le binaire porte sa propre copie des cibles valides : ce test la confronte
+// au registre, qui fait foi.
+test('miroir : le refus de --target cite les cibles du registre', () => {
+  // Arrange
+  const racine = nouvelleRacine(PREFIXE);
+  try {
+    ecrireDistAvecTemoins(racine);
+
+    // Act
+    const r = lance(racine, ['uninstall-hooks', '--target=cloude']);
+
+    // Assert
+    const sortie = `${r.stdout}${r.stderr}`;
+    assert.equal(r.status, 2, `code de sortie attendu 2, obtenu ${r.status} :\n${sortie}`);
+    const attendu = `Option '--target' must be one of ${TARGETS.join('|')}, got 'cloude'`;
+    assert.ok(r.stderr.includes(attendu), `le refus devrait dire « ${attendu} » :\n${sortie}`);
+  } finally {
+    nettoie(racine);
+  }
+});
+
+test('contrôle inverse : chaque cible du registre passe l\'analyse et uninstall-hooks charge dist/', () => {
+  for (const cible of TARGETS) {
+    // Arrange
+    const racine = nouvelleRacine(PREFIXE);
+    try {
+      ecrireDistAvecTemoins(racine);
+
+      // Act
+      const r = lance(racine, ['uninstall-hooks', '--user', `--target=${cible}`]);
+
+      // Assert
+      const sortie = `${r.stdout}${r.stderr}`;
+      assert.notEqual(r.status, 2, `la cible ${cible} ne doit pas être refusée :\n${sortie}`);
+      assert.ok(temoinsCharges(racine).includes('CHARGE-server-install-hooks.js'),
+        `uninstall-hooks --target=${cible} aurait dû charger install-hooks.js après l'analyse :\n${sortie}`);
+    } finally {
+      nettoie(racine);
+    }
+  }
+});
+
+test('contrôle inverse : la forme --target claude, séparée par une espace, passe l\'analyse', () => {
+  // Arrange
+  const racine = nouvelleRacine(PREFIXE);
+  try {
+    ecrireDistAvecTemoins(racine);
+
+    // Act
+    const r = lance(racine, ['uninstall-hooks', '--user', '--target', 'claude']);
+
+    // Assert
+    const sortie = `${r.stdout}${r.stderr}`;
+    assert.notEqual(r.status, 2, `la forme avec espace ne doit pas être refusée :\n${sortie}`);
+    assert.ok(temoinsCharges(racine).includes('CHARGE-server-install-hooks.js'),
+      `uninstall-hooks --target claude aurait dû charger install-hooks.js après l'analyse :\n${sortie}`);
   } finally {
     nettoie(racine);
   }
