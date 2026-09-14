@@ -63,7 +63,9 @@ test('install: refreshes existing hook whose timeout drifted (5 → 10)', () => 
   fs.mkdirSync(path.join(projectRoot, '.git'));
   // Pre-existing hook with the exact desired command BUT obsolete timeout=5.
   // Without the upgrade path, this would noop and the timeout would stay 5.
-  const command = 'npx --yes @vcueto/agent-viz@9.9.9-test hook --source=claude';
+  // Le spec npx épingle la version du produit, jamais celle d'un package.json voisin.
+  const { version: versionDuProduit } = require('../../package.json');
+  const command = `npx --yes @vcueto/agent-viz@${versionDuProduit} hook --source=claude`;
   const settingsFile = path.join(projectRoot, '.claude', 'settings.json');
   fs.mkdirSync(path.dirname(settingsFile), { recursive: true });
   fs.writeFileSync(settingsFile, JSON.stringify({
@@ -78,7 +80,6 @@ test('install: refreshes existing hook whose timeout drifted (5 → 10)', () => 
     scope: 'project',
     cwd: projectRoot,
     packageRoot: makeTempDir('avtest-pkg-timeout-'),
-    version: '9.9.9-test',
   });
   const r = result.claude;
   // Une config d'avant PostToolUseFailure : les 5 anciens sont rafraîchis ET le
@@ -136,7 +137,6 @@ test('install: crossScope flags pre-existing hook in a different scope', () => {
     scope: 'project',
     cwd: projectRoot,
     packageRoot: makeTempDir('avtest-pkg2-'),
-    version: '9.9.9-test',
   });
   const r = result.claude;
   assert.ok(r, 'expected claude install result');
@@ -169,7 +169,6 @@ test('installCopilot: le fichier ecrit ne declare que les evenements connus de C
     scope: 'project',
     cwd: projectRoot,
     packageRoot: makeTempDir('avtest-pkg-copilot-'),
-    version: '9.9.9-test',
   });
   const written = JSON.parse(fs.readFileSync(result.copilot.target.file, 'utf8'));
   assert.deepEqual(Object.keys(written.hooks), EVENTS_COPILOT_ATTENDUS,

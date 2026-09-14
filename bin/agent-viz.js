@@ -17,19 +17,12 @@ import os from 'node:os';
 import { parseArgs, styleText } from 'node:util';
 import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
+import pkg from '../package.json' with { type: 'json' };
 
 const PKG_ROOT = path.resolve(import.meta.dirname, '..');
-let PKG_VERSION = '0.0.0';
-// Le BOM est retire AVANT l analyse : l ancien chargeur CommonJS d un .json
-// le faisait, pas `JSON.parse`. Sans ce retrait, un package.json prefixe par
-// un writer Windows ferait retomber la version sur '0.0.0' EN SILENCE — meme
-// famille que le constat C1, et meme idiome que src/server/hook.js:73 : le BOM
-// se compare par CODE de caractere, jamais par un motif qui le contient, un BOM
-// litteral dans le source etant invisible a la relecture.
-try {
-  const brut = fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8');
-  PKG_VERSION = JSON.parse(brut.charCodeAt(0) === 0xFEFF ? brut.slice(1) : brut).version || '0.0.0';
-} catch {}
+// Le chargeur JSON de Node lit package.json au démarrage et retire le BOM ; un
+// fichier absent arrête le binaire plutôt que d'afficher une version inventée.
+const PKG_VERSION = pkg.version;
 
 // Semantic color helpers. node:util.styleText auto-disables for non-TTY
 // streams and respects NO_COLOR (https://no-color.org), so call sites stay
@@ -153,7 +146,7 @@ async function cmdStart(flags) {
   if (shouldInstall) {
     const { install } = await import(pathToFileURL(path.join(PKG_ROOT, 'dist', 'server', 'install-hooks.js')).href);
     try {
-      const result = install({ cwd: process.cwd(), packageRoot: PKG_ROOT, version: PKG_VERSION });
+      const result = install({ cwd: process.cwd(), packageRoot: PKG_ROOT });
       let printed = false;
       for (const [agent, r] of Object.entries(result)) {
         if (!r) continue;
@@ -325,7 +318,7 @@ async function cmdInstallHooks(flags) {
   }
 
   if (flags.check) {
-    const result = audit({ target, scope, cwd: process.cwd(), packageRoot: PKG_ROOT, version: PKG_VERSION });
+    const result = audit({ target, scope, cwd: process.cwd(), packageRoot: PKG_ROOT });
     let exitCode = 0;
     for (const [agent, a] of Object.entries(result)) {
       const label = agent === 'claude' ? 'Claude Code' : 'Copilot CLI';
@@ -353,7 +346,7 @@ async function cmdInstallHooks(flags) {
     process.exit(exitCode);
   }
 
-  const result = install({ target, scope, cwd: process.cwd(), packageRoot: PKG_ROOT, version: PKG_VERSION });
+  const result = install({ target, scope, cwd: process.cwd(), packageRoot: PKG_ROOT });
   let refused = false;
   for (const [agent, r] of Object.entries(result)) {
     const label = agent === 'claude' ? 'Claude Code' : 'Copilot CLI';

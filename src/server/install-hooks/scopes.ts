@@ -6,12 +6,7 @@ import path from 'node:path';
 import os from 'node:os';
 import type { AgentOpts, ResolvedTarget, ResolvedCommand, Scope } from './types.ts';
 import { AGENT_CONFIG } from './config.ts';
-
-// Un objet exploitable par accès de champ — même garde locale que les autres
-// fichiers du serveur : `JSON.parse` ne promet qu'un JSON valide, pas un objet.
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return typeof v === 'object' && v !== null && !Array.isArray(v);
-}
+import { PRODUCT_VERSION } from '../../engine/version.ts';
 
 // Walk up from `cwd` looking for a project root marker (.git or package.json).
 // Stop at homedir or filesystem root. Returns absolute path or null.
@@ -69,7 +64,7 @@ export function resolveScope({ scope, cwd, agent = 'claude', packageRoot }: Agen
 // `node "<abs>/bin/agent-viz.js" hook --source=<agent>` (fast). Otherwise use
 // `npx --yes @vcueto/agent-viz@<version> hook --source=<agent>` pinned to the
 // currently-running version (~300-800ms cold start).
-export function resolveHookCommand({ packageRoot, version, agent = 'claude' }: AgentOpts = {}): ResolvedCommand {
+export function resolveHookCommand({ packageRoot, agent = 'claude' }: AgentOpts = {}): ResolvedCommand {
   // Émis en dist/server/install-hooks/scopes.js : la racine du paquet est
   // TROIS crans au-dessus (l'original, un cran moins profond, en comptait deux).
   packageRoot = packageRoot || path.resolve(import.meta.dirname, '..', '..', '..');
@@ -81,17 +76,7 @@ export function resolveHookCommand({ packageRoot, version, agent = 'claude' }: A
     const norm = binPath.replace(/\\/g, '/');
     return { command: `node "${norm}" hook --source=${agent}`, mode: 'absolute', path: norm };
   }
-  let v = version;
-  if (!v) {
-    // BOM retire avant l analyse (constat C1, idiome de hook.js:64) : sans lui,
-    // un package.json prefixe rendrait un spec npx SANS version, en silence.
-    try {
-      const brut = fs.readFileSync(path.join(packageRoot, 'package.json'), 'utf8');
-      const pkg: unknown = JSON.parse(brut.charCodeAt(0) === 0xFEFF ? brut.slice(1) : brut);
-      if (isRecord(pkg) && typeof pkg.version === 'string') v = pkg.version;
-    } catch {}
-  }
-  const spec = v ? `@vcueto/agent-viz@${v}` : '@vcueto/agent-viz';
+  const spec = `@vcueto/agent-viz@${PRODUCT_VERSION}`;
   return { command: `npx --yes ${spec} hook --source=${agent}`, mode: 'npx', spec };
 }
 

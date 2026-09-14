@@ -11,10 +11,10 @@
 // (`ensureBuildIsFresh`) and names the fix.
 
 import path from 'node:path';
-import { readFileSync } from 'node:fs';
 
 import { discoverSessions, parseSince, priceTable } from '../../engine/core/index.ts';
 import { scanSession, netTokens } from '../../engine/doctor/index.ts';
+import { PRODUCT_VERSION } from '../../engine/version.ts';
 
 export interface Engine {
   discoverSessions: typeof discoverSessions;
@@ -39,17 +39,11 @@ let _error: string | null = null;
 let _pending: Promise<Engine> | null = null;
 
 // The injection seam the rest of the observatory depends on: callers receive
-// the engine as a value and never reach into `../../engine/` themselves. The
-// only async work is reading the product's version to stamp onto it.
+// the engine as a value and never reach into `../../engine/` themselves.
 async function loadEngine(): Promise<Engine> {
   if (_engine) return _engine;
   if (!_pending) {
     _pending = (async (): Promise<Engine> => {
-      // BOM retire avant l analyse (constat C1, idiome de hook.js:64). Ce site
-      // est le SEUL des trois sans repli : un package.json prefixe ne rendrait
-      // pas une version fausse, il ferait echouer le chargement du moteur.
-      const pkgBrut = readFileSync(path.join(import.meta.dirname, '..', '..', '..', 'package.json'), 'utf8');
-      const pkg: { version: string } = JSON.parse(pkgBrut.charCodeAt(0) === 0xFEFF ? pkgBrut.slice(1) : pkgBrut);
       return {
         discoverSessions,
         parseSince,
@@ -60,7 +54,7 @@ async function loadEngine(): Promise<Engine> {
         // and the real-time pill can adopt the same table (unification).
         priceTable,
         // One tool, one version: the engine no longer carries its own.
-        version: pkg.version,
+        version: PRODUCT_VERSION,
       };
     })().then(
       engine => { _engine = engine; _error = null; _pending = null; return engine; },
@@ -74,9 +68,7 @@ async function loadEngine(): Promise<Engine> {
   return _pending;
 }
 
-// Last known load outcome, without triggering a load. The only failure it can
-// report is the package.json read above: a missing engine stops
-// `bin/agent-viz.js` before this module loads (see the header).
+// Last known load outcome, without triggering a load.
 function engineStatus(): EngineStatus {
   return { ok: _engine !== null, error: _error };
 }

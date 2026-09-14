@@ -77,6 +77,39 @@ for (const argv of DEMANDES_DE_VERSION) {
   });
 }
 
+test('package.json précédé d\'un BOM : --version affiche la version, sort 0, rien sur stderr', () => {
+  // Arrange
+  const racine = nouvelleRacine(PREFIXE, { version: VERSION, bom: true });
+  try {
+    // Act
+    const r = lance(racine, ['--version']);
+
+    // Assert
+    const sortie = `${r.stdout}${r.stderr}`;
+    assert.equal(r.status, 0, `code de sortie attendu 0, obtenu ${r.status} :\n${sortie}`);
+    assert.equal(r.stdout, `${VERSION}\n`, `la version devrait se lire malgré le BOM :\n${sortie}`);
+    assert.equal(r.stderr, '', `rien ne devrait sortir sur stderr :\n${r.stderr}`);
+  } finally {
+    nettoie(racine);
+  }
+});
+
+test('package.json absent : --version échoue au lieu d\'afficher une version inventée', () => {
+  // Arrange
+  const racine = nouvelleRacine(PREFIXE, { sansPackageJson: true });
+  try {
+    // Act
+    const r = lance(racine, ['--version']);
+
+    // Assert
+    const sortie = `${r.stdout}${r.stderr}`;
+    assert.notEqual(r.status, 0, `un package.json absent ne doit pas passer pour un succès :\n${sortie}`);
+    assert.ok(!r.stdout.includes('0.0.0'), `aucune version de repli ne doit s'afficher :\n${sortie}`);
+  } finally {
+    nettoie(racine);
+  }
+});
+
 test('contrôle inverse : sans --help, la même commande atteint la garde de build et s\'arrête', () => {
   // Arrange
   const racine = nouvelleRacine(PREFIXE, { version: VERSION });

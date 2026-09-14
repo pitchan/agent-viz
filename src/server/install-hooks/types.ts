@@ -34,7 +34,6 @@ export interface AgentOpts {
   scope?: Scope;
   cwd?: string;
   packageRoot?: string;
-  version?: string;
   agent?: AgentName;
   target?: string;
 }

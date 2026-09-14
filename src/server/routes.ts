@@ -27,6 +27,7 @@ import { createObservatoryRoutes } from './observatory/routes.ts';
 import { getObservatoryService } from './observatory/index.ts';
 import { createWatchdogRoutes } from './watchdog/routes.ts';
 import { getWatchdogService } from './watchdog/index.ts';
+import { PRODUCT_VERSION } from '../engine/version.ts';
 
 // Un objet exploitable par accès de champ — même garde locale que les autres
 // fichiers du serveur : `JSON.parse` ne promet qu'un JSON valide, pas un objet.
@@ -189,9 +190,7 @@ async function engineStaticHandler(_req: IncomingMessage, res: ServerResponse, u
 // running. A re-read at request time would report whatever sits on disk —
 // after an `npm i -g`, that is the NEXT version, not this process. Proving
 // what a daemon serves is a measured pain of this project; this is the answer.
-const VERSION: string = (JSON.parse(
-  fs.readFileSync(path.join(PROJECT_ROOT, 'package.json'), 'utf8'),
-) as { version: string }).version;
+const VERSION: string = PRODUCT_VERSION;
 
 function versionHandler(_req: IncomingMessage, res: ServerResponse): void {
   res.writeHead(200, { 'Content-Type': 'application/json' });

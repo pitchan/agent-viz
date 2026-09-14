@@ -24,10 +24,10 @@ export function auditSettings(
   });
 }
 
-export function auditClaude({ scope, cwd, packageRoot, version }: AgentOpts = {}) {
+export function auditClaude({ scope, cwd, packageRoot }: AgentOpts = {}) {
   const target = resolveScope({ scope, cwd, packageRoot });
   const settings = readSettings(target.file);
-  const cmd = resolveHookCommand({ packageRoot, version });
+  const cmd = resolveHookCommand({ packageRoot });
   return { ...target, audit: auditSettings(settings, cmd.command), command: cmd };
 }
 
@@ -50,10 +50,10 @@ function claudeInstalledScopes(cwd?: string, packageRoot?: string) {
 //   present:    events where an up-to-date agent-viz hook was already there
 //   coexisting: { event: count } — non-agent-viz hooks sharing the same events
 //                (informational; they will run in parallel, we never touch them)
-export function installClaude({ scope, cwd, packageRoot, version }: AgentOpts = {}) {
+export function installClaude({ scope, cwd, packageRoot }: AgentOpts = {}) {
   const target = resolveScope({ scope, cwd, packageRoot });
   const settings = readSettings(target.file);
-  const cmd = resolveHookCommand({ packageRoot, version });
+  const cmd = resolveHookCommand({ packageRoot });
 
   const missing: string[] = [];
   const updated: string[] = [];

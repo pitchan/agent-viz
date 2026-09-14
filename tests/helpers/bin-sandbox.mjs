@@ -21,12 +21,17 @@ export const REQUIS = [
   'engine/doctor/index.js',
 ];
 
-export function nouvelleRacine(prefixe, { version = '0.0.0' } = {}) {
+// `bom` préfixe package.json du caractère qu'ajoutent certains éditeurs Windows ;
+// `sansPackageJson` simule une installation dont ce fichier a disparu.
+export function nouvelleRacine(prefixe, { version = '0.0.0', bom = false, sansPackageJson = false } = {}) {
   if (!prefixe.startsWith(PREFIXE_COMMUN)) throw new Error(`préfixe de bac inattendu : ${prefixe}`);
   const racine = fs.mkdtempSync(path.join(os.tmpdir(), prefixe));
   fs.mkdirSync(path.join(racine, 'bin'), { recursive: true });
   fs.copyFileSync(BIN_REEL, path.join(racine, 'bin', 'agent-viz.js'));
-  fs.writeFileSync(path.join(racine, 'package.json'), JSON.stringify({ name: 'sonde-agent-viz', version, type: 'module' }));
+  if (!sansPackageJson) {
+    const contenu = JSON.stringify({ name: 'sonde-agent-viz', version, type: 'module' });
+    fs.writeFileSync(path.join(racine, 'package.json'), bom ? `﻿${contenu}` : contenu);
+  }
   return racine;
 }
 

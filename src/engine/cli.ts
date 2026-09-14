@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { parseCliArgs, UsageError } from './cli-args.ts';
-import { readPackageVersion } from './version.ts';
+import { PRODUCT_VERSION } from './version.ts';
 
 const HELP = `netgain — mesurer net, jamais brut (local-only, lecture seule)
 
@@ -33,7 +33,7 @@ async function main(): Promise<number> {
 
   switch (cli.command) {
     case 'version': {
-      process.stdout.write(`netgain ${readPackageVersion()}\n`);
+      process.stdout.write(`netgain ${PRODUCT_VERSION}\n`);
       return 0;
     }
     case 'help': {

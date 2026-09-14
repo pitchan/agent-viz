@@ -126,9 +126,9 @@ function copilotInstalledScopes(cwd?: string, packageRoot?: string) {
   return scanInstalled(copilotSweepTargets(cwd, { packageRoot }), copilotHookIn);
 }
 
-export function auditCopilot({ scope, cwd, packageRoot, version }: AgentOpts = {}) {
+export function auditCopilot({ scope, cwd, packageRoot }: AgentOpts = {}) {
   const target = resolveScope({ scope, cwd, agent: 'copilot', packageRoot });
-  const cmd = resolveHookCommand({ packageRoot, version, agent: 'copilot' });
+  const cmd = resolveHookCommand({ packageRoot, agent: 'copilot' });
   const content = readCopilotFile(target.file);
   // Restaure le garde à trois niveaux de l'original (`content && content.hooks
   // && content.hooks[ev]`) — `content` est `unknown` (voir `readCopilotFile`) :
@@ -155,9 +155,9 @@ export function auditCopilot({ scope, cwd, packageRoot, version }: AgentOpts = {
   return { ...target, audit: rows, command: cmd };
 }
 
-export function installCopilot({ scope, cwd, packageRoot, version }: AgentOpts = {}) {
+export function installCopilot({ scope, cwd, packageRoot }: AgentOpts = {}) {
   const target = resolveScope({ scope, cwd, agent: 'copilot', packageRoot });
-  const cmd = resolveHookCommand({ packageRoot, version, agent: 'copilot' });
+  const cmd = resolveHookCommand({ packageRoot, agent: 'copilot' });
   const desired = buildCopilotHookFile(cmd.command);
   const existing = readCopilotFile(target.file);
 
