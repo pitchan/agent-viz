@@ -105,6 +105,7 @@ test('package.json absent : --version échoue au lieu d\'afficher une version in
     const sortie = `${r.stdout}${r.stderr}`;
     assert.notEqual(r.status, 0, `un package.json absent ne doit pas passer pour un succès :\n${sortie}`);
     assert.ok(!r.stdout.includes('0.0.0'), `aucune version de repli ne doit s'afficher :\n${sortie}`);
+    assert.match(r.stderr, /package\.json/, `l'échec doit nommer package.json :\n${sortie}`);
   } finally {
     nettoie(racine);
   }
