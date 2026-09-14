@@ -1,7 +1,9 @@
-import type { NormalizedEvent, RawUsage, ToolUseRef } from '../../core/events.ts';
+import type { NormalizedEvent, ToolUseRef } from '../../core/events.ts';
+import { addUsage, emptyUsageBucket, isDedupableMsgId } from '../../core/usage.ts';
 import { detectGraphSignal, type GraphSignal } from '../detector.ts';
 import { detectAgentGesture, type AgentGestureKind } from './agent-gestures.ts';
 import { isNoisePrompt } from './prompts.ts';
+import { netTokens } from './tokens.ts';
 
 type AssistantEvent = Extract<NormalizedEvent, { kind: 'assistant' }>;
 type UserPromptEvent = Extract<NormalizedEvent, { kind: 'user_prompt' }>;
@@ -40,11 +42,6 @@ export function emptyAgentGraphByKind(): Record<AgentGestureKind, number> {
 
 export function emptyBySignal(): Record<GraphSignal, number> {
   return { 'blast-radius': 0, impact: 0, dependents: 0, importers: 0, 'hot-files': 0 };
-}
-
-/** Convention du repo : input + cache_creation + output, cache_read exclu. */
-function netOfUsage(u: RawUsage): number {
-  return (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.output_tokens ?? 0);
 }
 
 function parseTs(timestamp: string | undefined): number | null {
@@ -122,12 +119,14 @@ export class TurnsAggregator {
       this.subBuckets.set(agentKey, sub);
     }
     if (evt.usage === null) return;
-    if (evt.msgId !== null) {
+    if (isDedupableMsgId(evt.msgId)) {
       const key = `${agentKey}:${evt.msgId}`;
       if (this.seen.has(key)) return;
       this.seen.add(key);
     }
-    const net = netOfUsage(evt.usage);
+    const bucket = emptyUsageBucket();
+    addUsage(bucket, evt.usage);
+    const net = netTokens(bucket);
     if (sub !== null) {
       sub.netTokens += net;
     } else {

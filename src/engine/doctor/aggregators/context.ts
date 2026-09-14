@@ -1,6 +1,7 @@
 import { statSync } from 'node:fs';
 import path from 'node:path';
 import type { NormalizedEvent } from '../../core/events.ts';
+import { finiteCount, isDedupableMsgId } from '../../core/usage.ts';
 import { isNoisePrompt } from './prompts.ts';
 
 type AssistantEvent = Extract<NormalizedEvent, { kind: 'assistant' }>;
@@ -240,15 +241,15 @@ export class ContextAggregator {
 
   addAssistant(evt: AssistantEvent, agentKey: string): void {
     if (evt.usage === null) return;
-    if (evt.msgId !== null) {
+    if (isDedupableMsgId(evt.msgId)) {
       const key = `${agentKey}:${evt.msgId}`;
       if (this.seen.has(key)) return;
       this.seen.add(key);
     }
     const u = evt.usage;
-    const cacheRead = u.cache_read_input_tokens ?? 0;
-    const cacheCreate = u.cache_creation_input_tokens ?? 0;
-    const contextSize = (u.input_tokens ?? 0) + cacheRead + cacheCreate;
+    const cacheRead = finiteCount(u.cache_read_input_tokens);
+    const cacheCreate = finiteCount(u.cache_creation_input_tokens);
+    const contextSize = finiteCount(u.input_tokens) + cacheRead + cacheCreate;
     if (agentKey === 'main') {
       if (this.first === null) this.first = contextSize;
       if (contextSize > this.max) this.max = contextSize;
@@ -256,8 +257,8 @@ export class ContextAggregator {
     }
     const detail = typeof u.cache_creation === 'object' && u.cache_creation !== null ? u.cache_creation : null;
     if (detail !== null) {
-      const t5 = detail.ephemeral_5m_input_tokens ?? 0;
-      const t1 = detail.ephemeral_1h_input_tokens ?? 0;
+      const t5 = finiteCount(detail.ephemeral_5m_input_tokens);
+      const t1 = finiteCount(detail.ephemeral_1h_input_tokens);
       this.cacheWrites.tokens5m += t5;
       this.cacheWrites.tokens1h += t1;
       this.cacheWrites.tokensUnknown += Math.max(0, cacheCreate - t5 - t1);
@@ -306,7 +307,7 @@ export class ContextAggregator {
     this.prevByAgent.set(agentKey, {
       cachedTotal: cacheRead + cacheCreate,
       timestamp: evt.timestamp,
-      wrote1h: (u.cache_creation?.ephemeral_1h_input_tokens ?? 0) > 0,
+      wrote1h: finiteCount(u.cache_creation?.ephemeral_1h_input_tokens) > 0,
       model: evt.model,
     });
   }

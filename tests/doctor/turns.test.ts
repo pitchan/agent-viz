@@ -86,6 +86,23 @@ describe('TurnsAggregator — découpage en tours et classement par le détecteu
     expect(agg.result().silent.netTokens).toBe(100);
   });
 
+  test.each([
+    ['chaîne numérique convertible', '100'],
+    ['1e999, lu par JSON.parse comme Infinity', 1e999],
+    ['NaN', NaN],
+    ['booléen', true],
+    ['tableau', [7]],
+    ['objet', {}],
+  ])('input_tokens = %s : compté zéro dans les jetons nets du tour', (_label, valeur) => {
+    const agg = new TurnsAggregator();
+    agg.addPrompt(prompt('corrige le bug', '2026-07-01T10:00:00Z'));
+    agg.addAssistant(
+      assistant('m1', { input_tokens: valeur, output_tokens: 5, cache_creation_input_tokens: 7 } as never, '2026-07-01T10:00:05Z'),
+      'main',
+    );
+    expect(agg.result().silent).toEqual({ turns: 1, netTokens: 12 });
+  });
+
   test('sous-agent dont le premier événement tombe dans la fenêtre du tour 2 → facturé au tour 2', () => {
     const agg = new TurnsAggregator();
     agg.addPrompt(prompt('explique ce module', '2026-07-01T10:00:00Z'));
@@ -143,6 +160,8 @@ describe('TurnsAggregator — découpage en tours et classement par le détecteu
     feed(assistant('a1', usage(1000, 200, 500), '2026-07-01T10:05:30Z'), 'agent-x'); // rattaché au tour 2
     feed(assistant('b1', usage(300, 80)), 'agent-y'); // sans horodatage → non-attribuable
     feed(assistant(null, usage(7, 3)), 'main'); // sans msgId : pas de dédup possible, compté tel quel
+    feed(assistant('', usage(11, 4)), 'main'); // identifiant vide : pas un identifiant, compté tel quel
+    feed(assistant('', usage(9, 6)), 'main'); // un second message distinct, au même identifiant vide
     const r = turns.result();
     const expected = netTokens(tokens.result().total);
     expect(r.triggered.netTokens + r.silent.netTokens + r.unattributedNetTokens).toBe(expected);

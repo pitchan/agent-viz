@@ -432,6 +432,45 @@ describe('ContextAggregator — mix des écritures de cache (cacheWrites)', () =
   });
 });
 
+// Un compteur brut qui n'est pas un nombre fini compte zéro, et un identifiant
+// vide n'est pas un identifiant : la lecture du champ usage est celle de TokensAggregator.
+describe('ContextAggregator — champ usage malformé', () => {
+  test.each([
+    ['chaîne numérique convertible', '100'],
+    ['1e999, lu par JSON.parse comme Infinity', 1e999],
+    ['NaN', NaN],
+    ['booléen', true],
+    ['tableau', [7]],
+    ['objet', {}],
+  ])('input_tokens = %s : compté zéro dans la taille de contexte', (_label, valeur) => {
+    const agg = new ContextAggregator();
+    agg.addAssistant(
+      assistant('m1', { input_tokens: valeur, cache_read_input_tokens: 13, cache_creation_input_tokens: 50, output_tokens: 1 } as never),
+      'main',
+    );
+    expect(agg.result().contextGrowth).toEqual({ first: 63, max: 63, last: 63 });
+  });
+
+  test('cache_creation_input_tokens en chaîne au deuxième tour : ni re-création, ni écriture de cache', () => {
+    const agg = new ContextAggregator();
+    agg.addAssistant(assistant('m1', { cache_creation_input_tokens: 50000 }), 'main');
+    agg.addAssistant(assistant('m2', { cache_creation_input_tokens: '300000', cache_read_input_tokens: 0 } as never), 'main');
+    const r = agg.result();
+    expect(r.cacheChurnEvents).toBe(0);
+    expect(r.cacheChurnTokens).toBe(0);
+    expect(r.cacheWrites).toEqual({ tokens5m: 0, tokens1h: 0, tokensUnknown: 50000 });
+  });
+
+  test('identifiant vide répété : deux messages distincts, jamais dédoublonnés', () => {
+    const agg = new ContextAggregator();
+    agg.addAssistant(assistant('', { cache_creation_input_tokens: 50000 }), 'main');
+    agg.addAssistant(assistant('', { cache_creation_input_tokens: 30000, cache_read_input_tokens: 20000 }), 'main');
+    const r = agg.result();
+    expect(r.cacheChurnEvents).toBe(1);
+    expect(r.cacheChurnTokens).toBe(30000);
+  });
+});
+
 describe('findClaudeMdFiles', () => {
   const dir = mkdtempSync(path.join(tmpdir(), 'netgain-ctx-'));
   afterAll(() => rmSync(dir, { recursive: true, force: true }));
