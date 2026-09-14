@@ -14,7 +14,7 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
-import { styleText } from 'node:util';
+import { parseArgs, styleText } from 'node:util';
 import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
@@ -65,37 +65,56 @@ Usage:
   agent-viz uninstall-hooks      Remove hooks (sweeps all targets unless --target given).
   agent-viz hook                 Internal — read JSON event from stdin.
                                    --source=claude|copilot   set the source agent tag
-  agent-viz --help               Show this help.
+  agent-viz [<command>] --help   Show this help (never runs the command).
   agent-viz --version            Print version.
 `);
 }
 
-function parseFlags(argv, allowed = {}) {
-  // allowed: { booleans: ['foreground', ...], values: ['port'] }
-  const booleans = new Set(allowed.booleans || []);
-  const values = new Set(allowed.values || []);
-  const out = { _: [] };
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
-    if (a.startsWith('--no-') && booleans.has(a.slice(5))) {
-      out[a.slice(5)] = false;
-    } else if (a.startsWith('--')) {
-      const key = a.slice(2);
-      if (booleans.has(key)) {
-        out[key] = true;
-      } else if (values.has(key)) {
-        out[key] = argv[++i];
-      } else if (key.includes('=')) {
-        const [k, v] = key.split('=', 2);
-        out[k] = v;
-      } else {
-        out[key] = true;
-      }
-    } else {
-      out._.push(a);
-    }
+// Les options que chaque sous-commande accepte. `hook` n'y figure pas : Claude
+// Code bloque l'outil en cours sur un code 2, et hook.ts lit seul ses arguments.
+const COMMAND_OPTIONS = {
+  start: {
+    port: { type: 'string' },
+    foreground: { type: 'boolean' },
+    'install-hooks': { type: 'boolean' },
+    open: { type: 'boolean' },
+  },
+  stop: { 'keep-hooks': { type: 'boolean' } },
+  status: {},
+  'install-hooks': {
+    user: { type: 'boolean' },
+    project: { type: 'boolean' },
+    local: { type: 'boolean' },
+    check: { type: 'boolean' },
+    target: { type: 'string' },
+  },
+  'uninstall-hooks': {
+    user: { type: 'boolean' },
+    project: { type: 'boolean' },
+    local: { type: 'boolean' },
+    target: { type: 'string' },
+  },
+};
+
+function wantsHelp(argv) {
+  return argv.includes('--help') || argv.includes('-h') || argv[0] === 'help';
+}
+
+function wantsVersion(argv) {
+  return argv.includes('--version') || argv.includes('-v');
+}
+
+// Une option non déclarée est refusée avant tout effet : ignorée, une faute de
+// frappe comme `stop --keep-hook` retirait les hooks sans un mot.
+function parseCommandOptions(cmd, args) {
+  try {
+    return parseArgs({ args, options: COMMAND_OPTIONS[cmd], strict: true, allowPositionals: false, allowNegative: true }).values;
+  } catch (e) {
+    if (!String(e.code).startsWith('ERR_PARSE_ARGS_')) throw e;
+    console.error(`${c.err('✗')} ${cmd}: ${e.message.split('. ')[0]}`);
+    console.error("  Run 'agent-viz --help' to list the options.");
+    process.exit(2);
   }
-  return out;
 }
 
 function pickScopeFlag(flags) {
@@ -126,11 +145,7 @@ function openBrowser(url) {
   child.unref();
 }
 
-async function cmdStart(argv) {
-  const flags = parseFlags(argv, {
-    booleans: ['foreground', 'install-hooks', 'open'],
-    values: ['port'],
-  });
+async function cmdStart(flags) {
   const port = parseInt(flags.port || process.env.PORT || '3333', 10);
   // Default install-hooks=true unless --no-install-hooks given.
   const shouldInstall = flags['install-hooks'] !== false;
@@ -186,8 +201,7 @@ async function cmdStart(argv) {
   }
 }
 
-async function cmdStop(argv) {
-  const flags = parseFlags(argv || [], { booleans: ['keep-hooks'] });
+async function cmdStop(flags) {
   const { stop, status } = await import(pathToFileURL(path.join(PKG_ROOT, 'dist', 'server', 'lifecycle.js')).href);
   const before = await status();
   let res = null;
@@ -279,11 +293,7 @@ async function cmdStatus() {
   }
 }
 
-async function cmdInstallHooks(argv) {
-  const flags = parseFlags(argv, {
-    booleans: ['user', 'project', 'local', 'check'],
-    values: ['target'],
-  });
+async function cmdInstallHooks(flags) {
   let scope = pickScopeFlag(flags);
   let target = pickTargetFlag(flags);
   const { install, audit, detectAgents, findProjectRoot } = await import(pathToFileURL(path.join(PKG_ROOT, 'dist', 'server', 'install-hooks.js')).href);
@@ -389,11 +399,7 @@ async function cmdInstallHooks(argv) {
   if (refused) process.exitCode = 1;
 }
 
-async function cmdUninstallHooks(argv) {
-  const flags = parseFlags(argv, {
-    booleans: ['user', 'project', 'local'],
-    values: ['target'],
-  });
+async function cmdUninstallHooks(flags) {
   const scope = pickScopeFlag(flags);
   const target = pickTargetFlag(flags);
   const { uninstall } = await import(pathToFileURL(path.join(PKG_ROOT, 'dist', 'server', 'install-hooks.js')).href);
@@ -502,9 +508,8 @@ function ensureBuildIsFresh(cmd) {
 // So we don't ship a postinstall hook — onboarding is surfaced here on
 // the first agent-viz invocation, persisted via a sentinel file in
 // ~/.agent-viz/. Skipped for the internal `hook` subcommand (would
-// pollute the event hot path) and for --version (often parsed by tooling).
+// pollute the event hot path); --help and --version never reach it.
 function showFirstRunWelcomeIfNeeded(argv) {
-  if (argv.includes('--version') || argv.includes('-v')) return;
   if (argv[0] === 'hook') return;
   const sentinelDir = path.join(os.homedir(), '.agent-viz');
   const sentinel = path.join(sentinelDir, '.welcomed');
@@ -525,28 +530,31 @@ function showFirstRunWelcomeIfNeeded(argv) {
 
 async function main() {
   const argv = process.argv.slice(2);
-  showFirstRunWelcomeIfNeeded(argv);
-  // Top-level flags
-  if (argv[0] === '--version' || argv[0] === '-v') {
-    console.log(PKG_VERSION);
+  // L'aide et la version passent avant tout le reste : la bienvenue écrit un
+  // témoin, la garde de build peut arrêter le processus, une commande agit dès
+  // qu'elle démarre.
+  if (wantsHelp(argv)) {
+    help();
     return;
   }
-  if (argv[0] === '--help' || argv[0] === '-h' || argv[0] === 'help') {
-    help();
+  if (wantsVersion(argv)) {
+    console.log(PKG_VERSION);
     return;
   }
 
   const cmd = argv[0] && !argv[0].startsWith('-') ? argv[0] : 'start';
   const rest = argv[0] && !argv[0].startsWith('-') ? argv.slice(1) : argv;
+  const flags = Object.hasOwn(COMMAND_OPTIONS, cmd) ? parseCommandOptions(cmd, rest) : null;
 
+  showFirstRunWelcomeIfNeeded(argv);
   ensureBuildIsFresh(cmd);
 
   switch (cmd) {
-    case 'start':            return cmdStart(rest);
-    case 'stop':             return cmdStop(rest);
+    case 'start':            return cmdStart(flags);
+    case 'stop':             return cmdStop(flags);
     case 'status':           return cmdStatus();
-    case 'install-hooks':    return cmdInstallHooks(rest);
-    case 'uninstall-hooks':  return cmdUninstallHooks(rest);
+    case 'install-hooks':    return cmdInstallHooks(flags);
+    case 'uninstall-hooks':  return cmdUninstallHooks(flags);
     case 'hook':             return cmdHook();
     default:
       console.error(`${c.err('Unknown command:')} ${cmd}\n`);

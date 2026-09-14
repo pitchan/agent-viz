@@ -582,10 +582,10 @@ rapport avec le changement de langage. Le serveur, lui, est inchangé.
 
 ## 9. La plomberie de test
 
-**Un seul exécuteur, un seul arbre de tests dans 121 fichiers.**
+**Un seul exécuteur, un seul arbre de tests dans 123 fichiers.**
 
 ```
-npx vitest run     → tous passés, 121 fichiers
+npx vitest run     → tous passés, 123 fichiers
 ```
 
 Les deux arbres ont fusionné à plat à l'étape 2 : `netgain/tests/` a rejoint
@@ -594,7 +594,7 @@ même dossier, et c'est ce qui explique le pont ci-dessous.
 
 | Dialecte | Fichiers | Écrits en |
 |---|---|---|
-| CommonJS + ESM | 42 `.test.cjs` + 51 `.test.mjs` | `node:test` |
+| CommonJS + ESM | 42 `.test.cjs` + 53 `.test.mjs` | `node:test` |
 | TypeScript | 28 `.test.ts` | l'API de vitest |
 
 **L'extension dit désormais le régime, et c'est l'étape 3 qui l'a rendue
@@ -651,7 +651,7 @@ manquante est ci-dessous, relevée après coup et non réécrite) :
 ```
 
 ```
-grep -rlE "(require\(|from )['\"]node:test['\"]" tests | wc -l   → 93
+grep -rlE "(require\(|from )['\"]node:test['\"]" tests | wc -l   → 95
 ```
 
 Le test du pont a la propriété amusante de passer par ce qu'il teste dès qu'on
