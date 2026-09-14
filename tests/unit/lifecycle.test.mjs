@@ -103,13 +103,10 @@ function pidLance({ dossier }) {
   try { return Number(fs.readFileSync(path.join(dossier, TEMOIN), 'utf8')); } catch { return null; }
 }
 
-// Le processus de test garde ouverts les descripteurs du journal que
-// spawnDetached lui a fait ouvrir : sous Windows le dossier peut refuser de
-// partir, et le bac du harnais le purgera avec le reste.
 function nettoie(montage) {
   const pid = pidLance(montage);
   if (pid) { try { process.kill(pid, 'SIGKILL'); } catch {} }
-  try { fs.rmSync(montage.dossier, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }); } catch {}
+  fs.rmSync(montage.dossier, { recursive: true, force: true });
 }
 
 test('status : rien sur le port demandé et pas de fichier de pid, le démon est dit arrêté', async () => {
@@ -215,6 +212,30 @@ test('stop sans argument vise le port du fichier de pid et le retire', async () 
     assert.equal(resultat.stopped, true);
     assert.equal(resultat.port, port);
     assert.equal(fs.existsSync(montage.lifecycle.PID_FILE), false, 'le fichier de pid devait être retiré');
+  } finally {
+    nettoie(montage);
+  }
+});
+
+// Sous Windows, un dossier ne se renomme pas tant qu'un fichier qu'il contient
+// reste ouvert : la suppression, elle, réussit malgré un descripteur ouvert.
+test('après start puis stop, le processus qui a lancé le démon ne tient plus le journal : son dossier se renomme du premier coup', async () => {
+  // Arrange
+  const [port, portParDefaut] = await portsLibres(2);
+  const montage = await chargeLifecycle({ portParDefaut, serveur: SERVEUR_QUI_ECOUTE });
+  const dossierJournal = path.dirname(montage.lifecycle.LOG_FILE);
+  const renomme = `${dossierJournal}-renomme`;
+  try {
+    await montage.lifecycle.start({ port });
+    await montage.lifecycle.stop();
+
+    // Act
+    let erreur = null;
+    try { fs.renameSync(dossierJournal, renomme); } catch (e) { erreur = e; }
+
+    // Assert
+    assert.equal(erreur, null, `renommage refusé : ${erreur?.code} sur ${erreur?.path}`);
+    assert.equal(fs.existsSync(path.join(renomme, path.basename(montage.lifecycle.LOG_FILE))), true, 'le journal devait suivre son dossier');
   } finally {
     nettoie(montage);
   }

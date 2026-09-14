@@ -107,17 +107,24 @@ async function spawnDetached(port: number): Promise<number> {
   const out = fs.openSync(LOG_FILE, 'a');
   const err = fs.openSync(LOG_FILE, 'a');
   const env = { ...process.env, PORT: String(port) };
-  const child = spawn(process.execPath, [...NODE_FLAGS, SERVER_SCRIPT], {
-    detached: true,
-    stdio: ['ignore', out, err],
-    env,
-  });
-  child.unref();
-  // `spawn(process.execPath, …)` lance le binaire Node courant, qui existe
-  // forcément : `pid` n'est `undefined` que sur un échec synchrone de spawn
-  // (exécutable introuvable), qui ne peut pas se produire ici. Le cast reflète
-  // cet invariant plutôt que de propager `number | undefined` aux appelants.
-  return child.pid as number;
+  try {
+    const child = spawn(process.execPath, [...NODE_FLAGS, SERVER_SCRIPT], {
+      detached: true,
+      stdio: ['ignore', out, err],
+      env,
+    });
+    child.unref();
+    // `spawn(process.execPath, …)` lance le binaire Node courant, qui existe
+    // forcément : `pid` n'est `undefined` que sur un échec synchrone de spawn
+    // (exécutable introuvable), qui ne peut pas se produire ici. Le cast reflète
+    // cet invariant plutôt que de propager `number | undefined` aux appelants.
+    return child.pid as number;
+  } finally {
+    // Le fils garde ses propres copies des descripteurs du journal. Ceux du
+    // parent ne servent plus, et sous Windows ils bloquent le dossier du journal.
+    fs.closeSync(out);
+    fs.closeSync(err);
+  }
 }
 
 // Run the server attached to current process (foreground mode). Inherits stdio.
