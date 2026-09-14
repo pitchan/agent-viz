@@ -1,19 +1,18 @@
 'use strict';
 // Anthropic model pricing: the engine's embedded table (priceTable) prices the whole
-// product, copied into the in-memory map by server.ts at boot. FALLBACK, its tested
-// mirror, prices until that table lands. LiteLLM only reports drift (see litellmDrift).
+// product, read once when this module loads. LiteLLM only reports drift (see litellmDrift).
 //
 // SRP: this module's only job is `model id -> { input, output, cacheCreate,
-// cacheRead, maxInput, label, history? }`. No I/O leakage to consumers — they
+// cacheRead, maxInput, label, history }`. No I/O leakage to consumers — they
 // call getPrice() and don't know the source.
 //
 // The COST FORMULA and the model-id NORMALIZATION live in the engine and are
 // imported from it: two copies diverge silently. What remains here is what only
-// the server owns: the in-memory price map, display metadata and the LiteLLM watchdog.
+// the server owns: the price map, display metadata and the LiteLLM watchdog.
 
 import https from 'node:https';
-import { computeCost, normalizeModel } from '../engine/core/pricing.ts';
-import type { ModelPrices, PricePeriod, PriceTable } from '../engine/core/pricing.ts';
+import { normalizeModel, priceTable } from '../engine/core/pricing.ts';
+import type { ModelPrices, PricePeriod } from '../engine/core/pricing.ts';
 
 const LITELLM_URL = 'https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json';
 const REFRESH_MS = 24 * 60 * 60 * 1000;
@@ -27,43 +26,14 @@ const MAX_BODY_BYTES = 5 * 1024 * 1024;
 // claude-(opus|sonnet|haiku)-X-Y.
 const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
-/** Une entrée de la carte de prix en mémoire — les quatre tarifs (hérités du
- *  moteur, `ModelPrices`) plus les métadonnées d'affichage que SEUL le
- *  serveur porte (C4), et l'historique optionnel des barèmes antérieurs. */
+/** Une entrée de la carte de prix — les quatre tarifs (hérités du moteur,
+ *  `ModelPrices`) plus les métadonnées d'affichage, et les barèmes antérieurs
+ *  datés (liste vide pour un modèle dont le tarif n'a jamais changé). */
 interface PriceEntry extends ModelPrices {
-  maxInput: number;
-  label: string;
-  history?: readonly PricePeriod[];
+  readonly maxInput: number;
+  readonly label: string;
+  readonly history: readonly PricePeriod[];
 }
-
-// Static fallback — covers the Claude 5 and 4.x families. Prices in USD per
-// token. This is the proven offline mirror of the engine's embedded table
-// (tests/unit/pricing-engine-mirror.test.cjs keeps the two in lockstep) — it
-// covers the BOOT WINDOW only: `applyEnginePrices` is wired asynchronously in
-// src/server/server.ts, so a few messages can be priced before the engine table
-// lands. This module makes no promise about the engine being absent from the
-// build — that is not its job. Numbers
-// must be kept aligned with Anthropic's public rate card. Each entry carries
-// its CURRENT rates; a model whose tariff changed over time also carries its
-// dated periods in its own `history` field (see claude-sonnet-5 below).
-const FALLBACK: Readonly<Record<string, PriceEntry>> = Object.freeze({
-  'claude-fable-5':    { input: 1e-5, output: 5e-5,   cacheCreate: 1.25e-5, cacheRead: 1e-6, maxInput: 1_000_000, label: 'Fable 5' },
-  'claude-mythos-5':   { input: 1e-5, output: 5e-5,   cacheCreate: 1.25e-5, cacheRead: 1e-6, maxInput: 1_000_000, label: 'Mythos 5' },
-  'claude-opus-5':     { input: 5e-6, output: 2.5e-5, cacheCreate: 6.25e-6, cacheRead: 5e-7, maxInput: 1_000_000, label: 'Opus 5' },
-  'claude-sonnet-5':   { input: 3e-6, output: 1.5e-5, cacheCreate: 3.75e-6, cacheRead: 3e-7, maxInput: 1_000_000, label: 'Sonnet 5',
-    // Intro rate through 2026-08-31 (Anthropic announcement), sticker 3/15 after.
-    history: Object.freeze([Object.freeze({
-      until: '2026-09-01',
-      prices: Object.freeze({ input: 2e-6, output: 1e-5, cacheCreate: 2.5e-6, cacheRead: 2e-7 }),
-    })]) },
-  'claude-opus-4-8':   { input: 5e-6, output: 2.5e-5, cacheCreate: 6.25e-6, cacheRead: 5e-7, maxInput: 1_000_000, label: 'Opus 4.8' },
-  'claude-opus-4-7':   { input: 5e-6, output: 2.5e-5, cacheCreate: 6.25e-6, cacheRead: 5e-7, maxInput: 1_000_000, label: 'Opus 4.7' },
-  'claude-opus-4-6':   { input: 5e-6, output: 2.5e-5, cacheCreate: 6.25e-6, cacheRead: 5e-7, maxInput: 1_000_000, label: 'Opus 4.6' },
-  'claude-opus-4-5':   { input: 5e-6, output: 2.5e-5, cacheCreate: 6.25e-6, cacheRead: 5e-7, maxInput: 200_000,   label: 'Opus 4.5' },
-  'claude-sonnet-4-6': { input: 3e-6, output: 1.5e-5, cacheCreate: 3.75e-6, cacheRead: 3e-7, maxInput: 1_000_000, label: 'Sonnet 4.6' },
-  'claude-sonnet-4-5': { input: 3e-6, output: 1.5e-5, cacheCreate: 3.75e-6, cacheRead: 3e-7, maxInput: 200_000,   label: 'Sonnet 4.5' },
-  'claude-haiku-4-5':  { input: 1e-6, output: 5e-6,   cacheCreate: 1.25e-6, cacheRead: 1e-7, maxInput: 200_000,   label: 'Haiku 4.5' },
-});
 
 // C4 (2026-08-11): the deliberate zero-cost list (`<synthetic>`, local Ollama
 // models) used to be mirrored here too. It was DEAD CODE — measured, not
@@ -74,26 +44,25 @@ const FALLBACK: Readonly<Record<string, PriceEntry>> = Object.freeze({
 // src/engine/core/pricing.ts, and `known: true` on a $0 result is how a
 // WANTED zero is told apart from a tariff we do not know.
 
-let prices: Record<string, PriceEntry> = { ...FALLBACK };
+// Built once from the engine's table. A Map, not an object: a model id read
+// from a third-party transcript never matches an inherited property such as
+// `constructor`.
+const PRICES: ReadonlyMap<string, PriceEntry> = new Map(
+  priceTable().entries.map(e => [e.model, { ...e.current, maxInput: e.maxInput, label: e.label, history: e.history }]),
+);
 let lastFetched = 0;
 let refreshTimer: NodeJS.Timeout | null = null;
 
 // `at` (optional, ISO UTC timestamp) selects the tariff in effect at that
-// instant; omitted means "now". Dated periods travel WITH the entry (engine
-// table or FALLBACK mirror); only the rates go back in time — label and
-// maxInput stay from the current entry.
+// instant; omitted means "now". Dated periods travel WITH the entry; only the
+// rates go back in time — label and maxInput stay from the current entry.
 function getPrice(id: string | null | undefined, at?: string): PriceEntry | null {
   if (!id) return null;
-  const current: PriceEntry | null = prices[id] || (() => {
-    const norm = normalizeModel(id);
-    return (norm && prices[norm]) || null;
-  })();
+  const current = PRICES.get(id) ?? PRICES.get(normalizeModel(id) ?? '');
   if (!current) return null;
-  if (current.history) {
-    const ts = at || new Date().toISOString();
-    for (const period of current.history) {
-      if (ts < period.until) return { ...current, ...period.prices };
-    }
+  const ts = at || new Date().toISOString();
+  for (const period of current.history) {
+    if (ts < period.until) return { ...current, ...period.prices };
   }
   return current;
 }
@@ -133,12 +102,11 @@ function familyVersionOf(canonical: string): FamilyVersion | null {
   return { family, version: [Number(m[2]), m[3] === undefined ? 0 : Number(m[3])] };
 }
 
-// Highest [major, minor] tuple currently on file for a family, read from the
-// live price map (FALLBACK or the engine table, whichever is loaded) at call
-// time — so the "new model" bar rises automatically as the table grows.
+// Highest [major, minor] tuple on file for a family, read from the price map —
+// so the "new model" bar rises automatically as the engine table grows.
 function familyMaxVersion(family: string): readonly [number, number] | null {
   let max: readonly [number, number] | null = null;
-  for (const key of Object.keys(prices)) {
+  for (const key of PRICES.keys()) {
     const fv = familyVersionOf(key);
     if (!fv || fv.family !== family) continue;
     if (!max || fv.version[0] > max[0] || (fv.version[0] === max[0] && fv.version[1] > max[1])) {
@@ -240,9 +208,8 @@ interface DriftReport {
 let _onDrift: ((report: DriftReport) => void) | null = null;
 function onPricingDrift(fn: (report: DriftReport) => void): void { _onDrift = fn; }
 
-// One-shot fetch with no retries — the in-memory map keeps the previous
-// value (or FALLBACK) if this fails. Resolves to a boolean for callers who
-// want to log success.
+// One-shot fetch with no retries: a failure only means no drift report this
+// cycle. Resolves to a boolean for callers who want to log success.
 //
 // Body is buffered as a list of chunks then joined once at the end; this
 // avoids the quadratic string concat that `body += chunk` would produce on
@@ -282,8 +249,8 @@ function loadPricing(): Promise<boolean> {
   });
 }
 
-// Fire-and-forget kickoff used at server boot. Schedules a 24h refresh on
-// first success. Idempotent — the timer guard short-circuits BEFORE the
+// Fire-and-forget kickoff used at server boot: one fetch now, then one every 24h
+// whatever the outcome. Idempotent — the timer guard short-circuits BEFORE the
 // initial fetch so a second call doesn't trigger a duplicate HTTPS round-trip.
 function startPricingRefresh(): void {
   if (refreshTimer) return;
@@ -295,25 +262,6 @@ function startPricingRefresh(): void {
   refreshTimer.unref();
 }
 
-// Test hook — lets unit tests stub the price map without going through https.
-function _setPricesForTest(map: Record<string, PriceEntry>): void {
-  prices = { ...FALLBACK, ...map };
-}
-
-// UNIFICATION (2026-08-05): fill the price map from the engine's embedded
-// table — the ONE tariff authority of the product, real-time pill included.
-// Called at boot by server.js once the engine resolves; a missing engine is
-// normal and leaves the FALLBACK mirror in place. Dated periods included.
-function applyEnginePrices(table: PriceTable): void {
-  const next: Record<string, PriceEntry> = Object.create(null);
-  Object.assign(next, FALLBACK);
-  for (const e of table.entries) {
-    if (!e.model || FORBIDDEN_KEYS.has(e.model)) continue;
-    next[e.model] = { ...e.current, maxInput: e.maxInput, label: e.label, history: e.history };
-  }
-  prices = next;
-}
-
 // Ni `computeCost` ni `normalizeModel` ne sortent d'ici : la formule et la
 // normalisation ont UNE définition, dans le moteur, et qui en a besoin l'importe
 // sous son nom du moteur.
@@ -323,9 +271,6 @@ const _internals = { litellmDrift, FORBIDDEN_KEYS, MAX_BODY_BYTES };
 export {
   getPrice,
   loadPricing, startPricingRefresh,
-  applyEnginePrices,
   onPricingDrift,
-  FALLBACK as _FALLBACK,
-  _setPricesForTest,
   _internals,
 };

@@ -1,13 +1,11 @@
 'use strict';
 // Pricing — id normalization, lookup, and per-message cost calculation.
-// No network in these tests: we exercise the static FALLBACK plus the test
-// hook (_setPricesForTest).
+// No network in these tests: the server's price map is built from the engine's
+// embedded table when the module loads.
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const {
-  getPrice, _FALLBACK, _setPricesForTest,
-} = require('../../src/server/pricing.ts');
+const { getPrice } = require('../../src/server/pricing.ts');
 // MODIFIÉ LE 2026-08-11 PAR C4 — `computeCost` et la normalisation ne sortent
 // plus de `src/server/pricing.js` : elles avaient UNE jumelle dans le moteur,
 // les deux avaient divergé, et la définition unique vit désormais en
@@ -42,10 +40,10 @@ test('normalizeModel strips regional routing prefixes and single-digit version s
   assert.equal(normalizeModel('claude-opus-4-6-v1'), 'claude-opus-4-6');
 });
 
-test('getPrice resolves direct ids and provider-prefixed ids from the fallback map', () => {
+test('getPrice resolves direct ids and provider-prefixed ids from the engine table', () => {
   const direct = getPrice('claude-sonnet-4-5');
-  assert.ok(direct, 'direct lookup should hit fallback');
-  assert.equal(direct, _FALLBACK['claude-sonnet-4-5']);
+  assert.ok(direct, 'direct lookup should hit the engine table');
+  assert.equal(direct.label, 'Sonnet 4.5');
 
   const prefixed = getPrice('anthropic.claude-haiku-4-5-v1:0');
   assert.ok(prefixed, 'prefixed lookup should normalize and hit');
@@ -58,8 +56,39 @@ test('getPrice returns null for unknown models', () => {
   assert.equal(getPrice(undefined), null);
 });
 
+test('getPrice rend null pour un identifiant qui porte le nom d\'une propriété héritée', () => {
+  // Arrange : l'identifiant de modèle vient d'un transcript écrit par un tiers.
+  const noms = ['constructor', 'toString', '__proto__'];
+
+  // Act
+  const prix = noms.map(nom => getPrice(nom));
+
+  // Assert
+  assert.deepEqual(prix, [null, null, null]);
+});
+
+test('la carte du serveur rend, pour chaque modèle du barème du moteur, ses tarifs courants, son libellé, sa fenêtre de contexte et ses périodes datées', () => {
+  // Arrange
+  const { priceTable } = require('../../src/engine/core/pricing.ts');
+  const table = priceTable();
+  const apresToutePeriode = '2099-01-01T00:00:00.000Z';
+
+  // Act
+  const servis = table.entries.map(e => getPrice(e.model, apresToutePeriode));
+
+  // Assert
+  table.entries.forEach((e, i) => {
+    const s = servis[i];
+    assert.ok(s, `${e.model} absent de la carte du serveur`);
+    for (const f of ['input', 'output', 'cacheCreate', 'cacheRead']) assert.equal(s[f], e.current[f], `${e.model} ${f}`);
+    assert.equal(s.label, e.label, `${e.model} label`);
+    assert.equal(s.maxInput, e.maxInput, `${e.model} maxInput`);
+    assert.deepEqual(s.history, e.history, `${e.model} périodes datées`);
+  });
+});
+
 test('computeCost sums input/output/cache contributions', () => {
-  // Sonnet 4.5 fallback: 3e-6 / 1.5e-5 / 3.75e-6 / 3e-7
+  // Sonnet 4.5: 3e-6 / 1.5e-5 / 3.75e-6 / 3e-7
   const cost = computeCost({
     input_tokens: 1_000,
     output_tokens: 500,
@@ -166,22 +195,11 @@ test('FORBIDDEN_KEYS contains the dangerous property names', () => {
   assert.ok(_internals.FORBIDDEN_KEYS.has('prototype'));
 });
 
-test('_setPricesForTest overrides without mutating the FALLBACK constant', () => {
-  _setPricesForTest({
-    'fake-model': { input: 1, output: 2, cacheCreate: 0, cacheRead: 0, maxInput: 1000, label: 'Fake' },
-  });
-  const p = getPrice('fake-model');
-  assert.equal(p.input, 1);
-  assert.equal(p.label, 'Fake');
-  // Restore to fallback so later tests in the same process aren't polluted.
-  _setPricesForTest({});
-});
-
-test('FALLBACK covers the Claude 5 family and Opus 4.8 (2026 rate card)', () => {
+test('the price map covers the Claude 5 family and Opus 4.8 (2026 rate card)', () => {
   // A missing entry made the observatory report ~$24 of 1h-cache rewrite on
-  // Fable 5 as $0.02 — the fallback must price the current family offline.
+  // Fable 5 as $0.02 — the server map must price the current family.
   const fable = getPrice('claude-fable-5');
-  assert.ok(fable, 'fable-5 must resolve from the static fallback');
+  assert.ok(fable, 'fable-5 must resolve from the engine table');
   assert.equal(fable.input, 1e-5);
   assert.equal(fable.output, 5e-5);
   assert.equal(fable.cacheCreate, 1.25e-5);
@@ -207,7 +225,7 @@ test('FALLBACK covers the Claude 5 family and Opus 4.8 (2026 rate card)', () => 
   assert.equal(sonnet5.label, 'Sonnet 5');
 
   const opus48 = getPrice('claude-opus-4-8');
-  assert.ok(opus48, 'opus-4-8 must resolve (was missing from the fallback)');
+  assert.ok(opus48, 'opus-4-8 must resolve (was missing from the table)');
   assert.equal(opus48.input, 5e-6);
   assert.equal(opus48.label, 'Opus 4.8');
 });

@@ -9,8 +9,8 @@ export interface ModelPrices {
 }
 
 // Table statique embarquée (local-only : jamais de fetch).
-// Miroir de la table de repli d'agent-viz, contre-vérifié au centime sur des
-// sessions réelles via son API /tokens. USD par token.
+// Contre-vérifiée au centime sur des sessions réelles via l'API /tokens
+// d'agent-viz. USD par token.
 // PRICES = tarif COURANT ; les barèmes antérieurs vivent dans PRICE_HISTORY.
 const PRICES: Record<string, ModelPrices> = {
   // Famille Claude 5 (2026).
@@ -54,9 +54,8 @@ const ZERO_COST: Record<string, string> = {
 };
 
 // Descriptif produit par modèle (libellé lisible, fenêtre de contexte) —
-// jamais lu par computeCost : la tarification reste dans PRICES. Valeurs
-// alignées sur le repli d'agent-viz (src/server/pricing.js FALLBACK), qui les
-// portait déjà ; le test « libellés et fenêtres » garde les deux alignés.
+// jamais lu par computeCost : la tarification reste dans PRICES. Le serveur
+// les sert tels quels (src/server/pricing.ts).
 const MODEL_INFO: Record<string, { label: string; maxInput: number }> = {
   'claude-fable-5': { label: 'Fable 5', maxInput: 1_000_000 },
   'claude-mythos-5': { label: 'Mythos 5', maxInput: 1_000_000 },
@@ -121,7 +120,7 @@ export interface CostResult {
 }
 
 /**
- * Reproduit la formule agent-viz (pricing.js) : cache 1h à 2× input, 5m au tarif
+ * La formule de coût du produit : cache 1h à 2× input, 5m au tarif
  * cacheCreate, le reste linéaire. Modèle inconnu → usd null, JAMAIS un zéro
  * silencieux (le tarif d'un modèle qu'on ne connaît pas ne s'invente pas).
  * `at` = horodatage ISO du message : le barème appliqué est celui en vigueur à

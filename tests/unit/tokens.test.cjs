@@ -60,7 +60,7 @@ test('accumulateUsage without a model leaves pricing fields untouched', () => {
 
 test('accumulateUsage with a known model populates lastModel/contextMax and accumulates costUsd', () => {
   const b = newBucket();
-  // claude-sonnet-4-5 is in the static FALLBACK — no network needed.
+  // claude-sonnet-4-5 is in the engine's embedded table — no network needed.
   accumulateUsage(b, {
     input_tokens: 1_000,
     output_tokens: 500,

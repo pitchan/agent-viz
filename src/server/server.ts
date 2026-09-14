@@ -23,10 +23,9 @@ import { broadcastSessionsChanged, broadcastSSE } from './sse.ts';
 import { watchSession, liveHandoffOffset } from './event-reader.ts';
 import { housekeep, scanAndWatch } from './housekeep.ts';
 import { dispatch, setServer } from './routes.ts';
-import { startPricingRefresh, applyEnginePrices, onPricingDrift } from './pricing.ts';
+import { startPricingRefresh, onPricingDrift } from './pricing.ts';
 import { getObservatoryService } from './observatory/index.ts';
 import { startWatchdog } from './watchdog/index.ts';
-import { loadEngine } from './observatory/engine.ts';
 
 const PORT = process.env.PORT || 3333;
 
@@ -93,13 +92,6 @@ function startServer() {
 }
 
 killOldServer().then(async () => {
-  // UNIFICATION (2026-08-05): the engine's embedded table prices the whole
-  // product, real-time pill included. Missing engine = normal, the FALLBACK
-  // mirror (proven identical by test) applies. Fire-and-forget: pricing must
-  // not block boot.
-  loadEngine()
-    .then(engine => applyEnginePrices(engine.priceTable()))
-    .catch(() => console.log('[pricing] engine absent — static mirror table in use'));
   // LiteLLM is a watchdog now: drift reports surface on the SSE stream and in
   // the alerts popup; it never writes prices.
   onPricingDrift(report => broadcastSSE({ type: 'pricingDrift', drifts: report.drifts }));

@@ -582,10 +582,10 @@ rapport avec le changement de langage. Le serveur, lui, est inchangé.
 
 ## 9. La plomberie de test
 
-**Un seul exécuteur, un seul arbre de tests dans 123 fichiers.**
+**Un seul exécuteur, un seul arbre de tests dans 122 fichiers.**
 
 ```
-npx vitest run     → tous passés, 123 fichiers
+npx vitest run     → tous passés, 122 fichiers
 ```
 
 Les deux arbres ont fusionné à plat à l'étape 2 : `netgain/tests/` a rejoint
@@ -594,7 +594,7 @@ même dossier, et c'est ce qui explique le pont ci-dessous.
 
 | Dialecte | Fichiers | Écrits en |
 |---|---|---|
-| CommonJS + ESM | 42 `.test.cjs` + 53 `.test.mjs` | `node:test` |
+| CommonJS + ESM | 41 `.test.cjs` + 53 `.test.mjs` | `node:test` |
 | TypeScript | 28 `.test.ts` | l'API de vitest |
 
 **L'extension dit désormais le régime, et c'est l'étape 3 qui l'a rendue
@@ -607,7 +607,7 @@ par un `git mv` pur ; les **3** derniers manipulaient `require.cache`, un
 mécanisme que le régime ESM rend inerte, et ont été réécrits en même temps que
 renommés — deux en `.test.mjs`, un en `.test.ts`.
 
-**Les 93 fichiers en `node:test` passent par un pont** (`test-support/bridge/`),
+**Les 94 fichiers en `node:test` passent par un pont** (`test-support/bridge/`),
 qui rend la surface `node:test` au-dessus des primitives de vitest. **L'addition,
 écrite pour qu'on puisse la refaire — et re-dérivée à l'étape 3, où l'ancienne
 version se contredisait elle-même** (elle totalisait 74 trois lignes sous un
@@ -648,10 +648,16 @@ manquante est ci-dessous, relevée après coup et non réécrite) :
                       trois comptes au disque, plutôt que de les affirmer
 ――
 93
++2  14/09  bin-help.test.mjs · cli-flags.test.mjs   aide, version et options de la ligne de commande
+――
+95
+-1  14/09  pricing-engine-mirror.test.cjs quitte l'arbre avec la table recopiée qu'il comparait
+――
+94
 ```
 
 ```
-grep -rlE "(require\(|from )['\"]node:test['\"]" tests | wc -l   → 95
+grep -rlE "(require\(|from )['\"]node:test['\"]" tests | wc -l   → 94
 ```
 
 Le test du pont a la propriété amusante de passer par ce qu'il teste dès qu'on
@@ -693,7 +699,7 @@ de passer sans que rien ne l'annonce. La publication lance les deux.
 **Les sources du moteur se chargent sous les deux exécuteurs.** `src/engine/**`
 nomme ses voisins en `.ts`, comme `src/server/**`, et Node 24 retire les types à
 l'import : un test `node:test` peut charger une source du moteur et tourner sous
-vitest comme sous `node --test`. `tests/unit/pricing-engine-mirror.test.cjs`
+vitest comme sous `node --test`. `tests/unit/pricing.test.cjs`
 charge `src/engine/core/pricing.ts` et passe dans les deux suites.
 
 ```
