@@ -35,6 +35,16 @@ const EXTENSIONS_LUES = new Set(['.cjs', '.mjs', '.ts']);
 // en post-mortem.
 const NOM_DE_TEST = /\.(test|spec)\.[^.]+$/;
 
+// Dossiers qui ne font pas partie du produit : dependances, historique git,
+// build, et .superpowers/, ou un arbre de travail d agent copie le depot entier.
+const DOSSIERS_IGNORES = new Set(['node_modules', '.git', 'dist', '.superpowers']);
+
+// Hors de tests/, aucun executeur ne lit un fichier de test : chaque exception
+// dit pourquoi elle existe, et une exception qui ne couvre plus rien doit sortir.
+const EXCEPTIONS = new Map([
+  ['docs/audit/scripts/', 'outillage de l audit date : il se rejoue a la main, aucune suite ne le lance'],
+]);
+
 function fichiersDeTest() {
   const acc = [];
   const marche = dir => {
@@ -47,6 +57,25 @@ function fichiersDeTest() {
   marche(path.join(ROOT, 'tests'));
   return acc;
 }
+
+function fichiersDeTestHorsDeTests() {
+  const acc = [];
+  const marche = dir => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const abs = path.join(dir, e.name);
+      const rel = path.relative(ROOT, abs).replaceAll('\\', '/');
+      if (e.isDirectory()) {
+        if (!DOSSIERS_IGNORES.has(e.name) && rel !== 'tests') marche(abs);
+      } else if (NOM_DE_TEST.test(e.name)) {
+        acc.push(rel);
+      }
+    }
+  };
+  marche(ROOT);
+  return acc;
+}
+
+const couvertParUneException = rel => [...EXCEPTIONS.keys()].some(prefixe => rel.startsWith(prefixe));
 
 test('tout fichier *.test.* ou *.spec.* sous tests/ porte une extension que les executeurs lisent', () => {
   // Arrange
@@ -65,4 +94,31 @@ test('tout fichier *.test.* ou *.spec.* sous tests/ porte une extension que les 
       'node --test : .test.{cjs,mjs}) : il ne tournera jamais, vert par absence. ' +
       'Le renommer vers une extension lue, ou etendre les motifs des executeurs ET ce filet ensemble.',
   );
+});
+
+test('aucun fichier *.test.* ou *.spec.* hors de tests/, sauf sous une exception nommee', () => {
+  // Arrange
+  const horsDeTests = fichiersDeTestHorsDeTests();
+
+  // Act
+  const nonCouverts = horsDeTests.filter(rel => !couvertParUneException(rel));
+
+  // Assert
+  assert.deepEqual(
+    nonCouverts,
+    [],
+    'les deux executeurs ne lisent que tests/ : ce fichier ne tournera jamais. ' +
+      'Le deplacer sous tests/, ou inscrire son dossier dans EXCEPTIONS avec sa raison.',
+  );
+});
+
+test('chaque exception d emplacement couvre encore au moins un fichier de test', () => {
+  // Arrange
+  const horsDeTests = fichiersDeTestHorsDeTests();
+
+  // Act
+  const orphelines = [...EXCEPTIONS.keys()].filter(prefixe => !horsDeTests.some(rel => rel.startsWith(prefixe)));
+
+  // Assert
+  assert.deepEqual(orphelines, [], 'une exception qui ne couvre plus aucun fichier doit sortir de EXCEPTIONS');
 });
