@@ -181,6 +181,81 @@ test('contrôle inverse : chaque cible du registre passe l\'analyse et uninstall
   }
 });
 
+// Faux lifecycle.js : chaque appel s'écrit dans un fichier à la racine du bac,
+// `undefined` en toutes lettres, que JSON.stringify effacerait sinon.
+const LIFECYCLE_ESPION = [
+  "import fs from 'node:fs';",
+  "const consigne = (fn, args) => fs.appendFileSync(new URL('../../APPELS-lifecycle.jsonl', import.meta.url),",
+  "  JSON.stringify({ fn, args }, (cle, valeur) => valeur === undefined ? '<undefined>' : valeur) + '\\n');",
+  "export async function status(...args) { consigne('status', args); return { running: true, port: 1, log: 'journal' }; }",
+  "export async function stop(...args) { consigne('stop', args); return { stopped: true, port: 1, viaShutdown: true }; }",
+  "export async function start(...args) { consigne('start', args); return { alreadyRunning: true, pid: 1, port: 1 }; }",
+].join('\n');
+const INSTALL_HOOKS_VIDE = 'export function installedScopes() { return {}; }\n';
+
+function appelsLifecycle(racine) {
+  const fichier = `${racine}/APPELS-lifecycle.jsonl`;
+  if (!fs.existsSync(fichier)) return [];
+  return fs.readFileSync(fichier, 'utf8').split('\n').filter(Boolean).map(ligne => JSON.parse(ligne));
+}
+
+test('stop sans --port ni PORT : status et stop reçoivent un port indéfini, le défaut appartient à lifecycle', () => {
+  // Arrange
+  const racine = nouvelleRacine(PREFIXE);
+  try {
+    ecrireDist(racine, { contenus: { 'server/lifecycle.js': LIFECYCLE_ESPION } });
+
+    // Act
+    const r = lance(racine, ['stop', '--keep-hooks'], { env: { PORT: undefined } });
+
+    // Assert
+    assert.equal(r.status, 0, `${r.stdout}${r.stderr}`);
+    assert.deepEqual(appelsLifecycle(racine), [
+      { fn: 'status', args: [{ port: '<undefined>' }] },
+      { fn: 'stop', args: [{ port: '<undefined>' }] },
+    ]);
+  } finally {
+    nettoie(racine);
+  }
+});
+
+test('stop avec PORT=3334 : status et stop visent ce port', () => {
+  // Arrange
+  const racine = nouvelleRacine(PREFIXE);
+  try {
+    ecrireDist(racine, { contenus: { 'server/lifecycle.js': LIFECYCLE_ESPION } });
+
+    // Act
+    const r = lance(racine, ['stop', '--keep-hooks'], { env: { PORT: '3334' } });
+
+    // Assert
+    assert.equal(r.status, 0, `${r.stdout}${r.stderr}`);
+    assert.deepEqual(appelsLifecycle(racine), [
+      { fn: 'status', args: [{ port: 3334 }] },
+      { fn: 'stop', args: [{ port: 3334 }] },
+    ]);
+  } finally {
+    nettoie(racine);
+  }
+});
+
+test('status avec PORT=3334 : status vise ce port', () => {
+  // Arrange
+  const racine = nouvelleRacine(PREFIXE);
+  try {
+    ecrireDist(racine, { contenus: { 'server/lifecycle.js': LIFECYCLE_ESPION, 'server/install-hooks.js': INSTALL_HOOKS_VIDE } });
+
+    // Act
+    const r = lance(racine, ['status'], { env: { PORT: '3334' } });
+
+    // Assert
+    assert.equal(r.status, 0, `${r.stdout}${r.stderr}`);
+    assert.deepEqual(appelsLifecycle(racine), [{ fn: 'status', args: [{ port: 3334 }] }]);
+  } finally {
+    nettoie(racine);
+  }
+});
+
 test('contrôle inverse : la forme --target claude, séparée par une espace, passe l\'analyse', () => {
   // Arrange
   const racine = nouvelleRacine(PREFIXE);

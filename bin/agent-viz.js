@@ -151,8 +151,15 @@ function openBrowser(url) {
   child.unref();
 }
 
+// Sans --port ni PORT, le port reste indéfini : la valeur par défaut appartient
+// à lifecycle, qui la connaît seul.
+function requestedPort(flags) {
+  const valeur = flags.port || process.env.PORT;
+  return valeur ? parseInt(valeur, 10) : undefined;
+}
+
 async function cmdStart(flags) {
-  const port = parseInt(flags.port || process.env.PORT || '3333', 10);
+  const port = requestedPort(flags);
   // Default install-hooks=true unless --no-install-hooks given.
   const shouldInstall = flags['install-hooks'] !== false;
 
@@ -209,10 +216,11 @@ async function cmdStart(flags) {
 
 async function cmdStop(flags) {
   const { stop, status } = await import(pathToFileURL(path.join(PKG_ROOT, 'dist', 'server', 'lifecycle.js')).href);
-  const before = await status();
+  const port = requestedPort(flags);
+  const before = await status({ port });
   let res = null;
   if (before.running) {
-    res = await stop();
+    res = await stop({ port });
   } else {
     console.log('agent-viz not running.');
   }
@@ -269,10 +277,10 @@ async function cmdStop(flags) {
   }
 }
 
-async function cmdStatus() {
+async function cmdStatus(flags) {
   const { status } = await import(pathToFileURL(path.join(PKG_ROOT, 'dist', 'server', 'lifecycle.js')).href);
   const { installedScopes } = await import(pathToFileURL(path.join(PKG_ROOT, 'dist', 'server', 'install-hooks.js')).href);
-  const s = await status();
+  const s = await status({ port: requestedPort(flags) });
   if (s.running) {
     console.log(`${c.ok('running')} ${c.hint('→')} http://localhost:${s.port}`);
     if (s.pid) console.log(c.dim(`pid     : ${s.pid}`));
@@ -558,7 +566,7 @@ async function main() {
   switch (cmd) {
     case 'start':            return cmdStart(flags);
     case 'stop':             return cmdStop(flags);
-    case 'status':           return cmdStatus();
+    case 'status':           return cmdStatus(flags);
     case 'install-hooks':    return cmdInstallHooks(flags);
     case 'uninstall-hooks':  return cmdUninstallHooks(flags);
     case 'hook':             return cmdHook();

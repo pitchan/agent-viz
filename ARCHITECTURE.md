@@ -381,11 +381,19 @@ répond 500 avec son message exact.
 | dépôt de développement, le témoin est absent | avertit qu'elle ne peut pas juger de la fraîcheur, et la commande continue |
 | paquet installé (pas de `src/server/`), ou commande `hook` | ne fait que le contrôle des fichiers manquants : aucun avertissement de fraîcheur |
 
-**Ce que la garde ne voit pas : l'issue du build.** Elle compare des présences
-et des dates. Un `npm run build` en erreur se voit à sa propre sortie — les
-erreurs de `tsc` et un code de sortie non nul —, jamais à la garde.
-`tests/repo/build-guards.test.mjs` rejoue ces situations sur un arbre synthétique
-hors du dépôt.
+**Ce que la garde ne voit pas.** Elle contrôle six fichiers témoins
+(`REQUIRED_DIST_FILES`), pas l'inventaire de `dist/`, et elle compare des
+présences et des dates, pas l'issue du build.
+
+| Situation | Qui la signale |
+|---|---|
+| `dist/` vidé par un build interrompu (le build efface `dist/engine` et `dist/server` avant de compiler) | la garde : les témoins manquent, `exit 1` |
+| un fichier compilé isolé manque, hors des six témoins, dans ce que charge une commande | Node, au chargement du module : sortie 1 et le chemin du fichier, avant que la commande agisse. Exception : `stop` arrête le démon avant de charger `install-hooks.js` |
+| un fichier compilé isolé manque dans ce que charge le démon, `dist/server/server.js` compris | le démon sort au démarrage ; `start` rend `exited during startup` et la fin du journal, où Node nomme le fichier. Exception : le détecteur du chien de garde, chargé à part — le démon démarre sans surveillance des pannes et ne s'en plaint que dans le journal |
+| `npm run build` en erreur | sa propre sortie — les erreurs de `tsc` et un code de sortie non nul —, jamais la garde |
+
+`tests/repo/build-guards.test.mjs` rejoue les situations de la garde sur un arbre
+synthétique hors du dépôt.
 
 **La frontière du navigateur est tenue par trois filets de dépôt**, qui lisent
 la table `ROUTES` de `src/server/routes.ts` au lieu d'en recopier une :
@@ -585,10 +593,10 @@ rapport avec le changement de langage. Le serveur, lui, est inchangé.
 
 ## 9. La plomberie de test
 
-**Un seul exécuteur, un seul arbre de tests dans 122 fichiers.**
+**Un seul exécuteur, un seul arbre de tests dans 123 fichiers.**
 
 ```
-npx vitest run     → tous passés, 122 fichiers
+npx vitest run     → tous passés, 123 fichiers
 ```
 
 Les deux arbres ont fusionné à plat à l'étape 2 : `netgain/tests/` a rejoint
@@ -597,7 +605,7 @@ même dossier, et c'est ce qui explique le pont ci-dessous.
 
 | Dialecte | Fichiers | Écrits en |
 |---|---|---|
-| CommonJS + ESM | 41 `.test.cjs` + 53 `.test.mjs` | `node:test` |
+| CommonJS + ESM | 41 `.test.cjs` + 54 `.test.mjs` | `node:test` |
 | TypeScript | 28 `.test.ts` | l'API de vitest |
 
 **L'extension dit désormais le régime, et c'est l'étape 3 qui l'a rendue
@@ -610,7 +618,7 @@ par un `git mv` pur ; les **3** derniers manipulaient `require.cache`, un
 mécanisme que le régime ESM rend inerte, et ont été réécrits en même temps que
 renommés — deux en `.test.mjs`, un en `.test.ts`.
 
-**Les 94 fichiers en `node:test` passent par un pont** (`test-support/bridge/`),
+**Les 95 fichiers en `node:test` passent par un pont** (`test-support/bridge/`),
 qui rend la surface `node:test` au-dessus des primitives de vitest. **L'addition,
 écrite pour qu'on puisse la refaire — et re-dérivée à l'étape 3, où l'ancienne
 version se contredisait elle-même** (elle totalisait 74 trois lignes sous un
@@ -657,10 +665,13 @@ manquante est ci-dessous, relevée après coup et non réécrite) :
 -1  14/09  pricing-engine-mirror.test.cjs quitte l'arbre avec la table recopiée qu'il comparait
 ――
 94
++1  14/09  lifecycle.test.mjs   start, status et stop sur de vrais processus et des ports de test
+――
+95
 ```
 
 ```
-grep -rlE "(require\(|from )['\"]node:test['\"]" tests | wc -l   → 94
+grep -rlE "(require\(|from )['\"]node:test['\"]" tests | wc -l   → 95
 ```
 
 Le test du pont a la propriété amusante de passer par ce qu'il teste dès qu'on

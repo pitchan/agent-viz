@@ -14,6 +14,9 @@ const SERVER_SCRIPT = path.join(import.meta.dirname, 'server.js');
 // servi : avalé en tâche de fond (stdio vers le fichier de log), visible en
 // avant-plan sans ce drapeau.
 const NODE_FLAGS = ['--disable-warning=ExperimentalWarning'];
+// Seule valeur par défaut du port : le binaire transmet un port indéfini quand
+// ni --port ni PORT ne sont donnés.
+const DEFAULT_PORT = 3333;
 
 interface PidRecord {
   pid: number;
@@ -76,11 +79,15 @@ async function postShutdown(port: number, timeout: number = 2000): Promise<boole
   });
 }
 
-async function status() {
+interface PortOptions {
+  port?: number;
+}
+
+async function status({ port = DEFAULT_PORT }: PortOptions = {}) {
   const rec = readPidFile();
   if (!rec) {
     // Maybe a server is running but without our PID file (e.g. started manually).
-    if (await probe(3333, 200)) return { running: true, pid: null, port: 3333, startedAt: null, log: LOG_FILE, viaPidFile: false };
+    if (await probe(port, 200)) return { running: true, pid: null, port, startedAt: null, log: LOG_FILE, viaPidFile: false };
     return { running: false, log: LOG_FILE };
   }
   const alive = isPidAlive(rec.pid);
@@ -129,15 +136,14 @@ function spawnForeground(port: number): Promise<number> {
   });
 }
 
-interface StartOptions {
-  port?: number;
+interface StartOptions extends PortOptions {
   foreground?: boolean;
 }
 
 // Idempotent start. Resolves with { alreadyRunning, pid, port }.
-async function start({ port = 3333, foreground = false }: StartOptions = {}) {
+async function start({ port = DEFAULT_PORT, foreground = false }: StartOptions = {}) {
   // 1. Check existing instance via PID file.
-  const existing = await status();
+  const existing = await status({ port });
   if (existing.running) {
     if (foreground) {
       // User wants foreground but something is already on the port.
@@ -169,17 +175,19 @@ async function start({ port = 3333, foreground = false }: StartOptions = {}) {
     const logContent = fs.readFileSync(LOG_FILE, 'utf8');
     tail = logContent.split('\n').slice(-20).join('\n');
   } catch {}
-  throw new Error(`agent-viz failed to start within 3s (pid ${pid}, port ${port}).\nLog tail:\n${tail}`);
+  const why = isPidAlive(pid) ? 'did not answer within 3s' : 'exited during startup';
+  throw new Error(`agent-viz ${why} (pid ${pid}, port ${port}).\nLog tail:\n${tail}`);
 }
 
-async function stop() {
+async function stop({ port = DEFAULT_PORT }: PortOptions = {}) {
   const rec = readPidFile();
-  // Determine which port to talk to.
-  const port = rec?.port || 3333;
-  const responsive = await probe(port, 200);
+  // Le fichier de pid dit où le démon écoute réellement : il l'emporte sur le
+  // port demandé.
+  const cible = rec ? rec.port : port;
+  const responsive = await probe(cible, 200);
   let shutdownOk = false;
   if (responsive) {
-    shutdownOk = await postShutdown(port, 2000);
+    shutdownOk = await postShutdown(cible, 2000);
   }
   if (rec && isPidAlive(rec.pid)) {
     // Wait briefly for graceful exit.
@@ -199,10 +207,11 @@ async function stop() {
     }
   }
   removePidFile();
-  return { stopped: shutdownOk || !!rec, port, viaShutdown: shutdownOk };
+  return { stopped: shutdownOk || !!rec, port: cible, viaShutdown: shutdownOk };
 }
 
 export {
+  DEFAULT_PORT,
   PID_FILE,
   LOG_FILE,
   status,

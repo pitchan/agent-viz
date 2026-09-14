@@ -192,7 +192,7 @@ Environment variables (all optional):
 
 | Var | Default | Effect |
 |---|---|---|
-| `PORT` | `3333` | Port the dashboard listens on. |
+| `PORT` | `3333` | Port the dashboard listens on. Also the port `start`, `stop` and `status` target when no pid file exists. |
 | `VIZ_PURGE_AGE_H` | `24` | Delete sessions older than N hours. |
 | `VIZ_KEEP_MAX` | `20` | Keep at most N most recent sessions. |
 | `VIZ_COMPACT_KB` | `500` | Compact files larger than N KB (keeps last 100 events + summary). |

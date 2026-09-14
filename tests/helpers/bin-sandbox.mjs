@@ -48,8 +48,9 @@ export function ecrireDist(racine, { omettre = [], contenus = {} } = {}) {
 }
 
 // `input: ''` ferme stdin tout de suite : une commande qui lirait l'entrée
-// standard (hook, invite interactive) ne reste jamais suspendue.
-export function lance(racine, argv) {
+// standard (hook, invite interactive) ne reste jamais suspendue. `env` complète
+// l'environnement ; une valeur `undefined` retire la variable du processus lancé.
+export function lance(racine, argv, { env = {} } = {}) {
   return spawnSync(process.execPath, [path.join(racine, 'bin', 'agent-viz.js'), ...argv], {
     cwd: racine,
     encoding: 'utf8',
@@ -61,6 +62,7 @@ export function lance(racine, argv) {
       TEMP: racine,
       TMP: racine,
       AGENT_VIZ_PORT: '59999',
+      ...env,
     },
   });
 }
