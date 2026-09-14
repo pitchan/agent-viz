@@ -22,6 +22,15 @@ dans l'annexe méthode.
 `docs/` (l'audit ne s'audite pas lui-même)
 **Rejouable :** `node --test "docs/audit/scripts/**/*.test.mjs"` puis
 `node docs/audit/scripts/run-all.mjs --comparer`
+**Où rejouer :** dans une copie de travail placée au commit `aba0953`, celui
+de la relecture, et jamais dans l'arbre actuel. Dans l'arbre actuel, `lib/`,
+`public/` et `netgain/` n'existent plus : les scripts d'audit sautent ces
+dossiers sans message et réécrivent `docs/audit/resultats/*.json` avec un code
+de sortie 0. Par ailleurs, `run-all.mjs` relance la suite de tests du produit
+de ce commit, qui écrit dans le vrai dossier temporaire de la machine et lit la
+configuration des hooks de l'utilisateur. L'annexe « Rejouer l'audit » donne la
+marche à suivre sans ces effets ; elle vaut pour chaque invitation à rejouer de
+ce rapport.
 **Qualification préparée par :** Claude
 **Relue et acceptée par :** Vincent — 2026-08-10 — commit `aba0953`
 
@@ -1040,7 +1049,7 @@ casse en cas de divergence, `tests/unit/pricing-engine-mirror.test.js`,
 rejouable seul, sans tube :
 
 ```
-$ node --test tests/unit/pricing-engine-mirror.test.cjs
+$ node --test tests/unit/pricing-engine-mirror.test.js
 ✔ FALLBACK mirrors the engine table: rates, labels, context windows, dated periods
 ✔ switching the price source to the engine table changes no amount
 ℹ tests 2
@@ -1079,7 +1088,7 @@ voit qu'un à la fois.
 pas par héritage ») :
 
 ```
-$ node --test tests/unit/transcript-adapters.test.cjs
+$ node --test tests/unit/transcript-adapters.test.js
 ✔ every adapter honors the same contract (Liskov)
 ✔ getAdapter: null/undefined defaults to claude (pre-0.2.0 sessions)
 ✔ getAdapter: unknown string logs an error and returns claude (loud fallback)
@@ -1239,6 +1248,65 @@ que la fiche affirmait à l'origine.
 ## Annexe méthode
 
 ### Rejouer l'audit
+
+**Où rejouer.** Les scripts d'audit lisent `lib/`, `bin/`, `public/` et
+`netgain/src/`. Dans l'arbre actuel, ces dossiers n'existent plus, sauf `bin/`,
+et un dossier absent est sauté sans message
+(`docs/audit/scripts/lib/source-files.mjs:36`). Le rejeu se fait donc dans une
+copie de travail placée au commit `aba0953`. La commande `git worktree add`
+crée cette copie dans un dossier voisin, sans toucher à l'arbre en cours :
+
+```
+git worktree add ../agent-viz-audit aba0953
+cd ../agent-viz-audit
+node --test "docs/audit/scripts/**/*.test.mjs"
+node docs/audit/scripts/run.mjs d1
+node docs/audit/scripts/run.mjs d2
+node docs/audit/scripts/run.mjs d3
+node docs/audit/scripts/run.mjs d4
+node docs/audit/scripts/run.mjs d5
+node docs/audit/scripts/run.mjs d6
+node docs/audit/scripts/run.mjs d7
+git diff -- docs/audit/resultats/
+```
+
+Ce bloc n'exécute aucun code du produit et ne demande aucune installation.
+`run.mjs` recalcule chaque résultat à partir des sources du commit ; pour D6,
+il relit la couverture enregistrée dans `docs/audit/resultats/couverture.lcov`
+au lieu de la remesurer. Le rejeu est conforme quand `git diff` ne montre que
+les quatre champs qui changent à chaque exécution : `commitOutils`, `genereLe`,
+`node` et `nonSuivis`. La copie se retire ensuite par
+`git worktree remove --force ../agent-viz-audit` ; l'option `--force` est
+nécessaire parce que les résultats y ont été réécrits.
+
+**Ce que `run-all.mjs` fait en plus.** Avant les sept détecteurs, il relance
+toute la suite de tests du produit, `tests/**/*.test.*`, pour remesurer la
+couverture (`run-all.mjs:33-38`). À `aba0953`, rien ne protège la machine
+pendant cette suite : `package.json` la lance par
+`node --test "tests/**/*.test.*"`, et aucun fichier commun ne redirige le
+dossier personnel ni le dossier temporaire avant les tests. La lecture des
+tests de ce commit donne quatre faits :
+
+- La suite n'écrit ni dans `~/.claude`, ni dans `~/.copilot`, ni dans
+  `~/.agent-viz`. Aucun test ne charge `lib/server.js`, et aucun ne contacte le
+  port 3333.
+- La suite écrit dans le vrai dossier temporaire de la machine. Le chargement
+  de `lib/server/session-index.js` y crée le dossier `agent-events`, celui où
+  le hook d'agent-viz dépose ses événements, et
+  `tests/unit/install-hooks.test.js` y laisse des dossiers `avtest-*` qu'il ne
+  supprime pas.
+- La suite lit la configuration des hooks de l'utilisateur, dans
+  `~/.claude/settings.json` et `~/.copilot/hooks/agent-viz.json`.
+- La suite a besoin du moteur compilé, `netgain/dist/`, que git ne suit pas.
+  Sans `npm ci` puis `npm run build` dans la copie, les tests qui chargent le
+  moteur échouent, et `run-all.mjs` s'arrête avant le premier détecteur.
+
+`run-all.mjs` et `run-all.mjs --comparer` ne se lancent donc que dans cette
+copie, après ces deux commandes, et en acceptant ces effets sur la machine. La
+même préparation vaut pour `node --test tests/unit/pricing-engine-mirror.test.js`,
+dans « Ce qui est sain », parce que ce test charge le moteur.
+
+Le bloc suivant et son explication sont ceux de l'audit d'origine.
 
 ```
 node --test "docs/audit/scripts/**/*.test.mjs"
