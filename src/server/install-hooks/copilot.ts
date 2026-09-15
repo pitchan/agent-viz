@@ -1,5 +1,5 @@
 // L'adaptateur GitHub Copilot CLI : audit / install / uninstall du fichier de
-// crochets agent-viz.json, balayage des portées, détection de l'agent.
+// hooks agent-viz.json, balayage des portées, détection de l'agent.
 // Implémente le contrat AgentInstaller. Le fichier de hooks Copilot n'est typé
 // que sur ce que ce module lit/écrit réellement — une index signature ouverte
 // tolère le reste.
@@ -115,7 +115,8 @@ function isAgentVizCopilotFile(content: unknown): content is CopilotHooksFile {
   return false;
 }
 
-// « Ce fichier porte notre crochet » — extrait de l'ancien findInstalledScopes.
+// « Ce fichier porte notre hook » : le prédicat du balayage local des portées
+// et de `installedIn`, que lit le registre.
 function copilotHookIn(file: string): boolean {
   return isAgentVizCopilotFile(readCopilotFile(file));
 }

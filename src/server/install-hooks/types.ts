@@ -1,6 +1,6 @@
-// Le vocabulaire partagé du sous-système d'installation de crochets — types
-// communs aux modules de src/server/install-hooks/ et à la façade. Voir
-// doc/43 (dépôt privé) pour le découpage.
+// Le vocabulaire partagé du sous-système d'installation de hooks : les types
+// communs aux modules de src/server/install-hooks/, dont `Target` que
+// prompt-install.ts importe aussi.
 
 export type AgentName = 'claude' | 'copilot';
 // Ce que `--target` et l'invite d'installation acceptent : un agent, ou 'both'

@@ -1,5 +1,5 @@
 // Lire, écrire et inspecter un settings.json Claude Code : la forme des
-// crochets, leur reconnaissance, leur ajout/retrait/rafraîchissement.
+// hooks, leur reconnaissance, leur ajout/retrait/rafraîchissement.
 // Les settings ne sont typés que sur ce que ce module lit/écrit réellement —
 // une index signature ouverte tolère le reste (un settings.json porte bien
 // d'autres clés que `hooks`).

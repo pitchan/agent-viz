@@ -1,8 +1,6 @@
-// La garde de point d entree de `src/server/install-hooks.js` etait le seul
-// point d entree du depot SANS filet : doc/36 § 4.3, mesure — neutraliser la
-// garde de `hook.js` fait rougir 3 tests nommes, neutraliser celle-ci laisse la
-// suite ENTIEREMENT VERTE. Or c est ce fichier-la qui ecrit un chemin absolu
-// dans le `settings.json` de l utilisateur.
+// La garde de point d entree de `src/server/install-hooks.ts` decide si le module
+// agit au chargement. C est ce module qui ecrit un chemin absolu dans le
+// `settings.json` de l utilisateur : sa garde a son propre filet.
 //
 // Les deux tests ci-dessous tiennent la garde par ses DEUX bords :
 //   G1  lance comme un script, le module DOIT parler   -> `if (false && ...)` rougit
@@ -11,17 +9,13 @@
 // Un seul des deux ne suffit pas : G1 seul laisserait passer une garde toujours
 // vraie, et c est precisement ce sens-la qui est dangereux.
 //
-// Tout se joue en PROCESSUS FILS, jamais dans le processus de test. Deux
-// raisons mesurees : dans la branche gardee le module a des effets de bord AU
-// CHARGEMENT, et les deux executeurs (vitest, `node --test`) lancent plusieurs
-// fichiers EN PARALLELE — un effet de bord dans le processus de test
-// contaminerait ses voisins.
+// Tout se joue en PROCESSUS FILS : dans la branche gardee, le module a des effets
+// de bord AU CHARGEMENT, et les deux executeurs lancent plusieurs fichiers EN
+// PARALLELE ; dans le processus de test, ces effets contamineraient ses voisins.
 //
-// Chaque fils recoit un home JETABLE. Mesure : sous Windows `os.homedir()` suit
-// USERPROFILE SEUL, HOME seul ne detourne rien ; HOMEPATH est inoperant. Ce
-// detournement n est pas du confort : sans lui, la mutation `true ||` fait
-// reecrire le `~/.claude/settings.json` REEL et repointer les six crochets de
-// capture de la machine.
+// Chaque fils recoit un home JETABLE : sous Windows `os.homedir()` suit
+// USERPROFILE SEUL. Sans ce detournement, la mutation `true ||` reecrirait le
+// `~/.claude/settings.json` REEL et repointerait les hooks de capture de la machine.
 //
 // Le fils tourne aussi avec `cwd` HORS du depot : ce module sait ajouter une
 // ligne au `.gitignore` de `findProjectRoot(cwd)`, qu aucun detournement de
@@ -135,7 +129,7 @@ test('G1 : lance comme un script, la branche de point d entree s execute et parl
     assert.equal(r.error, undefined, `le fils n a pas demarre : ${r.error}`);
 
     // On lit la SORTIE, pas le code de retour : `--check` sort en 1 quand les
-    // crochets ne sont pas installes (mesure), ce qui est le cas d un home neuf.
+    // hooks ne sont pas installes (mesure), ce qui est le cas d un home neuf.
     assert.ok(
       r.stdout.includes(SEULE_LA_BRANCHE_GARDEE),
       `la sortie doit porter ${JSON.stringify(SEULE_LA_BRANCHE_GARDEE)}\n`

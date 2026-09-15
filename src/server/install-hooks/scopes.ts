@@ -1,6 +1,6 @@
 // Décider OÙ installer (portée → fichier cible), QUELLE commande écrire dans
 // les settings, tenir le .gitignore de la portée locale, et balayer les cibles
-// qui portent réellement notre crochet.
+// qui portent réellement notre hook.
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -97,7 +97,7 @@ export function ensureGitignore(
   return { changed: true };
 }
 
-// La boucle « quelles cibles portent réellement notre crochet », écrite une
+// La boucle « quelles cibles portent réellement notre hook », écrite une
 // fois : les adaptateurs s'en servent pour leur avertissement inter-portées
 // (crossScope) et le registre pour findInstalledScopes.
 export function scanInstalled(

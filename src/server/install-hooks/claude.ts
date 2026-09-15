@@ -1,4 +1,4 @@
-// L'adaptateur Claude Code : audit / install / uninstall des crochets dans
+// L'adaptateur Claude Code : audit / install / uninstall des hooks dans
 // settings.json, balayage des portées, détection de l'agent sur la machine.
 // Implémente le contrat AgentInstaller — le registre (registry.ts) n'a besoin
 // de rien savoir de plus.
@@ -31,7 +31,8 @@ export function auditClaude({ scope, cwd, packageRoot }: AgentOpts = {}) {
   return { ...target, audit: auditSettings(settings, cmd.command), command: cmd };
 }
 
-// « Ce fichier porte notre crochet » — extrait de l'ancien findInstalledScopes.
+// « Ce fichier porte notre hook » : le prédicat du balayage local des portées
+// et de `installedIn`, que lit le registre.
 function claudeHookIn(file: string): boolean {
   const settings = readSettings(file);
   return EVENTS.some(ev => hasHookForEvent(settings, ev));

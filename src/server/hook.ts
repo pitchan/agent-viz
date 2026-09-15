@@ -25,7 +25,7 @@ const http = process.getBuiltinModule('node:http');
 const DIR = path.join(os.tmpdir(), 'agent-events');
 const PORT = parseInt(process.env.AGENT_VIZ_PORT || process.env.PORT || '3333', 10);
 
-// Journal d'erreur du crochet. Volontairement PAS stderr : certaines interfaces
+// Journal d'erreur du hook. Volontairement PAS stderr : certaines interfaces
 // d'agent affichent toute sortie stderr non vide comme une « erreur de hook »
 // même quand le processus sort en 0. Un échec d'écriture disque est avalé — on
 // ne peut de toute façon rien en faire ici.

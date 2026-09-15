@@ -1,13 +1,10 @@
-// C1 (audit de qualité de code, docs/audit-qualite-code.md) — le crochet
-// `src/server/hook.js` n'avait AUCUN test : `runHook` n'est importé que par
-// `bin/agent-viz.js`, et les quatre fichiers de test qui citaient `hook.js` s'en
-// servaient comme nom de fichier de fixture, jamais comme module.
+// `runHook` (src/server/hook.ts) n'est importé que par `bin/agent-viz.js` : ce
+// fichier l'exerce comme le harnais le lance, en processus enfant, la charge sur
+// l'entrée standard.
 //
-// On l'exerce ici pour de vrai, en le lançant comme le harnais le lance : un
-// processus enfant, la charge sur l'entrée standard. `DIR` étant calculé une
-// fois pour toutes depuis `os.tmpdir()`, on redirige le dossier temporaire de
-// l'enfant par son environnement (TMPDIR côté POSIX, TEMP/TMP côté Windows) —
-// aucune modification du code de production n'est nécessaire pour le tester.
+// `DIR` est calculé une fois depuis `os.tmpdir()`, au chargement du module :
+// l'enfant reçoit son dossier temporaire par l'environnement (TMPDIR côté POSIX,
+// TEMP/TMP côté Windows), sans modifier le code de production.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -20,10 +17,10 @@ import { fileURLToPath } from 'node:url';
 const HOOK = fileURLToPath(new URL('../../src/server/hook.ts', import.meta.url));
 const BOM = Buffer.from([0xef, 0xbb, 0xbf]);
 
-// Lance le crochet sur une charge donnée, dans un dossier temporaire isolé.
+// Lance le hook sur une charge donnée, dans un dossier temporaire isolé.
 // Le port pointe volontairement vers personne : le POST /notify est en
 // « tire et oublie », son échec est déjà avalé par `req.on('error')`.
-function lanceLeCrochet(charge) {
+function lanceLeHook(charge) {
   const racine = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-viz-hook-test-'));
   return new Promise((resolve, reject) => {
     const enfant = spawn(process.execPath, [HOOK, '--source=claude'], {
@@ -47,9 +44,9 @@ function lit(fichier) {
   try { return fs.readFileSync(fichier, 'utf8'); } catch { return null; }
 }
 
-test('un crochet préfixé d’un BOM est capturé, pas perdu', async () => {
+test('un hook préfixé d’un BOM est capturé, pas perdu', async () => {
   const evt = { session_id: 'sess-bom-1', hook_event_name: 'PreToolUse', tool_name: 'Read' };
-  const r = await lanceLeCrochet(Buffer.concat([BOM, Buffer.from(JSON.stringify(evt))]));
+  const r = await lanceLeHook(Buffer.concat([BOM, Buffer.from(JSON.stringify(evt))]));
   try {
     const ligne = lit(path.join(r.dossier, 'sess-bom-1.jsonl'));
     assert.notEqual(ligne, null, 'aucun .jsonl écrit : l’événement a été perdu');
@@ -63,7 +60,7 @@ test('un crochet préfixé d’un BOM est capturé, pas perdu', async () => {
 });
 
 test('une charge illisible laisse une trace dans _hook-errors.log', async () => {
-  const r = await lanceLeCrochet('{ceci n’est pas du JSON');
+  const r = await lanceLeHook('{ceci n’est pas du JSON');
   try {
     const journal = lit(path.join(r.dossier, '_hook-errors.log'));
     assert.notEqual(journal, null, 'aucun journal d’erreur : l’échec est totalement silencieux');
@@ -78,7 +75,7 @@ test('une charge illisible laisse une trace dans _hook-errors.log', async () => 
 // journal d'erreur écrit à tort, se voie immédiatement sur le chemin normal.
 test('non-régression : une charge normale, sans BOM, reste capturée et sans erreur journalisée', async () => {
   const evt = { session_id: 'sess-normale-1', hook_event_name: 'PostToolUse', tool_name: 'Edit' };
-  const r = await lanceLeCrochet(JSON.stringify(evt));
+  const r = await lanceLeHook(JSON.stringify(evt));
   try {
     const ligne = lit(path.join(r.dossier, 'sess-normale-1.jsonl'));
     assert.notEqual(ligne, null, 'le chemin normal a cessé de capturer');

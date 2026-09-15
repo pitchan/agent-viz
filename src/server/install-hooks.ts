@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 'use strict';
-// Façade du sous-système d'installation de crochets — le corps vit dans
-// src/server/install-hooks/ (doc/43 du dépôt privé). Chemin et exports FIGÉS :
-// bin/agent-viz.js importe dist/server/install-hooks.js par chemin écrit en
-// dur, et les tests consomment _internals / EVENTS. Le bloc main garde le
-// module exécutable en direct :
+// Façade du sous-système d'installation de hooks ; le corps vit dans
+// src/server/install-hooks/.
+//
+// Chemin et exports FIGÉS : bin/agent-viz.js importe dist/server/install-hooks.js
+// par un chemin écrit en dur, et les tests consomment _internals et EVENTS.
+//
+// Le bloc main garde le module exécutable en direct :
 //   node dist/server/install-hooks.js [--user|--project|--local] [--check|--uninstall]
 import { fileURLToPath } from 'node:url';
 import { EVENTS, eventsFor } from './install-hooks/config.ts';
