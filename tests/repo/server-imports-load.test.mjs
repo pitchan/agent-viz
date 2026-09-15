@@ -141,7 +141,7 @@ test('le point d entree du paquet est du JavaScript syntaxiquement valide', () =
   // mais avale d autres cassures, et passe donc un controle negatif mal choisi.
   assert.equal(ext, '.js',
     `${path.basename(entree)} n est plus du JavaScript : node --check est INTERMITTENT sur du `
-    + 'TypeScript (mesure tour 3 -- il attrape certaines cassures et en avale d autres). '
+    + 'TypeScript (il attrape certaines cassures et en avale d autres). '
     + 'Remplacer ce controle par un tsc --noEmit sur ce seul fichier.');
 
   // Act + Assert — `node --check` en sous-processus : charger `server.js` lierait

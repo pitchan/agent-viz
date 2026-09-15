@@ -157,6 +157,6 @@ test('aucun fichier de src/server ne définit localement une primitive du moteur
     [],
     `ces primitives n’ont qu’UNE définition, dans src/engine/core/ (${[...PRIMITIVES].sort().join(', ')}) — ` +
       'un fichier de src/server/ qui en (re)définit une localement, sous quelque forme que ' +
-      'ce soit, recrée la jumelle que le retrait des ponts a supprimée. Importer, ne pas réécrire.',
+      'ce soit, recrée une copie locale de la primitive du moteur. Importer, ne pas réécrire.',
   );
 });

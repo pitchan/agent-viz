@@ -129,7 +129,7 @@ test('aucune citation de lib/, public/ ou netgain/ hors liste blanche', () => {
     perimees.map(o => `${o.fichier}:${o.ligne} \u2192 ${o.texte.trim()}`),
     [],
     '`lib/`, `public/` et `netgain/` n existent plus : une citation qui les nomme envoie le lecteur nulle part. ' +
-      'La faire suivre le deplacement, ou l inscrire dans LISTE_BLANCHE avec sa raison.',
+      'La corriger, ou l inscrire dans LISTE_BLANCHE avec sa raison.',
   );
 });
 
@@ -196,7 +196,7 @@ test('aucune citation d un ancien nom .test.js hors liste blanche, et chaque exe
   assert.deepEqual(
     perimees.map(o => `${o.fichier}:${o.ligne} \u2192 ${o.texte.trim()}`),
     [],
-    'citation d un ancien nom .test.js hors liste blanche : la faire suivre le renommage (step 1), ' +
+    'citation d un ancien nom .test.js hors liste blanche : la reecrire avec le nom actuel, ' +
       'ou l inscrire dans LISTE_BLANCHE_TEST_JS avec sa raison.',
   );
 

@@ -95,7 +95,7 @@ test('le script build efface dist/engine avant de compiler', () => {
     [],
     'le build doit s auto-nettoyer : sans cet effacement, un marqueur ou un fichier emis par une ' +
       'version anterieure survit dans `dist/engine/` et repart dans le tarball, sans qu aucune ' +
-      'commande ne rougisse (exit 0, `npm pack` a 172 au lieu de 171).',
+      'commande ne rougisse (exit 0).',
   );
 });
 
