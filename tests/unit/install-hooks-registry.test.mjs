@@ -9,8 +9,8 @@ import path from 'node:path';
 import { INSTALLERS, TARGETS, install, pickAgents, uninstall } from '../../src/server/install-hooks/registry.ts';
 
 // Un bac à sable qui ressemble à un projet : `resolveScope({ scope: 'project' })`
-// exige un `.git` pour trouver la racine. On n'utilise JAMAIS la portée `user`
-// dans les tests — `os.homedir()` n'est pas interceptable.
+// exige un `.git` pour trouver la racine. La portée `user`, elle, vise le bac de
+// `test-support/env-guard.mjs`, commun à tous les tests de ce fichier.
 function sandboxProject(prefix) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
   fs.mkdirSync(path.join(root, '.git'));

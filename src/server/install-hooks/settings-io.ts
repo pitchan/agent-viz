@@ -28,7 +28,7 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
-// Match three forms used historically + currently:
+// Match four forms used historically + currently:
 //   1. node /abs/.../agent-viz/hook.js              (legacy)
 //   2. node /abs/.../agent-viz/lib/hook.js          (path-style after refactor)
 //   3. node /abs/.../agent-viz/bin/agent-viz.js hook (absolute bin-style)

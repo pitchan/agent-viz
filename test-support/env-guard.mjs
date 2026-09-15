@@ -12,28 +12,28 @@
 // (mutation, migration), l'ecriture part dans un bac jetable, jamais dans le
 // vrai ~/.claude ni ~/.agent-viz.
 //
-// Mesure (doc/39, decision prevention-harnais, § 4) : sous
-// Windows `os.homedir()` suit USERPROFILE seul ; HOME seule ne detourne rien.
-// `os.tmpdir()` et `os.homedir()` relisent l'environnement a chaque appel.
+// Mesure : sous Windows `os.homedir()` suit USERPROFILE seul ; HOME seule ne
+// detourne rien. `os.tmpdir()` et `os.homedir()` relisent l'environnement a
+// chaque appel.
 // AGENT_VIZ_PORT=59999 est un port ou aucun demon n'ecoute : un runHook()
 // accidentel parle dans le vide — reconduction d'un port deja employe ailleurs
 // dans le depot (`tests/unit/hook-runtime.test.mjs`,
 // `tests/unit/install-hooks-entrypoint.test.mjs`), pas une valeur inventee.
 //
-// CE QUE CE FICHIER NE COUVRE PAS (les cinq limites de la decision, § 7) :
-//   1. L'ecriture cote DEPOT : `install-hooks.js` sait ajouter une ligne au
+// CE QUE CE FICHIER NE COUVRE PAS (cinq limites) :
+//   1. L'ecriture cote DEPOT : `install-hooks.ts` sait ajouter une ligne au
 //      `.gitignore` de `findProjectRoot(cwd)` — aucun detournement de home ne
 //      l'empeche. `git status --porcelain` reste le controle qui la voit.
 //   2. Les executions HORS harnais : un script lance directement
-//      (`node src/server/install-hooks.js`), `npm start`, le bin, ou un
+//      (`node src/server/install-hooks.ts`), `npm start`, le bin, ou un
 //      fichier de test lance NU sans runner ne passent ni par `setupFiles`
 //      ni par `--import`.
 //   3. Un `node --test` tape a la main SANS `--import` : seuls les DEUX
 //      scripts npm (`test:node`, `test:ids:node`) portent le drapeau.
 //   4. La garde de harnais ELLE-MEME : retirer cette entree de `setupFiles`
 //      ou ce `--import` fait tomber la prevention sans bruit. Le filet qui
-//      reste alors est `tests/unit/install-hooks-entrypoint.test.mjs` (G1/G2,
-//      detection) — doublure voulue, pas un repli suppose.
+//      reste alors est `tests/unit/install-hooks-entrypoint.test.mjs`, qui
+//      detecte sans empecher — doublure voulue, pas un repli suppose.
 //   5. `~/.agent-viz/observatory.db` : couverte par ricochet (vit sous
 //      `os.homedir()/.agent-viz`, suit donc le detournement) mais un demon
 //      REEL deja lance sur la machine continue d'y ecrire — cette garde
@@ -53,14 +53,12 @@ const AGE_MIN_PURGE_MS = 10 * 60 * 1000;
 // les autres.
 //
 // SEUIL D'AGE, pas "tout ce qui existe deja" : un run cree PLUSIEURS bacs,
-// pas un seul — voir la note sur l'idempotence plus bas. Mesure sur ce
-// depot (2026-08-13) : `node --test` sur le glob complet des deux scripts npm
-// (76 fichiers `.cjs`/`.mjs`, 841 tests) cree 76 bacs en 2,4 s ; vitest
-// (121 fichiers, 1365 tests) en 6 a 8 s. Purger sans seuil d'age ferait
-// qu'un fichier supprime le bac tout juste cree par son voisin, ENCORE EN
-// COURS D'USAGE. Un seuil de 10 minutes laisse une marge superieure a x70 sur
-// le run complet le plus lent mesure ici, tout en bornant l'accumulation sur
-// des runs repetes (dev quotidien, CI).
+// pas un seul — voir la note sur l'idempotence plus bas. Purger sans seuil
+// d'age ferait qu'un fichier supprime le bac tout juste cree par son voisin,
+// ENCORE EN COURS D'USAGE. Mesure sur ce depot : un run complet cree un bac
+// par fichier de test en moins de 15 s ; le seuil de 10 minutes laisse une
+// marge superieure a x40, tout en bornant l'accumulation sur des runs repetes
+// (dev quotidien, CI).
 //
 // Trois garde-fous, non negociables :
 //   1. le prefixe compare est EXACT (`agent-viz-harnais-`), jamais un motif

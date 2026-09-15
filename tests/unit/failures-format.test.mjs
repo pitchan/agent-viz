@@ -98,7 +98,7 @@ test('une premiere occurrence ne parle pas de repetition', () => {
   assert.doesNotMatch(failureLine(invocation).headline, /fois dans la session/);
 });
 
-// La table des motifs (src/web/viz-invocation-patterns.mjs) grandit a chaque cas
+// La table des motifs (src/engine/watchdog/invocation-patterns.ts) grandit a chaque cas
 // rencontre, et elle n'a pas a attendre ce fichier-ci pour le faire. Un motif
 // qu'il ne connait pas encore doit donc dire ce qu'on sait vraiment — que
 // quelque chose se regle sur le poste — plutot que de laisser un trou.

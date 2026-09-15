@@ -67,20 +67,13 @@ test('copilot adapter declares tokens unsupported and parseUsageLine is a no-op'
   assert.equal(a.parseUsageLine('', {}), false);
 });
 
-// TEST AJOUTÉ, daté — C2, 2026-08-11.
+// Ce site décode la QUEUE du transcript en direct, ligne par ligne, au fil de
+// l'écriture : une ligne perdue ici n'est rattrapée par aucune relecture. Il
+// tolère le BOM, comme le moteur.
 //
-// Ce fichier ne vérifiait que le contrat du registre : avant la migration, une
-// mutation qui détruisait entièrement une des trois formes reconnues par
-// l'adaptateur claude le laissait VERT (vérifié par exécution ; ce sont
-// `transcript.test.js` et `transcript-subagents.test.js` qui virent au rouge).
-// Le seul changement de comportement apporté par C2 sur ce site n'était donc
-// épinglé nulle part : il l'est ici.
-//
-// Pourquoi il compte plus qu'ailleurs : ce site décode la QUEUE du transcript
-// en direct, ligne par ligne, au fil de l'écriture. Une ligne perdue ici n'est
-// rattrapée par aucune relecture ultérieure, contrairement aux deux sites déjà
-// migrés. Arbitrage retenu, le même que partout : tolérer le BOM, comme le
-// moteur le fait déjà.
+// Ce test épingle cette tolérance ici : sans lui, une mutation qui détruisait une
+// des trois formes reconnues par l'adaptateur claude laissait ce fichier VERT, et
+// seuls `transcript.test.cjs` et `transcript-subagents.test.cjs` rougissaient.
 test('C2 — une ligne d’usage préfixée d’un BOM est désormais comptabilisée', () => {
   const BOM = String.fromCharCode(0xFEFF);
   const ligne = JSON.stringify({

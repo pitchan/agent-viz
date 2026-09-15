@@ -35,9 +35,9 @@ test('findProjectRoot: nested cwd inside a real project still finds the project 
   assert.equal(result, projectRoot);
 });
 
-// Helpers for the cross-scope tests below. We can't intercept os.homedir(), so
-// the user scope may or may not have real agent-viz hooks on the dev's box —
-// these tests only assert presence of the scopes we explicitly populated.
+// Helpers for the cross-scope tests below. os.homedir() is the disposable dir that
+// test-support/env-guard.mjs creates for each test file, so the user scope holds no
+// hook; these tests assert the scopes they populate themselves.
 function writeClaudeSettingsWithHook(file, command = 'node /tmp/agent-viz/lib/hook.js --source=claude') {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, JSON.stringify({

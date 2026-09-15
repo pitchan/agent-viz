@@ -210,10 +210,9 @@ test('chaque entree de la liste blanche protege encore quelque chose', () => {
 // l autre ne touche `EXCLUS` ni `LISTE_BLANCHE` : y ajouter changerait ce que
 // les deux tests ci-dessus prouvent (mesure).
 const EXCLUS_TEST_JS = [
-  // 13 litt\u00e9raux FABRIQU\u00c9S ('a.test.js', 'b.test.js', 'c.test.js' \u2014 jamais
-  // touches, Global Constraints) : donnees de test pour `formatId` et le
-  // reporter node:test, pas des citations d un fichier reel. Rien a
-  // proteger fragment par fragment, le fichier entier est hors sujet.
+  // Litteraux fabriques ('a.test.js', 'b.test.js'...) : donnees de test pour
+  // `formatId` et le reporter node:test, pas des citations d un fichier reel.
+  // Rien a proteger fragment par fragment : le fichier entier est hors sujet.
   'tests/unit/test-ids-format.test.mjs',
 ];
 
@@ -224,21 +223,9 @@ const EXCLUS_TEST_JS = [
 // (tache 5, qui refait tout le tableau d un coup), pas ici.
 const CITATION_TEST_JS = /[A-Za-z0-9_-]+\.test\.js\b/;
 
-const LISTE_BLANCHE_TEST_JS = [
-  // PERMANENTE \u2014 ne pourra JAMAIS etre retiree tant que ce filet reste ce
-  // filet. Cite ses deux voisins `transcript.test.js` et
-  // `transcript-subagents.test.js` par leur nom D AVANT le step 1 ; les
-  // Global Constraints interdisent de changer le contenu des 39 `.test.cjs`
-  // (\u00ab aucun fichier de test ne change de semantique \u00bb, et corriger cette
-  // citation n est pas un `git mv`). L entree protege donc pour toujours
-  // une citation FAUSSE et gelee, pas un oubli provisoire a solder \u2014 sauf
-  // si doc/36 \u00a7 1.3 levait un jour cet interdit sur le contenu des 39.
-  {
-    fichier: 'tests/unit/transcript-adapters.test.cjs',
-    fragment: '`transcript.test.js` et `transcript-subagents.test.js`',
-    raison: 'citation interne perimee par le step 1, gelee : contenu des 39 .test.cjs hors de portee (PERMANENT)',
-  },
-];
+// Une entree = { fichier, fragment, raison } : une citation d un ancien nom
+// `*.test.js` que reecrire rendrait fausse. Aucune n est citee aujourd hui.
+const LISTE_BLANCHE_TEST_JS = [];
 
 function occurrencesTestJs() {
   const trouvees = [];

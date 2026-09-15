@@ -199,12 +199,9 @@ const SAMPLES = [
 // `inv-cross-shell-cmdlet-in-posix` n en fait pas partie : 1 occurrence en 90
 // jours, et il ne distinguait un cmdlet PowerShell d un binaire absent que par
 // la CASSE du nom.
-// `inv-bash-unbalanced-quote` en fait de nouveau partie, et c est la
-// correction du 2026-08-08 : une version anterieure de la scission l avait
-// sorti en affirmant qu il « comptait encore sans etre dit ». Il ne comptait
-// rien. Le filtre du detecteur (viz-watchdog.mjs:495) rend null AVANT le
-// compteur des lignes 502-503 : un motif qui n alerte pas ne compte pas non
-// plus, il est classe puis jete.
+// `inv-bash-unbalanced-quote` en fait partie : le filtre de `badInvocation`
+// (src/engine/watchdog/detector.ts) rend null AVANT le compteur, donc un motif
+// qui n alerte pas ne compte pas non plus, il est classe puis jete.
 const WORKSTATION_IDS = [
   'inv-bash-windows-path-unquoted',
   'inv-bash-cd-too-many-args',
@@ -562,8 +559,9 @@ test('LIMITE ECRITE : un journal de conteneur atteint le sous-ensemble qui alert
 
 test('le filet generique ALERTE, parce qu un motif muet ne compte pas non plus', () => {
   // Une version anterieure de la scission l avait mis a false en le disant
-  // « compte sans etre dit ». Le filtre du detecteur (viz-watchdog.mjs:495)
-  // rend null AVANT le compteur : un motif non alertant est classe puis jete.
+  // « compte sans etre dit ». Le filtre de `badInvocation`, dans
+  // src/engine/watchdog/detector.ts, rend null AVANT le compteur : un motif non
+  // alertant est classe puis jete.
   // Et avant la scission, toute forme estampillee unexpected EOF sonnait —
   // n alerter que sur eval: et -c: rendait muette une troisieme forme.
   const p = PATTERNS.find(x => x.id === 'inv-bash-unbalanced-quote');
