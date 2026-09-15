@@ -14,15 +14,22 @@ const SOURCE = path.resolve(import.meta.dirname, '..', '..', 'src', 'server', 'l
 const TEMOIN = 'lance.pid';
 
 // Chaque faux server.js dépose son pid dans TEMOIN dès son lancement : le test
-// sait ainsi s'il a été lancé, et quel processus tuer.
+// sait ainsi s'il a été lancé, et le faux serveur sort seul quand son dossier disparaît.
 const DEPOSE_TEMOIN = [
   "import fs from 'node:fs';",
   "import path from 'node:path';",
   `fs.writeFileSync(path.join(import.meta.dirname, '${TEMOIN}'), String(process.pid));`,
 ].join('\n');
 
+// Un faux serveur qui reste vivant sort de lui-même quand son témoin disparaît :
+// nettoie efface le dossier et ne signale jamais un pid, que Windows peut avoir
+// réattribué à un autre processus.
+const SURVEILLE_TEMOIN =
+  `setInterval(() => { if (!fs.existsSync(path.join(import.meta.dirname, '${TEMOIN}'))) process.exit(0); }, 50);`;
+
 const SERVEUR_QUI_ECOUTE = [
   DEPOSE_TEMOIN,
+  SURVEILLE_TEMOIN,
   "import http from 'node:http';",
   'http.createServer((req, res) => {',
   "  if (req.method === 'POST' && req.url === '/shutdown') { res.end('bye', () => process.exit(0)); return; }",
@@ -40,7 +47,7 @@ const SERVEUR_QUI_MEURT = [
 
 const SERVEUR_MUET = [
   DEPOSE_TEMOIN,
-  'setInterval(() => {}, 60000);',
+  SURVEILLE_TEMOIN,
 ].join('\n');
 
 // Les serveurs restent ouverts jusqu'au dernier : deux ports demandés ensemble
@@ -104,8 +111,6 @@ function pidLance({ dossier }) {
 }
 
 function nettoie(montage) {
-  const pid = pidLance(montage);
-  if (pid) { try { process.kill(pid, 'SIGKILL'); } catch {} }
   fs.rmSync(montage.dossier, { recursive: true, force: true });
 }
 
