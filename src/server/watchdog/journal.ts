@@ -203,10 +203,9 @@ function createJournal({ filePath = DEFAULT_PATH, now = Date.now }: { filePath?:
       // declenche pas a elle seule une reecriture — on ne reecrit que pour la
       // peremption — mais elle disparaitra a la prochaine compaction.
       //
-      // Le verdict vient de la primitive commune, qui rend deja null sur une ligne
-      // vide. Une ligne prefixee d'un BOM est decodee ; `gardees` retient la ligne
-      // BRUTE, donc la compaction recopie ce BOM, que la primitive retolere au
-      // chargement suivant.
+      // La primitive commune rend deja null sur une ligne vide et decode une ligne
+      // prefixee d'un BOM ; `gardees` retient la ligne BRUTE, donc la compaction
+      // recopie ce BOM, que la primitive retolere au chargement suivant.
       const verdict: { ok: true; value: unknown } | { ok: false; rawLength: number } | null = decodeJsonlLine(line);
       if (!verdict || !verdict.ok) continue;
       const rec = verdict.value;

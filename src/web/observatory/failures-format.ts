@@ -141,10 +141,9 @@ export function failuresSummary(alerts: Alert[]) {
 // sous des commandes simplement longues. Un etat qui se resout seul n'est pas une
 // dette du lecteur : il n'a pas a reclamer d'acquittement.
 //
-// Le filtre est NOMME, jamais en creux : seul `stuck` est ecarte, et un
-// detecteur ajoute demain s'affiche sans toucher a ce filtre. Les formulations
-// stuck restent dans les tables ci-dessus : le contrat se verifie des deux cotes
-// du detecteur, et montrer `stuck` ici ne demande que de retirer ce filtre.
+// Le filtre est NOMME : seul `stuck` est ecarte, et un detecteur ajoute demain
+// s'affiche sans toucher a ce filtre. Les formulations stuck restent dans les
+// tables du fichier, et montrer `stuck` ici ne demande que de retirer ce filtre.
 export function panelAlerts(alerts: Alert[]) {
   return alerts.filter(a => a.type !== 'stuck');
 }

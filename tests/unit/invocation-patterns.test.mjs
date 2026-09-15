@@ -195,11 +195,9 @@ const SAMPLES = [
 
 // Le sous-ensemble « réglage du poste » : le seul qui donnera lieu à une
 // alerte. Exactement ces onze motifs.
-// `inv-cross-shell-cmdlet-in-posix` n en fait pas partie : il ne distingue un
-// cmdlet PowerShell d un binaire absent que par la CASSE du nom.
-// `inv-bash-unbalanced-quote` en fait partie : le filtre de `badInvocation`
-// (src/engine/watchdog/detector.ts) rend null AVANT le compteur, donc un motif
-// qui n alerte pas ne compte pas non plus, il est classe puis jete.
+// `inv-cross-shell-cmdlet-in-posix` n en fait pas partie : seule la CASSE du
+// nom y separe un cmdlet d un binaire absent. `inv-bash-unbalanced-quote` en
+// fait partie : `badInvocation` jette avant le compteur ce qui n alerte pas.
 const WORKSTATION_IDS = [
   'inv-bash-windows-path-unquoted',
   'inv-bash-cd-too-many-args',
@@ -792,8 +790,7 @@ test('un message PowerShell prive de FullyQualifiedErrorId n est pas classe, Cat
 
 // ═══ 8. Les 39 expressions, verrouillees contre les deux releves ═══════════
 //
-// Sans ce test, tout elargissement passe, par exemple
-// `inv-bash-windows-path-unquoted`
+// Sans ce test, tout elargissement passe, par exemple `inv-bash-windows-path-unquoted`
 // elargi a `/cd: [^\n]*: No such file or directory/`, ce qui ferait de toute
 // exploration ratee une alerte.
 //
@@ -842,10 +839,9 @@ const RELEVE = new Map([
   ['vrd-exit-code-bare', String.raw`^\s*Exit code \d+`, ''],
 ].map(([id, source, flags]) => [id, { source, flags }]));
 
-// Le SECOND releve, du meme depot prive : deux motifs de plus, qui separent les
-// deux causes que `inv-bash-unbalanced-quote` reunit. Ils ne vont PAS dans RELEVE —
-// celui-ci est le temoin du premier releve, et les y glisser mentirait sur leur
-// provenance, la seule chose que cette section existe pour tenir.
+// Le SECOND releve : deux motifs de plus, qui separent les deux causes que
+// `inv-bash-unbalanced-quote` reunit. Ils ne vont PAS dans RELEVE — celui-ci est le
+// temoin du premier releve, et les y glisser mentirait sur leur provenance.
 //
 // `String.raw` ne convient pas ici et c est la seule raison du changement de
 // style : un backtick ne peut pas figurer nu dans un litteral de gabarit, et

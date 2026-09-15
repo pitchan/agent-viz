@@ -48,10 +48,9 @@ const ACTION_BY_MARKER = Object.freeze({
   // ambiguïté (doc officielle : connecter/déconnecter un serveur MCP en cours
   // de session réécrit le bloc d'outils ; le chargement différé, lui, préserve).
   toolsChanged: 'Connecter (ou déconnecter) les serveurs MCP avant la session, pas en cours de route — chaque bascule réécrit le bloc d’outils.',
-  // toolsAppeared: tool search APPENDS the discovered definition to the conversation history, the
-  // prefix is untouched and the cache preserved (official docs; our controlled test agrees, +265 tk
-  // fully re-read — docs/sources-externes.md). A ToolSearch call before a break is a true temporal
-  // observation, but with no established mechanism there is no honest gesture to prescribe.
+  // toolsAppeared: tool search APPENDS the discovered definition to the conversation history, so
+  // the prefix and the cache hold (docs/sources-externes.md). A ToolSearch call before a break is a
+  // true observation, but with no established mechanism there is no honest gesture to prescribe.
   toolsAppeared: null,
   // noMarker: the engine found nothing that explains the break, and inventing
   // a remedy is what this rule once got wrong. A null action = informative

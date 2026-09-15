@@ -392,10 +392,9 @@ function openStore(dbPath: string): Store {
     // for project-scoped rules the subject IS the project path — a
     // moved or renamed project is a new subject, its card is reborn active and
     // the old path keeps its own decision. A choice, not an oversight.
-    // last_seen_at only
-    // moves for recommendations the scan re-emitted; rows left behind keep
-    // their older date and are NOT deleted — the ranking decides what a stale
-    // date means, this module only records it.
+    // last_seen_at only moves for recommendations the scan re-emitted; rows
+    // left behind keep their older date and are NOT deleted — the ranking
+    // decides what a stale date means, this module only records it.
     upsertRecommendations(recs: RecommendationInput[], now: string): void {
       for (const r of recs) {
         upsertRec.run(r.ruleId, r.subject, now, now, now, r.title, r.category, r.confidence,

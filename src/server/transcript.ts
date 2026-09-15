@@ -158,10 +158,9 @@ function extractPromptFromText(content: string): string | null {
     // bornée (256 Ko puis 1 Mo) et coupe en plein milieu de ligne, donc une trace se
     // déclencherait à chaque lecture — du bruit de routine, pas un signal.
     //
-    // Le `try` qui suit rattrape deux levées, reproduites par CAST et jamais filtrées :
-    // `block.type` sur un bloc `null`/`undefined`, `cleanUserText(block.text)` sur un bloc
-    // `text` sans champ `text`. La ligne ENTIÈRE est alors abandonnée, frères valides compris ;
-    // un garde (`isRecord(block)`) sauterait le seul bloc cassé et changerait qui gagne.
+    // Le `try` rattrape deux levées, `cleanUserText(block.text)` sur un bloc `text` sans `text`
+    // et `block.type` sur un bloc `null` : la ligne ENTIÈRE est abandonnée, frères valides
+    // compris. Un garde `isRecord(block)` sauterait le seul bloc cassé et changerait qui gagne.
     const verdict = decodeJsonlLine(line);
     if (!verdict || !verdict.ok) continue;
     const o = verdict.value;
