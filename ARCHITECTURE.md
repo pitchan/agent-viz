@@ -593,10 +593,10 @@ rapport avec le changement de langage. Le serveur, lui, est inchangé.
 
 ## 9. La plomberie de test
 
-**Un seul exécuteur, un seul arbre de tests dans 122 fichiers.**
+**Un seul exécuteur, un seul arbre de tests dans 123 fichiers.**
 
 ```
-npx vitest run     → tous passés, 122 fichiers
+npx vitest run     → tous passés, 123 fichiers
 ```
 
 Les deux arbres ont fusionné à plat à l'étape 2 : `netgain/tests/` a rejoint
@@ -605,7 +605,7 @@ même dossier, et c'est ce qui explique le pont ci-dessous.
 
 | Dialecte | Fichiers | Écrits en |
 |---|---|---|
-| CommonJS + ESM | 41 `.test.cjs` + 56 `.test.mjs` | `node:test` |
+| CommonJS + ESM | 41 `.test.cjs` + 57 `.test.mjs` | `node:test` |
 | TypeScript | 25 `.test.ts` | l'API de vitest |
 
 **L'extension dit désormais le régime, et c'est l'étape 3 qui l'a rendue
@@ -618,7 +618,7 @@ par un `git mv` pur ; les **3** derniers manipulaient `require.cache`, un
 mécanisme que le régime ESM rend inerte, et ont été réécrits en même temps que
 renommés — deux en `.test.mjs`, un en `.test.ts`.
 
-**Les 97 fichiers en `node:test` passent par un pont** (`test-support/bridge/`),
+**Les 98 fichiers en `node:test` passent par un pont** (`test-support/bridge/`),
 qui rend la surface `node:test` au-dessus des primitives de vitest. **L'addition,
 écrite pour qu'on puisse la refaire — et re-dérivée à l'étape 3, où l'ancienne
 version se contredisait elle-même** (elle totalisait 74 trois lignes sous un
@@ -674,10 +674,13 @@ manquante est ci-dessous, relevée après coup et non réécrite) :
 +1  15/09  bind-port.e2e.test.mjs   prise du port : occupé = rien tué et message, libre = écoute
 ――
 97
++1  15/09  relative-specifiers-exist.test.mjs   un import relatif d'un .ts de src/ ou tests/ désigne un fichier qui existe
+――
+98
 ```
 
 ```
-grep -rlE "(require\(|from )['\"]node:test['\"]" tests | wc -l   → 97
+grep -rlE "(require\(|from )['\"]node:test['\"]" tests | wc -l   → 98
 ```
 
 Le test du pont a la propriété amusante de passer par ce qu'il teste dès qu'on
@@ -729,7 +732,10 @@ echo "import x from './core/usage.js'" | grep -cE "from ['\"]\.[^'\"]*\.js['\"]"
 
 Le dialecte d'un test ne dépend donc plus de ce qu'il importe, seulement de l'API
 qu'il emploie : `tests/doctor/verification.test.ts` est un `.test.ts` parce qu'il
-écrit `import { test } from 'vitest'`. L'inverse — un `.test.ts` qui importe
+écrit `import { test } from 'vitest'`. Le filet `tests/repo/relative-specifiers-exist.test.mjs`
+le tient : dans un `.ts` de `src/` ou de `tests/`, un spécificateur relatif désigne un
+fichier qui existe, ce qui refuse le `./x.js` que vitest résout seul vers `./x.ts` et
+que Node ne résout pas. L'inverse — un `.test.ts` qui importe
 `node:test` — est un **hybride** : il se lit comme couvert par les deux et n'est
 lu que par un. Le dépôt n'en compte aucun
 (`grep -rlE "(require\(|from )['\"]node:test['\"]" tests --include="*.test.ts" | wc -l` → 0).
