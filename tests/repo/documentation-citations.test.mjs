@@ -17,6 +17,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import { commentPart } from '../helpers/comment-lines.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 
@@ -34,16 +35,6 @@ function sourceFiles(dir = ROOT, acc = []) {
     }
   }
   return acc;
-}
-
-// La part commentée d'une ligne : ligne de bloc (`*`, `/*`, `<!--`, `#`) prise
-// entière, sinon ce qui suit un `//` qui n'est pas celui d'une URL (`://`).
-function commentPart(line) {
-  const trimmed = line.trim();
-  if (/^(\*|\/\*|<!--|#)/.test(trimmed)) return trimmed;
-  const at = line.indexOf('//');
-  if (at > 0 && line[at - 1] === ':') return '';
-  return at === -1 ? '' : line.slice(at + 2);
 }
 
 const MARKDOWN_PATH = /(?:[A-Za-z0-9_.-]+\/)+[A-Za-z0-9_.-]+\.md\b/g;
