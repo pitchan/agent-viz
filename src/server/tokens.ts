@@ -18,7 +18,7 @@
 import { broadcastSSE } from './sse.ts';
 import { getPrice } from './pricing.ts';
 import { computeCost, normalizeModel, pricingKindOf } from '../engine/core/pricing.ts';
-import { addUsage, countOrZero, emptyUsageBucket, isDedupableMsgId } from '../engine/core/usage.ts';
+import { addUsage, countOrZero, emptyUsageBucket, isDedupableMsgId, usageVerdict } from '../engine/core/usage.ts';
 import type { UsageBucket } from '../engine/core/usage.ts';
 import type { RawUsage } from '../engine/core/events.ts';
 
@@ -138,13 +138,15 @@ function accumulateUsage(
   }
   // C3 : l'accumulation des six champs bruts, une seule définition.
   addUsage(bucket, raw);
-  // Track the most recent message's values. Transcript/hook events are parsed
-  // in chronological order, so "last wins" gives the current context size.
-  // Même garde que la primitive : sans elle, un message malformé donnerait
-  // `in: 0` mais `lastIn: "100"` — une incohérence à l'intérieur d'un seul seau.
-  bucket.lastIn = countOrZero(raw.input_tokens);
-  bucket.lastCacheCreate = countOrZero(raw.cache_creation_input_tokens);
-  bucket.lastCacheRead = countOrZero(raw.cache_read_input_tokens);
+  // Les champs « dernier message » font la taille de contexte courante, le dernier lu l'emporte.
+  // Un usage inexploitable n'en mesure aucune : la jauge garde la dernière mesure saine
+  // plutôt que de tomber à zéro ou de mêler les champs de deux messages.
+  const verdict = usageVerdict(usage);
+  if (verdict === 'sain') {
+    bucket.lastIn = countOrZero(raw.input_tokens);
+    bucket.lastCacheCreate = countOrZero(raw.cache_creation_input_tokens);
+    bucket.lastCacheRead = countOrZero(raw.cache_read_input_tokens);
+  }
   // Le coût s'accumule message par message, au barème en vigueur à la date `at` du message.
   // La nature du tarif vient de `pricingKindOf` : ni un montant nul (un modèle tarifé sans
   // jeton coûte 0 $) ni `getPrice`, réservé aux métadonnées d'affichage, ne la disent.

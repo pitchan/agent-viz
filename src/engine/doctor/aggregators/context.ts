@@ -240,7 +240,10 @@ export class ContextAggregator {
   }
 
   addAssistant(evt: AssistantEvent, agentKey: string): void {
-    if (evt.usage === null) return;
+    // Tout ce que calcule cet agrégateur se lit sur des usages sains : un champ inexploitable
+    // compté zéro inventerait une cassure de cache ou en masquerait une, et les écritures
+    // resteraient sur une autre base que les cassures auxquelles le rapport les compare.
+    if (evt.usage === null || evt.usageVerdict === 'malforme') return;
     if (isDedupableMsgId(evt.msgId)) {
       const key = `${agentKey}:${evt.msgId}`;
       if (this.seen.has(key)) return;

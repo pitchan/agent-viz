@@ -231,20 +231,46 @@ test('C3 — un champ qui n\'est pas un nombre fini vaut zéro, et le seau reste
   assert.equal(b.out, 15, 'les champs valides du même message sont comptés normalement');
 });
 
-test('C3 — la garde vaut AUSSI pour les champs « dernier message »', () => {
-  // Sans ça, un message malformé donnerait `in: 0` mais `lastIn: "100"` : une
-  // incohérence à l'intérieur d'un seul seau, et la taille de fenêtre de
-  // contexte affichée au pilote temps réel deviendrait une chaîne.
+// La taille de contexte est la mesure d'un seul message. Un usage inexploitable
+// n'en donne aucune : les champs « dernier message » gardent la dernière mesure
+// saine, au lieu de tomber à zéro ou de mêler les champs de deux messages.
+const USAGE_SAIN = { input_tokens: 10, output_tokens: 5, cache_creation_input_tokens: 500, cache_read_input_tokens: 50000 };
+const USAGE_INEXPLOITABLE = [
+  ['un non-objet', 'x'],
+  ['input_tokens en chaîne', { input_tokens: '100', output_tokens: 5, cache_creation_input_tokens: 700, cache_read_input_tokens: 50200 }],
+  ['cache_read_input_tokens en chaîne', { input_tokens: 11, output_tokens: 5, cache_creation_input_tokens: 700, cache_read_input_tokens: '50200' }],
+  ['output_tokens absent', { input_tokens: 11, cache_creation_input_tokens: 700, cache_read_input_tokens: 50200 }],
+];
+
+for (const [forme, brut] of USAGE_INEXPLOITABLE) {
+  test(`usage inexploitable (${forme}) : la taille de contexte garde la dernière mesure saine`, () => {
+    // Arrange
+    const b = newBucket();
+    accumulateUsage(b, USAGE_SAIN, 'claude-opus-4-8', 'm1');
+
+    // Act
+    accumulateUsage(b, brut, 'claude-opus-4-8', 'm2');
+
+    // Assert
+    assert.equal(b.lastIn, 10);
+    assert.equal(b.lastCacheCreate, 500);
+    assert.equal(b.lastCacheRead, 50000);
+  });
+}
+
+test('après un usage inexploitable, le message sain suivant redonne sa propre taille de contexte', () => {
   // Arrange
   const b = newBucket();
+  accumulateUsage(b, USAGE_SAIN, 'claude-opus-4-8', 'm1');
+  accumulateUsage(b, 'x', 'claude-opus-4-8', 'm2');
 
   // Act
-  accumulateUsage(b, { input_tokens: '100', cache_read_input_tokens: 7 });
+  accumulateUsage(b, { input_tokens: 12, output_tokens: 5, cache_creation_input_tokens: 800, cache_read_input_tokens: 50500 }, 'claude-opus-4-8', 'm3');
 
   // Assert
-  assert.equal(b.lastIn, 0);
-  assert.equal(typeof b.lastIn, 'number');
-  assert.equal(b.lastCacheRead, 7);
+  assert.equal(b.lastIn, 12);
+  assert.equal(b.lastCacheCreate, 800);
+  assert.equal(b.lastCacheRead, 50500);
 });
 
 // L'ARBITRAGE DE C3, verrouillé ici : un identifiant VIDE n'est pas un

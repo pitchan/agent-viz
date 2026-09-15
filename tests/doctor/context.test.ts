@@ -3,20 +3,21 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, describe, expect, test } from 'vitest';
 import type { NormalizedEvent, RawUsage, ToolUseRef } from '../../src/engine/core/events.ts';
+import type { UsageVerdict } from '../../src/engine/core/usage.ts';
 import { ContextAggregator, findClaudeMdFiles } from '../../src/engine/doctor/aggregators/context.ts';
 
 function assistant(
   msgId: string,
   usage: RawUsage,
   timestamp?: string,
-  opts?: { model?: string | null; toolUses?: ToolUseRef[]; cacheMissReason?: string },
+  opts?: { model?: string | null; toolUses?: ToolUseRef[]; cacheMissReason?: string; usageVerdict?: UsageVerdict },
 ): Extract<NormalizedEvent, { kind: 'assistant' }> {
   return {
     kind: 'assistant',
     msgId,
     model: opts?.model !== undefined ? opts.model : 'claude-opus-4-8',
     usage,
-    usageVerdict: 'sain',
+    usageVerdict: opts?.usageVerdict ?? 'sain',
     toolUses: opts?.toolUses ?? [],
     textChars: 0,
     ...(timestamp !== undefined ? { timestamp } : {}),
@@ -433,32 +434,77 @@ describe('ContextAggregator — mix des écritures de cache (cacheWrites)', () =
   });
 });
 
-// Un compteur brut qui n'est pas un nombre fini compte zéro, et un identifiant
-// vide n'est pas un identifiant : la lecture du champ usage est celle de TokensAggregator.
-describe('ContextAggregator — champ usage malformé', () => {
-  test.each([
-    ['chaîne numérique convertible', '100'],
-    ['1e999, lu par JSON.parse comme Infinity', 1e999],
-    ['NaN', NaN],
-    ['booléen', true],
-    ['tableau', [7]],
-    ['objet', {}],
-  ])('input_tokens = %s : compté zéro dans la taille de contexte', (_label, valeur) => {
+// Un usage inexploitable est écarté comme un usage absent : le tour suivant se compare
+// au dernier tour sain. Un identifiant vide n'est pas un identifiant.
+describe('ContextAggregator — usage inexploitable', () => {
+  const T0 = '2026-07-13T10:00:00.000Z';
+  const plus = (seconds: number): string => new Date(Date.parse(T0) + seconds * 1000).toISOString();
+  const malforme = { usageVerdict: 'malforme' } as const;
+
+  test('un cache_read_input_tokens inexploitable n’invente pas de cassure de préfixe', () => {
+    // Arrange
     const agg = new ContextAggregator();
-    agg.addAssistant(
-      assistant('m1', { input_tokens: valeur, cache_read_input_tokens: 13, cache_creation_input_tokens: 50, output_tokens: 1 } as never),
-      'main',
-    );
-    expect(agg.result().contextGrowth).toEqual({ first: 63, max: 63, last: 63 });
+    const events = [
+      assistant('m1', { input_tokens: 10, cache_creation_input_tokens: 50000, cache_read_input_tokens: 0, output_tokens: 1 }, T0),
+      assistant('m2', { input_tokens: 10, cache_creation_input_tokens: 20000, cache_read_input_tokens: '50000', output_tokens: 1 } as never, plus(30), malforme),
+      assistant('m3', { input_tokens: 10, cache_creation_input_tokens: 500, cache_read_input_tokens: 70000, output_tokens: 1 }, plus(60)),
+    ];
+
+    // Act
+    for (const evt of events) agg.addAssistant(evt, 'main');
+    const r = agg.result();
+
+    // Assert
+    expect(r.churnCauses.prefixChange.events).toBe(0);
+    expect(r.cacheChurnEvents).toBe(0);
   });
 
-  test('cache_creation_input_tokens en chaîne au deuxième tour : ni re-création, ni écriture de cache', () => {
+  test('un usage inexploitable ne masque pas la cassure du tour suivant : elle se compare au dernier tour sain', () => {
+    // Arrange
     const agg = new ContextAggregator();
-    agg.addAssistant(assistant('m1', { cache_creation_input_tokens: 50000 }), 'main');
-    agg.addAssistant(assistant('m2', { cache_creation_input_tokens: '300000', cache_read_input_tokens: 0 } as never), 'main');
+    const events = [
+      assistant('m1', { input_tokens: 10, cache_creation_input_tokens: 50000, cache_read_input_tokens: 0, output_tokens: 1 }, T0),
+      assistant('m2', { input_tokens: 10, cache_creation_input_tokens: 500, cache_read_input_tokens: '50000', output_tokens: 1 } as never, plus(30), malforme),
+      assistant('m3', { input_tokens: 10, cache_creation_input_tokens: 60000, cache_read_input_tokens: 0, output_tokens: 1 }, plus(60)),
+    ];
+
+    // Act
+    for (const evt of events) agg.addAssistant(evt, 'main');
     const r = agg.result();
-    expect(r.cacheChurnEvents).toBe(0);
-    expect(r.cacheChurnTokens).toBe(0);
+
+    // Assert
+    expect(r.churnCauses.prefixChange).toEqual({ events: 1, tokens: 60000 });
+  });
+
+  test('un usage inexploitable n’entre pas dans la croissance du contexte', () => {
+    // Arrange
+    const agg = new ContextAggregator();
+    const events = [
+      assistant('m1', { input_tokens: 10, cache_creation_input_tokens: 50000, cache_read_input_tokens: 0, output_tokens: 1 }, T0),
+      assistant('m2', { input_tokens: 10, cache_creation_input_tokens: 500, cache_read_input_tokens: '50000', output_tokens: 1 } as never, plus(30), malforme),
+    ];
+
+    // Act
+    for (const evt of events) agg.addAssistant(evt, 'main');
+    const r = agg.result();
+
+    // Assert
+    expect(r.contextGrowth).toEqual({ first: 50010, max: 50010, last: 50010 });
+  });
+
+  test('les écritures de cache d’un usage inexploitable ne sont pas comptées, comme ses cassures', () => {
+    // Arrange
+    const agg = new ContextAggregator();
+    const events = [
+      assistant('m1', { input_tokens: 10, cache_creation_input_tokens: 50000, cache_read_input_tokens: 0, output_tokens: 1 }, T0),
+      assistant('m2', { input_tokens: 10, cache_creation_input_tokens: 20000, cache_read_input_tokens: '50000', output_tokens: 1 } as never, plus(30), malforme),
+    ];
+
+    // Act
+    for (const evt of events) agg.addAssistant(evt, 'main');
+    const r = agg.result();
+
+    // Assert
     expect(r.cacheWrites).toEqual({ tokens5m: 0, tokens1h: 0, tokensUnknown: 50000 });
   });
 
