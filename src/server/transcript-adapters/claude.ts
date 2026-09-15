@@ -41,7 +41,8 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 }
 
 // Seule l'absence écarte une ligne : un `usage` qui n'est pas un objet (`0`, `"x"`)
-// va jusqu'à `accumulateUsage`, qui le compte zéro, au lieu de disparaître ici sans trace.
+// va jusqu'à `accumulateUsage`, qui le compte à part et rend la session partielle,
+// au lieu de disparaître ici sans trace.
 function isAbsent(v: unknown): v is undefined | null {
   return v === undefined || v === null;
 }

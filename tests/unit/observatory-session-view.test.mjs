@@ -89,7 +89,7 @@ test('a clean session does not list a line of zeros', () => {
   assert.ok(!lines.some(l => l.includes('non analysable')));
 });
 
-test('un message au usage inexploitable est signalé, avec ce qui manque aux jetons et au coût', () => {
+test('un message au usage inexploitable est signalé : les jetons et le coût réels peuvent être plus élevés', () => {
   // Arrange
   const report = { ...fullReport, tokens: { total: { cacheRead: 4000 }, malformedUsageMessages: 1 } };
 
@@ -97,7 +97,7 @@ test('un message au usage inexploitable est signalé, avec ce qui manque aux jet
   const lines = drillDownLines(report);
 
   // Assert
-  assert.ok(lines.includes('1 message au champ usage inexploitable — jetons et coût comptés sans lui'));
+  assert.ok(lines.includes('1 message au champ usage inexploitable — les jetons et le coût réels peuvent être plus élevés'));
 });
 
 test('plusieurs messages au usage inexploitable sont signalés au pluriel', () => {
@@ -108,7 +108,7 @@ test('plusieurs messages au usage inexploitable sont signalés au pluriel', () =
   const lines = drillDownLines(report);
 
   // Assert
-  assert.ok(lines.includes('3 messages au champ usage inexploitable — jetons et coût comptés sans eux'));
+  assert.ok(lines.includes('3 messages au champ usage inexploitable — les jetons et le coût réels peuvent être plus élevés'));
 });
 
 test('aucun message au usage inexploitable : aucune ligne n’en parle', () => {

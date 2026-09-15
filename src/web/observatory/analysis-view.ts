@@ -102,7 +102,7 @@ export function drillDownLines(report: SessionReport) {
   const malformed = report.tokens.malformedUsageMessages;
   if (malformed !== undefined && malformed > 0) {
     lines.push(`${malformed} message${malformed > 1 ? 's' : ''} au champ usage inexploitable`
-      + ` — jetons et coût comptés sans ${malformed > 1 ? 'eux' : 'lui'}`);
+      + ' — les jetons et le coût réels peuvent être plus élevés');
   }
   return lines;
 }

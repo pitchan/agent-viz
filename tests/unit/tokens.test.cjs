@@ -391,7 +391,7 @@ test('un message malformé (input_tokens: 1e999) entre deux messages sains ne po
   assert.equal(b.costComplete, false);
 });
 
-// Un usage inexploitable rend la session partielle : ses champs valent zéro, si bien que le
+// Un usage inexploitable rend la session partielle : ses champs inexploitables valent zéro, si bien que le
 // total de jetons et le coût ne sont plus que des bornes inférieures.
 const USAGE_MALFORME = [
   ['un non-objet', 0],

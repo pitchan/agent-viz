@@ -200,7 +200,7 @@ export function renderReport(r: DoctorReport): string {
   if (r.scan.unknownModels.length > 0) partialReasons.push(`modèles sans tarif : ${r.scan.unknownModels.join(', ')}`);
   if (r.scan.malformedUsageMessages > 0) {
     partialReasons.push(
-      `${fmtInt(r.scan.malformedUsageMessages)} message(s) au champ usage inexploitable, jetons et coût comptés sans eux`,
+      `${fmtInt(r.scan.malformedUsageMessages)} message(s) au champ usage inexploitable, les jetons et le coût réels peuvent être plus élevés`,
     );
   }
   const cost = r.totals.costComplete

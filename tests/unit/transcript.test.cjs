@@ -159,7 +159,7 @@ test('lines without usage payload return false and do not touch buckets', () => 
 });
 
 // Seule l'absence de `usage` écarte une ligne. Un `usage` qui n'est pas un objet
-// arrive jusqu'au seau, qui le compte zéro, au lieu de disparaître ici sans trace.
+// arrive jusqu'au seau, qui le compte à part, au lieu de disparaître ici sans trace.
 // Un test de vérité (`!usage`) écarterait aussi `0`, `false` et `""`.
 const USAGE_NON_OBJET = [
   ['fil principal', 'x',

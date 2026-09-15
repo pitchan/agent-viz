@@ -359,10 +359,10 @@ export function updateBudget() {
     `Cost (this session): ${formatCostBound(totalCost, cout.complete)}`,
     ...(cout.complete ? [] : [
       `${totalCost > 0 ? 'Coût PARTIEL' : 'Aucun message tarifé'} — ${costReasons(cout).join(' · ')}`,
-      // Un message au `usage` inexploitable manque aussi aux jetons : dire « les jetons sont
-      // comptés » serait faux dès qu'il y en a un.
+      // Un `usage` inexploitable touche aussi les jetons : « les jetons sont comptés »
+      // ne serait plus sûr dès qu'il y en a un.
       cout.malformedUsageMessages > 0
-        ? 'Jetons et coût réels sont au-dessus : les messages au champ usage inexploitable manquent aux deux.'
+        ? 'Les jetons et le coût réels peuvent être plus élevés.'
         : totalCost > 0
           ? 'Le coût réel est supérieur.'
           : 'Les jetons sont comptés ; le coût n’est pas calculable.',

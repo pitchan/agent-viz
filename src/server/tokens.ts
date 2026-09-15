@@ -69,8 +69,8 @@ function newBucket(): Bucket {
     // Complétude du coût, portée par le seau donc par l'enveloppe SSE : `costUsd` est une
     // BORNE INFÉRIEURE exacte, `costComplete: false` dit que le vrai coût est AU-DESSUS et
     // `unknownModels` dit lesquels manquent (un tableau : un Set sérialise en `{}`).
-    // `malformedUsageMessages` compte les messages au `usage` inexploitable : ceux-là manquent
-    // aux jetons comme au coût.
+    // `malformedUsageMessages` compte les messages au `usage` inexploitable : leurs champs
+    // inexploitables valent zéro, aux jetons comme au coût.
     costComplete: true, unknownModels: [], malformedUsageMessages: 0,
     // Set of Anthropic message ids already accumulated. Claude Code writes one
     // JSONL line per content block (thinking, text, tool_use) but every line
