@@ -201,7 +201,7 @@ The server purges old sessions on boot and every hour.
 
 ## Requirements
 
-- Node.js ≥ 24
+- Node.js `>=24.16.0 <25 || >=26.1.0`. On Windows, every earlier release (24.0–24.15, all of 25.x, 26.0.0) ships a libuv defect that randomly kills a Node process on any connection to 127.0.0.1 (libuv#5107, cherry-picked into Node 24.16.0 and 26.1.0). agent-viz opens one such connection per hook event and on every `start`, `status` and `stop`.
 - Claude Code installed and configured
 
 ## Development

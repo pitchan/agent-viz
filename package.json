@@ -9,7 +9,7 @@
   "main": "dist/server/server.js",
   "type": "module",
   "engines": {
-    "node": ">=24"
+    "node": ">=24.16.0 <25 || >=26.1.0"
   },
   "devDependencies": {
     "@types/node": "^24.13.4",

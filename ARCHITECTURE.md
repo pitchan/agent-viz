@@ -593,10 +593,10 @@ rapport avec le changement de langage. Le serveur, lui, est inchangé.
 
 ## 9. La plomberie de test
 
-**Un seul exécuteur, un seul arbre de tests dans 120 fichiers.**
+**Un seul exécuteur, un seul arbre de tests dans 121 fichiers.**
 
 ```
-npx vitest run     → tous passés, 120 fichiers
+npx vitest run     → tous passés, 121 fichiers
 ```
 
 Les deux arbres ont fusionné à plat à l'étape 2 : `netgain/tests/` a rejoint
@@ -605,7 +605,7 @@ même dossier, et c'est ce qui explique le pont ci-dessous.
 
 | Dialecte | Fichiers | Écrits en |
 |---|---|---|
-| CommonJS + ESM | 41 `.test.cjs` + 54 `.test.mjs` | `node:test` |
+| CommonJS + ESM | 41 `.test.cjs` + 55 `.test.mjs` | `node:test` |
 | TypeScript | 25 `.test.ts` | l'API de vitest |
 
 **L'extension dit désormais le régime, et c'est l'étape 3 qui l'a rendue
@@ -618,7 +618,7 @@ par un `git mv` pur ; les **3** derniers manipulaient `require.cache`, un
 mécanisme que le régime ESM rend inerte, et ont été réécrits en même temps que
 renommés — deux en `.test.mjs`, un en `.test.ts`.
 
-**Les 95 fichiers en `node:test` passent par un pont** (`test-support/bridge/`),
+**Les 96 fichiers en `node:test` passent par un pont** (`test-support/bridge/`),
 qui rend la surface `node:test` au-dessus des primitives de vitest. **L'addition,
 écrite pour qu'on puisse la refaire — et re-dérivée à l'étape 3, où l'ancienne
 version se contredisait elle-même** (elle totalisait 74 trois lignes sous un
@@ -668,10 +668,13 @@ manquante est ci-dessous, relevée après coup et non réécrite) :
 +1  14/09  lifecycle.e2e.test.mjs   start, status et stop sur de vrais processus et des ports de test
 ――
 95
++1  15/09  engines-readme-mirror.test.mjs   la plage de Node exigée, identique dans package.json, le lock et le README
+――
+96
 ```
 
 ```
-grep -rlE "(require\(|from )['\"]node:test['\"]" tests | wc -l   → 95
+grep -rlE "(require\(|from )['\"]node:test['\"]" tests | wc -l   → 96
 ```
 
 Le test du pont a la propriété amusante de passer par ce qu'il teste dès qu'on
