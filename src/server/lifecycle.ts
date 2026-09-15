@@ -186,35 +186,35 @@ async function start({ port = DEFAULT_PORT, foreground = false }: StartOptions =
   throw new Error(`agent-viz ${why} (pid ${pid}, port ${port}).\nLog tail:\n${tail}`);
 }
 
-async function stop({ port = DEFAULT_PORT }: PortOptions = {}) {
+type StopResult =
+  | { stopped: true; port: number }
+  | { stopped: false; port: number; why: 'nothing-listening' | 'still-answering' };
+
+// stop ne signale jamais un pid : le démon ne retire pas son fichier de pid en
+// mourant et Windows réattribue un pid en quelques secondes, donc le pid du
+// fichier peut désigner n'importe quel processus. La preuve d'arrêt est le port.
+async function stop({ port = DEFAULT_PORT }: PortOptions = {}): Promise<StopResult> {
   const rec = readPidFile();
   // Le fichier de pid dit où le démon écoute réellement : il l'emporte sur le
   // port demandé.
   const cible = rec ? rec.port : port;
-  const responsive = await probe(cible, 200);
-  let shutdownOk = false;
-  if (responsive) {
-    shutdownOk = await postShutdown(cible, 2000);
+  if (!(await probe(cible, 200))) {
+    removePidFile();
+    return { stopped: false, port: cible, why: 'nothing-listening' };
   }
-  if (rec && isPidAlive(rec.pid)) {
-    // Wait briefly for graceful exit.
-    const deadline = Date.now() + 2000;
-    while (Date.now() < deadline && isPidAlive(rec.pid)) {
-      await new Promise(r => setTimeout(r, 100));
+  // La réponse au POST ne prouve rien (un serveur étranger répond 200 aussi) :
+  // seul le port qui se tait compte.
+  await postShutdown(cible, 2000);
+  const deadline = Date.now() + 2000;
+  while (Date.now() < deadline) {
+    if (!(await probe(cible, 200))) {
+      removePidFile();
+      return { stopped: true, port: cible };
     }
-    if (isPidAlive(rec.pid)) {
-      try { process.kill(rec.pid, 'SIGTERM'); } catch {}
-      const hardDeadline = Date.now() + 2000;
-      while (Date.now() < hardDeadline && isPidAlive(rec.pid)) {
-        await new Promise(r => setTimeout(r, 100));
-      }
-      if (isPidAlive(rec.pid)) {
-        try { process.kill(rec.pid, 'SIGKILL'); } catch {}
-      }
-    }
+    await new Promise(r => setTimeout(r, 100));
   }
-  removePidFile();
-  return { stopped: shutdownOk || !!rec, port: cible, viaShutdown: shutdownOk };
+  // Rien n'a été arrêté : le fichier de pid reste tel quel.
+  return { stopped: false, port: cible, why: 'still-answering' };
 }
 
 export {

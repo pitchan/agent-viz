@@ -273,7 +273,17 @@ async function cmdStop(flags) {
   }
 
   if (res) {
-    console.log(`${c.ok('✓')} agent-viz stopped ${c.dim(`(port ${res.port}${res.viaShutdown ? ', graceful' : ', forced'}).`)}`);
+    if (res.stopped) {
+      console.log(`${c.ok('✓')} agent-viz stopped ${c.dim(`(port ${res.port}).`)}`);
+    } else if (res.why === 'nothing-listening') {
+      console.log(`agent-viz not running ${c.dim(`(port ${res.port} does not answer).`)}`);
+    } else {
+      console.error(`${c.err('✗')} port ${res.port} still answers after POST /shutdown. Nothing was killed.`);
+      console.error(`  Either it is not agent-viz, or the daemon did not exit. Find the process listening on port ${res.port} and stop it yourself:`);
+      console.error(`  Windows     : netstat -ano | findstr :${res.port}   then   taskkill /PID <pid> /F`);
+      console.error(`  macOS/Linux : lsof -iTCP:${res.port} -sTCP:LISTEN   then   kill <pid>`);
+      process.exitCode = 1;
+    }
   }
 }
 

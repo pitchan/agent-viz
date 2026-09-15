@@ -183,14 +183,15 @@ test('contrôle inverse : chaque cible du registre passe l\'analyse et uninstall
 
 // Faux lifecycle.js : chaque appel s'écrit dans un fichier à la racine du bac,
 // `undefined` en toutes lettres, que JSON.stringify effacerait sinon.
-const LIFECYCLE_ESPION = [
+const lifecycleEspion = resultatStop => [
   "import fs from 'node:fs';",
   "const consigne = (fn, args) => fs.appendFileSync(new URL('../../APPELS-lifecycle.jsonl', import.meta.url),",
   "  JSON.stringify({ fn, args }, (cle, valeur) => valeur === undefined ? '<undefined>' : valeur) + '\\n');",
   "export async function status(...args) { consigne('status', args); return { running: true, port: 1, log: 'journal' }; }",
-  "export async function stop(...args) { consigne('stop', args); return { stopped: true, port: 1, viaShutdown: true }; }",
+  `export async function stop(...args) { consigne('stop', args); return ${JSON.stringify(resultatStop)}; }`,
   "export async function start(...args) { consigne('start', args); return { alreadyRunning: true, pid: 1, port: 1 }; }",
 ].join('\n');
+const LIFECYCLE_ESPION = lifecycleEspion({ stopped: true, port: 1 });
 const INSTALL_HOOKS_VIDE = 'export function installedScopes() { return {}; }\n';
 
 function appelsLifecycle(racine) {
@@ -234,6 +235,26 @@ test('stop avec PORT=3334 : status et stop visent ce port', () => {
       { fn: 'status', args: [{ port: 3334 }] },
       { fn: 'stop', args: [{ port: 3334 }] },
     ]);
+  } finally {
+    nettoie(racine);
+  }
+});
+
+test('stop dont le port répond encore après POST /shutdown : sortie 1 et le message sur la sortie d\'erreur', () => {
+  // Arrange
+  const racine = nouvelleRacine(PREFIXE);
+  try {
+    const espion = lifecycleEspion({ stopped: false, port: 1, why: 'still-answering' });
+    ecrireDist(racine, { contenus: { 'server/lifecycle.js': espion } });
+
+    // Act
+    const r = lance(racine, ['stop', '--keep-hooks']);
+
+    // Assert
+    const sortie = `${r.stdout}${r.stderr}`;
+    assert.equal(r.status, 1, `code de sortie attendu 1, obtenu ${r.status} :\n${sortie}`);
+    assert.ok(r.stderr.includes('port 1 still answers after POST /shutdown. Nothing was killed.'),
+      `le message attendu manque sur la sortie d'erreur :\n${sortie}`);
   } finally {
     nettoie(racine);
   }

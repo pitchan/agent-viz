@@ -3,6 +3,7 @@
 // défaut remplacé par un port de test, pour ne jamais sonder ni arrêter un démon réel.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
 import net from 'node:net';
@@ -285,7 +286,7 @@ test('start dont le serveur vit sans écouter : rejette au bout de 3 s en disant
   }
 });
 
-test('stop sans fichier de pid vise le port demandé et y envoie POST /shutdown', async () => {
+test('stop sans fichier de pid vise le port demandé et y envoie POST /shutdown : le serveur qui ne sort pas n\'est pas dit arrêté', async () => {
   // Arrange
   const [port, portParDefaut] = await portsLibres(2);
   const montage = await chargeLifecycle({ portParDefaut });
@@ -295,7 +296,7 @@ test('stop sans fichier de pid vise le port demandé et y envoie POST /shutdown'
     const resultat = await montage.lifecycle.stop({ port });
 
     // Assert
-    assert.deepEqual(resultat, { stopped: true, port, viaShutdown: true });
+    assert.deepEqual(resultat, { stopped: false, port, why: 'still-answering' });
     assert.ok(demon.requetes.includes('POST /shutdown'), JSON.stringify(demon.requetes));
   } finally {
     await demon.ferme();
@@ -312,8 +313,52 @@ test('stop sans fichier de pid ni serveur sur le port demandé : rien n\'est arr
     const resultat = await montage.lifecycle.stop({ port });
 
     // Assert
-    assert.deepEqual(resultat, { stopped: false, port, viaShutdown: false });
+    assert.deepEqual(resultat, { stopped: false, port, why: 'nothing-listening' });
   } finally {
+    nettoie(montage);
+  }
+});
+
+test('stop ne signale jamais le pid du fichier : pid vivant mais port muet, rien n\'est tué et le fichier est retiré', async () => {
+  // Arrange
+  const [port, portParDefaut] = await portsLibres(2);
+  const montage = await chargeLifecycle({ portParDefaut });
+  const intrus = spawn(process.execPath, ['-e', 'setInterval(() => {}, 60000)'], { stdio: 'ignore' });
+  fs.writeFileSync(montage.lifecycle.PID_FILE, `${intrus.pid}\n${port}\n2026-01-01T00:00:00.000Z\n`);
+  try {
+    // Act
+    const resultat = await montage.lifecycle.stop();
+
+    // Assert
+    assert.deepEqual(resultat, { stopped: false, port, why: 'nothing-listening' });
+    assert.deepEqual({ exitCode: intrus.exitCode, signalCode: intrus.signalCode }, { exitCode: null, signalCode: null },
+      'le processus dont le pid figure dans le fichier ne devait pas être tué');
+    assert.equal(fs.existsSync(montage.lifecycle.PID_FILE), false, 'le fichier de pid périmé devait être retiré');
+  } finally {
+    intrus.kill();
+    nettoie(montage);
+  }
+});
+
+test('stop sur un port où un serveur étranger répond sans sortir : rien n\'est tué, le fichier de pid reste', async () => {
+  // Arrange
+  const [port, portParDefaut] = await portsLibres(2);
+  const montage = await chargeLifecycle({ portParDefaut });
+  const demon = await demonFactice(port);
+  const intrus = spawn(process.execPath, ['-e', 'setInterval(() => {}, 60000)'], { stdio: 'ignore' });
+  fs.writeFileSync(montage.lifecycle.PID_FILE, `${intrus.pid}\n${port}\n2026-01-01T00:00:00.000Z\n`);
+  try {
+    // Act
+    const resultat = await montage.lifecycle.stop();
+
+    // Assert
+    assert.deepEqual(resultat, { stopped: false, port, why: 'still-answering' });
+    assert.ok(demon.requetes.includes('POST /shutdown'), JSON.stringify(demon.requetes));
+    assert.deepEqual({ exitCode: intrus.exitCode, signalCode: intrus.signalCode }, { exitCode: null, signalCode: null });
+    assert.equal(fs.existsSync(montage.lifecycle.PID_FILE), true, 'rien n\'a été arrêté : le fichier de pid reste');
+  } finally {
+    intrus.kill();
+    await demon.ferme();
     nettoie(montage);
   }
 });
