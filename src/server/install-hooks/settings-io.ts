@@ -4,8 +4,8 @@
 // une index signature ouverte tolère le reste (un settings.json porte bien
 // d'autres clés que `hooks`).
 import fs from 'node:fs';
-import path from 'node:path';
 import { HOOK_TIMEOUT_SEC } from './types.ts';
+import { writeJsonAtomic } from './atomic-write.ts';
 
 export interface HookCommand {
   type: string;
@@ -61,8 +61,7 @@ export function readSettings(file: string): ClaudeSettings {
 }
 
 export function writeSettings(file: string, settings: ClaudeSettings): void {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, JSON.stringify(settings, null, 2) + '\n');
+  writeJsonAtomic(file, settings);
 }
 
 export function hasHookForEvent(settings: ClaudeSettings, event: string): boolean {

@@ -11,6 +11,7 @@ import { HOOK_TIMEOUT_SEC } from './types.ts';
 import { AGENT_CONFIG, GITIGNORE_EXTRAS, eventsFor } from './config.ts';
 import { resolveScope, resolveHookCommand, ensureGitignore, findProjectRoot, scanInstalled } from './scopes.ts';
 import { inPath, dirHasFiles } from './detect.ts';
+import { writeJsonAtomic } from './atomic-write.ts';
 
 interface CopilotHookEntry {
   type: string;
@@ -212,8 +213,7 @@ export function installCopilot({ scope, cwd, packageRoot }: AgentOpts = {}) {
            : missing.length ? 'installed' : 'updated';
   }
 
-  fs.mkdirSync(path.dirname(target.file), { recursive: true });
-  fs.writeFileSync(target.file, JSON.stringify(content, null, 2) + '\n');
+  writeJsonAtomic(target.file, content);
 
   let gitignore: { changed: boolean; reason?: string } | null = null;
   if (target.scope === 'local' && target.projectRoot) {
@@ -272,7 +272,7 @@ export function uninstallCopilot({ scope, cwd, packageRoot }: AgentOpts = {}) {
       if (Object.keys(kept).length > 0) {
         // Des entrées tierces coexistent : retrait chirurgical, on ne supprime
         // pas le fichier qui les porte.
-        fs.writeFileSync(t.file, JSON.stringify({ ...content, hooks: kept }, null, 2) + '\n');
+        writeJsonAtomic(t.file, { ...content, hooks: kept });
       } else {
         // Le fichier ne portait que nous : il s'en va. Plus de `catch {}` muet —
         // un retrait qui échoue ne doit pas s'annoncer « removed » (règle maison
