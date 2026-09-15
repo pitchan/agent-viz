@@ -33,7 +33,7 @@ interface SessionSummaryRow {
 interface SessionReport {
   sessionId: string;
   netTokens: number;
-  tokens: { total: { cacheRead: number } };
+  tokens: { total: { cacheRead: number }; malformedUsageMessages?: number };
   context: {
     cacheChurnTokens: number;
     churnCauses: { prefixChange: { tokens: number } };
@@ -97,6 +97,12 @@ export function drillDownLines(report: SessionReport) {
   if (report.parseErrors > 0) {
     const n = report.parseErrors;
     lines.push(`${n} ligne${n > 1 ? 's' : ''} non analysable${n > 1 ? 's' : ''}`);
+  }
+  // Absent d'un rapport stocké avant que le moteur ne compte ces messages : aucune ligne.
+  const malformed = report.tokens.malformedUsageMessages;
+  if (malformed !== undefined && malformed > 0) {
+    lines.push(`${malformed} message${malformed > 1 ? 's' : ''} au champ usage inexploitable`
+      + ` — jetons et coût comptés sans ${malformed > 1 ? 'eux' : 'lui'}`);
   }
   return lines;
 }

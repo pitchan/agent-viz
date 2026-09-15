@@ -26,6 +26,11 @@
 // 3 cases de marqueurs ; les cases systemChanged/toolsChanged/messagesChanged
 // (cache_miss_reason) resteraient à zéro sur toute session déjà en base, et la
 // carte R1 continuerait d'afficher « aucun marqueur journalisé » à tort.
-const SCAN_VERSION = 9;
+// v10 : usage inexploitable — costComplete est faux dès qu'un message porte un
+// champ usage inexploitable, le rapport en donne le compte
+// (tokens.malformedUsageMessages) et l'analyse du contexte écarte ce message ;
+// une ligne v9 dirait « complet » à tort et compterait ce message dans les
+// tailles et les cassures de contexte.
+const SCAN_VERSION = 10;
 
 export { SCAN_VERSION };

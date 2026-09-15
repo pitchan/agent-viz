@@ -59,6 +59,14 @@ writeSessionTree(
           isSidechain: true,
           agentId: 'aaa',
         }),
+        // Aucun champ exploitable : 0 jeton et 0 $, les chiffres ci-dessous ne bougent pas.
+        assistantLine({
+          msgId: 'msg_a2',
+          model: 'claude-haiku-4-5',
+          usage: { input_tokens: '7', output_tokens: '1' },
+          isSidechain: true,
+          agentId: 'aaa',
+        }),
       ],
       meta: { agentType: 'Explore' },
     },
@@ -74,6 +82,7 @@ describe('runDoctor bout-en-bout sur fixture', () => {
     expect(report.scan.parseErrors).toBe(1);
     expect(report.scan.otherEventTypes).toEqual({ 'queue-operation': 1 });
     expect(report.scan.unknownModels).toEqual(['claude-futur-9']);
+    expect(report.scan.malformedUsageMessages).toBe(1);
     expect(report.scan.clientVersions).toEqual(['2.1.201']);
 
     const proj = report.projects[0];
@@ -90,6 +99,8 @@ describe('runDoctor bout-en-bout sur fixture', () => {
     // opus msg_1 0.12575 + opus msg_2 0.0135 + haiku 0.00002 = 0.13927 ; futur-9 exclu (inconnu)
     expect(sess?.tokens.costUsd).toBeCloseTo(0.13927, 6);
     expect(sess?.tokens.costComplete).toBe(false);
+    // msg_a2 du sous-agent : un message au usage inexploitable, compté à part
+    expect(sess?.tokens.malformedUsageMessages).toBe(1);
 
     // métrique 2 : bande 2–30 Ko, recognizer vitest
     expect(sess?.toolResults.bySize.band).toEqual({ count: 1, bytes: 5000 });
@@ -121,6 +132,7 @@ describe('runDoctor bout-en-bout sur fixture', () => {
     expect(text).toContain('1 ligne(s) illisible(s)');
     expect(text).toContain('claude-futur-9');
     expect(text).toContain('partiel');
+    expect(text).toContain('1 message(s) au champ usage inexploitable');
     expect(text).not.toContain('saved'); // jamais de compteur « saved »
   });
 });

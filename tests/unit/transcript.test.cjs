@@ -189,6 +189,19 @@ for (const [forme, valeur, ligne, seau] of USAGE_NON_OBJET) {
     assert.equal(changed, true);
     assert.equal(seau(rec).in, 0);
   });
+
+  test(`${forme} : un usage ${JSON.stringify(valeur)} rend le coût partiel et se compte à part`, () => {
+    // Arrange
+    const rec = freshRec();
+    const line = JSON.stringify(ligne(valeur));
+
+    // Act
+    parseTranscriptEvent(line, rec);
+
+    // Assert
+    assert.equal(seau(rec).costComplete, false);
+    assert.equal(seau(rec).malformedUsageMessages, 1);
+  });
 }
 
 test('un usage null est écarté comme un usage absent : aucun seau ne bouge', () => {

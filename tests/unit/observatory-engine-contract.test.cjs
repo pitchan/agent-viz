@@ -61,6 +61,7 @@ test('the SessionReport shape the product consumes is present and typed', async 
   assert.equal(typeof r.netTokens, 'number');
   assert.equal(typeof r.tokens.costUsd, 'number');
   assert.equal(typeof r.tokens.costComplete, 'boolean');
+  assert.equal(typeof r.tokens.malformedUsageMessages, 'number');
   assert.equal(typeof r.tokens.total.cacheRead, 'number');
   assert.equal(typeof r.tokens.perModel, 'object');
   // perAgent holds SUBAGENTS ONLY — the main agent has its own bucket, and

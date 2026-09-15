@@ -196,9 +196,16 @@ export function renderReport(r: DoctorReport): string {
   }
   L.push('');
 
+  const partialReasons: string[] = [];
+  if (r.scan.unknownModels.length > 0) partialReasons.push(`modèles sans tarif : ${r.scan.unknownModels.join(', ')}`);
+  if (r.scan.malformedUsageMessages > 0) {
+    partialReasons.push(
+      `${fmtInt(r.scan.malformedUsageMessages)} message(s) au champ usage inexploitable, jetons et coût comptés sans eux`,
+    );
+  }
   const cost = r.totals.costComplete
     ? fmtUsd(r.totals.costUsd)
-    : `${fmtUsd(r.totals.costUsd)} (partiel ⚠ — modèles sans tarif : ${r.scan.unknownModels.join(', ')})`;
+    : `${fmtUsd(r.totals.costUsd)} (partiel ⚠ — ${partialReasons.join(' ; ')})`;
   L.push('TOKENS     (net = input + cache_creation + output ; cache_read exclu)');
   L.push(`           net : ${fmtInt(r.totals.netTokens)} tk · coût connu : ${cost}`);
   L.push('');

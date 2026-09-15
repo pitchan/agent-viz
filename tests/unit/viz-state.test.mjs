@@ -95,6 +95,50 @@ test('C4 — un seau SANS le champ compte comme complet (enveloppe additive)', (
   assert.deepEqual(r.unknownModels, []);
 });
 
+test('les messages au usage inexploitable s’additionnent sur tous les seaux', () => {
+  // Arrange
+  const seaux = [
+    { costComplete: false, unknownModels: [], malformedUsageMessages: 2 },
+    { costComplete: false, unknownModels: [], malformedUsageMessages: 1 },
+  ];
+
+  // Act
+  const r = costCompleteness(seaux);
+
+  // Assert
+  assert.equal(r.malformedUsageMessages, 3);
+});
+
+test('un seau sans le compte des messages inexploitables n’en ajoute aucun (enveloppe additive)', () => {
+  // Arrange
+  const seaux = [{ costUsd: 1.5 }, { costComplete: false, malformedUsageMessages: 1 }, null, undefined];
+
+  // Act
+  const r = costCompleteness(seaux);
+
+  // Assert
+  assert.equal(r.malformedUsageMessages, 1);
+});
+
+// Les raisons d'un coût partiel, dans l'ordre où la pastille et le panneau les listent.
+import { costReasons } from '../../src/web/viz-state.ts';
+
+test('un coût complet n’a aucune raison à afficher', () => {
+  assert.deepEqual(costReasons({ unknownModels: [], malformedUsageMessages: 0 }), []);
+});
+
+test('des messages au usage inexploitable sont une raison à eux seuls', () => {
+  assert.deepEqual(
+    costReasons({ unknownModels: [], malformedUsageMessages: 2 }),
+    ['2 message(s) au champ usage inexploitable']);
+});
+
+test('les deux raisons sont listées : les modèles sans tarif, puis les messages inexploitables', () => {
+  assert.deepEqual(
+    costReasons({ unknownModels: ['claude-opus-6', 'zzz-modele'], malformedUsageMessages: 1 }),
+    ['sans tarif : claude-opus-6, zzz-modele', '1 message(s) au champ usage inexploitable']);
+});
+
 // C4 — trois énoncés, trois vérités. Le troisième existe parce que
 // « au moins $0 » est vrai et ne prétend rien : quand RIEN n'est tarifé, il
 // faut avouer l'absence, pas produire une borne inutile.

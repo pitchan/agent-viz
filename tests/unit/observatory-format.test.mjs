@@ -50,7 +50,7 @@ test('the cost label always states how the figure was obtained', () => {
 test('a partially-priced recommendation says so, never a silent total', () => {
   assert.equal(
     costLabel({ estimatedCostUsd: 3, costBasis: 'jetons-mesures', evidence: { costComplete: false } }),
-    '3,00 $ — jetons mesurés (coût partiel : un modèle sans tarif connu)');
+    '3,00 $ — jetons mesurés (coût partiel : une part des messages n’a pas pu être tarifée)');
 });
 
 test('each basis block has a title that warns against comparing across blocks', () => {

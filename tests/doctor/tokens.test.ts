@@ -84,6 +84,7 @@ describe('TokensAggregator', () => {
     expect(r.costUsd).toBeCloseTo(0.066, 10);
     expect(r.costComplete).toBe(true);
     expect(r.unknownModels).toEqual([]);
+    expect(r.malformedUsageMessages).toBe(0);
   });
 
   test('modèle inconnu : tokens comptés, coût incomplet signalé, jamais un zéro silencieux', () => {
@@ -166,6 +167,51 @@ describe('TokensAggregator', () => {
     expect(r.costUsd).toBeCloseTo(0.05, 12);
   });
 
+  test('un usage non objet rend jetons et coût partiels et se compte à part, sans nommer de modèle', () => {
+    // Arrange
+    const agg = new TokensAggregator();
+    const nonObjet = assistant({ msgId: 'mx', usageVerdict: 'malforme' });
+    nonObjet.usage = null;
+
+    // Act
+    agg.addAssistant(nonObjet, 'main');
+    const r = agg.result();
+
+    // Assert
+    expect(r.costComplete).toBe(false);
+    expect(r.malformedUsageMessages).toBe(1);
+    expect(r.unknownModels).toEqual([]);
+  });
+
+  test('un message malformé écrit sur plusieurs lignes n’est compté qu’une fois', () => {
+    // Arrange
+    const agg = new TokensAggregator();
+    const evt = assistant({ msgId: 'md', usage: { input_tokens: -1, output_tokens: 5 }, usageVerdict: 'malforme' });
+    agg.addAssistant(evt, 'main');
+
+    // Act
+    agg.addAssistant(evt, 'main');
+    const r = agg.result();
+
+    // Assert
+    expect(r.malformedUsageMessages).toBe(1);
+  });
+
+  test('une ligne sans usage ne rend pas la session partielle', () => {
+    // Arrange
+    const agg = new TokensAggregator();
+    const sansUsage = assistant({ msgId: 'ma', usageVerdict: 'absent' });
+    sansUsage.usage = null;
+
+    // Act
+    agg.addAssistant(sansUsage, 'main');
+    const r = agg.result();
+
+    // Assert
+    expect(r.costComplete).toBe(true);
+    expect(r.malformedUsageMessages).toBe(0);
+  });
+
   test('un modèle à zéro voulu ne rend pas le coût partiel', () => {
     const agg = new TokensAggregator();
     agg.addAssistant(
@@ -189,6 +235,7 @@ describe('TokensAggregator', () => {
     const r = agg.result();
     expect(r.costComplete).toBe(true);
     expect(r.unknownModels).toEqual([]);
+    expect(r.malformedUsageMessages).toBe(0);
   });
 });
 
@@ -242,15 +289,20 @@ describe('TokensAggregator — coût par modèle (costByModel)', () => {
   });
 
   // Un message malformé sur un modèle tarifé ne doit poisonner ni costUsd ni
-  // costByModel pour le reste de la session : les deux restent finis, et
-  // costComplete reste vrai (ce message ne rend aucun modèle inconnu).
+  // costByModel pour le reste de la session : les deux restent finis. costComplete
+  // devient faux, parce que ce message n'est pas tarifé, sans nommer aucun modèle inconnu.
   test('un message malformé (input_tokens: 1e999) entre deux sains ne poisonne ni costUsd ni costByModel', () => {
     const agg = new TokensAggregator();
     const sain = { input_tokens: 1000, output_tokens: 2000 };
     agg.addAssistant(assistant({ msgId: 'm1', model: 'claude-opus-4-8', usage: sain }), 'main');
     const coutUnSain = agg.result().costUsd;
     agg.addAssistant(
-      assistant({ msgId: 'm2', model: 'claude-opus-4-8', usage: JSON.parse('{"input_tokens":1e999}') }),
+      assistant({
+        msgId: 'm2',
+        model: 'claude-opus-4-8',
+        usage: JSON.parse('{"input_tokens":1e999}'),
+        usageVerdict: 'malforme',
+      }),
       'main',
     );
     agg.addAssistant(assistant({ msgId: 'm3', model: 'claude-opus-4-8', usage: sain }), 'main');
@@ -258,6 +310,8 @@ describe('TokensAggregator — coût par modèle (costByModel)', () => {
     expect(Number.isFinite(r.costUsd)).toBe(true);
     expect(r.costUsd).toBeCloseTo(coutUnSain * 2, 12);
     expect(r.costByModel['claude-opus-4-8']?.usd).toBeCloseTo(coutUnSain * 2, 12);
-    expect(r.costComplete).toBe(true);
+    expect(r.costComplete).toBe(false);
+    expect(r.malformedUsageMessages).toBe(1);
+    expect(r.unknownModels).toEqual([]);
   });
 });

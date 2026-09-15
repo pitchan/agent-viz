@@ -51,9 +51,11 @@ export async function runDoctor(opts: DoctorOptions): Promise<DoctorReport> {
   const clientVersions = new Set<string>();
   let events = 0;
   let parseErrors = 0;
+  let malformedUsageMessages = 0;
   for (const s of all) {
     events += s.events;
     parseErrors += s.parseErrors;
+    malformedUsageMessages += s.tokens.malformedUsageMessages;
     for (const [t, n] of Object.entries(s.otherEventTypes)) otherEventTypes[t] = (otherEventTypes[t] ?? 0) + n;
     for (const m of s.tokens.unknownModels) unknownModels.add(m);
     for (const v of s.clientVersions) clientVersions.add(v);
@@ -72,6 +74,7 @@ export async function runDoctor(opts: DoctorOptions): Promise<DoctorReport> {
       skippedSessions: all.filter((s) => s.skipped !== undefined).length,
       events,
       parseErrors,
+      malformedUsageMessages,
       otherEventTypes,
       unknownModels: [...unknownModels].sort(),
       clientVersions: [...clientVersions].sort(),

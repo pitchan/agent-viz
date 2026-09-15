@@ -373,8 +373,8 @@ test('C4 — la complétude traverse l\'enveloppe SSE', () => {
 });
 
 // Un message malformé sur un modèle tarifé ne doit pas empoisonner
-// bucket.costUsd pour le reste de la session (branche distincte du modèle
-// inconnu, testé ci-dessus) : costComplete reste vrai, costUsd fini.
+// bucket.costUsd pour le reste de la session : costUsd reste fini et vaut le coût
+// des messages sains, et costComplete devient faux (ce message n'est pas tarifé).
 test('un message malformé (input_tokens: 1e999) entre deux messages sains ne poisonne pas costUsd', () => {
   const b = newBucket();
   const sain = { input_tokens: 1000, output_tokens: 500 };
@@ -388,5 +388,67 @@ test('un message malformé (input_tokens: 1e999) entre deux messages sains ne po
     Math.abs(b.costUsd - coutUnSain * 2) < 1e-9,
     `costUsd devrait valoir le coût des deux messages sains (${coutUnSain * 2}), obtenu ${b.costUsd}`,
   );
+  assert.equal(b.costComplete, false);
+});
+
+// Un usage inexploitable rend la session partielle : ses champs valent zéro, si bien que le
+// total de jetons et le coût ne sont plus que des bornes inférieures.
+const USAGE_MALFORME = [
+  ['un non-objet', 0],
+  ['une chaîne', 'x'],
+  ['output_tokens absent', { input_tokens: 1000 }],
+];
+
+for (const [forme, brut] of USAGE_MALFORME) {
+  test(`usage inexploitable (${forme}) : le coût devient partiel et le message est compté à part`, () => {
+    // Arrange
+    const b = newBucket();
+
+    // Act
+    accumulateUsage(b, brut, 'claude-sonnet-4-5', 'm1', AT);
+
+    // Assert
+    assert.equal(b.costComplete, false);
+    assert.equal(b.malformedUsageMessages, 1);
+    assert.deepEqual(b.unknownModels, []);
+  });
+}
+
+test('un message inexploitable écrit sur plusieurs lignes n’est compté qu’une fois', () => {
+  // Arrange
+  const b = newBucket();
+  accumulateUsage(b, 0, 'claude-sonnet-4-5', 'm1', AT);
+
+  // Act
+  accumulateUsage(b, 0, 'claude-sonnet-4-5', 'm1', AT);
+
+  // Assert
+  assert.equal(b.malformedUsageMessages, 1);
+});
+
+test('une ligne sans usage est ignorée : ni marqueur, ni modèle sans tarif', () => {
+  // Arrange
+  const b = newBucket();
+
+  // Act
+  accumulateUsage(b, undefined, 'claude-opus-6', 'm1', AT);
+
+  // Assert
   assert.equal(b.costComplete, true);
+  assert.equal(b.malformedUsageMessages, 0);
+  assert.deepEqual(b.unknownModels, []);
+});
+
+test('le compte des messages inexploitables traverse l’enveloppe SSE', () => {
+  // Arrange
+  const rec = {};
+  ensureTokens(rec);
+  accumulateUsage(rec.tokens.main, 'x', 'claude-opus-5', 'm1', AT);
+
+  // Act
+  const msg = tokensMessage('s1', rec);
+
+  // Assert
+  assert.equal(msg.main.malformedUsageMessages, 1);
+  assert.equal(msg.main.costComplete, false);
 });

@@ -36,7 +36,8 @@ netgain doctor --claude-dir <dir>    # autre racine (défaut ~/.claude)
    entrée + création de cache + sortie : la lecture de cache est exclue parce qu'elle est
    relue à chaque tour et croît mécaniquement avec la longueur de la session. Le coût est
    calculé au tarif du modèle réel de chaque message, à la date du message ; **un modèle sans
-   tarif connu donne un coût marqué « partiel », jamais un zéro silencieux**.
+   tarif connu donne un coût marqué « partiel », jamais un zéro silencieux**. Un message dont le
+   champ `usage` est inexploitable est compté à part et marque de même la session « partiel ».
 2. **Distribution des sorties d'outils** — par outil, par tranche de taille
    (< 2 Ko / 2–30 Ko / > 30 Ko), répétitivité par famille de commande, formats reconnus
    (vitest, jest, tsc, eslint, git, npm, pytest…) et **candidats au filtrage** : les sorties

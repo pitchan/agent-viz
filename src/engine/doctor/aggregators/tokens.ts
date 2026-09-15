@@ -31,9 +31,13 @@ export interface TokensResult {
   total: TokenBucket;
   /** Somme des messages dont le modèle est tarifé — la part CONNUE seulement. */
   costUsd: number;
-  /** false dès qu'un modèle inconnu a produit des tokens (le coût affiché est alors partiel). */
+  /** false dès qu'un modèle sans tarif a produit des jetons ou qu'un message porte un `usage`
+   *  inexploitable : `costUsd` est alors une borne inférieure, et dans le second cas les seaux
+   *  de jetons aussi. Le détail : `unknownModels` et `malformedUsageMessages`. */
   costComplete: boolean;
   unknownModels: string[];
+  /** Messages, après déduplication, dont le `usage` est inexploitable. */
+  malformedUsageMessages: number;
   /** Dollars par modèle. Mêmes clés que perModel. La somme des `usd` non nuls
    *  vaut costUsd, au centime. */
   costByModel: Record<string, ModelCost>;
@@ -52,9 +56,11 @@ export class TokensAggregator {
   private readonly costByModel: Record<string, ModelCost> = {};
   private cost = 0;
   private readonly unknown = new Set<string>();
+  private malformed = 0;
 
   addAssistant(evt: AssistantEvent, agentKey: string): void {
-    if (evt.usage === null) return;
+    // Sans `usage`, aucune mesure : la ligne est ignorée et ne rend pas la session partielle.
+    if (evt.usageVerdict === 'absent') return;
     // C3 : la règle de déduplication vient de la primitive commune. Le test
     // était `evt.msgId !== null`, qui déduplique aussi sur la CHAÎNE VIDE —
     // donc fusionnerait des messages distincts sans identifiant en un seul, et
@@ -64,6 +70,10 @@ export class TokensAggregator {
       if (this.seen.has(key)) return;
       this.seen.add(key);
     }
+    // Compté une fois par message, avant d'écarter un `usage` non objet : ce message n'apporte
+    // aucun jeton, mais jetons et coût de la session deviennent des bornes inférieures.
+    if (evt.usageVerdict === 'malforme') this.malformed += 1;
+    if (evt.usage === null) return;
     const bucket = agentKey === 'main' ? this.main : (this.perAgent[agentKey] ??= emptyBucket());
     addUsage(bucket, evt.usage);
 
@@ -94,8 +104,9 @@ export class TokensAggregator {
       perModel: this.perModel,
       total,
       costUsd: this.cost,
-      costComplete: this.unknown.size === 0,
+      costComplete: this.unknown.size === 0 && this.malformed === 0,
       unknownModels: [...this.unknown].sort(),
+      malformedUsageMessages: this.malformed,
       costByModel: this.costByModel,
     };
   }

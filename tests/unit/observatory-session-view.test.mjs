@@ -88,3 +88,36 @@ test('a clean session does not list a line of zeros', () => {
   assert.equal(lines.length, 1, 'only the tokens line remains');
   assert.ok(!lines.some(l => l.includes('non analysable')));
 });
+
+test('un message au usage inexploitable est signalé, avec ce qui manque aux jetons et au coût', () => {
+  // Arrange
+  const report = { ...fullReport, tokens: { total: { cacheRead: 4000 }, malformedUsageMessages: 1 } };
+
+  // Act
+  const lines = drillDownLines(report);
+
+  // Assert
+  assert.ok(lines.includes('1 message au champ usage inexploitable — jetons et coût comptés sans lui'));
+});
+
+test('plusieurs messages au usage inexploitable sont signalés au pluriel', () => {
+  // Arrange
+  const report = { ...fullReport, tokens: { total: { cacheRead: 4000 }, malformedUsageMessages: 3 } };
+
+  // Act
+  const lines = drillDownLines(report);
+
+  // Assert
+  assert.ok(lines.includes('3 messages au champ usage inexploitable — jetons et coût comptés sans eux'));
+});
+
+test('aucun message au usage inexploitable : aucune ligne n’en parle', () => {
+  // Arrange
+  const report = { ...fullReport, tokens: { total: { cacheRead: 4000 }, malformedUsageMessages: 0 } };
+
+  // Act
+  const lines = drillDownLines(report);
+
+  // Assert
+  assert.ok(!lines.some(l => l.includes('usage inexploitable')));
+});

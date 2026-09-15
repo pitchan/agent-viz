@@ -40,8 +40,9 @@ export const LERP_EPS_SCALE = 0.005;
 export const PULSE_FRAME_MS = 1000 / 20;
 
 // Un seau de jetons tel que le serveur l'envoie (SSE `tokens` ou GET /tokens).
-// `costComplete`/`unknownModels` portent la réserve C4 (costCompleteness plus
-// bas) : absents sur un seau d'un serveur antérieur, ce qui vaut complet.
+// `costComplete`, `unknownModels` et `malformedUsageMessages` portent la réserve sur le
+// coût (costCompleteness plus bas) : absents sur un seau d'un serveur antérieur, ce qui
+// vaut complet.
 export interface TokenBucket {
   in?: number;
   out?: number;
@@ -55,6 +56,7 @@ export interface TokenBucket {
   costUsd?: number;
   costComplete?: boolean;
   unknownModels?: string[];
+  malformedUsageMessages?: number;
 }
 
 // Un nœud du graphe (state.nodes) — construit par viz-layout.ts, lu par
@@ -299,16 +301,28 @@ export function tokenContext(t: TokenBucket | null | undefined) {
 //
 // Un seau SANS le champ (enveloppe d'un serveur antérieur, rejeu d'un ancien
 // instantané) compte comme complet : l'enveloppe SSE est additive, et
-// `undefined` n'est pas `false`.
+// `undefined` n'est pas `false`. Pour la même raison, un seau sans le compte des
+// messages au `usage` inexploitable n'en ajoute aucun.
 export function costCompleteness(buckets: (TokenBucket | null | undefined)[]) {
   const inconnus = new Set<string>();
   let complete = true;
+  let malformedUsageMessages = 0;
   for (const b of buckets) {
     if (!b) continue;
     if (b.costComplete === false) complete = false;
     for (const m of (b.unknownModels || [])) inconnus.add(m);
+    malformedUsageMessages += countOrZero(b.malformedUsageMessages);
   }
-  return { complete, unknownModels: [...inconnus].sort() };
+  return { complete, unknownModels: [...inconnus].sort(), malformedUsageMessages };
+}
+
+// Les raisons d'un coût partiel, en mots, pour la pastille et le panneau de détail :
+// chaque raison n'apparaît que si elle a eu lieu.
+export function costReasons(c: { unknownModels: string[]; malformedUsageMessages: number }): string[] {
+  const reasons: string[] = [];
+  if (c.unknownModels.length > 0) reasons.push(`sans tarif : ${c.unknownModels.join(', ')}`);
+  if (c.malformedUsageMessages > 0) reasons.push(`${c.malformedUsageMessages} message(s) au champ usage inexploitable`);
+  return reasons;
 }
 
 // Format USD cost — "$0.42", "$12.30", "$1.2k" for very large sessions.

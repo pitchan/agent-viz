@@ -69,6 +69,7 @@ export interface DoctorReport {
     skippedSessions: number;
     events: number;
     parseErrors: number;
+    malformedUsageMessages: number;
     otherEventTypes: Record<string, number>;
     unknownModels: string[];
     clientVersions: string[];

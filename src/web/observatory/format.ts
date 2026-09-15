@@ -130,15 +130,19 @@ const LEAD_QUANTITY_BY_RULE: Record<string, ((e: RecommendationEvidence) => stri
   R4: e => `${formatBytes(e.duplicateBytes ?? 0)} mesurés`,
 };
 
+// La preuve et le résumé ne portent que le booléen `costComplete`, pas sa raison (modèle
+// sans tarif ou message au `usage` inexploitable) : la phrase doit rester vraie pour les deux.
+const PARTIAL_COST_REASON = 'une part des messages n’a pas pu être tarifée';
+
 export function costLabel(rec: Recommendation) {
   if (rec.evidence.costComplete === false) {
     const lead = LEAD_QUANTITY_BY_RULE[rec.ruleId];
     if (lead) {
       return `${lead(rec.evidence)} — dollars incomplets (au moins ${formatUsd(rec.estimatedCostUsd)}`
-        + ' : un modèle sans tarif connu)';
+        + ` : ${PARTIAL_COST_REASON})`;
     }
     return `${formatUsd(rec.estimatedCostUsd)} — ${costBasisLabel(rec.costBasis)}`
-      + ' (coût partiel : un modèle sans tarif connu)';
+      + ` (coût partiel : ${PARTIAL_COST_REASON})`;
   }
   return `${formatUsd(rec.estimatedCostUsd)} — ${costBasisLabel(rec.costBasis)}`;
 }
@@ -242,7 +246,7 @@ export function summaryHeadline(summary: Summary | null | undefined) {
 
 export function summaryDetails(summary: Summary | null | undefined) {
   if (!summary) return '';
-  const partiel = summary.costComplete === false ? ' · coût partiel (un modèle sans tarif connu)' : '';
+  const partiel = summary.costComplete === false ? ` · coût partiel (${PARTIAL_COST_REASON})` : '';
   return `${formatTokens(summary.netTokens)} jetons nets · `
     + `${formatTokens(summary.cacheReadTokens)} relus depuis le cache · `
     + `prix : ${summary.priceSource}${partiel}`;

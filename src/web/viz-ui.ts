@@ -8,7 +8,7 @@
 
 import {
   COLORS, state, vis, markDirty, hexAlpha, esc,
-  formatTokens, tokenTotal, tokenContext, formatCost, formatCostBound, costCompleteness,
+  formatTokens, tokenTotal, tokenContext, formatCost, formatCostBound, costCompleteness, costReasons,
   agentIdFromNode,
   type VizNode, type TokenBucket, type TimelineEntry,
 } from './viz-state.ts';
@@ -203,7 +203,7 @@ function tokenCardsHTML(n: VizNode) {
   // barre du haut et un montant net de toute réserve dans le panneau de détail
   // cohabiteraient à un clic l'un de l'autre — le constat rouvert un cran plus
   // bas.
-  let cout: ReturnType<typeof costCompleteness> = { complete: true, unknownModels: [] };
+  let cout: ReturnType<typeof costCompleteness> = { complete: true, unknownModels: [], malformedUsageMessages: 0 };
   if (n.type === 'session') {
     // Session's cumulative = main + all subagents (useful for raw volume view).
     // Le cumul porte ses quatre compteurs poses a zero, la ou un seau venu du
@@ -241,7 +241,7 @@ function tokenCardsHTML(n: VizNode) {
     ? `<div class="meta-card"><div class="meta-label">Cost (cumul.)</div>`
       + `<div class="meta-value">${esc(formatCostBound(totalCost, cout.complete))}</div>`
       + (cout.complete ? ''
-        : `<div class="meta-sub">coût partiel — sans tarif : ${esc(cout.unknownModels.join(', '))}</div>`)
+        : `<div class="meta-sub">coût partiel — ${esc(costReasons(cout).join(' · '))}</div>`)
       + `</div>`
     : '';
   return `
@@ -358,12 +358,14 @@ export function updateBudget() {
       : `Context: ${ctxNow.toLocaleString()} tokens (fenêtre inconnue pour ce modèle)`,
     `Cost (this session): ${formatCostBound(totalCost, cout.complete)}`,
     ...(cout.complete ? [] : [
-      totalCost > 0
-        ? `Coût PARTIEL — modèles sans tarif connu : ${cout.unknownModels.join(', ')}`
-        : `Aucun modèle tarifé — sans tarif connu : ${cout.unknownModels.join(', ')}`,
-      totalCost > 0
-        ? 'Le coût réel est supérieur.'
-        : 'Les jetons sont comptés ; le coût n’est pas calculable.',
+      `${totalCost > 0 ? 'Coût PARTIEL' : 'Aucun message tarifé'} — ${costReasons(cout).join(' · ')}`,
+      // Un message au `usage` inexploitable manque aussi aux jetons : dire « les jetons sont
+      // comptés » serait faux dès qu'il y en a un.
+      cout.malformedUsageMessages > 0
+        ? 'Jetons et coût réels sont au-dessus : les messages au champ usage inexploitable manquent aux deux.'
+        : totalCost > 0
+          ? 'Le coût réel est supérieur.'
+          : 'Les jetons sont comptés ; le coût n’est pas calculable.',
     ]),
   ].join('\n');
   els.pill.hidden = false;

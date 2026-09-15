@@ -33,6 +33,7 @@ interface Bucket extends UsageBucket {
   costUsd: number;
   costComplete: boolean;
   unknownModels: string[];
+  malformedUsageMessages: number;
   _seenMsgIds: Set<string>;
 }
 
@@ -68,7 +69,9 @@ function newBucket(): Bucket {
     // Complétude du coût, portée par le seau donc par l'enveloppe SSE : `costUsd` est une
     // BORNE INFÉRIEURE exacte, `costComplete: false` dit que le vrai coût est AU-DESSUS et
     // `unknownModels` dit lesquels manquent (un tableau : un Set sérialise en `{}`).
-    costComplete: true, unknownModels: [],
+    // `malformedUsageMessages` compte les messages au `usage` inexploitable : ceux-là manquent
+    // aux jetons comme au coût.
+    costComplete: true, unknownModels: [], malformedUsageMessages: 0,
     // Set of Anthropic message ids already accumulated. Claude Code writes one
     // JSONL line per content block (thinking, text, tool_use) but every line
     // carries the same `usage` — without dedup the bucket sums it N times.
@@ -124,6 +127,9 @@ function accumulateUsage(
   // Un non-objet devient `{}`, ce que tous les champs optionnels de
   // `RawUsage` tolèrent déjà sans autre garde.
   const raw: RawUsage = (typeof usage === 'object' && usage !== null) ? usage as RawUsage : {};
+  // Sans `usage`, aucune mesure : la ligne est ignorée et ne rend pas la session partielle.
+  const verdict = usageVerdict(usage);
+  if (verdict === 'absent') return;
   // Idempotence by Anthropic message id — see _seenMsgIds note in newBucket.
   // Opt-in: callers without a stable id (e.g. legacy hooks) keep cumulating
   // as before.
@@ -136,12 +142,17 @@ function accumulateUsage(
     if (bucket._seenMsgIds.has(msgId)) return;
     bucket._seenMsgIds.add(msgId);
   }
+  // Compté une fois par message : ses champs inexploitables valent zéro, jetons et coût de la
+  // session deviennent des bornes inférieures.
+  if (verdict === 'malforme') {
+    bucket.malformedUsageMessages += 1;
+    bucket.costComplete = false;
+  }
   // C3 : l'accumulation des six champs bruts, une seule définition.
   addUsage(bucket, raw);
   // Les champs « dernier message » font la taille de contexte courante, le dernier lu l'emporte.
   // Un usage inexploitable n'en mesure aucune : la jauge garde la dernière mesure saine
   // plutôt que de tomber à zéro ou de mêler les champs de deux messages.
-  const verdict = usageVerdict(usage);
   if (verdict === 'sain') {
     bucket.lastIn = countOrZero(raw.input_tokens);
     bucket.lastCacheCreate = countOrZero(raw.cache_creation_input_tokens);
