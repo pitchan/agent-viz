@@ -593,10 +593,10 @@ rapport avec le changement de langage. Le serveur, lui, est inchangé.
 
 ## 9. La plomberie de test
 
-**Un seul exécuteur, un seul arbre de tests dans 123 fichiers.**
+**Un seul exécuteur, un seul arbre de tests dans 120 fichiers.**
 
 ```
-npx vitest run     → tous passés, 123 fichiers
+npx vitest run     → tous passés, 120 fichiers
 ```
 
 Les deux arbres ont fusionné à plat à l'étape 2 : `netgain/tests/` a rejoint
@@ -606,7 +606,7 @@ même dossier, et c'est ce qui explique le pont ci-dessous.
 | Dialecte | Fichiers | Écrits en |
 |---|---|---|
 | CommonJS + ESM | 41 `.test.cjs` + 54 `.test.mjs` | `node:test` |
-| TypeScript | 28 `.test.ts` | l'API de vitest |
+| TypeScript | 25 `.test.ts` | l'API de vitest |
 
 **L'extension dit désormais le régime, et c'est l'étape 3 qui l'a rendue
 nécessaire.** Sous une racine `"type": "module"`, un `.js` **est** un module ES :

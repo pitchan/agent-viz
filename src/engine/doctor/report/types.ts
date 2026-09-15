@@ -5,7 +5,6 @@ import type { SessionKind } from '../aggregators/session-kind.ts';
 import type { SubagentStats } from '../aggregators/subagents.ts';
 import type { TokensResult } from '../aggregators/tokens.ts';
 import type { ToolResultStats } from '../aggregators/tool-results.ts';
-import type { TurnsStats } from '../aggregators/turns.ts';
 import type { VerificationStats } from '../aggregators/verification.ts';
 
 /** Le contrat de sortie --json : des FAITS mesurés, jamais un gain projeté. */
@@ -29,8 +28,6 @@ export interface SessionReport {
   subagents: SubagentStats;
   context: ContextStats;
   prompts: PromptsStats;
-  /** Découpage « gain vécu » : la dépense rattachée à chaque question, classée par le détecteur du router. */
-  turns: TurnsStats;
   /** Queue non vérifiée (doc/41) : dernière vérification de la session et ce qui l'a suivie. */
   verification: VerificationStats;
   events: number;
@@ -52,21 +49,6 @@ export interface AggregateTotals {
   subagentSidecars: number;
   mapShapedPrompts: number;
   totalPrompts: number;
-  /** Tours « gain vécu » : questions humaines non-bruit, dont tirées par le détecteur du router. */
-  turns: number;
-  triggeredTurns: number;
-  /** Jetons nets des tours tirés / silencieux / non-attribuables — la base de la projection au rendu. */
-  triggeredNetTokens: number;
-  silentNetTokens: number;
-  turnsUnattributedNetTokens: number;
-  /** Gestes de graphe de l'AGENT (comportement-agent) : compte total puis composition par geste. */
-  agentGestureEvents: number;
-  agentGrepGestures: number;
-  agentBashGestures: number;
-  agentSpawnGestures: number;
-  /** Tours SANS question de graphe mais où l'agent a fait le geste — l'angle mort de v0.7.0, en tours et jetons nets. */
-  agentOnlyTurns: number;
-  agentOnlyNetTokens: number;
 }
 
 export interface ProjectReport {

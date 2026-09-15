@@ -1,12 +1,9 @@
 import { describe, expect, test } from 'vitest';
 import { emptyChurnCauses, emptyPauseBuckets, emptyPrefixBreakdown } from '../../src/engine/doctor/aggregators/context.js';
 import {
-  computeLivedGain,
   renderCacheWritesByMonth,
   renderChurnCauses,
   renderCounterfactual1h,
-  renderAgentBehavior,
-  renderLivedGain,
   renderPauseBuckets,
   renderPrefixAdvice,
   renderPrefixBreakdown,
@@ -240,136 +237,5 @@ describe('renderCounterfactual1h — rentabilité du cache 1 h (contrefactuel é
 
   test('aucune écriture 5 min ni expiration récupérable → null', () => {
     expect(renderCounterfactual1h({ recoverableTokens: 0, tokens5m: 0 })).toBeNull();
-  });
-});
-
-describe('computeLivedGain — projection J6, fourchette jamais un chiffre sec', () => {
-  test('aucun tour tiré → fourchette −6 %…−1,4 % (la taxe seule), verdict skip', () => {
-    const p = computeLivedGain(0, 1_000_000);
-    expect(p).not.toBeNull();
-    expect(p!.sharePct).toBe(0);
-    expect(p!.lowPct).toBeCloseTo(-6, 6);
-    expect(p!.highPct).toBeCloseTo(-1.4, 6);
-    expect(p!.verdict).toBe('skip');
-  });
-
-  test('moitié de la dépense dans les tours tirés → +21 %…+23,3 %, verdict install', () => {
-    const p = computeLivedGain(500_000, 1_000_000);
-    expect(p!.sharePct).toBe(50);
-    expect(p!.lowPct).toBeCloseTo(21, 6);
-    expect(p!.highPct).toBeCloseTo(23.3, 6);
-    expect(p!.verdict).toBe('install');
-  });
-
-  test('fourchette à cheval sur zéro → verdict uncertain', () => {
-    // s = 5 % : basse = 0,05×48 − 0,95×6 = −3,3 ; haute = 0,05×48 − 0,95×1,4 = +1,07.
-    const p = computeLivedGain(50_000, 1_000_000);
-    expect(p!.lowPct).toBeLessThan(0);
-    expect(p!.highPct).toBeGreaterThan(0);
-    expect(p!.verdict).toBe('uncertain');
-  });
-
-  test('dépense nulle → null (rien à projeter)', () => {
-    expect(computeLivedGain(0, 0)).toBeNull();
-  });
-});
-
-describe('renderLivedGain — section « gain vécu » par dépôt', () => {
-  test('affiche part des questions, part de la dépense, fourchette et hypothèses', () => {
-    const lines = renderLivedGain({
-      turns: 120,
-      triggeredTurns: 3,
-      triggeredNetTokens: 12_300,
-      totalNetTokens: 100_000,
-      unattributedNetTokens: 234,
-    });
-    expect(lines).not.toBeNull();
-    const s = lines!.join('\n');
-    expect(s).toContain('gain vécu (projection J6, pas une mesure)');
-    expect(s).toContain('questions qui tirent 3/120 (2,5 %)');
-    expect(s).toContain(`dépense des tours tirés ${n(12300)} tk (12,3 % du net)`);
-    expect(s).toContain('entre +0,6 % et +4,7 % du net → installer');
-    expect(s).toContain('hypothèses : −48 % (J6) sur les seuls tours tirés (minorant)');
-    expect(s).toContain('taxe de présence 1,4–6 % sur tout le reste');
-    expect(s).toContain(`non-attribuable ${n(234)} tk compté dans le reste`);
-    expect(s).toContain('sous-agent facturé à son tour de lancement');
-  });
-
-  test('fourchette négative → « sur ce profil, ne pas installer », écrit tel quel', () => {
-    const lines = renderLivedGain({
-      turns: 40,
-      triggeredTurns: 0,
-      triggeredNetTokens: 0,
-      totalNetTokens: 500_000,
-      unattributedNetTokens: 0,
-    });
-    const s = lines!.join('\n');
-    expect(s).toContain('questions qui tirent 0/40 (0,0 %)');
-    expect(s).toContain('entre −6,0 % et −1,4 % du net → sur ce profil, ne pas installer');
-  });
-
-  test('dépense nulle → null (pas de section)', () => {
-    expect(
-      renderLivedGain({ turns: 0, triggeredTurns: 0, triggeredNetTokens: 0, totalNetTokens: 0, unattributedNetTokens: 0 }),
-    ).toBeNull();
-  });
-});
-
-describe('renderAgentBehavior — section « comportement-agent » par dépôt', () => {
-  test('composition des gestes, tours agent-seuls, fourchette élargie étiquetée hypothèse', () => {
-    const lines = renderAgentBehavior({
-      gestureEvents: 12,
-      grep: 8,
-      bash: 3,
-      spawn: 1,
-      agentOnlyTurns: 5,
-      agentOnlyNetTokens: 10_000,
-      triggeredNetTokens: 12_300,
-      totalNetTokens: 100_000,
-    });
-    expect(lines).not.toBeNull();
-    const s = lines!.join('\n');
-    expect(s).toContain('comportement-agent : recherches d’imports faites à la main ×12');
-    expect(s).toContain('motif d’import via Grep ×8');
-    expect(s).toContain('via Bash ×3');
-    expect(s).toContain('sous-agent missionné graphe ×1');
-    expect(s).toContain(`dont tours SANS question de graphe : 5 tour(s) (${n(10000)} tk · 10,0 % du net)`);
-    expect(s).toContain('fourchette élargie (hypothèse : un routeur au geste transfère le −48 % J6 — étage NON construit, pas une mesure)');
-    // computeLivedGain(12 300 + 10 000, 100 000) : s = 22,3 % → +6,0 % / +9,6 %
-    expect(s).toContain('entre +6,0 % et +9,6 % du net → installer');
-  });
-
-  test('gestes uniquement sur des tours déjà tirés au prompt → pas de fourchette (rien de neuf à projeter)', () => {
-    const lines = renderAgentBehavior({
-      gestureEvents: 2,
-      grep: 2,
-      bash: 0,
-      spawn: 0,
-      agentOnlyTurns: 0,
-      agentOnlyNetTokens: 0,
-      triggeredNetTokens: 12_300,
-      totalNetTokens: 100_000,
-    });
-    const s = lines!.join('\n');
-    expect(s).toContain('recherches d’imports faites à la main ×2');
-    expect(s).toContain('motif d’import via Grep ×2');
-    expect(s).not.toContain('via Bash');
-    expect(s).not.toContain('fourchette élargie');
-    expect(s).toContain('dont tours SANS question de graphe : 0 tour(s)');
-  });
-
-  test('aucun geste → null (pas de section)', () => {
-    expect(
-      renderAgentBehavior({
-        gestureEvents: 0,
-        grep: 0,
-        bash: 0,
-        spawn: 0,
-        agentOnlyTurns: 0,
-        agentOnlyNetTokens: 0,
-        triggeredNetTokens: 0,
-        totalNetTokens: 100_000,
-      }),
-    ).toBeNull();
   });
 });

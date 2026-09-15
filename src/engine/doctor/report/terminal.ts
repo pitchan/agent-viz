@@ -176,112 +176,6 @@ export function renderCounterfactual1h(c: { recoverableTokens: number; tokens5m:
   );
 }
 
-/** Constantes J6 (j6-regret-oracle) : −48 % mesuré sur les tours à signal de graphe, taxe de présence +1,4 à +6 % (n.s.) ailleurs. */
-const J6_TRIGGERED_GAIN = 0.48;
-const J6_PRESENCE_TAX = { low: 0.014, high: 0.06 };
-
-export interface LivedGainProjection {
-  /** Part de la dépense nette partie dans les tours tirés, en % du net. */
-  sharePct: number;
-  /** Bornes de la fourchette de gain projeté, en % du net (négatif = netgain coûterait). */
-  lowPct: number;
-  highPct: number;
-  /** install : les deux bornes > 0 ; skip : les deux ≤ 0 ; uncertain : à cheval sur zéro. */
-  verdict: 'install' | 'skip' | 'uncertain';
-}
-
-/**
- * Projection « gain vécu » — jamais un chiffre sec, toujours une fourchette :
- * basse = s×48 % − (1−s)×6 % ; haute = s×48 % − (1−s)×1,4 %. Le −48 % appliqué
- * aux seuls tours tirés est un minorant (en J6 il était mesuré sessions
- * entières) ; la taxe est comptée sur 100 % du reste, non-attribuable inclus.
- */
-export function computeLivedGain(triggeredNetTokens: number, totalNetTokens: number): LivedGainProjection | null {
-  if (totalNetTokens <= 0) return null;
-  const share = triggeredNetTokens / totalNetTokens;
-  const lowPct = 100 * (share * J6_TRIGGERED_GAIN - (1 - share) * J6_PRESENCE_TAX.high);
-  const highPct = 100 * (share * J6_TRIGGERED_GAIN - (1 - share) * J6_PRESENCE_TAX.low);
-  const verdict = lowPct > 0 ? 'install' : highPct <= 0 ? 'skip' : 'uncertain';
-  return { sharePct: 100 * share, lowPct, highPct, verdict };
-}
-
-/** Pourcent à 1 décimale, signe typographique explicite pour les bornes (« +0,6 % » / « −6,0 % »). */
-function fmtPct1(x: number): string {
-  return `${Math.abs(x).toLocaleString('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} %`;
-}
-
-function fmtSignedPct1(x: number): string {
-  return `${x < 0 ? '−' : '+'}${fmtPct1(x)}`;
-}
-
-const LIVED_GAIN_VERDICT_LABELS: Record<LivedGainProjection['verdict'], string> = {
-  install: '→ installer',
-  skip: '→ sur ce profil, ne pas installer',
-  uncertain: '→ incertain (la fourchette chevauche zéro)',
-};
-
-/**
- * Section « gain vécu » d'un dépôt : 3 lignes (faits, fourchette, hypothèses).
- * La projection vit ICI, au rendu — le contrat --json n'expose que les comptes.
- */
-export function renderLivedGain(p: {
-  turns: number;
-  triggeredTurns: number;
-  triggeredNetTokens: number;
-  totalNetTokens: number;
-  unattributedNetTokens: number;
-}): string[] | null {
-  const proj = computeLivedGain(p.triggeredNetTokens, p.totalNetTokens);
-  if (proj === null) return null;
-  const questionPct = p.turns > 0 ? (100 * p.triggeredTurns) / p.turns : 0;
-  return [
-    `gain vécu (projection J6, pas une mesure) : questions qui tirent ${fmtInt(p.triggeredTurns)}/${fmtInt(p.turns)} (${fmtPct1(questionPct)}) · ` +
-      `dépense des tours tirés ${fmtInt(p.triggeredNetTokens)} tk (${fmtPct1(proj.sharePct)} du net)`,
-    `  projection : entre ${fmtSignedPct1(proj.lowPct)} et ${fmtSignedPct1(proj.highPct)} du net ${LIVED_GAIN_VERDICT_LABELS[proj.verdict]}`,
-    `  hypothèses : −48 % (J6) sur les seuls tours tirés (minorant) · taxe de présence 1,4–6 % sur tout le reste · ` +
-      `non-attribuable ${fmtInt(p.unattributedNetTokens)} tk compté dans le reste · sous-agent facturé à son tour de lancement`,
-  ];
-}
-
-/**
- * Section « comportement-agent » d'un dépôt : les gestes de graphe que l'AGENT
- * fait à la main (recherches d'imports), même quand l'humain ne demande rien —
- * l'angle mort du « gain vécu » v0.7.0. La fourchette élargie n'apparaît que si
- * des tours SANS question de graphe portent des gestes, et elle est étiquetée
- * pour ce qu'elle est : le routeur livré tire au prompt, pas au geste — l'étage
- * qui récupérerait ces tours n'existe pas.
- */
-export function renderAgentBehavior(p: {
-  gestureEvents: number;
-  grep: number;
-  bash: number;
-  spawn: number;
-  agentOnlyTurns: number;
-  agentOnlyNetTokens: number;
-  triggeredNetTokens: number;
-  totalNetTokens: number;
-}): string[] | null {
-  if (p.gestureEvents === 0) return null;
-  const kinds = [
-    p.grep > 0 ? `motif d’import via Grep ×${fmtInt(p.grep)}` : null,
-    p.bash > 0 ? `via Bash ×${fmtInt(p.bash)}` : null,
-    p.spawn > 0 ? `sous-agent missionné graphe ×${fmtInt(p.spawn)}` : null,
-  ].filter((s): s is string => s !== null);
-  const pct = p.totalNetTokens > 0 ? fmtPct1((100 * p.agentOnlyNetTokens) / p.totalNetTokens) : fmtPct1(0);
-  const lines = [
-    `comportement-agent : recherches d’imports faites à la main ×${fmtInt(p.gestureEvents)} (${kinds.join(' · ')})`,
-    `  dont tours SANS question de graphe : ${fmtInt(p.agentOnlyTurns)} tour(s) (${fmtInt(p.agentOnlyNetTokens)} tk · ${pct} du net)`,
-  ];
-  const proj = p.agentOnlyNetTokens > 0 ? computeLivedGain(p.triggeredNetTokens + p.agentOnlyNetTokens, p.totalNetTokens) : null;
-  if (proj !== null) {
-    lines.push(
-      `  fourchette élargie (hypothèse : un routeur au geste transfère le −48 % J6 — étage NON construit, pas une mesure) : ` +
-        `entre ${fmtSignedPct1(proj.lowPct)} et ${fmtSignedPct1(proj.highPct)} du net ${LIVED_GAIN_VERDICT_LABELS[proj.verdict]}`,
-    );
-  }
-  return lines;
-}
-
 /**
  * Rendu terminal : des faits, pas de compteur de gain. Les anomalies
  * (lignes illisibles, modèles sans tarif, types inconnus) sont TOUJOURS affichées.
@@ -425,25 +319,6 @@ export function renderReport(r: DoctorReport): string {
     for (const f of p.claudeMdFiles) {
       L.push(`    CLAUDE.md (état disque actuel, approximation) : ${f.path} — ${fmtKo(f.bytes)}`);
     }
-    const gainLines = renderLivedGain({
-      turns: p.totals.turns,
-      triggeredTurns: p.totals.triggeredTurns,
-      triggeredNetTokens: p.totals.triggeredNetTokens,
-      totalNetTokens: p.totals.netTokens,
-      unattributedNetTokens: p.totals.turnsUnattributedNetTokens,
-    });
-    if (gainLines !== null) for (const line of gainLines) L.push(`    ${line}`);
-    const behaviorLines = renderAgentBehavior({
-      gestureEvents: p.totals.agentGestureEvents,
-      grep: p.totals.agentGrepGestures,
-      bash: p.totals.agentBashGestures,
-      spawn: p.totals.agentSpawnGestures,
-      agentOnlyTurns: p.totals.agentOnlyTurns,
-      agentOnlyNetTokens: p.totals.agentOnlyNetTokens,
-      triggeredNetTokens: p.totals.triggeredNetTokens,
-      totalNetTokens: p.totals.netTokens,
-    });
-    if (behaviorLines !== null) for (const line of behaviorLines) L.push(`    ${line}`);
   }
   L.push('');
   return L.join('\n');

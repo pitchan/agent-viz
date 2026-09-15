@@ -233,7 +233,7 @@ export class ContextAggregator {
   private readonly noMarkerBreaks: Array<{ tokens: number; turn: number; isMain: boolean }> = [];
 
   /** Un prompt de l'agent principal ouvre un tour ; le bruit du harnais n'en
-   * ouvre pas (même règle que TurnsAggregator — une seule définition du tour). */
+   * ouvre pas. */
   addPrompt(evt: UserPromptEvent): void {
     if (isNoisePrompt(evt.text)) return;
     this.mainTurns += 1;

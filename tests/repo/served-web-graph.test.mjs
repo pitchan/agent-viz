@@ -17,7 +17,7 @@
 // par elles (`viz-errors.ts`, `viz-layout.ts`), et le test d'assiette le verrait.
 //
 // Analyse SYNTAXIQUE (API de `typescript`) : une expression reguliere lirait comme un
-// `import(` le motif francais `/\bqui\s+import(e|ent)\b/i` de `src/engine/doctor/detector.ts`.
+// `import(` une chaine ou un commentaire qui contient ce texte.
 //
 // Ce que ce filet ne prouve pas :
 //   - que les modules atteints tournent dans un navigateur : une API Node atteinte sans

@@ -107,17 +107,6 @@ describe('runDoctor bout-en-bout sur fixture', () => {
     expect(sess?.prompts.mapShapedCount).toBe(1);
     expect(sess?.prompts.corpus).toEqual([{ text: 'Où est définie la route des communes ?', category: 'where' }]);
 
-    // « gain vécu » : 1 tour silencieux (« où » ne tire pas le router), agent sans horodatage non-attribuable
-    expect(sess?.turns.turns).toBe(1);
-    expect(sess?.turns.triggered).toEqual({ turns: 0, netTokens: 0 });
-    expect(sess?.turns.silent).toEqual({ turns: 1, netTokens: 20667 });
-    expect(sess?.turns.unattributedNetTokens).toBe(12);
-    expect(sess?.turns.subagents).toEqual({ attributed: 0, unattributed: 1 });
-    // invariant de somme au niveau session : tirés + silencieux + non-attribuable = net
-    expect(sess !== undefined && sess.turns.silent.netTokens + sess.turns.unattributedNetTokens).toBe(sess?.netTokens);
-    expect(report.totals.turns).toBe(1);
-    expect(report.totals.triggeredNetTokens).toBe(0);
-
     // totaux
     expect(report.totals.sessions).toBe(1);
     expect(report.totals.costComplete).toBe(false);
@@ -133,10 +122,6 @@ describe('runDoctor bout-en-bout sur fixture', () => {
     expect(text).toContain('claude-futur-9');
     expect(text).toContain('partiel');
     expect(text).not.toContain('saved'); // jamais de compteur « saved »
-    // la projection est étiquetée comme telle, avec ses hypothèses ; ici 0 tour tiré → verdict négatif tel quel
-    expect(text).toContain('gain vécu (projection J6, pas une mesure)');
-    expect(text).toContain('entre −6,0 % et −1,4 % du net → sur ce profil, ne pas installer');
-    expect(text).toContain('hypothèses : −48 % (J6) sur les seuls tours tirés (minorant)');
   });
 });
 

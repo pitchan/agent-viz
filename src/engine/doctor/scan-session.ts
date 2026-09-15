@@ -10,7 +10,6 @@ import { SessionKindAggregator } from './aggregators/session-kind.ts';
 import { SubagentsAggregator } from './aggregators/subagents.ts';
 import { netTokens, TokensAggregator } from './aggregators/tokens.ts';
 import { ToolResultsAggregator } from './aggregators/tool-results.ts';
-import { TurnsAggregator } from './aggregators/turns.ts';
 import { VerificationAggregator } from './aggregators/verification.ts';
 import type { SessionReport } from './report/types.ts';
 
@@ -25,7 +24,6 @@ export async function scanSession(ref: SessionRef, maxPrompts: number): Promise<
   const subagents = new SubagentsAggregator();
   const context = new ContextAggregator();
   const prompts = new PromptsAggregator(maxPrompts);
-  const turns = new TurnsAggregator();
   const verification = new VerificationAggregator();
   const spawnSeen = new Set<string>();
   let events = 0;
@@ -54,12 +52,10 @@ export async function scanSession(ref: SessionRef, maxPrompts: number): Promise<
           case 'assistant':
             tokens.addAssistant(evt, agentKey);
             context.addAssistant(evt, agentKey);
-            turns.addAssistant(evt, agentKey);
             verification.addAssistant(evt, agentKey);
             for (const tu of evt.toolUses) {
               toolResults.registerToolUse(tu);
               reads.registerToolUse(tu);
-              turns.registerToolUse(tu, agentKey);
               // La même ligne assistant est répétée par content block : dédup des spawns par id.
               if (agentKey === 'main' && !spawnSeen.has(tu.id)) {
                 spawnSeen.add(tu.id);
@@ -78,7 +74,6 @@ export async function scanSession(ref: SessionRef, maxPrompts: number): Promise<
             if (agentKey === 'main') {
               clock.add(evt.timestamp);
               prompts.addPrompt(evt);
-              turns.addPrompt(evt);
               sessionKind.addPrompt(evt);
               context.addPrompt(evt);
             }
@@ -139,7 +134,6 @@ export async function scanSession(ref: SessionRef, maxPrompts: number): Promise<
     subagents: subagents.result(),
     context: context.result(),
     prompts: prompts.result(),
-    turns: turns.result(),
     verification: verification.result(),
     events,
     parseErrors,

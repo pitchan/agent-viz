@@ -81,15 +81,6 @@ const LISTE_BLANCHE = [
   { fichier: 'tests/unit/watchdog-alert-content.test.mjs', fragment: '"session_id" lib/server/observatory --stats', raison: 'commande rg SIMULEE dans un evenement : le test asserte le libelle de l alerte' },
   { fichier: 'tests/unit/watchdog-alert-content.test.mjs', fragment: "file_path: '/repo/lib/hook.js'", raison: 'chemin simule hors de ce depot' },
 
-  // DONNEES DE TEST — arbres ETRANGERS, decouverts par le balayage integral de
-  // `netgain/tests` fusionne dans `tests/`. Le plan ne les avait pas releves :
-  // son inventaire datait d avant la fusion.
-  { fichier: 'tests/doctor/agent-gestures.test.ts', fragment: 'lib/GristServer', raison: 'depot Grist : sujet simule d un geste d agent' },
-  { fichier: 'tests/doctor/agent-gestures.test.ts', fragment: 'app/server/lib/DocApi.ts', raison: 'depot Grist, idem' },
-  { fichier: 'tests/doctor/agent-gestures.test.ts', fragment: "@/lib/foo", raison: 'alias d un projet tiers, simule' },
-  { fichier: 'tests/doctor/turns.test.ts', fragment: 'lib/GristServer', raison: 'depot Grist : sujet simule (3 sites)' },
-  { fichier: 'tests/doctor/turns.test.ts', fragment: "@/lib/foo", raison: 'alias d un projet tiers, simule' },
-
   // RECITS HISTORIQUES DATES — la phrase nomme l adresse d AVANT, et la reecrire
   // la rendrait FAUSSE. Ce ne sont pas des citations perimees : ce sont des
   // citations DE la perimee.
@@ -176,10 +167,10 @@ test('aucune adresse d avant le deplacement ne subsiste hors liste blanche', () 
   const perimees = toutes.filter(o => !couvertePar(o));
 
   // Assert — l assiette est dite AVANT le verdict : un balayage qui ne lit
-  // rien passerait aussi, et ne prouverait rien. Plancher 25 = compte reel
-  // (27) moins une marge de 2 : plus bas, une purge legitime du registre
+  // rien passerait aussi, et ne prouverait rien. Plancher 18 = compte reel
+  // (20) moins une marge de 2 : plus bas, une purge legitime du registre
   // suffirait a rendre cette garde vide.
-  assert.ok(toutes.length >= 25, `assiette suspecte : ${toutes.length} occurrences vues, attendu >= 25`);
+  assert.ok(toutes.length >= 18, `assiette suspecte : ${toutes.length} occurrences vues, attendu >= 18`);
   assert.deepEqual(
     perimees.map(o => `${o.fichier}:${o.ligne} \u2192 ${o.texte.trim()}`),
     [],

@@ -93,17 +93,6 @@ function totalsOf(sessions: SessionReport[]): AggregateTotals {
     subagentSidecars: sum((s) => s.subagents.sidecarCount),
     mapShapedPrompts: sum((s) => s.prompts.mapShapedCount),
     totalPrompts: sum((s) => s.prompts.totalPrompts),
-    turns: sum((s) => s.turns.turns),
-    triggeredTurns: sum((s) => s.turns.triggered.turns),
-    triggeredNetTokens: sum((s) => s.turns.triggered.netTokens),
-    silentNetTokens: sum((s) => s.turns.silent.netTokens),
-    turnsUnattributedNetTokens: sum((s) => s.turns.unattributedNetTokens),
-    agentGestureEvents: sum((s) => s.turns.agentGraph.events),
-    agentGrepGestures: sum((s) => s.turns.agentGraph.byKind.grepImport),
-    agentBashGestures: sum((s) => s.turns.agentGraph.byKind.bashImport),
-    agentSpawnGestures: sum((s) => s.turns.agentGraph.byKind.spawnGraphPrompt),
-    agentOnlyTurns: sum((s) => s.turns.agentGraph.agentOnly.turns),
-    agentOnlyNetTokens: sum((s) => s.turns.agentGraph.agentOnly.netTokens),
   };
 }
 
