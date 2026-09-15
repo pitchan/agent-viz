@@ -7,14 +7,39 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { failureLine, projectLabel, failuresSummary, groupKey, groupAlerts, causeLabel, episodeLabel, panelAlerts } from '../../src/web/observatory/failures-format.ts';
 import { _DETECTOR_TYPES } from '../../src/engine/watchdog/detector.ts';
+import { readAlert } from '../../src/web/viz-alert-shape.ts';
 
-const base = {
-  type: 'loop', toolName: 'Bash', count: 4, subject: 'npm run build',
-  cwd: 'f:\\DEV\\Demo IA OPTIM\\SKILLS TOKEN SAVERS',
-  createdAt: Date.UTC(2026, 7, 7, 14, 42, 0),
-  occurrences: [{ failed: true }, { failed: true }, { failed: true }, { failed: null }],
-  tools: [],
-};
+const T0 = Date.UTC(2026, 7, 7, 14, 42, 0);
+
+// Une alerte complete, avec tous les champs qu'ecrit le detecteur : chaque
+// fixture ne declare que ce qui differe.
+const alerte = (sur = {}) => ({
+  id: 'loop:s1:Bash', type: 'loop', sessionId: 's1', toolName: 'Bash', count: 4,
+  createdAt: T0, message: 'Bash called 4 times with the same input in 15s',
+  agentId: '', agentType: '', subject: 'npm run build', occurrences: [], tools: [],
+  cwd: 'f:\\DEV\\Demo IA OPTIM\\SKILLS TOKEN SAVERS', standing: false, patternId: '',
+  acknowledged: false, ...sur,
+});
+const occurrences = (...issues) => issues.map((failed, i) => ({ ts: T0 + i * 5_000, toolUseId: `t${i}`, failed }));
+const outil = (toolName, subject) => ({ toolUseId: `u-${toolName}`, toolName, subject, startedAt: T0, agentId: '', agentType: '' });
+
+const base = alerte({ occurrences: occurrences(true, true, true, null) });
+
+const invocation = alerte({
+  id: 'badInvocation:s1:inv-bash-windows-path-unquoted', type: 'badInvocation', count: 1, subject: '',
+  message: 'Bash: unquoted Windows path', patternId: 'inv-bash-windows-path-unquoted',
+});
+
+// Le bloc ne recoit que ce que la porte d'entree du navigateur laisse passer :
+// une fixture qu'elle refuserait ferait passer un test sur une forme impossible.
+test('les fixtures de ce fichier ont la forme qu une alerte doit avoir pour entrer', () => {
+  // Arrange
+  const fixtures = [base, invocation];
+  // Act
+  const lues = fixtures.map(f => readAlert(f));
+  // Assert
+  assert.deepEqual(lues, fixtures);
+});
 
 test('le projet se nomme par son chemin reel, lettre de lecteur en majuscule', () => {
   assert.equal(projectLabel('f:\\DEV\\projet'), 'F:\\DEV\\projet');
@@ -29,12 +54,12 @@ test('une boucle en echec COMPTE, en francais, sans traduire le message anglais'
 });
 
 test('une boucle en partie en echec affiche son denominateur', () => {
-  const l = failureLine({ ...base, occurrences: [{ failed: true }, { failed: false }, { failed: false }, { failed: null }] });
+  const l = failureLine({ ...base, occurrences: occurrences(true, false, false, null) });
   assert.equal(l.headline, 'Bash · même commande 4×, 1 sur 4 en échec');
 });
 
 test('une boucle sans echec connu ne parle pas d echec', () => {
-  const l = failureLine({ ...base, occurrences: [{ failed: false }, { failed: false }, { failed: false }, { failed: null }] });
+  const l = failureLine({ ...base, occurrences: occurrences(false, false, false, null) });
   assert.equal(l.headline, 'Bash · même commande 4×');
 });
 
@@ -46,7 +71,7 @@ test('un orage d echecs se distingue d une boucle', () => {
 test('une session bloquee nomme ce qu elle attend', () => {
   const l = failureLine({
     ...base, type: 'stuck', toolName: '', count: 2, subject: '', occurrences: [],
-    tools: [{ toolName: 'Bash', subject: 'npm run build' }, { toolName: 'Read', subject: 'a.js' }],
+    tools: [outil('Bash', 'npm run build'), outil('Read', 'a.js')],
   });
   assert.equal(l.headline, 'Aucun événement · 2 outils encore en vol');
   assert.equal(l.subject, 'Bash · npm run build');
@@ -57,13 +82,9 @@ test('une session bloquee nomme ce qu elle attend', () => {
 test('une session bloquee sur un seul outil parle au singulier', () => {
   const l = failureLine({
     ...base, type: 'stuck', toolName: '', count: 1, subject: '', occurrences: [],
-    tools: [{ toolName: 'Bash', subject: 'npm run build' }],
+    tools: [outil('Bash', 'npm run build')],
   });
   assert.equal(l.headline, 'Aucun événement · 1 outil encore en vol');
-});
-
-test('un type inconnu se rend lisible plutot que vide', () => {
-  assert.equal(failureLine({ ...base, type: 'pricingDrift' }).headline, 'pricingDrift');
 });
 
 // ── Appel mal formé ────────────────────────────────────────────────────────
@@ -72,12 +93,8 @@ test('un type inconnu se rend lisible plutot que vide', () => {
 // et rien d'autre : ni la commande, ni le message d'erreur. C'est ce bloc qui
 // en fait une phrase. Traduire le `message` anglais serait la seule facon de
 // le voir diverger de ce que le detecteur a mesure, et ce `message` sert la
-// notification bureau, qui suit la langue du chrome.
-
-const invocation = {
-  ...base, type: 'badInvocation', toolName: 'Bash', count: 1, subject: '',
-  occurrences: [], patternId: 'inv-bash-windows-path-unquoted',
-};
+// notification bureau, qui suit la langue du chrome. La fixture `invocation`
+// est posee en tete de fichier, avec `base`.
 
 test('un appel mal forme dit LEQUEL, en francais, depuis le seul identifiant', () => {
   const l = failureLine(invocation);
@@ -131,14 +148,6 @@ test('la phrase du filet est celle qui sert quand la cause n est pas caracterise
   assert.doesNotMatch(l.headline, /réglage du poste de travail/);
 });
 
-test('une alerte d invocation amputee de son motif se rend quand meme', () => {
-  // Le journal ne regarde pas ce qu il relit : une ligne abimee mais encore
-  // analysable arrive jusqu ici. Un jet ferait afficher le bloc ENTIER vide.
-  const { patternId, ...ampute } = invocation;
-  assert.equal(failureLine(ampute).headline,
-    'Bash · appel mal formé : un réglage du poste de travail');
-});
-
 // ── Le filet : aucun detecteur ne peut arriver muet ────────────────────────
 //
 // Ce bloc est le SEUL endroit du produit ou une panne survit a la session
@@ -161,20 +170,6 @@ test('tout type d alerte du detecteur a sa formulation francaise', () => {
   }
 });
 
-// Le journal ne regarde pas ce qu'il relit : de la forme d'une alerte il ne
-// connait que `id` et `createdAt` (voir l'en-tete de src/server/watchdog/
-// journal.js), et une ligne abimee mais encore analysable traverse jusqu'ici.
-// Un jet dans cette fonction ne casserait pas une ligne : `loadFailures` avale
-// l'erreur, et le bloc entier s'affiche VIDE — indiscernable de « aucune
-// panne », le pire mode de panne d'un panneau de surveillance.
-//
-// Mutation attrapee : retirer les defauts `[]` de `occurrences` et `tools`.
-test('une alerte amputee de ses tableaux se rend quand meme, sans jeter', () => {
-  const ampute = { ...base, occurrences: undefined, tools: undefined };
-  assert.equal(failureLine(ampute).headline, 'Bash · même commande 4×');
-  assert.equal(failureLine({ ...ampute, type: 'stuck', count: 1 }).subject, '');
-});
-
 // Le bloc est la MEMOIRE des pannes, pas leur vivacite : sur 30 jours,
 // « non acquittees » et « en cours » sont deux choses differentes, et c'est la
 // pastille qui dit la seconde (`standing` -> activeIds, evenementiel ->
@@ -184,10 +179,10 @@ test('une alerte amputee de ses tableaux se rend quand meme, sans jeter', () => 
 // Mutation attrapee : remplacer le libelle par un quantificateur de vivacite.
 test('le resume compte les non acquittees, il ne prononce pas « en cours »', () => {
   assert.equal(failuresSummary([]), 'aucune');
-  assert.equal(failuresSummary([{ acknowledged: true }]), 'aucune');
-  assert.equal(failuresSummary([{ acknowledged: false }]), '1 non acquittée');
+  assert.equal(failuresSummary([alerte({ acknowledged: true })]), 'aucune');
+  assert.equal(failuresSummary([alerte({ acknowledged: false })]), '1 non acquittée');
   assert.equal(
-    failuresSummary([{ acknowledged: false }, { acknowledged: true }, { acknowledged: false }]),
+    failuresSummary([alerte({ acknowledged: false }), alerte({ acknowledged: true }), alerte({ acknowledged: false })]),
     '2 non acquittées',
   );
 });
@@ -205,16 +200,9 @@ test('panelAlerts ecarte les silences (stuck) et garde tout le reste', () => {
     base,
     { ...base, type: 'stuck', toolName: '', count: 1 },
     invocation,
-    // Un type de demain TRAVERSE : le filtre est nomme, jamais en creux — on
-    // n'ecarte que ce qu'on sait etre un etat, pas ce qu'on ne connait pas.
-    { ...base, type: 'unTypeDeDemain' },
+    { ...base, type: 'retryStorm' },
   ]);
-  assert.deepEqual(kept.map(a => a.type), ['loop', 'badInvocation', 'unTypeDeDemain']);
-});
-
-test('panelAlerts tolere une liste absente ou abimee, sans jeter', () => {
-  assert.deepEqual(panelAlerts(undefined), []);
-  assert.deepEqual(panelAlerts(null), []);
+  assert.deepEqual(kept.map(a => a.type), ['loop', 'badInvocation', 'retryStorm']);
 });
 
 // ── Regroupement par cause ─────────────────────────────────────────────────
@@ -248,11 +236,6 @@ test('les groupes a traiter passent devant, puis le plus recent', () => {
     ['retryStorm:Bash', 'badInvocation:inv-bash-windows-path-unquoted', 'loop:Bash']);
 });
 
-test('une liste absente ou abimee rend une liste vide, sans jeter', () => {
-  assert.deepEqual(groupAlerts(undefined), []);
-  assert.equal(groupAlerts([{ type: 'loop' }]).length, 1, 'une alerte sans champs se groupe quand meme');
-});
-
 // ── Libellés : la cause n emprunte jamais les chiffres d un episode ────────
 
 test('causeLabel nomme la cause, sans compter', () => {
@@ -281,8 +264,6 @@ test('causeLabel des autres types', () => {
     'Bash · échecs consécutifs');
   assert.equal(causeLabel(groupAlerts([{ ...base, type: 'stuck', toolName: '' }])[0]),
     'Aucun événement · outils encore en vol');
-  assert.equal(causeLabel(groupAlerts([{ ...base, type: 'pricingDrift' }])[0]),
-    'pricingDrift', 'un type inconnu se rend lisible plutot que vide');
 });
 
 test('episodeLabel dit les faits du seul episode', () => {
@@ -292,5 +273,4 @@ test('episodeLabel dit les faits du seul episode', () => {
   assert.equal(episodeLabel({ ...base, type: 'stuck', count: 1 }), '1 outil encore en vol');
   assert.equal(episodeLabel({ ...invocation, count: 3 }), '3 fois dans la session');
   assert.equal(episodeLabel(invocation), '', 'une premiere occurrence ne parle pas de repetition');
-  assert.equal(episodeLabel({ ...base, type: 'pricingDrift' }), '');
 });

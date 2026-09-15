@@ -75,5 +75,5 @@ export const REMEDES: Record<string, Remedy> = {
 
 export function remedyFor(alert: Pick<Alert, 'type' | 'patternId'>): Remedy {
   if (alert.type !== 'badInvocation') return null;
-  return REMEDES[alert.patternId ?? ''] ?? null;
+  return REMEDES[alert.patternId] ?? null;
 }

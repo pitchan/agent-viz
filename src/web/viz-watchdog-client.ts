@@ -115,33 +115,24 @@ export function getActiveAlerts(): LiveAlert[] {
 }
 
 export async function refreshAlerts() {
-  let payload;
+  // A read that failed is not evidence that all is well: the badge stays on
+  // what it already knew rather than blanking. A server gone, a non-200 and a
+  // body out of shape all throw from fetchAlerts and land in this catch.
+  let journal;
   try {
-    payload = await fetchAlerts({ days: 30 }, _fetch);
-  } catch { return; }            // server gone, or not a 200: the badge simply stops moving
-  // A read that failed is not evidence that all is well: leave the badge on
-  // what it already knew rather than blanking it. A 200 whose body cannot be
-  // parsed comes back as `null` — the shared client's contract — and counts as
-  // a failed read, not as an empty journal.
-  if (!payload) return;
-  // Both fields are read defensively, and not out of ceremony: neither
-  // `for...of` nor `new Set` tolerates a non-iterable, and nobody awaits this
-  // promise. A malformed 200 would therefore reject into nothing and stop the
-  // 30s refresh for good, without a word — the badge would go on showing
-  // whatever it last knew, looking perfectly healthy.
-  const journal = payload && Array.isArray(payload.alerts) ? payload.alerts : [];
-  const live = payload && Array.isArray(payload.activeIds) ? payload.activeIds : [];
+    journal = await fetchAlerts({ days: 30 }, _fetch);
+  } catch { return; }
   // L'etat affiche, PAS `liveServerAlerts()` a l'instant courant : la
   // difference entre les deux est precisement le retrait par expiration.
   const before = shownKeys;
-  const next = new Map();
-  for (const a of journal) {
-    if (!a || !a.id || a.acknowledged) continue;
+  const next = new Map<string, Alert>();
+  for (const a of journal.alerts) {
+    if (a.acknowledged) continue;
     const held = next.get(a.id);
     if (!held || a.createdAt > held.createdAt) next.set(a.id, a);
   }
   serverAlerts = next;
-  activeIds = new Set(live);
+  activeIds = new Set(journal.activeIds);
   const after = liveServerAlerts();
   // Only what the display would show gets announced, and only the first time.
   // This signal is what fires the desktop notification, and this function runs
@@ -168,7 +159,7 @@ export async function refreshAlerts() {
 // Pushed by the SSE stream the moment the server records something, so the
 // badge does not wait for the next poll.
 export function applyServerAlert(alert: Alert | null | undefined): void {
-  if (!alert || !alert.id) return;
+  if (!alert) return;
   const held = serverAlerts.get(alert.id);
   // Same rule as the refresh: of two incidents sharing an id, the latest one
   // is the one that speaks. A live stream can carry an alert built from an old

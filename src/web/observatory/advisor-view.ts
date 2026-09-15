@@ -175,11 +175,10 @@ async function loadFailures() {
   const node = document.getElementById('advisor-failures')!;
   const erreur = document.getElementById('advisor-failures-error')!;
   try {
-    // Le type non verifie de fetchAlerts (getJson, api.ts) est repris ici :
-    // c'est le point de lecture qui doit dire la vraie forme du payload.
-    const { alerts } = await api.fetchAlerts({ days: getState().periodDays }) as { alerts: Alert[] };
+    const { alerts, rejetees } = await api.fetchAlerts({ days: getState().periodDays });
     erreur.textContent = '';
     renderFailures(node, alerts, {
+      rejetees,
       onAckGroup: episodes => ackEpisodes(api, episodes).then(
         () => loadFailures(),
         // L'etat vrai d'abord, le message ensuite : recharge PUIS pose le

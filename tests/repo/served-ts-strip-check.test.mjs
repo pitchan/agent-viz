@@ -1,6 +1,6 @@
 // La doc Node dit que `stripTypeScriptTypes` n'est pas stable d'une version
-// à l'autre : ce test rejoue, sur les 31 vrais fichiers servis au navigateur
-// (28 modules + 3 primitives du moteur), le même retrait que le serveur.
+// à l'autre : ce test rejoue, sur les 32 vrais fichiers servis au navigateur
+// (29 modules + 3 primitives du moteur), le même retrait que le serveur.
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, statSync, readFileSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -50,10 +50,10 @@ const MODULES = webModules();
 const PRIMITIVES = enginePrimitives();
 const SERVED = [...MODULES, ...PRIMITIVES];
 
-test('la liste blanche sert exactement 31 fichiers (28 modules + 3 primitives du moteur)', () => {
-  assert.equal(MODULES.length, 28, `ASSIETTE : ${MODULES.length} module(s) .ts sous src/web, attendu 28.`);
+test('la liste blanche sert exactement 32 fichiers (29 modules + 3 primitives du moteur)', () => {
+  assert.equal(MODULES.length, 29, `ASSIETTE : ${MODULES.length} module(s) .ts sous src/web, attendu 29.`);
   assert.equal(PRIMITIVES.length, 3, `ASSIETTE : ${PRIMITIVES.length} primitive(s) du moteur en liste blanche, attendu 3.`);
-  assert.equal(SERVED.length, 31);
+  assert.equal(SERVED.length, 32);
 });
 
 test('aucun prefixe de route ne recouvre /src/engine/ : le filtre ci-dessus ne saute rien', () => {

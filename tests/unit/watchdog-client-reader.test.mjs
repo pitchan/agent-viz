@@ -25,11 +25,12 @@ import { pricingDriftAlert } from '../../src/web/viz-pricing-drift-alert.ts';
 const T = 1_700_000_000_000;
 const HOUR = 3_600_000;
 
-// Uniform alert shape, as the journal serves it back.
+// The full alert shape, as the journal serves it back: a line missing a field
+// does not get past the browser's entry check.
 const evt = (createdAt, id, extra = {}) => ({
-  id, type: 'loop', sessionId: 's', agentId: '', toolName: 'Bash',
-  createdAt, message: 'x', subject: 'npm run build',
-  occurrences: [], tools: [], cwd: 'f:\\p', standing: false,
+  id, type: 'loop', sessionId: 's', agentId: '', agentType: '', toolName: 'Bash',
+  count: 4, createdAt, message: 'x', subject: 'npm run build',
+  occurrences: [], tools: [], cwd: 'f:\\p', standing: false, patternId: '',
   acknowledged: false, ...extra,
 });
 // A state, not a moment: no expiry of its own, liveness comes from the server.
@@ -378,10 +379,9 @@ test('un serveur muet ne fait pas tomber la pastille', async () => {
 });
 
 test('un serveur qui repond n importe quoi ne casse pas la pastille', async () => {
-  // 200 avec une charge hors contrat. `for...of` sur un nombre et `new Set`
-  // d un nombre levent tous les deux, et personne n attend cette promesse :
-  // le rejet ne serait rattrape par rien, et le rafraichissement periodique
-  // s arreterait la, sans un mot.
+  // 200 avec une charge hors contrat. Le module de forme leve, et la lecture
+  // compte comme ratee : personne n attend cette promesse, un rejet non
+  // rattrape arreterait le rafraichissement periodique sans un mot.
   const mod = await import(`../../src/web/viz-watchdog-client.ts?t=${T}-charge-${Math.random().toString(36).slice(2)}`);
   await mod.initAlertReader({
     fetchImpl: async () => ({ ok: true, json: async () => ({ alerts: 5, activeIds: 7 }) }),
@@ -391,10 +391,9 @@ test('un serveur qui repond n importe quoi ne casse pas la pastille', async () =
 });
 
 test('une entree hors forme dans le journal ne casse pas la lecture', async () => {
-  // La garde par TABLEAU ne protege pas de ce qu il y a DEDANS. `null.id` leve,
-  // et personne n attend cette promesse : meme panne muette qu une charge hors
-  // contrat, une case plus bas. Une entree sans identifiant est aussi
-  // inutilisable — c est la moitie de la cle du journal.
+  // Le module de forme lit chaque ligne : `null`, `undefined` et une ligne
+  // sans ses champs sont ecartes, le reste du journal est lu. Une entree sans
+  // identifiant est inutilisable — c est la moitie de la cle du journal.
   const { mod } = await freshClient({
     alerts: [null, evt(T - 1000, 'a'), { createdAt: T - 1000 }, undefined],
   });

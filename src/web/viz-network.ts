@@ -14,6 +14,7 @@ import {
   pauseTick, resumeTick, markNarratorDirty,
 } from './viz-narrator.ts';
 import { raiseExternalAlert, applyServerAlert, refreshAlerts } from './viz-watchdog-client.ts';
+import { readAlert } from './viz-alert-shape.ts';
 import { pricingDriftAlert } from './viz-pricing-drift-alert.ts';
 import { connectionPresentation } from './viz-topbar-status.ts';
 import { resetErrors } from './viz-errors.ts';
@@ -131,9 +132,9 @@ export function connectSSE() {
       }
       // The server has just recorded a failure: show it without waiting for
       // the next poll. The journal stays the source of truth — this is only a
-      // display shortcut.
+      // display shortcut. A line out of shape reads as null and shows nothing.
       if (data.type === 'alert') {
-        applyServerAlert(data.alert);
+        applyServerAlert(readAlert(data.alert));
         return;
       }
       if (data.type === 'pricingDrift') {

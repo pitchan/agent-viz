@@ -96,6 +96,24 @@ test('rien que des stuck = le bloc dit « aucune panne », pas un bloc vide', ()
     'un bloc vide sans un mot serait indiscernable d un bug du panneau');
 });
 
+// Une ligne du journal hors forme est ecartee a l'entree du navigateur : elle
+// n'est dans aucun compte du bloc, qui dit combien il en a laisse de cote.
+test('la ligne des illisibles ne s affiche que s il y en a, avec son compte accorde', () => {
+  // Arrange
+  const comptes = [0, 1, 3];
+  // Act
+  const [sans, une, trois] = comptes.map(rejetees => {
+    const node = fauxElement('div');
+    renderFailures(node, [invocation()], { rejetees });
+    return node;
+  });
+  // Assert
+  assert.equal(parClasse(sans, 'failures-illisibles').length, 0, 'aucune ligne ecartee, rien a dire');
+  assert.equal(parClasse(une, 'failures-illisibles')[0].textContent, '1 ligne du journal illisible, non comptée');
+  assert.equal(parClasse(trois, 'failures-illisibles')[0].textContent, '3 lignes du journal illisibles, non comptées');
+  assert.equal(parClasse(trois, 'failure-group').length, 1, 'le reste du bloc se rend normalement');
+});
+
 test('le remede s affiche avec son extrait ; le filet n en a pas', () => {
   const node = fauxElement('div');
   renderFailures(node, [invocation()]);

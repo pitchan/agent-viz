@@ -2,6 +2,9 @@
 // server and turn a failure into a readable error; it holds no state and
 // formats nothing.
 
+import type { Alert } from '../../engine/watchdog/detector.ts';
+import { readAlertsPayload } from '../viz-alert-shape.ts';
+
 // `fetchImpl` n'est pas une commodité de test : la pastille de la page viz
 // appelle deux de ces routes avec SA propre couture (`initAlertReader`), et le
 // module ne doit pas dépendre en dur du `fetch` global pour autant (CLAUDE.md
@@ -86,9 +89,13 @@ export const fetchPricing = () => getJson('/pricing');
 // Le journal des pannes. Meme fenetre que les conseils : la page n'a qu'une
 // seule notion de periode, et le serveur retombe seul sur son defaut hors de la
 // table 7/30/90.
-export function fetchAlerts(opts: WindowOpts = {}, fetchImpl: typeof fetch = fetch) {
+//
+// Une reponse hors forme est une erreur lisible, comme une panne du serveur ;
+// une ligne hors forme est ecartee et comptee dans `rejetees`.
+export async function fetchAlerts(opts: WindowOpts = {}, fetchImpl: typeof fetch = fetch)
+  : Promise<{ alerts: Alert[]; rejetees: number; activeIds: string[] }> {
   const q = windowParams(opts).toString();
-  return getJson(`/alerts${q ? `?${q}` : ''}`, fetchImpl);
+  return readAlertsPayload(await getJson(`/alerts${q ? `?${q}` : ''}`, fetchImpl));
 }
 
 // L'acquittement d'UNE alerte du journal. La route est unitaire et validante

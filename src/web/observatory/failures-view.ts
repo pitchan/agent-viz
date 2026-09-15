@@ -31,7 +31,7 @@ const SANS_COMMANDE = 'commande non consignée (alerte ancienne)';
 // comme un bug du bloc.
 function commandes(alert: Alert): string[] {
   if (alert.type === 'stuck') {
-    return (Array.isArray(alert.tools) ? alert.tools : [])
+    return alert.tools
       .map(t => (t.subject ? `${t.toolName} · ${t.subject}` : t.toolName));
   }
   if (alert.subject) return [alert.subject];
@@ -124,10 +124,13 @@ function groupNode(group: AlertGroup, onAckGroup: ((episodes: Alert[]) => void) 
 }
 
 export interface RenderFailuresOptions {
+  // Les lignes du journal écartées à l'entrée parce qu'hors forme : elles ne
+  // sont dans aucun compte du bloc, et le bloc dit combien il en a laissé.
+  rejetees?: number;
   onAckGroup?: (episodes: Alert[]) => void;
 }
 
-export function renderFailures(node: HTMLElement, alerts: Alert[] | null | undefined, { onAckGroup }: RenderFailuresOptions = {}) {
+export function renderFailures(node: HTMLElement, alerts: Alert[], { rejetees = 0, onAckGroup }: RenderFailuresOptions = {}) {
   node.textContent = '';
   // Le filtre se pose ICI, a l'affichage, et nulle part en amont : le journal
   // continue de consigner les stuck (la pastille vivante les lit par la meme
@@ -139,6 +142,11 @@ export function renderFailures(node: HTMLElement, alerts: Alert[] | null | undef
   title.appendChild(el('span', enAttente ? 'failures-count' : 'failures-count is-quiet',
     failuresSummary(pannes)));
   node.appendChild(title);
+  if (rejetees > 0) {
+    const s = rejetees > 1 ? 's' : '';
+    node.appendChild(el('div', 'failures-illisibles',
+      `${rejetees} ligne${s} du journal illisible${s}, non comptée${s}`));
+  }
   if (pannes.length === 0) {
     node.appendChild(el('div', 'failures-empty',
       'Aucune panne sur la période. Ce bloc garde ce qui s’est produit même quand personne ne regardait.'));

@@ -11,8 +11,8 @@
 // src/web/observatory/analysis-view.js, dont la part testable est exportee nue
 // et la part DOM ne l'est pas.
 
-// Le journal (GET /alerts) rend l'alerte telle que le détecteur l'a écrite :
-// ce fichier en lit le type à la source.
+// Les alertes arrivent vérifiées par viz-alert-shape.ts, à l'entrée du
+// navigateur : ce fichier lit le type du détecteur et ne regarde plus la forme.
 import type { Alert, AlertType } from '../../engine/watchdog/detector.ts';
 
 // Une cause (groupKey) et ses episodes, du plus recent au plus ancien.
@@ -32,18 +32,6 @@ export function projectLabel(cwd: string | null | undefined): string {
   if (!cwd) return 'projet inconnu';
   return cwd.replace(/^([a-z]):/, (_, d) => `${d.toUpperCase()}:`);
 }
-
-// `occurrences` et `tools` sont TOUJOURS des tableaux chez le detecteur (voir
-// src/engine/watchdog/detector.ts, au-dessus de makeAlert). Mais ces alertes-ci ne viennent pas du
-// detecteur : elles reviennent du journal, qui de leur forme ne connait que
-// `id` et `createdAt` et laisse passer tout le reste sans le regarder. Une
-// ligne abimee mais encore analysable arrive donc ici telle quelle.
-//
-// Le defaut n'est pas de la prudence decorative : `loadFailures` avale
-// l'erreur, si bien qu'un jet ici n'abimerait pas une ligne mais afficherait le
-// bloc ENTIER vide — indiscernable de « aucune panne » sur le seul panneau
-// charge de dire qu'il y en a eu.
-function listeDe<T>(v: T[] | null | undefined): T[] { return Array.isArray(v) ? v : []; }
 
 // Ce qu'on peut honnetement dire des issues : un compte, jamais un
 // quantificateur. L'alerte se leve SUR l'appel qui se repete, dont l'issue
@@ -99,41 +87,37 @@ const MOTIFS: Record<string, string> = {
 // La table des motifs (src/engine/watchdog/invocation-patterns.ts) grandit a chaque cas
 // rencontre, et elle n'a aucune raison d'attendre ce fichier-ci pour le faire.
 // Un motif encore inconnu doit donc dire ce qu'on sait vraiment — qu'il y a un
-// reglage a poser — plutot que de laisser un trou dans la phrase. Meme parti
-// que le repli sur le type d'alerte plus bas : une ligne muette dans un tableau
-// de bord se lit comme un bug de l'outil.
+// reglage a poser — plutot que de laisser un trou dans la phrase : une ligne
+// muette dans un tableau de bord se lit comme un bug de l'outil.
 const REGLAGE_INCONNU = 'un réglage du poste de travail';
 
 // Le detecteur compte des la premiere occurrence — c'est son role. Mais « 1
 // fois dans la session » n'apprend rien et occupe la ligne : le compte ne se
 // dit qu'a partir du moment ou il distingue quelque chose.
-const repetitionNote = (count: number | undefined) => ((count ?? 0) > 1 ? `, ${count} fois dans la session` : '');
+const repetitionNote = (count: number) => (count > 1 ? `, ${count} fois dans la session` : '');
 
 const HEADLINES: Record<AlertType, (a: Alert) => string> = {
-  loop: a => `${a.toolName} · même commande ${a.count}×${failureNote(listeDe(a.occurrences))}`,
+  loop: a => `${a.toolName} · même commande ${a.count}×${failureNote(a.occurrences)}`,
   retryStorm: a => `${a.toolName} · ${a.count} échecs consécutifs`,
-  stuck: a => `Aucun événement · ${a.count} outil${(a.count ?? 0) > 1 ? 's' : ''} encore en vol`,
+  stuck: a => `Aucun événement · ${a.count} outil${a.count > 1 ? 's' : ''} encore en vol`,
   badInvocation: a =>
-    `${a.toolName} · appel mal formé : ${MOTIFS[a.patternId ?? ''] || REGLAGE_INCONNU}`
+    `${a.toolName} · appel mal formé : ${MOTIFS[a.patternId] || REGLAGE_INCONNU}`
     + repetitionNote(a.count),
 };
 
 function subjectOf(alert: Alert) {
   if (alert.type === 'stuck') {
-    const first = listeDe(alert.tools)[0];
+    const first = alert.tools[0];
     return first ? `${first.toolName} · ${first.subject}` : '';
   }
-  return alert.subject || '';
+  return alert.subject;
 }
 
 export function failureLine(alert: Alert) {
-  const build = HEADLINES[alert.type];
   return {
     time: alert.createdAt,
     project: projectLabel(alert.cwd),
-    // Un type inconnu se rend lisible plutot que vide : une ligne muette dans
-    // un tableau de bord se lit comme un bug de l'outil.
-    headline: build ? build(alert) : String(alert.type),
+    headline: HEADLINES[alert.type](alert),
     subject: subjectOf(alert),
   };
 }
@@ -149,8 +133,8 @@ export function failureLine(alert: Alert) {
 // rejouerait la confusion que la tache 9 a paye pour trancher.
 //
 // Donc un compte, et le mot exact de ce qui est compte.
-export function failuresSummary(alerts: Alert[] | null | undefined) {
-  const n = listeDe(alerts).filter(a => !a.acknowledged).length;
+export function failuresSummary(alerts: Alert[]) {
+  const n = alerts.filter(a => !a.acknowledged).length;
   if (n === 0) return 'aucune';
   return `${n} non acquittée${n > 1 ? 's' : ''}`;
 }
@@ -165,13 +149,13 @@ export function failuresSummary(alerts: Alert[] | null | undefined) {
 // en prod le 2026-08-20. Un etat qui se resout seul n'est pas une dette du
 // lecteur : il n'a pas a reclamer d'acquittement.
 //
-// Le filtre est NOMME, jamais en creux : seul `stuck` est ecarte. Un type de
-// demain traverse — le filet « tout detecteur arrive avec sa phrase » ne
-// protege que ce qui s'affiche. Et les formulations stuck restent dans les
-// tables ci-dessus : le contrat se verifie des deux cotes du detecteur, et le
-// jour ou cette decision se rejoue, tout est encore la.
-export function panelAlerts(alerts: Alert[] | null | undefined) {
-  return listeDe(alerts).filter(a => a.type !== 'stuck');
+// Le filtre est NOMME, jamais en creux : seul `stuck` est ecarte, et un
+// detecteur ajoute demain s'affiche sans toucher a ce filtre. Et les
+// formulations stuck restent dans les tables ci-dessus : le contrat se verifie
+// des deux cotes du detecteur, et le jour ou cette decision se rejoue, tout est
+// encore la.
+export function panelAlerts(alerts: Alert[]) {
+  return alerts.filter(a => a.type !== 'stuck');
 }
 
 // ── Regroupement par cause ─────────────────────────────────────────────────
@@ -183,26 +167,26 @@ export function panelAlerts(alerts: Alert[] | null | undefined) {
 // les silences.
 
 export function groupKey(alert: Alert): string {
-  if (alert.type === 'badInvocation') return `badInvocation:${alert.patternId || ''}`;
+  if (alert.type === 'badInvocation') return `badInvocation:${alert.patternId}`;
   if (alert.type === 'stuck') return 'stuck';
-  return `${alert.type}:${alert.toolName || ''}`;
+  return `${alert.type}:${alert.toolName}`;
 }
 
-export function groupAlerts(alerts: Alert[] | null | undefined): AlertGroup[] {
+export function groupAlerts(alerts: Alert[]): AlertGroup[] {
   const parClef = new Map<string, Alert[]>();
-  for (const a of listeDe(alerts)) {
+  for (const a of alerts) {
     const key = groupKey(a);
     if (!parClef.has(key)) parClef.set(key, []);
     parClef.get(key)!.push(a);
   }
   const groupes = [...parClef.entries()].map(([key, episodes]) => {
-    episodes.sort((x, y) => (y.createdAt || 0) - (x.createdAt || 0));
+    episodes.sort((x, y) => y.createdAt - x.createdAt);
     return {
       key,
       episodes,
       // `episodes` vient toujours d'au moins un push ci-dessus : l'index 0
       // existe reellement, noUncheckedIndexedAccess ne le sait pas.
-      lastAt: episodes[0]!.createdAt || 0,
+      lastAt: episodes[0]!.createdAt,
       unacked: episodes.filter(e => !e.acknowledged).length,
     };
   });
@@ -218,13 +202,13 @@ export function groupAlerts(alerts: Alert[] | null | undefined): AlertGroup[] {
 // un fait d'episode, pas un nom de cause (revue doc/32). L'outil ne se dit que
 // s'il est uniforme — jamais celui d'un episode arbitraire.
 function outilUniforme(episodes: Alert[]) {
-  const outils = new Set(episodes.map(e => e.toolName || ''));
+  const outils = new Set(episodes.map(e => e.toolName));
   return outils.size === 1 ? [...outils][0] : '';
 }
 
 const CAUSES: Record<AlertType, (first: Alert, prefix: string) => string> = {
   badInvocation: (first, prefix) =>
-    `${prefix}appel mal formé : ${MOTIFS[first.patternId ?? ''] || REGLAGE_INCONNU}`,
+    `${prefix}appel mal formé : ${MOTIFS[first.patternId] || REGLAGE_INCONNU}`,
   loop: (_first, prefix) => `${prefix}même commande répétée`,
   retryStorm: (_first, prefix) => `${prefix}échecs consécutifs`,
   stuck: () => 'Aucun événement · outils encore en vol',
@@ -234,21 +218,18 @@ export function causeLabel(group: AlertGroup) {
   // Meme invariant qu'a la construction du groupe (groupAlerts) : au moins
   // un episode.
   const first = group.episodes[0]!;
-  const build = CAUSES[first.type];
-  if (!build) return String(first.type);
   const outil = outilUniforme(group.episodes);
-  return build(first, outil ? `${outil} · ` : '');
+  return CAUSES[first.type](first, outil ? `${outil} · ` : '');
 }
 
 // Les faits d'UN episode, l'outil en moins (il est dit par la cause).
 const EPISODES: Record<AlertType, (a: Alert) => string> = {
-  loop: a => `même commande ${a.count}×${failureNote(listeDe(a.occurrences))}`,
+  loop: a => `même commande ${a.count}×${failureNote(a.occurrences)}`,
   retryStorm: a => `${a.count} échecs consécutifs`,
-  stuck: a => `${a.count} outil${(a.count ?? 0) > 1 ? 's' : ''} encore en vol`,
-  badInvocation: a => ((a.count ?? 0) > 1 ? `${a.count} fois dans la session` : ''),
+  stuck: a => `${a.count} outil${a.count > 1 ? 's' : ''} encore en vol`,
+  badInvocation: a => (a.count > 1 ? `${a.count} fois dans la session` : ''),
 };
 
 export function episodeLabel(alert: Alert) {
-  const build = EPISODES[alert.type];
-  return build ? build(alert) : '';
+  return EPISODES[alert.type](alert);
 }
