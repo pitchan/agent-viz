@@ -1,6 +1,6 @@
-// Une seule écriture d'une durée pour trois appelants : `calcDuration`
-// (viz-layout.ts), `formatSessionDuration` (viz-narrator.ts) et
-// `updateLiveDurations` (viz-ui.ts).
+// Une seule écriture de la durée d'un intervalle en millisecondes, pour trois
+// appelants : `calcDuration` (viz-layout.ts), `formatSessionDuration`
+// (viz-narrator.ts) et `updateLiveDurations` (viz-ui.ts).
 //
 // Le module dit ce qu'est une durée et comment on l'écrit ; il rend `null` pour ce
 // qui n'en est pas une, et chaque appelant garde SON mot pour ce cas — `null` pour

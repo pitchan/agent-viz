@@ -6,7 +6,7 @@ import { decodeJsonlLine, iterJsonlLines, type JsonlLine } from '../../src/engin
 // contenu en memoire, sonde bornee, tail incremental) restent aux appelants.
 //
 // `iterJsonlLines` est l'un de ces modes : jsonl.test.ts tient son comportement, et le test
-// « les deux rendent le meme verdict sur les memes lignes » verifie qu'il passe par ici.
+// « les deux rendent le meme verdict sur les memes lignes » epingle leur accord ligne a ligne.
 
 describe('decodeJsonlLine', () => {
   test('une ligne valide rend sa valeur', () => {

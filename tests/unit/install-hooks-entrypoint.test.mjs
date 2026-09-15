@@ -37,9 +37,9 @@ const PREFIXE = 'agent-viz-entrypoint-';
 // gardee : aucune autre voie du fichier n emet cette ligne (le « masque amont »).
 const SEULE_LA_BRANCHE_GARDEE = '[claude] settings :';
 
-// CHOIX DELIBERE : `import()`, JAMAIS `require()`. Un `require()` d un module ES jette
-// ERR_REQUIRE_ASYNC_MODULE des que la cible porte une top-level await (mesure, Node v24.15.0) ;
-// `import()` se comporte a l IDENTIQUE, donc un rouge de G2 signifie toujours « la garde a fui ».
+// CHOIX DELIBERE : `import()`, JAMAIS `require()`. Un `require()` jette ERR_REQUIRE_ASYNC_MODULE
+// sur une top-level await (Node v24.15.0) ; `import()` se comporte a l IDENTIQUE sur une cible
+// CommonJS et sur une cible ES module, donc un rouge de G2 signifie toujours « la garde a fui ».
 //
 // Le fils importe la cible par son URL `file:`. On passe par l environnement et
 // non par argv : une chaine `C:\...` passee a `import()` se lit comme un

@@ -5,7 +5,7 @@
 //
 // The bump is the only lever: needsScan() compares path, mtime, size and this
 // number — sub-agent files appear without moving the main transcript's mtime —
-// so a row stored before the bump lacks the new field until it is re-read.
+// so a row whose file still looks the same is re-read only when this number moves.
 const SCAN_VERSION = 10;
 
 export { SCAN_VERSION };

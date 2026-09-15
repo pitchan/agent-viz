@@ -12,7 +12,8 @@
 //      does not emit it. `vrd-exit-code-bare` stays dead last, or it takes everything.
 //   2. POWERSHELL ANCHORS ON `FullyQualifiedErrorId`, a .NET identifier never translated nor
 //      accented, never on the sentence before it, which is localised and can arrive mangled.
-//      `CategoryInfo` is excluded by name. Both French-prose anchors stay outside the alerts.
+//      `CategoryInfo` is excluded by name. The two French-prose anchors, `env-binary-missing`
+//      and `inv-path-not-found`, stay outside the alerts.
 //   3. EVERY POSIX-SHELL PATTERN REQUIRES BASH'S `line N:` STAMP, which a quotation lacks and a
 //      container running bash also prints. The anchors name the invocation path, not the cause:
 //      the French sentences state the established fact first and the likely gesture second.

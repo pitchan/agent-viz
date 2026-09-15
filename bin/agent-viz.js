@@ -174,8 +174,8 @@ async function cmdStart(flags) {
         if (!r) continue;
         const label = agent === 'claude' ? 'Claude Code' : 'Copilot CLI';
         if (r.error) {
-          // Un refus ne vaut que pour son agent : les hooks de l'autre sont posés
-          // et l'annoncent sur leur propre ligne, sans « skipped » pour tous.
+          // Un refus ne vaut que pour son agent : le message le nomme, plutôt qu'un
+          // « skipped » qui vaudrait pour tous.
           console.error(`${c.warn('!')} ${label} hooks not installed: ${r.error}`);
           continue;
         }

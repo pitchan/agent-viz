@@ -73,7 +73,7 @@ const LISTE_BLANCHE = [
   },
   {
     fichier: 'src/engine/doctor/aggregators/tokens.ts',
-    fragment: 'lancement',
+    fragment: 'lancement→catalogue',
     raison: "la date de bascule du tarif de Sonnet 5 est la donnée qui explique deux coûts différents pour le même modèle",
   },
   {
@@ -88,7 +88,7 @@ const LISTE_BLANCHE = [
   },
   {
     fichier: 'tests/unit/pricing.test.cjs',
-    fragment: 'the embedded table',
+    fragment: 'From 2026-09-01 the embedded table',
     raison: "la date de bascule dit quel tarif la table embarquée rend : elle est la donnée sous test",
   },
   {

@@ -13,9 +13,9 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 
-// node:http par process.getBuiltinModule, pas par `import` : materialiser l'espace de noms ESM
-// de node:http se paie a chaque processus de hook, donc a chaque evenement. getBuiltinModule rend
-// le meme objet sans ce cout, et reste synchrone (API stable depuis Node 22.3, sous `engines`).
+// node:http arrive par process.getBuiltinModule, pas par `import` : matérialiser son espace de
+// noms ESM se paie à chaque processus de hook, donc à chaque événement. getBuiltinModule rend le
+// même objet sans ce coût, reste synchrone, et date de Node 22.3, là où `engines` exige Node 24.
 const http = process.getBuiltinModule('node:http');
 
 const DIR = path.join(os.tmpdir(), 'agent-events');

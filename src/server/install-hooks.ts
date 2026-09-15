@@ -21,7 +21,9 @@ import {
 } from './install-hooks/registry.ts';
 import { cliMain } from './install-hooks/cli.ts';
 
-// Couture de test : les fonctions internes que les tests appellent directement.
+// Couture de test : les fonctions internes atteignables en un point unique, sans lancer le
+// binaire ni importer chaque module. La liste suit les fonctions du sous-système, pas les
+// appels du moment : une clé sans appelant sous tests/ n'est pas pour autant sans emploi.
 const _internals = {
   readSettings, writeSettings, auditSettings, addHook, removeHook,
   hasHookForEvent, inspectEvent, refreshStaleCommand, eventsFor,

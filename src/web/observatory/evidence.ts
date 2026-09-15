@@ -11,7 +11,7 @@ import { formatTokens, formatBytes } from './format.ts';
 // rule decides which one dominates; this file only puts it into French.
 // "Marqueur", never "cause": only modelSwitch has a proven mechanism (caches are model-scoped).
 // toolsAppeared is a coincidence: deferred tool loading appends to the history and preserves the
-// cache (official docs; our controlled test agrees, +265 tk fully re-read).
+// cache (official docs; our controlled test agrees, docs/sources-externes.md).
 // The three *Changed markers come from message.diagnostics.cache_miss_reason
 // (Claude Code ≥ ~2.1.220): the client compared the request to the previous one
 // and named the block that changed. First-hand facts — the wording may assert

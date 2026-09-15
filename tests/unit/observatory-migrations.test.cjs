@@ -1,7 +1,7 @@
 'use strict';
-// An observatory.db without the session_kind and period columns must gain them
-// without losing a single row — recommendation statuses are the only data a
-// re-scan cannot rebuild.
+// An observatory.db without the session_kind column must gain it without losing
+// a single row — recommendation statuses are the only data a re-scan cannot
+// rebuild.
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -12,15 +12,15 @@ const { DatabaseSync } = require('node:sqlite');
 
 const { openStore } = require('../../src/server/observatory/store.ts');
 
-// Copy of a sessions schema without session_kind and period — the point of the
-// test is opening a database written before those columns existed.
+// Copy of a sessions schema without session_kind — the point of the test is
+// opening a database written before that column existed.
 const M1_SESSIONS = `CREATE TABLE sessions (
   id TEXT PRIMARY KEY, project TEXT, transcript_path TEXT,
   file_mtime INTEGER, file_size INTEGER, scan_version INTEGER,
   started_at TEXT, ended_at TEXT, model_main TEXT,
   net_tokens INTEGER, cost_usd REAL, cost_complete INTEGER, report_json TEXT)`;
 
-test('opening a database without session_kind and period adds both columns, rows intact', () => {
+test('opening a database without session_kind adds the column, rows intact', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'obs-mig-'));
   const dbPath = path.join(dir, 'observatory.db');
   const db = new DatabaseSync(dbPath);
