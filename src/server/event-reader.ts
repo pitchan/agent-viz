@@ -62,44 +62,27 @@ function feedWatchdog(wd: NonNullable<ReturnType<typeof getWatchdogService>>, ev
 // cursor, and the difference is the whole point — see liveHandoffOffset.
 const fedFrom = new Map<string, number>();
 
-// The byte offset from which the live path owns this file, as far as the
-// watchdog is concerned.
+// The byte offset from which the live path owns this file for the watchdog:
+// the start-up sweep reads [0, offset) and the live path [offset, ∞), so no
+// event is counted twice.
 //
-// This is the hand-off point between the two readers of one file, and it is
-// what keeps them from counting the same event twice: the start-up sweep reads
-// [0, offset) and the live path [offset, ∞).
+// The offset is where the FIRST live read with a service to feed started, not
+// the read cursor; the test that holds why is
+//   « cablage: la frontiere est l octet ou le vif a NOURRI, pas son curseur »
 //
-// The value is the offset of the FIRST live read that actually fed the
-// detector, and nothing else will do. The read cursor will not: the live path
-// reads and advances that cursor WITHOUT feeding for as long as the service
-// does not exist yet — which is the whole of scanAndWatch() plus housekeep().
-// Once the service does exist, every live delivery pushes the cursor past bytes
-// the detector has already been given, so a sweep bounded by the cursor re-feeds
-// them. Measured, not supposed: a session written to while the server boots
-// yielded `Bash called 4x with the same input` on three real calls, with one
-// timestamp listed twice — a durable line in an append-only journal.
+// Before such a read, it is the read cursor, and the test that holds why is
+//   « event-reader: sans chien de garde, le flux d evenements passe quand meme »
 //
-// The arming offset will not do either, and is worse: it would drop
-// [armed, service ready), which the live path reads and hands to nobody.
+// The arming offset would be worse: the live path reads [armed, service ready)
+// without feeding the detector, and the sweep would skip those bytes.
 //
-// Falling back to the cursor when nothing has been fed yet IS right: no live
-// delivery has reached the detector, so everything below the cursor is still
-// the sweep's to read. And that fallback carries weight in BOTH directions:
-// setting a hand-off byte when nothing has been fed would not duplicate
-// anything, it would dig a HOLE — the sweep would skip [0, offset), which
-// nobody ever gave the detector, and the legitimate alert would simply never
-// fire. Silence costs more than a duplicate, because silence does not show.
+// Sharing by instant instead of by byte fails: the sweep yields at every await,
+// so a line written meanwhile travels both paths. The journal de-duplicates the
+// alert but not the detector's counters, and loop counts every PreToolUse.
 //
-// Sharing by instant rather than by byte is what fails outright: the sweep
-// reads whole files and yields to the event loop at every await, so anything
-// written while it runs travels the live path AND is re-read from the file. The
-// journal de-duplicates the resulting alert but not the detector's counters —
-// loop stacks one occurrence per PreToolUse.
-//
-// null means no live path covers this file — then the whole file is the
-// sweep's business. `has` rather than a truthiness test on purpose: an offset
-// of 0 is a real answer (a watcher armed on an empty file owns all of it), and
-// `|| null` would turn it into "read everything" and bring the overlap back.
+// null means that no live path covers this file. 0 is a real answer (a watcher
+// armed on an empty file owns all of it), so the code tests `has`; the test is
+//   « cablage: le rattrapage s arrete la ou le chemin vif prend la main »
 function liveHandoffOffset(fp: string): number | null {
   if (fedFrom.has(fp)) return fedFrom.get(fp) ?? null;
   return fileOffsets.has(fp) ? (fileOffsets.get(fp) ?? null) : null;

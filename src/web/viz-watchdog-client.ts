@@ -1,34 +1,29 @@
-// viz-watchdog-client.ts — the browser side of the watchdog: a reader, not a
-// detector.
+// viz-watchdog-client.ts — the browser side of the watchdog: it reads the server's
+// journal and detects nothing (test « le module n expose ni feedEvent ni setObserving »).
 //
-// Detection and memory live on the server (src/server/watchdog/): it sees
-// every event whether or not a tab is open, and it writes what it sees to a
-// journal that survives a reload, a restart and an acknowledgement. This
-// module's whole job is the LIVE case — say what is wrong right now — so it
-// takes the server's journal and keeps only what is still worth shouting
-// about. The lasting record is read in the Conseils drawer, not here.
+// Detection and memory live on the server (src/server/watchdog/): it sees every
+// event, tab open or not, and its journal outlives a reload, a restart and an
+// acknowledgement.
 //
-// Two sieves, not one, because GET /alerts answers two different questions:
+// This module keeps only what is wrong right now; the lasting record is read in
+// the Conseils drawer.
 //
-//   * `alerts` is the MEMORY. The journal has no notion of liveness at all —
-//     it hands back what was written down over the requested window.
-//   * `activeIds` is what the server's detector still judges LIVE, and it is
-//     the only thing that can say so. A standing alert (`stuck`) describes a
-//     STATE, so it has no expiry: `isFresh` answers true for it for ever, by
-//     design. Served from the journal alone, a session stuck yesterday would
-//     shout until someone clicked it.
+// Two sieves, because GET /alerts answers two questions: `alerts` is the journal,
+// which has no notion of liveness, and `activeIds` is what the server's detector
+// still judges live.
 //
-// So: an event-driven alert is judged by freshness, a standing alert by
-// `activeIds`. Not the union of the two — `loop` and `retryStorm` declare no
-// `isStale`, so their alert sits in the server's registry until it is
-// acknowledged; taking membership as sufficient would keep the badge red on a
-// loop that ended an hour ago, which is the exact thing the freshness rule
-// exists to prevent.
+// An event-driven alert is judged by freshness alone, even when `activeIds` still
+// holds its id (test « un incident evenementiel perime ne redevient pas vif parce que le serveur le garde en registre »).
 //
-// External alerts (the pricing vigil) do not come from the hook stream. They
-// carry the full Alert shape — `createdAt` is the moment the tab received the
-// report, `standing` is true — but neither sieve reads them: they are current
-// by construction, live in their own registry, and leave it on acknowledgement alone.
+// A standing alert describes a state that `isFresh` never retires, so `activeIds`
+// alone judges it, as the tests « une alerte permanente d hier se tait si le serveur ne la compte plus »
+// and « une alerte permanente que le serveur compte encore reste affichee, quel que soit son age » hold.
+//
+// External alerts (the pricing vigil) do not come from the hook stream. They are
+// current by construction, so neither sieve reads them (test « une alerte externe vieille de dix minutes reste affichée : ni l'âge ni activeIds ne la filtrent »).
+//
+// They live in their own registry and leave the badge only on acknowledgement
+// (test « acknowledged disappears; a fresh raise after ack fires again »).
 
 import { isFresh } from './viz-alert-freshness.ts';
 // Les deux routes du journal des pannes sont décrites une seule fois, dans le

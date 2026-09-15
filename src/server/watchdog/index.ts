@@ -142,37 +142,34 @@ interface StartWatchdogOpts {
   init?: WatchdogOpts;
 }
 
-// La sequence de demarrage du chien de garde, dans l'ordre qui est sa
-// CONDITION : d'abord l'instance, puis le rattrapage de ce qui s'est passe
-// serveur eteint, puis seulement le battement. Battre pendant un rattrapage
-// ferait juger `stuck` sur une horloge qui n'est pas celle des evenements
-// relus ; rattraper avant que l'instance existe ferait rendre 0 a `runCatchUp`,
-// et le passe ne serait jamais relu.
+// Le chien de garde demarre en trois temps : l'instance, puis le rattrapage de ce qui
+// s'est passe serveur eteint, puis le battement. L'instance precede le rattrapage, ce
+// que tient le test « demarrage: l instance d abord, le rattrapage ensuite ».
 //
-// Pourquoi cette sequence vit ici et pas dans `src/server/server.ts` : `server.ts` est
-// un point d'entree, son chargement demarre le serveur entier et ouvre un
-// port. Aucun test ne peut l'appeler, donc rien de ce qu'on y ecrirait ne
-// serait essayable — or les trois pieges de cette sequence (l'ordre, le dossier
-// nomme, l'exception qui remonte) sont precisement ceux qu'on ne voit pas a la
-// lecture. `server.ts` garde ce qui est a lui : le vrai dossier et le vrai flux.
+// Pendant le rattrapage, le drapeau que leve `runCatchUp` fait taire `stuck`, et le
+// test qui le tient est
+//   « service: pendant un rattrapage, stuck se tait - et reparle apres »
 //
-// Tout ce qui appartient au serveur est donc INJECTE, et ce module ne gagne
-// aucun `require` : `dir` (c'est `session-index` qui fait autorite sur le
-// dossier d'evenements), `liveFrom` (c'est le lecteur d'evenements qui sait ou
-// son chemin vif prend la main), et `broadcastAlert`, qui recoit une ALERTE et
-// rien d'autre — l'enveloppe du message est un detail du protocole du serveur,
-// et ce module n'a pas a la connaitre pour se dire ignorant du flux.
+// La sequence vit ici et non dans `src/server/server.ts` : charger ce point d'entree
+// demarre le serveur et ouvre un port, donc aucun test ne le charge. Or ses pieges
+// (l'ordre, le dossier nomme, l'exception qui remonte) ne se voient pas a la lecture.
 //
-// `cadenceMs` est injecte aussi, 5 s par defaut : c'est le battement qui fait
-// juger `stuck`, et un test doit pouvoir le regler sans attendre cinq secondes.
-// Et `init` passe a `initWatchdog` ce qu'on lui
-// aurait passe directement — meme raison que `journalPath` : sans cela, la
-// seule branche que la production emprunte serait la seule qu'aucun test ne
-// peut emprunter sans ecrire dans le vrai `~` de l'utilisateur.
+// Ce qui appartient au serveur arrive en parametre, et ce module n'importe rien de ce
+// qui le fournit : `dir` et `liveFrom` pour les raisons dites sur `runCatchUp`, et
+// `broadcastAlert`, qui recoit l'alerte nue ; le serveur en compose l'enveloppe.
 //
-// Rend le minuteur, pour que l'appelant puisse l'arreter. Le serveur ne s'en
-// sert pas — il tourne jusqu'a l'extinction — mais un appelant qui lance une
-// sequence doit pouvoir la rendre.
+// Deux tests tiennent ce que `server.ts` passe au chien de garde :
+//   « serveur: le chien de garde recoit le vrai dossier et la vraie frontiere »
+//   « serveur: l enveloppe SSE est composee ici, et le canal n est pas broadcastSSE nu »
+//
+// `cadenceMs` vaut 5 s par defaut et se regle, parce que le battement fait juger
+// `stuck` et qu'un test ne doit pas attendre cinq secondes.
+//
+// `init` va a `initWatchdog` pour la raison de `journalPath` : un test emprunte la
+// branche de production sans ecrire dans le vrai `~`.
+//
+// Rend le minuteur, pour que l'appelant puisse arreter la sequence ; le serveur ne
+// s'en sert pas, il tourne jusqu'a l'extinction.
 async function startWatchdog(
   { dir, broadcastAlert, liveFrom, cadenceMs = 5_000, init }: StartWatchdogOpts = {},
 ): Promise<NodeJS.Timeout> {

@@ -115,6 +115,29 @@ const enHorodatage = (v: unknown): number | null => {
   return isFiniteNumber(n) ? n : null;
 };
 
+// Le fichier n'est compacte qu'au chargement, avant le premier `append` ;
+// ensuite l'ajout seul est la regle, et aucune ligne n'est reecrite pour etre
+// changee.
+//
+// Le chargement ne compacte pas quand il ne resterait rien : un effacement
+// total signe une horloge fausse, et non un journal qui vieillit.
+//
+// Cette garde ne tient qu'un demarrage. Une alerte ajoutee sous l'horloge
+// fausse rend `gardees` non vide, et un demarrage suivant encore sous cette
+// horloge compacte en perdant les lignes d'avant, acquittements compris.
+//
+// Si l'horloge est revenue a l'heure juste avant ce demarrage, rien n'est
+// perdu : l'alerte datee du futur est gardee, aucune ligne n'a peri, et le
+// fichier n'est pas reecrit.
+//
+// Le meme mecanisme compacte un journal perime en entier au demarrage qui
+// suit un ajout.
+//
+// Un saut d'horloge partiel, qui perime une tranche sans tout perimer, emporte
+// cette tranche au chargement.
+//
+// La memoire vive reste bornee meme sans reecriture, parce que le filtre de la
+// boucle de chargement ne depend pas de la compaction.
 function createJournal({ filePath = DEFAULT_PATH, now = Date.now }: { filePath?: string; now?: () => number } = {}) {
   const seen = new Set<string>();          // cles (id, createdAt) deja consignees
   // `at` n'est PAS engage par `estClef` (seuls id/createdAt le sont) : le
@@ -200,38 +223,9 @@ function createJournal({ filePath = DEFAULT_PATH, now = Date.now }: { filePath?:
       gardees.push(line);
       ingest(rec);
     }
-    // La compaction a lieu ici, avant le premier `append` : l'ajout seul reste
-    // intact, aucune ligne n'est jamais reecrite pour etre changee.
-    //
-    // Mais on ne compacte pas quand il ne resterait RIEN. `readAll` refuse
-    // deja de jeter une alerte datee du futur parce que l'horloge peut mentir ;
-    // `load` ne peut pas se fier a cette meme horloge pour reecrire le fichier
-    // de facon irreversible. Pile morte, machine restauree depuis un
-    // instantane, saut NTP au demarrage : un seul demarrage suffirait a vider
-    // la seule chose que le produit ne sait pas reconstruire — alertes ET
-    // acquittements. L'effacement TOTAL est la signature de l'accident, pas
-    // d'un journal qui vieillit.
-    //
-    // Ce que cette garde achete, exactement, et pas plus : UN demarrage, et
-    // seulement tant que rien n'est consigne entre deux. Des qu'une alerte est
-    // ajoutee sous l'horloge folle, `gardees` cesse d'etre vide et le
-    // demarrage suivant compacte pour de bon — les lignes d'avant,
-    // acquittements compris, sont alors perdues. Mesure :
-    //
-    //   demarrage fou 1 : 3 lignes    (la garde tient)
-    //   + 1 append      : 4 lignes
-    //   demarrage fou 2 : 1 ligne     (tout le reste est detruit)
-    //
-    // C'est le meme mecanisme qui fait que le cas se resout quand le journal
-    // est reellement perime a 100 % : on ne peut pas avoir l'un sans l'autre.
-    // La garde achete du temps pour que l'horloge revienne, elle ne rend pas
-    // le journal indestructible.
-    //
-    // La memoire, elle, reste bornee dans tous les cas — le filtre ci-dessus
-    // ne depend pas de la reecriture.
-    //
-    // Residu : un saut d'horloge PARTIEL — assez pour perimer une
-    // tranche, pas assez pour tout perimer — emporte encore cette tranche.
+    // La compaction a lieu ici, avant le premier `append`, et jamais quand il
+    // ne resterait rien ; le test qui tient cette garde est
+    //   « une horloge qui saute ne vide pas le journal »
     if (perimees > 0 && gardees.length > 0) compacter(gardees);
   }
 
