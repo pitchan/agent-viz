@@ -50,7 +50,7 @@ const PRICE_HISTORY: Record<string, PricePeriod[]> = {
 // local = une ligne ici (même philosophie que PRICE_HISTORY).
 const ZERO_COST: Record<string, string> = {
   '<synthetic>': 'artefact du harnais Claude Code — aucun appel API',
-  'ministral-3:latest': 'modèle local Ollama (essais S8) — inférence locale, 0 $ API',
+  'ministral-3:latest': 'modèle local Ollama — inférence locale, 0 $ API',
 };
 
 // Descriptif produit par modèle (libellé lisible, fenêtre de contexte) —

@@ -23,7 +23,7 @@ function refus(api) {
   return () => {
     throw new Error(
       `pont node:test : ${api} n est pas implemente. Aucun test du depot ne l utilisait `
-      + `quand le pont a ete ecrit (mesure du 2026-08-11). Implemente-le dans ${FICHIER} `
+      + `quand le pont a ete ecrit. Implemente-le dans ${FICHIER} `
       + `et ajoute son test — ne le contourne pas.`);
   };
 }
@@ -90,7 +90,7 @@ export function createBridge({ test: runTest, afterAll, beforeEach, vi }) {
     if (typeof fn !== 'function') {
       throw new Error(
         `pont node:test : la forme test(nom, option, fn) n est pas implementee — aucun test `
-        + `du depot n utilisait d option (mesure du 2026-08-11). Implemente-la dans ${FICHIER}.`);
+        + `du depot n utilisait d option. Implemente-la dans ${FICHIER}.`);
     }
     return runTest(nom, async () => {
       const { contexte, nettoyer } = creerContexte(vi);
