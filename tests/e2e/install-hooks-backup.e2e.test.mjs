@@ -76,13 +76,46 @@ test('au-delà de 30 copies, la plus ancienne part et un fichier posé là par q
   assert.ok(noms.includes('notes.txt'), 'un fichier étranger ne devait être ni compté ni supprimé');
 });
 
-test('deux copies dans la même milliseconde : la seconde lève EEXIST et la première garde les octets d\'origine', () => {
+test('deux copies du même fichier dans la même milliseconde : la seconde prend la milliseconde suivante, se trie après la première, et la première garde les octets d\'origine', () => {
   // Arrange
   const { file, root } = fichierSource();
   const premiere = backupHookFile(file, { root, now: () => T0 });
   fs.writeFileSync(file, '{"reecrit":true}\n');
   // Act
-  const appel = () => backupHookFile(file, { root, now: () => T0 });
+  const seconde = backupHookFile(file, { root, now: () => T0 });
+  // Assert
+  assert.equal(seconde, path.join(dossierDesCopies(root, file), nomDeCopie(T0 + 1)));
+  assert.equal(fs.readFileSync(seconde, 'utf8'), '{"reecrit":true}\n');
+  assert.equal(fs.readFileSync(premiere, 'utf8'), CRLF);
+  assert.deepEqual(fs.readdirSync(dossierDesCopies(root, file)).sort(), [nomDeCopie(T0), nomDeCopie(T0 + 1)]);
+});
+
+test('une horloge en retard sur les copies déjà là : la copie neuve se nomme après la dernière et la purge la garde', () => {
+  // Arrange
+  const { file, root } = fichierSource();
+  const dir = dossierDesCopies(root, file);
+  const T1 = T0 + 60 * 60 * 1000;
+  fs.mkdirSync(dir, { recursive: true });
+  for (let k = 29; k >= 0; k--) fs.writeFileSync(path.join(dir, nomDeCopie(T1 - k)), 'ancienne');
+  // Act
+  const copie = backupHookFile(file, { root, now: () => T0 });
+  // Assert
+  assert.equal(copie, path.join(dir, nomDeCopie(T1 + 1)));
+  assert.equal(fs.readFileSync(copie, 'utf8'), CRLF);
+  assert.equal(fs.readdirSync(dir).length, 30);
+  assert.equal(fs.existsSync(path.join(dir, nomDeCopie(T1 - 29))), false, 'la plus ancienne copie devait partir');
+});
+
+test('une copie ne s\'écrase jamais : un nom pris entre la lecture du dossier et la copie lève EEXIST et la copie déjà là garde ses octets', () => {
+  // Arrange
+  const { file, root } = fichierSource();
+  const premiere = backupHookFile(file, { root, now: () => T0 });
+  fs.writeFileSync(file, '{"reecrit":true}\n');
+  // Un dossier lu vide : le nom de T0 paraît libre, comme si un autre processus
+  // venait de le prendre.
+  const io = { ...fs, readdirSync: () => [] };
+  // Act
+  const appel = () => backupHookFile(file, { root, io, now: () => T0 });
   // Assert
   assert.throws(appel, (e) =>
     e.message.startsWith(`backup of ${file} failed, file left unchanged: EEXIST`) && e.cause.code === 'EEXIST');
