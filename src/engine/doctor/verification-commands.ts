@@ -1,10 +1,10 @@
-// Classement déclaratif des commandes de vérification (doc/41).
+// Classement déclaratif des commandes de vérification.
 //
-// Une « vérification » est une commande dont le rouge/vert constitue une
-// preuve : test, build, lint, typecheck. La table est volontairement
-// conservatrice — un manque se mesure (sonde doc/41), une fausse preuve se
-// paie (doc/41, D4). D'où la règle centrale : nommer un outil n'est pas
-// l'exécuter. Quatre filtres l'appliquent, dans cet ordre :
+// Une « vérification » est une commande dont le rouge/vert constitue une preuve : test,
+// build, lint, typecheck. La table est volontairement conservatrice : un manque se mesure,
+// une fausse preuve se paie. D'où la règle centrale : nommer un outil n'est pas l'exécuter.
+//
+// Quatre filtres l'appliquent, dans cet ordre :
 //   1. les chaînes entre guillemets sont retirées — un
 //      `git commit -m "npm test vert"` n'est pas une vérification ;
 //   2. la commande est découpée en segments shell, et chaque motif est ancré

@@ -1,126 +1,28 @@
 // invocation-patterns.ts — recognising, from the shape of its message, an
 // error that comes from HOW something was called rather than from what it did.
 //
-// Pure module: no DOM, no fs, no clock, no state, no dependencies. Give it a
-// string, it gives back a category or null. It knows nothing about alerts or
-// events, and nothing about what a detector will do with the answer.
+// Pure module: a string in, a category or null out; no DOM, fs, clock, state or dependency.
+// A file of its own because this table grows with every pattern met, the alerting logic does not.
 //
-// It is a file in its own right rather than a block inside the detector because
-// it has its own reason to change: this table grows with every new pattern met,
-// while the alerting logic does not move.
+// The table comes from a survey of real failures that measured, for every pattern, both its
+// occurrences AND its false positives (docs/sources-externes.md). Four rules are easy to undo:
 //
-// ── Where this table comes from ───────────────────────────────────────────
-// It is not guessed. It comes from a survey of 370 sessions, 8 projects,
-// 24,182 tool calls and 587 real failures (doc/27, 2026-08-08 — private repo,
-// see docs/sources-externes.md), which measured for every pattern both its
-// occurrences AND its false positives.
+//   1. THE ORDER IS LAYERED, first match wins. Whatever explains a failure by something other
+//      than the way it was written comes first: a program's report QUOTES a system message, it
+//      does not emit it. `vrd-exit-code-bare` stays dead last, or it takes everything.
+//   2. POWERSHELL ANCHORS ON `FullyQualifiedErrorId`, a .NET identifier never translated nor
+//      accented, never on the sentence before it, which is localised and can arrive mangled.
+//      `CategoryInfo` is excluded by name. Both French-prose anchors stay outside the alerts.
+//   3. EVERY POSIX-SHELL PATTERN REQUIRES BASH'S `line N:` STAMP, which a quotation lacks and a
+//      container running bash also prints. The anchors name the invocation path, not the cause:
+//      the French sentences state the established fact first and the likely gesture second.
+//   4. `workstationSetting` marks what the user can fix ONCE and never see again, the only
+//      subset that alerts. Tool-protocol patterns fail that test: the tool descriptions the
+//      agent re-reads every turn already carry their instruction.
 //
-// Four of its findings are easy to undo by accident and expensive to find
-// again:
-//
-//   1. THE ORDER, AND IT IS LAYERED. First match wins, exactly like
-//      RECOGNIZERS in the engine — but "specific → generic" is not enough on
-//      its own, and an independent review measured why: with the alerting
-//      patterns near the top, 18 of its 20 hostile texts reached them,
-//      including a `cat` of this detector's own design document.
-//
-//      The rule that replaces it: EVERYTHING THAT EXPLAINS THE FAILURE BY
-//      SOMETHING OTHER THAN THE WAY IT WAS WRITTEN IS CONSULTED FIRST. If a
-//      text carries the proof that a program ran and reported — a test
-//      runner's glyphs, an execution stack, a compiler diagnostic, an npm
-//      script's output — then the system message inside it is QUOTED, not
-//      EMITTED, and it is a verdict. Hence the seven layers below, in this
-//      order: harness → environment → program report → workstation setting →
-//      tool protocol → missing path → bare exit code.
-//
-//      The trap that layering must not fall into, and it was measured too:
-//      `vrd-exit-code-bare` matches `^\s*Exit code \d+`, and nearly every
-//      failing Bash output opens that way. Ahead of the invocation patterns it
-//      would take everything and the detector would go silent — the worst
-//      failure this product has. Which is why it is a layer of its own, dead
-//      last, and why only the FIVE SPECIFIC verdict patterns move up.
-//
-//      Measured on the 587 real failures: this order gives, cell for cell,
-//      the same distribution as the survey's — 206 invocation, 214 verdict,
-//      88 harness, 74 environment, 5 unclassified, and the same 42-hit
-//      alerting subset — on the raw hook text and on the ANSI-stripped text
-//      alike. It changes nothing that was measured and closes what was not.
-//
-//   2. THE POWERSHELL ANCHOR. On the machine this was calibrated against,
-//      100% of PowerShell messages are in FRENCH: `At line:N char:` appears
-//      0 times, `is not recognized` appears 0 times, and eleven messages have
-//      their accents mangled into U+FFFD. A table written in English would
-//      have caught ZERO PowerShell cases on the very machine where the
-//      problem exists — silently, the worst failure mode this product has.
-//      One written in French would have broken on the mangled accents. So the
-//      five PowerShell patterns anchor on `FullyQualifiedErrorId`, a .NET
-//      identifier PowerShell has never translated nor accented, and never on
-//      the readable sentence in front of it.
-//
-//      `CategoryInfo` is NOT an anchor and is excluded by name: no pattern of
-//      the survey used it, and a test refuses any pattern that mentions it.
-//      The cost of that choice, measured and accepted: a PowerShell message
-//      that arrives without its `FullyQualifiedErrorId` line is not classified
-//      at all, however much French prose it carries.
-//
-//      Two patterns anchor on FRENCH prose instead, and both are outside the
-//      alerting subset: `env-binary-missing` (`est introuvable`) and
-//      `inv-path-not-found` (`introuvable dans`). They are the table's only
-//      translated anchors and a test exercises each of them.
-//
-//   3. THE SHELL'S OWN STAMP. Bash prefixes every message it emits with
-//      `line N:` — `/usr/bin/bash: line 1: cd: …`, `bash: eval: line 16: …`.
-//      A text that merely QUOTES the message does not. All seven POSIX-shell
-//      patterns therefore require that stamp: it is what tells a message the
-//      shell wrote from a message a document, a test report or a container's
-//      multiplexed log carries. Verified on all 28 real POSIX-shell failures
-//      of the survey — every one of them keeps its classification — and on
-//      the hostile texts, which stop reaching the alerting subset.
-//      Residual limit, written rather than hidden: a container running bash
-//      does stamp `line N:`, so its log lines can still be taken for local
-//      ones.
-//      That residual limit got WIDER on 2026-08-08 and is named here rather
-//      than left to be discovered: `-c:` is exactly what a container stamps,
-//      since `CMD`/`RUN` in shell form run `sh -c`. A multiplexed container
-//      log line now reaches the ALERTING subset through
-//      `inv-bash-heredoc-too-large`. A test exercises this deliberately so
-//      the exposure is visible in the suite rather than in production.
-//
-//      A second limit, and the more important one: THE ANCHORS IDENTIFY THE
-//      INVOCATION PATH, NOT THE CAUSE. `eval:` plus a double quote
-//      establishes "unterminated double quote under the eval path" and
-//      nothing else — no backslash, no path, no heredoc appears in the
-//      regex. That the two coincided 19 times out of 19 over 90 days is a
-//      correlation, not a mechanism. `grep "TODO src/` lands on the first
-//      anchor, `git commit -m 'l'agent'` on the second, and each would be
-//      handed the other cause's remedy. This is why the French sentences
-//      state the established fact first and the likely gesture second, and
-//      why the counters these patterns feed are noisier than a reader of the
-//      survey would assume.
-//
-//   4. THE WORKSTATION SETTING. `workstationSetting` marks the subset that
-//      alone deserves an alert — Windows paths, Bash quoting, PowerShell
-//      cmdlets, command separators. Everything else is recognised TO BE
-//      EXCLUDED, not to be said.
-//
-//      A pattern earns that flag by ONE test, and the doc states it by its
-//      criterion rather than by a symptom: is this something the user can fix
-//      ONCE and never see again? Two different things fail that test. The
-//      tool-protocol patterns (`inv-write-before-read`,
-//      `inv-read-without-pagination`, `inv-search-bad-pattern`) fail it
-//      because their instruction is ALREADY WRITTEN in the tool descriptions
-//      the agent re-reads every turn. `inv-bash-unbalanced-quote` failed it
-//      for a third reason and only briefly: it merged two causes, so it could
-//      name no remedy. Splitting it (doc/30) gave both causes their own flag.
-//      The merged pattern stays in the table AND stays alerting — see its
-//      entry for why a non-alerting net would have been silent rather than
-//      safe.
-//
-// ── A limit that is written down rather than hidden ───────────────────────
-// `bash` messages are not localised on this machine, so the `inv-bash-*`
-// patterns are in English. But `bash` IS translatable through LANG/LC_ALL:
-// under a non-English locale those patterns will fall silent. No stable
-// identifier exists on the POSIX side to guard against it.
+// A limit written rather than hidden: bash is translatable through LANG/LC_ALL, so under a
+// non-English locale the `inv-bash-*` patterns fall silent; no stable POSIX identifier exists.
+// Each rule has its tests in tests/unit/invocation-patterns.test.mjs.
 
 /**
  * The patterns are DATA, not code: adding one is a line in this table, never
@@ -215,16 +117,14 @@ export const PATTERNS: readonly Readonly<InvocationPattern>[] = Object.freeze(([
   // point 3 of the header. It is what a quotation does not have.
   //
   // The SHAPE of a Windows path whose backslashes were eaten by the POSIX
-  // shell — never one particular path. This is the 5 August incident: three
-  // subagents of the same session tripping on `cd F:\DEV\… && …` minutes apart.
+  // shell, never one particular path: `cd F:\DEV\… && …` without quotes.
   { id: 'inv-bash-windows-path-unquoted', class: 'invocation', workstationSetting: true,
     re: /line \d+: cd: [A-Za-z]:[^\s/\\][^\s:]*: No such file or directory/ },
   { id: 'inv-bash-cd-too-many-args', class: 'invocation', workstationSetting: true,
     re: /line \d+: cd: too many arguments/ },
-  // Two disjoint causes under one message. The 2026-08-08 survey (doc/30)
-  // went back from the message TO THE COMMAND — which the original
-  // calibration never did, having only ever read the failure text — and
-  // found no typo among the 19: two workstation settings, 11 and 8.
+  // Two disjoint causes under one message. Read from the command that produced
+  // it rather than from the failure text, it hides no typo: two workstation
+  // settings, one per entry below.
   //
   // A. A DIRECTORY path ending in a backslash, the way Windows displays one:
   // `ls "D:\folder\"`. Under a POSIX shell `\` escapes, so `\"` stops being a
@@ -244,18 +144,11 @@ export const PATTERNS: readonly Readonly<InvocationPattern>[] = Object.freeze(([
   { id: 'inv-bash-heredoc-too-large', class: 'invocation', workstationSetting: true,
     re: /-c: line \d+: unexpected EOF while looking for matching `'/ },
   // The net, and it ALERTS. It matches both forms above, so it must stay
-  // BEHIND them — but it must not be silent, and an earlier version of this
-  // split got that wrong in a way worth writing down.
+  // BEHIND them, and it must not be silent.
   //
-  // That version marked it `workstationSetting: false`, claiming it was
-  // "classified and counted, never said". It counted nothing: the detector's
-  // filter (`detector.ts:632`) returns BEFORE the counter at :639-640,
-  // so a non-alerting pattern is classified and then thrown away. Counting is
-  // a side effect of alerting, not a channel of its own. And before the split
-  // EVERY stamped `unexpected EOF` rang, so alerting on `eval:` and `-c:`
-  // alone silenced a third shape — `bash script.sh` stamps `script.sh: line
-  // N:` — that used to ring. The split written to prevent silence was
-  // introducing one, justified by a mechanism that did not exist.
+  // A non-alerting pattern is not counted either: `badInvocation` drops it before
+  // its counter. Marked `workstationSetting: false`, the net would silence a third
+  // shape, `script.sh: line N:` from `bash script.sh`, that neither form above matches.
   //
   // Alerting, it cannot silence anything, and its vague sentence — « un
   // guillemet ouvert et jamais refermé » — becomes the honest one: it states
@@ -265,30 +158,20 @@ export const PATTERNS: readonly Readonly<InvocationPattern>[] = Object.freeze(([
   { id: 'inv-bash-syntax-error', class: 'invocation', workstationSetting: true,
     re: /line \d+: syntax error near unexpected token/ },
   // Recognised in order to be EXCLUDED, never to be said — and it is NOT
-  // counted either: the detector's filter returns before its counter. This is
-  // a correction of a first calibration rather than a nuance.
+  // counted either: the detector's filter returns before its counter.
   //
-  // It is silenced for the opposite reason to the net above, and
-  // the difference is the whole rule. The net was silenced while it still
-  // covered a shape that used to ring, with nothing to catch it: that was a
-  // hole. This one was silenced because it rang WRONGLY — the same failure is
-  // still classified by `env-binary-missing` above, and a missing binary has
-  // no workstation setting to post, so saying nothing is correct. Not
-  // alerting is right when the failure has no gesture to offer; it is wrong
-  // when it merely hides a shape nobody has characterised yet.
+  // It tells a PowerShell cmdlet from a missing binary by the CASE of the name alone, which
+  // is no criterion: alerting, `Docker-Compose: command not found` would ring while
+  // `docker-compose: command not found` stays silent, and a missing binary has no setting to post.
   //
-  // It weighs 1 occurrence, 1 project, 1 actor over 90 days, and it tells a
-  // PowerShell cmdlet from a missing binary by the CASE of the name alone —
-  // which is not a criterion. Left alerting, `Docker-Compose: command not
-  // found` rang while `docker-compose: command not found` stayed silent: the
-  // same failure, and only the capital deciding. It also now sits after
-  // `env-binary-missing`, the pattern it used to precede 51 occurrences to 1.
+  // Silence is right here and wrong for the net above, which would hide a shape nobody has
+  // characterised yet. It sits after `env-binary-missing`, so a message both match is taken as
+  // an environment failure first.
   { id: 'inv-cross-shell-cmdlet-in-posix', class: 'invocation', workstationSetting: false,
     re: /line \d+: [A-Z][a-z]+-[A-Z][A-Za-z]+: command not found/ },
-  // The five PowerShell patterns, all five of them, together. The anchor is
-  // the .NET identifier, never the sentence in front of it — see point 2 of
-  // the header. This is the least intuitive decision of the survey and the
-  // easiest one to undo by accident.
+  // The five PowerShell patterns, together. The anchor is the .NET identifier,
+  // never the sentence in front of it — see point 2 of the header, the rule of
+  // this table easiest to undo by accident.
   { id: 'inv-ps-command-not-found', class: 'invocation', workstationSetting: true,
     re: /FullyQualifiedErrorId\s*:\s*CommandNotFoundException/ },
   { id: 'inv-ps-parameter-not-found', class: 'invocation', workstationSetting: true,

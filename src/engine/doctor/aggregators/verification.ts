@@ -1,38 +1,27 @@
-// La queue non vérifiée par session (doc/41).
+// La queue non vérifiée par session.
 //
-// Fait mesuré, jamais un jugement : quelles modifications de fichiers sont
-// postérieures à la dernière commande de vérification DE LA SESSION, et
-// combien de jetons nets ont été émis après cette dernière preuve. Une
-// vérification lancée hors session (terminal humain, CI) est invisible ici —
-// le produit dit toujours « dans la session ».
+// Fait mesuré, jamais un jugement : quelles modifications de fichiers suivent la dernière
+// commande de vérification DE LA SESSION, et combien de jetons nets ont été émis après elle.
+// Une vérification lancée hors session (terminal humain, CI) est invisible ici.
 //
-// Fusion inter-agents par horodatage au bilan : scanSession lit le transcript
-// principal PUIS chaque sous-agent, l'ordre de lecture n'est donc pas l'ordre
-// du temps. Un événement sans horodatage exploitable est compté (`unordered`),
-// jamais classé au hasard. Limite connue : un fichier modifié par commande
-// shell (sed, redirection) est invisible — seuls Edit/Write/MultiEdit/
-// NotebookEdit comptent comme éditions.
+// Fusion inter-agents par horodatage au bilan : scanSession lit le transcript principal PUIS
+// chaque sous-agent, l'ordre de lecture n'est donc pas l'ordre du temps.
 //
-// Ce qui est STOCKÉ d'une commande, et ce qui ne l'est pas : le texte de la
-// première et de la dernière vérification, tronqué à 200 caractères — une
-// adresse de preuve, pas un contenu — et débarrassé de ses affectations
-// `NOM=valeur`, où qu'elles soient dans la chaîne. Le classement, lui, reçoit
-// toujours la commande entière.
+// Limite connue : un fichier modifié par commande shell (sed, redirection) est invisible ;
+// seuls Edit, Write, MultiEdit et NotebookEdit comptent comme éditions.
 //
-// Fenêtre de recouvrement en parallèle : une édition faite par un sous-agent
-// PENDANT un long test est datée AVANT le résultat de ce test, donc dite
-// couverte alors qu'elle ne l'est pas. Le biais va dans le sens conservateur —
-// le produit SOUS-déclare la queue plutôt que d'accuser à tort — et la
-// frontière est stricte pour la même raison : à la milliseconde exacte du
-// résultat, l'édition est comptée couverte.
+// D'une commande, seuls les textes de la première et de la dernière vérification sont
+// stockés, tronqués et sans affectation `NOM=valeur` : une adresse de preuve, pas un contenu.
 //
-// Seconde limite, déclarée au même titre : `ok` reflète le code de retour du
-// shell, pas le verdict de l'outil — un tube sans pipefail
-// (`npm test 2>&1 | tail -20` rend le code de `tail`) ou un `|| true` peut
-// rendre un vert optimiste ; déclaré, pas corrigé (doc/41). Ce qui NE relève
-// pas de la déclaration mais du refus : un lancement en arrière-plan, dont le
-// résultat est un accusé de départ et non un verdict — celui-là n'est pas
-// enregistré du tout (doc/41, D4 : une fausse preuve se paie).
+// Une édition faite par un sous-agent PENDANT un long test est datée avant le résultat de ce
+// test, donc dite couverte : le produit sous-déclare la queue plutôt que d'accuser à tort.
+//
+// `ok` reflète le code de retour du shell, pas le verdict de l'outil : un tube sans pipefail
+// (`npm test 2>&1 | tail -20`) ou un `|| true` peut rendre un vert optimiste, limite déclarée.
+// Un lancement en arrière-plan n'est pas enregistré : son résultat n'est pas un verdict.
+//
+// L'horodatage absent, la frontière à la milliseconde et les affectations au milieu d'une
+// commande composée sont tenus par tests/doctor/verification.test.ts.
 
 import type { NormalizedEvent } from '../../core/events.ts';
 import { addUsage, emptyUsageBucket, isDedupableMsgId } from '../../core/usage.ts';

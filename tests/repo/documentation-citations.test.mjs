@@ -82,15 +82,16 @@ test('aucune citation de document ne pointe vers un chemin absent du dépôt', (
     'le citer via docs/sources-externes.md');
 });
 
-test('la sonde voit bien les citations qu\'elle est censée surveiller', () => {
-  // Arrange — contrôle de l'instrument : un filet qui ne trouve RIEN passerait
-  // aussi, et ne prouverait rien. Ces deux citations sont vivantes et le
-  // resteront (l'audit et son cahier des charges sont dans ce dépôt).
+test('le balayage retrouve la citation écrite dans ce fichier même', () => {
+  // Arrange — un balayage qui ne lit rien laisserait le test précédent vert.
+  // Ce commentaire cite docs/sources-externes.md : le balayage doit l'y retrouver.
+  const ici = path.relative(ROOT, import.meta.filename).replaceAll('\\', '/');
   const cites = citations();
 
   // Act
-  const vues = cites.filter(c => c.cite === 'docs/audit-qualite-code.md');
+  const vues = cites.filter(c => c.file === ici && c.cite === 'docs/sources-externes.md');
 
   // Assert
-  assert.ok(vues.length >= 10, `attendu ≥ 10 citations de l'audit, vu ${vues.length}`);
+  assert.ok(vues.length > 0,
+    `aucune citation de docs/sources-externes.md vue dans ${ici} : le balayage ne lit plus ce fichier ou n'y reconnaît plus une citation`);
 });

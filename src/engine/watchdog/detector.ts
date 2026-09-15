@@ -85,10 +85,9 @@ function eventTime(evt: WatchdogEvent, now: () => number): number {
   return Number.isFinite(parsed) ? parsed : now();
 }
 
-// The failure counter is scoped to the agent as well as the tool, because the
-// alert's identity is. Two subagents failing on the same tool are two storms,
-// and one of them succeeding must not close the other's series — which matters
-// twice over now that the counter also decides when the dedup lock is released.
+// The failure counter is scoped to the agent as well as the tool, because the alert's identity
+// is: two subagents failing on one tool are two storms, and one succeeding must not close the
+// other's series, whose counter also decides when the dedup lock is released.
 function failureKey(agentId: string | undefined, toolName: string | undefined): string {
   return `${agentId || ''}:${toolName}`;
 }
@@ -158,9 +157,8 @@ function emptyBuffer(): SessionBuffer {
   };
 }
 
-// Drop what has left loop's window. Nothing is bounded by a count any more —
-// only by time, which is the only bound loop's rule actually names. Both maps
-// are pruned together, so neither can outlive the window it describes.
+// Drop what has left loop's window. Time is the only bound, the one bound loop's rule
+// names. Both maps are pruned together, so neither can outlive the window it describes.
 function pruneCalls(buf: SessionBuffer, windowStart: number): void {
   for (const [sig, occ] of buf.calls) {
     // `occ.length` garantit l'index 0 : noUncheckedIndexedAccess ne le voit
@@ -201,13 +199,9 @@ function actor(evt: WatchdogEvent): { agentId: string; agentType: string } {
 // detector that raises the alert is the only thing that can answer it, so it
 // answers it here rather than leaving every consumer to guess from the type.
 //
-// `patternId` is part of it too, and empty for every detector that recognises
-// no pattern. It carries the identifier of the invocation pattern and NEVER a
-// fragment of the text that was matched — that distinction is what a pattern
-// identifier is for. `subject`, by contrast, DOES retain text: the triggering
-// command, in full, for any detector that has one to give (arbitrage doc/32
-// du 2026-08-09) — the two fields answer different questions and neither
-// stands in for the other.
+// `patternId` is part of it too: empty for every detector that recognises no pattern, and NEVER
+// a fragment of the matched text. `subject`, by contrast, DOES retain text — the triggering
+// command, in full, for any detector that has one — and neither field stands in for the other.
 //
 // The id scopes to the agent as well as the session, so two subagents looping
 // at once are two alerts rather than one that names whichever fired first.
@@ -468,27 +462,15 @@ const DETECTORS: Record<AlertType, Detector> = {
         // this product exists to catch. So the deference is conditional: stay
         // quiet only when the measured cadence proves `loop` will get there.
         //
-        // Cadence is nearly the whole of it. `loop` now counts per signature,
-        // bounded by time alone, so nothing can evict its evidence: if the
-        // repetition fits in its window, it will reach its threshold. Earlier
-        // rounds needed a capacity forecast only because a shared fixed-size
-        // buffer could drop the proof — that failure mode went with the buffer.
+        // `loop` counts per signature, bounded by time alone, so nothing can evict its
+        // evidence: a repetition that fits its window reaches its threshold.
         //
-        // What remains is not a forecast but a fact: `loop` has to be watching
-        // this signature at all. A failure can arrive whose PreToolUse we never
-        // saw — the stream opened mid-flight, or the call started before the
-        // page did. `tool_input` still tells us what it was, so the signature
-        // is known, but `loop` holds no record of it and never will. Deferring
-        // then is silence with nobody left watching.
+        // Cadence is not enough: `loop` must be watching this signature. A failure whose
+        // PreToolUse was never seen (stream opened mid-flight) has a known signature that
+        // `loop` holds no record of; deferring then is silence with nobody left watching.
         //
-        // `sig !== null` is redundant with `buf.calls.has(sig)`: the keys of
-        // `calls` are always strings, so `has(null)` is always false. It is
-        // kept because it states the intent — an unknown call is never a
-        // repeat — and would still hold if `calls` ever changed shape. No test
-        // can cover it: no input reaches this line with sig === null and a
-        // matching key, so mutating it away kills nothing. Do not add a test
-        // to "close the gap" — a test that cannot fail proves nothing, which
-        // is the exact fault this task spent three rounds removing.
+        // `sig !== null` is redundant with `buf.calls.has(sig)` and kept for intent: an unknown
+        // call is never a repeat. No input makes it matter, so no test can fail on it: add none.
         if (sig !== null && previous && sig === previous.sig
             && (ts - previous.ts) * (ctx.thresholds.loop.count - 1) <= ctx.thresholds.loop.windowMs
             && buf.calls.has(sig)) {
@@ -642,14 +624,9 @@ const DETECTORS: Record<AlertType, Detector> = {
         type: 'badInvocation', sessionId: sid, toolName: evt.tool_name,
         count, createdAt: ts, ...actor(evt), cwd: evt.cwd || '',
         patternId: pattern.id, discriminator: pattern.id,
-        // `subject` carries the triggering command, in full (arbitrage doc/32,
-        // kept whole on purpose) — the same field the other
-        // detectors fill, via the same `toolSubject(evt)`. A failure without
-        // its command is not fixable by the person reading the alert, and
-        // that is what settled it: the pattern identifier says WHAT kind of
-        // setting is missing, `subject` says WHICH command hit it. `message`
-        // is the one field this detector still keeps bare — it is shared with
-        // the desktop notification, which names only the motif.
+        // `subject` carries the triggering command in full, through the same `toolSubject(evt)`
+        // as the other detectors: the reader cannot fix a failure without it. `message` stays
+        // bare, because the desktop notification shares it and names only the motif.
         subject: toolSubject(evt),
         //
         // The count only appears once it means something: "1× this session"
@@ -679,7 +656,7 @@ const DETECTORS: Record<AlertType, Detector> = {
 // journal.
 //
 // A detector that declares neither hook keeps its alert until it is
-// acknowledged — the safe default, and what loop and retryStorm did before.
+// acknowledged — the safe default.
 function startsNewEpisode(ctx: WatchdogContext, alert: Alert, at: number): boolean {
   const det = DETECTORS[alert.type];
   return !!(det && typeof det.isPastEpisode === 'function' && det.isPastEpisode(ctx, alert, at));

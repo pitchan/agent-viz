@@ -25,7 +25,7 @@ export type NormalizedEvent =
       msgId: string | null;
       model: string | null;
       usage: RawUsage | null;
-      /** `usage` à `null` ne dit plus si le champ manquait ou n'était pas un objet : le verdict, lui, le dit. */
+      /** `usage` à `null` confond un champ absent et un champ qui n'est pas un objet : le verdict, lui, les distingue. */
       usageVerdict: UsageVerdict;
       toolUses: ToolUseRef[];
       textChars: number;

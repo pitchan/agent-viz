@@ -3,11 +3,11 @@ import type { NormalizedEvent, ToolUseRef } from '../../core/events.ts';
 type ToolResultEvent = Extract<NormalizedEvent, { kind: 'tool_result' }>;
 
 /**
- * Cases du plan J8 (dépôt privé, cf. docs/sources-externes.md) :
+ * Les cinq cas d'une lecture Read :
  * - firstRead : première lecture, la base irréductible ;
  * - identicalReread : même agent, même chemin+plage, même empreinte — le gisement du dédoublonneur ;
  * - modifiedReread : même clé, empreinte différente — irréductible par dédoublonnage ;
- * - crossAgentDuplicate : autre agent de la session, même chemin+plage+empreinte — gisement map-server, pas gate ;
+ * - crossAgentDuplicate : autre agent de la session, même chemin+plage+empreinte ;
  * - error : is_error, compté à part, jamais classé.
  */
 export type ReadCase = 'firstRead' | 'identicalReread' | 'modifiedReread' | 'crossAgentDuplicate' | 'error';
@@ -35,9 +35,9 @@ export function emptyReadCases(): Record<ReadCase, ReadCaseStat> {
 }
 
 /**
- * Métrique J8 : ventilation des lectures Read par session. Périmètre v1 : l'outil
- * Read seul (la famille `cat` Bash est une extension future). Mémoire O(1) par
- * clé : seules les empreintes sont conservées, jamais le contenu.
+ * Ventilation des lectures Read par session, l'outil Read seul : une lecture par `cat`
+ * en Bash n'est pas comptée. Mémoire O(1) par clé : seules les empreintes sont
+ * conservées, jamais le contenu.
  */
 export class ReadsAggregator {
   /** toolUseId → clé chemin+plage (seuls les tool_use Read sont retenus). */

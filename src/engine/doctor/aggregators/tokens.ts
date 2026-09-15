@@ -61,10 +61,8 @@ export class TokensAggregator {
   addAssistant(evt: AssistantEvent, agentKey: string): void {
     // Sans `usage`, aucune mesure : la ligne est ignorée et ne rend pas la session partielle.
     if (evt.usageVerdict === 'absent') return;
-    // C3 : la règle de déduplication vient de la primitive commune. Le test
-    // était `evt.msgId !== null`, qui déduplique aussi sur la CHAÎNE VIDE —
-    // donc fusionnerait des messages distincts sans identifiant en un seul, et
-    // sous-compterait. Le sens du serveur est retenu : vide ≠ identifiant.
+    // Un identifiant vide ne déduplique pas (`isDedupableMsgId`) : tester `msgId !== null`
+    // fusionnait des messages distincts sans identifiant, et les sous-comptait.
     if (isDedupableMsgId(evt.msgId)) {
       const key = `${agentKey}:${evt.msgId}`;
       if (this.seen.has(key)) return;

@@ -23,12 +23,12 @@ export interface SessionReport {
   /** Convention du repo : input + cache_creation + output, cache_read exclu. */
   netTokens: number;
   toolResults: ToolResultStats;
-  /** Ventilation J8 des lectures Read (relectures identiques/modifiées, doublons inter-agents). */
+  /** Ventilation des lectures Read (relectures identiques/modifiées, doublons inter-agents). */
   reads: ReadStats;
   subagents: SubagentStats;
   context: ContextStats;
   prompts: PromptsStats;
-  /** Queue non vérifiée (doc/41) : dernière vérification de la session et ce qui l'a suivie. */
+  /** Queue non vérifiée : dernière vérification de la session et ce qui l'a suivie. */
   verification: VerificationStats;
   events: number;
   parseErrors: number;
@@ -44,7 +44,7 @@ export interface AggregateTotals {
   costUsd: number;
   costComplete: boolean;
   toolResultBytes: number;
-  /** Octets des tool_results dans la fenêtre 2–30 Ko (l'habitat du futur gate). */
+  /** Octets des tool_results dans la fenêtre utile de compression, 2–30 Ko. */
   bandBytes: number;
   subagentSidecars: number;
   mapShapedPrompts: number;

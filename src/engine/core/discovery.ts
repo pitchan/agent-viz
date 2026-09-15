@@ -25,8 +25,8 @@ export interface DiscoveryFilters {
 /**
  * Énumère les sessions sous <claudeDir>/projects/<slug>/<sessionId>.jsonl
  * et leurs sous-agents, à TOUTE profondeur sous <slug>/<sessionId>/subagents/ :
- * les agents de workflow vivent sous subagents/workflows/wf_<id>/ et étaient
- * invisibles à un balayage à plat — 3,4 % des jetons nets, sans erreur levée.
+ * les agents de workflow vivent sous subagents/workflows/wf_<id>/, qu'un balayage
+ * à plat manque sans lever d'erreur.
  * Lecture seule ; tout dossier illisible est ignoré sans throw.
  */
 export async function discoverSessions(claudeDir: string, filters: DiscoveryFilters): Promise<SessionRef[]> {

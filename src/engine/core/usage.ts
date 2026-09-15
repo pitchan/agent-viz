@@ -66,18 +66,17 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
 }
 
 /**
- * L'accumulation des six champs bruts, à une seule définition — constat C3 de
- * `docs/audit-qualite-code.md`.
+ * L'accumulation des six champs bruts, à une seule définition, que le serveur
+ * importe aussi : deux copies divergeraient en silence.
  *
  * Ce que les deux côtés partagent est **cette addition-là**, pas ce qu'ils en
  * font ensuite : le serveur y ajoute le « dernier message » (taille de fenêtre
  * de contexte courante) et un coût calculé à l'analyse, le moteur une
  * ventilation par modèle et un coût daté. Ces suites restent chez eux.
  *
- * `tokenSum` (serveur, `cacheRead` INCLUS) et `netTokens` (moteur, `cacheRead`
- * EXCLU) sont deux métriques distinctes par convention documentée : elles
- * s'appliquent au résultat de cette primitive et **ne sont pas des cibles de
- * fusion** (arbitrage de la fiche, respecté).
+ * `tokenSum` (serveur, `cacheRead` INCLUS) et `netTokens` (moteur, `cacheRead` EXCLU) sont
+ * deux métriques distinctes par convention documentée : elles s'appliquent au résultat de
+ * cette primitive et **ne sont pas des cibles de fusion**.
  */
 export function addUsage(b: UsageBucket, u: RawUsage): void {
   b.in += countOrZero(u.input_tokens);
@@ -107,18 +106,9 @@ export function sumUsageInto(target: UsageBucket, src: UsageBucket): void {
  * portent le même `usage`** : sans déduplication par identifiant de message, le
  * seau compte N fois la même consommation.
  *
- * Les deux côtés se contredisaient ici, et c'est le seul endroit où ils le
- * faisaient vraiment : le serveur testait la vérité (`if (msgId)`), le moteur la
- * non-nullité (`if (msgId !== null)`). **C'est le sens du serveur qui est
- * retenu : un identifiant vide n'est pas un identifiant.**
- *
- * Ce n'est pas un choix de style. Dédupliquer sur `''` fusionnerait des messages
- * **distincts** dépourvus d'identifiant en un seul, donc **sous-compterait** —
- * une perte silencieuse, dans le sens le plus difficile à voir. Même doctrine
- * que la variable d'environnement vide de C5 : vide vaut non posé.
- *
- * Mesuré avant de trancher : `"id":""` apparaît **0 fois sur les 833
- * transcripts** de la machine. Aucun chiffre déjà publié ne bouge.
+ * **Un identifiant vide n'est pas un identifiant.** Dédupliquer sur `''` fusionnerait des
+ * messages **distincts** dépourvus d'identifiant en un seul, donc **sous-compterait** — une
+ * perte silencieuse, dans le sens le plus difficile à voir.
  */
 export function isDedupableMsgId(msgId: unknown): boolean {
   return typeof msgId === 'string' && msgId !== '';

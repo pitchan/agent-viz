@@ -4,10 +4,10 @@ export interface OutputRecognizer {
 }
 
 /**
- * Les filtres sont des DONNÉES, pas du code (spec §2.2) : table déclarative,
+ * Les formats reconnus sont des DONNÉES, pas du code : table déclarative,
  * ordre spécifique → générique (le premier qui matche gagne).
- * C'est le ciblage des futurs filtres de l'output-gate : doctor mesure combien
- * d'octets chaque format pèse réellement dans les sessions de l'utilisateur.
+ * doctor mesure ainsi combien d'octets chaque format pèse réellement dans les
+ * sessions de l'utilisateur.
  */
 export const RECOGNIZERS: OutputRecognizer[] = [
   { id: 'vitest', commandPattern: /\bvitest\b/ },

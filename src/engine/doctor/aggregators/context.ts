@@ -50,8 +50,8 @@ export interface NoMarkerDetail {
   other: ChurnCauseStat;
 }
 
-/** Étude des 1 700 sessions (2026-07-27) : la sur-cassure des sessions à
- * serveurs MCP (×6,3, répliquée ×6,7) disparaît après le tour 5. */
+/** Mesuré sur 1 700 sessions : la sur-cassure des sessions à serveurs MCP
+ * (×6,3, répliquée ×6,7) disparaît après le tour 5. */
 export const EARLY_TURN_MAX = 5;
 
 const MCP_TOOL_PREFIX = 'mcp__';
@@ -60,14 +60,12 @@ const MCP_TOOL_PREFIX = 'mcp__';
  * Marqueur journalisé attribuable à une re-création « prefixChange » (une seule case, par priorité) :
  * - systemChanged / toolsChanged / messagesChanged : diagnostic de PREMIÈRE MAIN écrit par
  *   Claude Code (≥ ~2.1.220) dans message.diagnostics.cache_miss_reason — le client compare la
- *   requête à la précédente et nomme le bloc qui a changé octet par octet ; prime sur toute
- *   heuristique (relevé 2026-08-19 : 88 % des grosses refactures du projet en portent un) ;
+ *   requête à la précédente et nomme le bloc changé octet par octet ; prime sur toute heuristique ;
  * - modelSwitch : diagnostic model_changed, ou modèle observé différent du tour précédent —
  *   deux espaces de cache, mécanique ;
  * - toolsAppeared : un chargement d'outils différés (ToolSearch) depuis le tour précédent —
- *   coïncidence temporelle observée, PAS un mécanisme (correctif 2026-08-05 : la doc officielle
- *   établit que le chargement différé via tool search ajoute la définition à l'historique et
- *   préserve le cache ; notre test contrôlé l'avait innocenté, +265 tk plein relu) ;
+ *   coïncidence temporelle observée, PAS un mécanisme : selon la doc officielle, le chargement
+ *   différé via tool search ajoute la définition à l'historique et préserve le cache ;
  * - noMarker : rien de journalisé n'explique la cassure — affiché tel quel, jamais deviné
  *   (y compris un diagnostic sans bloc nommé : unavailable, previous_message_not_found).
  */
@@ -121,7 +119,7 @@ export function emptyPrefixBreakdown(): PrefixBreakdown {
 }
 
 /** Nom de l'outil dont l'appel sert de marqueur temporel « outils apparus » (corrélat observé —
- * le chargement différé lui-même préserve le cache selon la doc officielle, correctif 2026-08-05). */
+ * le chargement différé lui-même préserve le cache selon la doc officielle). */
 const TOOLSEARCH_NAME = 'ToolSearch';
 
 function bucketOfDepth(ratio: number): BreakDepth {
@@ -133,7 +131,7 @@ function bucketOfDepth(ratio: number): BreakDepth {
 
 /** Durée de vie en vigueur au moment de la pause (celle écrite par le tour d'avant). */
 export type PauseTtl = 'ttl5m' | 'ttl1h';
-/** Tranches alignées sur la décision : ≤ 1 h = récupérable par le cache 1 h, au-delà = par rien. */
+/** Tranches alignées sur le cache 1 h : ≤ 1 h = récupérable par ce cache, au-delà = par rien. */
 export type PauseBucketKey = 'b5to15m' | 'b15to60m' | 'b1to3h' | 'bOver3h';
 export type PauseBuckets = Record<PauseTtl, Record<PauseBucketKey, ChurnCauseStat>>;
 
@@ -193,8 +191,7 @@ function bucketOfGap(gapMs: number): PauseBucketKey {
 
 /**
  * L'écart est mesuré réponse-à-réponse : il surestime l'écart requête-à-requête
- * du temps de génération (approximation choisie, cf. l'entrée « plan J7 » de
- * docs/sources-externes.md).
+ * du temps de génération, approximation choisie (docs/sources-externes.md).
  */
 function classifyChurn(prev: PrevTurn, cacheRead: number, timestamp: string | undefined, compacted: boolean): ChurnVerdict {
   if (prev.cachedTotal - cacheRead <= HELD_TOLERANCE) return { cause: 'growth', pause: null };

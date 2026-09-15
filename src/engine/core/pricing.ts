@@ -136,14 +136,9 @@ export function computeCost(
   const p = norm !== null ? priceAt(norm, at ?? new Date().toISOString()) : undefined;
   if (p === undefined) return { usd: null, known: false, model: norm };
 
-  // C4 (2026-08-11) — `usage` et son champ `cache_creation` viennent d'un JSONL
-  // écrit par un tiers, et RIEN dans la chaîne ne garantit leur forme :
-  // `normalizeEvent` (core/events.ts) passe `usage` par `asRec`, qui neutralise
-  // un non-objet, mais ne touche pas à ses champs. `"cache_creation": null` est
-  // du JSON parfaitement valide et faisait LEVER cette fonction. Latent sur la
-  // machine de mesure (0 occurrence sur 833 transcripts), mais le serveur
-  // délègue désormais sa formule à celle-ci : sans ces gardes, l'unification
-  // ferait APPARAÎTRE côté serveur une panne qu'il n'avait pas.
+  // `usage` vient d'un JSONL écrit par un tiers : `normalizeEvent` écarte un non-objet mais pas ses
+  // champs, et `"cache_creation": null`, du JSON valide, faisait LEVER cette fonction. Le serveur
+  // calcule son coût ici lui aussi : sans ces deux gardes, la panne le toucherait.
   const u: RawUsage = isRecord(usage) ? usage : {};
   const cc = isRecord(u.cache_creation) ? u.cache_creation : undefined;
   // Un champ brut qui n'est pas un compte (chaîne, Infinity, négatif, décimal)
@@ -185,7 +180,7 @@ export interface PriceTableEntry {
   model: string;
   /** Libellé lisible (« Opus 5 ») et fenêtre de contexte — les deux champs que
    *  la pastille temps réel consomme : la table moteur les porte pour être
-   *  l'autorité tarifaire de TOUT le produit (unification 2026-08-05). */
+   *  l'autorité tarifaire de TOUT le produit. */
   label: string;
   maxInput: number;
   current: ModelPrices;

@@ -18,29 +18,16 @@ export type ResolveClaudeDirOptions = {
 };
 
 /**
- * LA résolution du dossier de configuration, à un seul endroit — constat C5 de
- * `docs/audit-qualite-code.md`.
+ * LA résolution du dossier de configuration, à un seul endroit : l'Observatoire du serveur et
+ * le doctor du moteur l'importent tous deux. Un nom de variable par moitié du produit ne
+ * déplacerait que cette moitié, et deux vues liraient deux jeux de sessions sans avertir.
  *
- * Ce qui était en cause n'est pas un doublon de code mais un doublon de
- * VOCABULAIRE : `CLAUDE_CONFIG_DIR` côté produit (serveur, page Observatoire),
- * `NETGAIN_CLAUDE_DIR` côté moteur, dans un seul paquet npm portant deux `bin`.
- * Poser l'une ne déplaçait que la moitié correspondante — deux vues du même
- * produit sur deux jeux de sessions, sans qu'aucun message n'avertisse.
+ * `NETGAIN_CLAUDE_DIR` n'est pas lue, même en repli : un second nom vivrait pour toujours
+ * afin de couvrir un utilisateur qui n'existe pas.
  *
- * `NETGAIN_CLAUDE_DIR` est SUPPRIMÉE, pas repliée : elle n'était annoncée que
- * dans le texte d'aide de `netgain --help` (`docs/netgain.md` n'est même pas
- * dans le champ `files` du paquet), et le produit n'est installé nulle part
- * ailleurs. Un repli aurait fait vivre un second nom pour toujours afin de
- * couvrir un utilisateur qui n'existe pas.
- *
- * UNE VARIABLE VIDE EST UNE VARIABLE NON POSÉE. Ce point n'est pas un détail de
- * style : les deux moitiés en divergeaient déjà, et cette divergence-là ne
- * figure pas dans le rapport d'audit — elle a été trouvée en exécutant. Le
- * moteur employait `??` (nullish), donc avec `NETGAIN_CLAUDE_DIR=""` il
- * scannait la chaîne vide et annonçait « 0 session(s) découverte(s) sous  » :
- * une cécité totale, silencieuse, qui se lit comme « vous n'avez pas de
- * sessions ». Le serveur employait `||` et retombait correctement sur le home.
- * C'est le sens du serveur qui est retenu, des deux côtés.
+ * UNE VARIABLE VIDE EST UNE VARIABLE NON POSÉE. Lue avec `??`, une variable vide faisait
+ * scanner la chaîne vide et annoncer « 0 session(s) découverte(s) » : une cécité totale,
+ * silencieuse, qui se lit comme « vous n'avez pas de sessions ».
  *
  * Pure et synchrone : aucune E/S, aucun accès au disque. Elle ne vérifie pas que
  * le dossier existe — ce n'est pas sa décision, et un dossier absent se signale

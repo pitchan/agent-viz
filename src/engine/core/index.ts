@@ -1,5 +1,5 @@
 /** Surface publique du noyau : l'énumération des sessions, l'analyse de --since
- *  et le barème embarqué (exposé pour le produit — unification 2026-08-05). */
+ *  et le barème embarqué, exposé pour le produit. */
 export { CLAUDE_DIR_ENV, resolveClaudeDir, resolveClaudeJsonPath } from './claude-dir.ts';
 export {
   addUsage, countOrZero, emptyUsageBucket, isDedupableMsgId, isTokenCount, sumUsageInto, usageVerdict,

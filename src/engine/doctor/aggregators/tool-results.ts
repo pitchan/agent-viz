@@ -3,7 +3,7 @@ import { familyOf, recognizeCommand } from './recognizers.ts';
 
 type ToolResultEvent = Extract<NormalizedEvent, { kind: 'tool_result' }>;
 
-/** Fenêtre utile de compression mesurée par la saga : 2–30 Ko (au-delà, l'hôte tronque). */
+/** Fenêtre utile de compression, mesurée : 2–30 Ko (au-delà, l'hôte tronque). */
 const BAND_MIN = 2048;
 const BAND_MAX = 30 * 1024;
 
@@ -32,7 +32,7 @@ export interface ToolResultStats {
   families: FamilyStat[];
   /** Octets des familles répétées (≥3 occurrences) — là où un filtre composerait. */
   repetitiveBytes: number;
-  /** Familles répétées, non reconnues, ≥2 Ko de moyenne : les filtres qui manquent au gate. */
+  /** Familles répétées, non reconnues, ≥2 Ko de moyenne : les formats qu'aucun reconnaisseur ne couvre. */
   candidateFilters: { family: string; count: number; bytes: number }[];
 }
 
