@@ -240,6 +240,13 @@ export class ContextAggregator {
   }
 
   addAssistant(evt: AssistantEvent, agentKey: string): void {
+    this.measureTurn(evt, agentKey);
+    // Un appel d'outil peut être écrit sur n'importe quelle ligne du message, y compris celles que
+    // la mesure écarte ; lu après elle, le ToolSearch d'un message marque le tour suivant, jamais le sien.
+    this.noteToolUses(evt, agentKey);
+  }
+
+  private measureTurn(evt: AssistantEvent, agentKey: string): void {
     // Tout ce que calcule cet agrégateur se lit sur des usages sains : un champ inexploitable
     // compté zéro inventerait une cassure de cache ou en masquerait une, et les écritures
     // resteraient sur une autre base que les cassures auxquelles le rapport les compare.
@@ -305,14 +312,17 @@ export class ContextAggregator {
         this.prefixBreakdown.depth[depth].tokens += cacheCreate;
       }
     }
-    if (evt.toolUses.some((t) => t.name === TOOLSEARCH_NAME)) this.toolSearchPending.add(agentKey);
-    if (evt.toolUses.some((t) => t.name.startsWith(MCP_TOOL_PREFIX))) this.mcpSeen = true;
     this.prevByAgent.set(agentKey, {
       cachedTotal: cacheRead + cacheCreate,
       timestamp: evt.timestamp,
       wrote1h: countOrZero(u.cache_creation?.ephemeral_1h_input_tokens) > 0,
       model: evt.model,
     });
+  }
+
+  private noteToolUses(evt: AssistantEvent, agentKey: string): void {
+    if (evt.toolUses.some((t) => t.name === TOOLSEARCH_NAME)) this.toolSearchPending.add(agentKey);
+    if (evt.toolUses.some((t) => t.name.startsWith(MCP_TOOL_PREFIX))) this.mcpSeen = true;
   }
 
   addCompact(evt: CompactEvent, agentKey: string): void {

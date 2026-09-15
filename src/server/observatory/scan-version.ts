@@ -30,7 +30,9 @@
 // champ usage inexploitable, le rapport en donne le compte
 // (tokens.malformedUsageMessages) et l'analyse du contexte écarte ce message ;
 // une ligne v9 dirait « complet » à tort et compterait ce message dans les
-// tailles et les cassures de contexte.
+// tailles et les cassures de contexte. Les appels d'outils de chaque ligne d'un
+// message comptent aussi : une ligne v9 sous-compte « outils apparus » et la
+// présence MCP qui range les cassures earlyMcp.
 const SCAN_VERSION = 10;
 
 export { SCAN_VERSION };
