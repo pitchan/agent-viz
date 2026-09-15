@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, describe, expect, test } from 'vitest';
-import { iterJsonlLines, type JsonlLine } from '../../src/engine/core/jsonl.js';
+import { iterJsonlLines, type JsonlLine } from '../../src/engine/core/jsonl.ts';
 
 const dir = mkdtempSync(path.join(tmpdir(), 'netgain-jsonl-'));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));

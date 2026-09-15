@@ -4,9 +4,9 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, describe, expect, test } from 'vitest';
-import { runDoctor } from '../../src/engine/doctor/index.js';
-import { renderReport } from '../../src/engine/doctor/report/terminal.js';
-import { assistantLine, compactLine, promptLine, toolResultLine, toolUse, writeSessionTree } from '../helpers/build-transcript.js';
+import { runDoctor } from '../../src/engine/doctor/index.ts';
+import { renderReport } from '../../src/engine/doctor/report/terminal.ts';
+import { assistantLine, compactLine, promptLine, toolResultLine, toolUse, writeSessionTree } from '../helpers/build-transcript.ts';
 
 const claudeDir = mkdtempSync(path.join(tmpdir(), 'netgain-e2e-'));
 afterAll(() => rmSync(claudeDir, { recursive: true, force: true }));

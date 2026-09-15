@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { emptyChurnCauses, emptyPauseBuckets, emptyPrefixBreakdown } from '../../src/engine/doctor/aggregators/context.js';
+import { emptyChurnCauses, emptyPauseBuckets, emptyPrefixBreakdown } from '../../src/engine/doctor/aggregators/context.ts';
 import {
   renderCacheWritesByMonth,
   renderChurnCauses,
@@ -8,7 +8,7 @@ import {
   renderPrefixAdvice,
   renderPrefixBreakdown,
   renderReadsLine,
-} from '../../src/engine/doctor/report/terminal.js';
+} from '../../src/engine/doctor/report/terminal.ts';
 
 const n = (x: number): string => x.toLocaleString('fr-FR');
 

@@ -2,8 +2,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, describe, expect, test } from 'vitest';
-import type { NormalizedEvent, RawUsage, ToolUseRef } from '../../src/engine/core/events.js';
-import { ContextAggregator, findClaudeMdFiles } from '../../src/engine/doctor/aggregators/context.js';
+import type { NormalizedEvent, RawUsage, ToolUseRef } from '../../src/engine/core/events.ts';
+import { ContextAggregator, findClaudeMdFiles } from '../../src/engine/doctor/aggregators/context.ts';
 
 function assistant(
   msgId: string,

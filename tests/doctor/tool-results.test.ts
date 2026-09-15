@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
-import { familyOf, recognizeCommand } from '../../src/engine/doctor/aggregators/recognizers.js';
-import { ToolResultsAggregator } from '../../src/engine/doctor/aggregators/tool-results.js';
+import { familyOf, recognizeCommand } from '../../src/engine/doctor/aggregators/recognizers.ts';
+import { ToolResultsAggregator } from '../../src/engine/doctor/aggregators/tool-results.ts';
 
 describe('recognizeCommand', () => {
   test('reconnaît les reporters ciblés par le futur gate', () => {

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { classifyPrompt, isNoisePrompt, PromptsAggregator } from '../../src/engine/doctor/aggregators/prompts.js';
+import { classifyPrompt, isNoisePrompt, PromptsAggregator } from '../../src/engine/doctor/aggregators/prompts.ts';
 
 describe('isNoisePrompt — bruit injecté, pas un prompt humain', () => {
   test('contenu XML injecté par le harnais exclu', () => {

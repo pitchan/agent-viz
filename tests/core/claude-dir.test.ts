@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { describe, expect, test } from 'vitest';
-import { CLAUDE_DIR_ENV, resolveClaudeDir, resolveClaudeJsonPath } from '../../src/engine/core/claude-dir.js';
+import { CLAUDE_DIR_ENV, resolveClaudeDir, resolveClaudeJsonPath } from '../../src/engine/core/claude-dir.ts';
 
 // C5 (docs/audit-qualite-code.md) : DEUX variables d'environnement designaient le
 // meme dossier dans un SEUL paquet npm — CLAUDE_CONFIG_DIR cote produit

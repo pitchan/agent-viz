@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, describe, expect, test } from 'vitest';
-import { discoverSessions, parseSince } from '../../src/engine/core/discovery.js';
+import { discoverSessions, parseSince } from '../../src/engine/core/discovery.ts';
 
 const claudeDir = mkdtempSync(path.join(tmpdir(), 'netgain-disc-'));
 afterAll(() => rmSync(claudeDir, { recursive: true, force: true }));

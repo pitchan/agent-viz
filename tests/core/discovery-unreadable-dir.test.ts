@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, describe, expect, test, vi } from 'vitest';
-import { discoverSessions } from '../../src/engine/core/discovery.js';
+import { discoverSessions } from '../../src/engine/core/discovery.ts';
 
 // Item 1 de la revue : le balayage récursif d'origine (readdir({recursive:true})) rejette
 // la promesse ENTIÈRE au premier sous-dossier illisible, et la session perd TOUS ses

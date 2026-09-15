@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { decodeJsonlLine, iterJsonlLines, type JsonlLine } from '../../src/engine/core/jsonl.js';
+import { decodeJsonlLine, iterJsonlLines, type JsonlLine } from '../../src/engine/core/jsonl.ts';
 
 // C2 (docs/audit-qualite-code.md) : le decodage JSONL est reimplemente sur 7
 // fichiers cote serveur, avec une tolerance au BOM incidente et inegale.

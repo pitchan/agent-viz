@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
-import type { NormalizedEvent, ToolUseRef } from '../../src/engine/core/events.js';
-import { ReadsAggregator } from '../../src/engine/doctor/aggregators/reads.js';
+import type { NormalizedEvent, ToolUseRef } from '../../src/engine/core/events.ts';
+import { ReadsAggregator } from '../../src/engine/doctor/aggregators/reads.ts';
 
 function readUse(id: string, filePath: string, range?: { offset?: number; limit?: number }): ToolUseRef {
   return { id, name: 'Read', input: { file_path: filePath, ...range } };

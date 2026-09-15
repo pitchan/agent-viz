@@ -2,10 +2,10 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, describe, expect, test } from 'vitest';
-import { SessionClock } from '../../src/engine/doctor/aggregators/clock.js';
-import { discoverSessions } from '../../src/engine/core/discovery.js';
-import { scanSession } from '../../src/engine/doctor/scan-session.js';
-import { assistantLine, promptLine, toolResultLine, toolUse, writeSessionTree } from '../helpers/build-transcript.js';
+import { SessionClock } from '../../src/engine/doctor/aggregators/clock.ts';
+import { discoverSessions } from '../../src/engine/core/discovery.ts';
+import { scanSession } from '../../src/engine/doctor/scan-session.ts';
+import { assistantLine, promptLine, toolResultLine, toolUse, writeSessionTree } from '../helpers/build-transcript.ts';
 
 describe('SessionClock — premier et dernier horodatage', () => {
   test('sans aucun horodatage, first et last valent null', () => {

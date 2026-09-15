@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
-import type { NormalizedEvent } from '../../src/engine/core/events.js';
-import { netTokens, TokensAggregator } from '../../src/engine/doctor/aggregators/tokens.js';
+import type { NormalizedEvent } from '../../src/engine/core/events.ts';
+import { netTokens, TokensAggregator } from '../../src/engine/doctor/aggregators/tokens.ts';
 
 function assistant(over: {
   msgId?: string | null;

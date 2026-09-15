@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { parseCliArgs, UsageError } from '../src/engine/cli-args.js';
+import { parseCliArgs, UsageError } from '../src/engine/cli-args.ts';
 
 describe('parseCliArgs', () => {
   test('--version donne la commande version', () => {

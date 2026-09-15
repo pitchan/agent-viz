@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { computeCost, normalizeModel, priceTable, pricingKindOf } from '../../src/engine/core/pricing.js';
+import { computeCost, normalizeModel, priceTable, pricingKindOf } from '../../src/engine/core/pricing.ts';
 
 describe('normalizeModel', () => {
   test('retire suffixe [1m], préfixes transport, dates et versions', () => {

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
-import { ContextAggregator, EARLY_TURN_MAX } from '../../src/engine/doctor/aggregators/context.js';
-import type { NormalizedEvent } from '../../src/engine/core/events.js';
+import { ContextAggregator, EARLY_TURN_MAX } from '../../src/engine/doctor/aggregators/context.ts';
+import type { NormalizedEvent } from '../../src/engine/core/events.ts';
 
 type AssistantEvt = Extract<NormalizedEvent, { kind: 'assistant' }>;
 type UserPromptEvt = Extract<NormalizedEvent, { kind: 'user_prompt' }>;

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { addUsage, emptyUsageBucket, isDedupableMsgId, sumUsageInto } from '../../src/engine/core/usage.js';
+import { addUsage, emptyUsageBucket, isDedupableMsgId, sumUsageInto } from '../../src/engine/core/usage.ts';
 
 // C3 (docs/audit-qualite-code.md) : l'accumulation des jetons d'usage etait
 // reimplementee cote serveur (src/server/tokens.js, `accumulateUsage`) et cote

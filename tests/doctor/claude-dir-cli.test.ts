@@ -2,8 +2,8 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { runDoctorCli } from '../../src/engine/doctor/index.js';
-import { promptLine, writeSessionTree } from '../helpers/build-transcript.js';
+import { runDoctorCli } from '../../src/engine/doctor/index.ts';
+import { promptLine, writeSessionTree } from '../helpers/build-transcript.ts';
 
 // C5 : le point de resolution REEL du moteur, celui que l'audit designe
 // (src/engine/doctor/index.ts:112). Le test de `resolveClaudeDir` prouve la

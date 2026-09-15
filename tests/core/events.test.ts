@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, test } from 'vitest';
-import { extractLineMeta, normalizeEvent } from '../../src/engine/core/events.js';
+import { extractLineMeta, normalizeEvent } from '../../src/engine/core/events.ts';
 
 describe('normalizeEvent', () => {
   test('ligne assistant complète → événement assistant (usage, toolUses, texte)', () => {

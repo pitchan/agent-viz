@@ -2,9 +2,9 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, describe, expect, test } from 'vitest';
-import * as core from '../../src/engine/core/index.js';
-import * as doctor from '../../src/engine/doctor/index.js';
-import { assistantLine, promptLine, writeSessionTree } from '../helpers/build-transcript.js';
+import * as core from '../../src/engine/core/index.ts';
+import * as doctor from '../../src/engine/doctor/index.ts';
+import { assistantLine, promptLine, writeSessionTree } from '../helpers/build-transcript.ts';
 
 describe('barillets publics — le contrat consommé par le produit', () => {
   const claudeDir = mkdtempSync(path.join(tmpdir(), 'netgain-exports-'));

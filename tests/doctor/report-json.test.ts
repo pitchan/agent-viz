@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { stableStringify } from '../../src/engine/doctor/report/json.js';
+import { stableStringify } from '../../src/engine/doctor/report/json.ts';
 
 describe('stableStringify', () => {
   test('clés triées récursivement, round-trip fidèle', () => {

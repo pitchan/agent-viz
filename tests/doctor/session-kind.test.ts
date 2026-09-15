@@ -2,10 +2,10 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, describe, expect, test } from 'vitest';
-import { SessionKindAggregator } from '../../src/engine/doctor/aggregators/session-kind.js';
-import { discoverSessions } from '../../src/engine/core/discovery.js';
-import { scanSession } from '../../src/engine/doctor/scan-session.js';
-import { assistantLine, promptBlocksLine, promptLine, writeSessionTree } from '../helpers/build-transcript.js';
+import { SessionKindAggregator } from '../../src/engine/doctor/aggregators/session-kind.ts';
+import { discoverSessions } from '../../src/engine/core/discovery.ts';
+import { scanSession } from '../../src/engine/doctor/scan-session.ts';
+import { assistantLine, promptBlocksLine, promptLine, writeSessionTree } from '../helpers/build-transcript.ts';
 
 const prompt = (
   shape: 'string' | 'blocks',

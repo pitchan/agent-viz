@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { SubagentsAggregator } from '../../src/engine/doctor/aggregators/subagents.js';
+import { SubagentsAggregator } from '../../src/engine/doctor/aggregators/subagents.ts';
 
 describe('SubagentsAggregator', () => {
   test('compte les side-cars et ventile par agentType du meta.json', () => {
