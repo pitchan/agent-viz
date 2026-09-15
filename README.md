@@ -48,7 +48,7 @@ npm install --save-dev @vcueto/agent-viz
 npx agent-viz
 ```
 
-Adds `agent-viz` as a dev dependency. The hook command embedded in `settings.json` points at the local `node_modules/.bin/agent-viz` (fast, no npx overhead). Scope defaults to user level (`~/.claude/settings.json`), as for the global install. To limit the hook to this repo, see [Hook management](#hook-management).
+Adds `agent-viz` as a dev dependency. The hook command embedded in `settings.json` runs the installed package directly, `node "<repo>/node_modules/@vcueto/agent-viz/bin/agent-viz.js" hook` (fast, no npx overhead). Scope defaults to user level (`~/.claude/settings.json`), as for the global install. To limit the hook to this repo, see [Hook management](#hook-management).
 
 ## Daily usage
 
@@ -209,7 +209,7 @@ If you reinstall agent-viz to a different path later (e.g. moved your dev clone)
 
 ## Captured events
 
-`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, `SessionStart`. Events land as JSONL in `${tmpdir}/agent-events/<session_id>.jsonl` and are streamed to the dashboard via Server-Sent Events. Each event carries a `_source: "claude" | "copilot"` field set by the hook command's `--source` flag.
+`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure` (Claude Code only), `Stop`, `SessionStart`. Events land as JSONL in `${tmpdir}/agent-events/<session_id>.jsonl` and are streamed to the dashboard via Server-Sent Events. Each event carries a `_source: "claude" | "copilot"` field set by the hook command's `--source` flag.
 
 ## Configuration
 
@@ -256,8 +256,8 @@ under `node --test`, kept as the reference the bridge is checked against). After
 engine source, rebuild it (`npm run build`) — the product loads the compiled `dist/engine/`.
 Publishing runs both test commands and the build first (`prepublishOnly`).
 
-Test files are named after the module system they use: `.test.cjs` (40, CommonJS),
-`.test.mjs` (38, ESM) and `.test.ts` (45, vitest API). Since the root package is ESM, a
+Test files are named after the module system they use: `.test.cjs` (CommonJS),
+`.test.mjs` (ESM) and `.test.ts` (vitest API). Since the root package is ESM, a
 `.js` test file *is* an ES module — the extension is what tells the runtime, so it has to be
 right. Both runners load `test-support/env-guard.mjs` first: it redirects `HOME`,
 `USERPROFILE`, `TEMP` and `TMP` to a throwaway sandbox and forces a dead port, so a test can
