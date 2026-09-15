@@ -1,27 +1,16 @@
-// D8 — le critere d arret des citations est une LISTE NOIRE, pas un detecteur
-// qui resout.
+// `lib/`, `public/` et `netgain/` sont des racines MORTES, absentes du depot : une
+// citation qui les nomme ne resout pas, et un detecteur fonde sur `fs.existsSync` ne
+// la voit donc jamais. D ou une LISTE NOIRE : leur simple APPARITION est la preuve.
 //
-// Le detecteur d inventaire de l etape 2 reposait sur `fs.existsSync` : « une
-// adresse est un chemin qui resout ». C est un instrument d AVANT le
-// deplacement. Apres les `git mv`, `lib/`, `public/` et `netgain/` n existent
-// plus : les citations perimees cessent de resoudre et deviennent INVISIBLES
-// (mesure : 46 -> 19 et 57 -> 23). Le commit qui corrige ces citations n avait
-// donc aucun critere falsifiable — une citation oubliee ne rougissait rien.
-//
-// La logique s inverse. Les trois racines sont mortes, donc leur simple
-// APPARITION est la preuve. Pas d `existsSync`, pas d extension exigee : cela
-// attrape du meme coup les citations qui nomment un DOSSIER (`lib/`), qu aucun
-// motif a extension ne pouvait voir.
+// Aucune extension n est exigee : une citation qui nomme un DOSSIER (`lib/`) est vue.
 //
 // Ce filet n est PAS un test unitaire (il lit le vrai disque, cf.
 // `tests/CLAUDE.md` § 4) : c est une verification d hygiene du depot, d ou
 // `tests/repo/` — meme famille que `documentation-citations.test.mjs`.
 //
-// Le motif prefere le FAUX POSITIF — visible, il part en liste blanche nommee —
-// au FAUX NEGATIF, silencieux, que ce chantier a deja paye quatre fois. D ou le
-// second test : une entree de liste blanche qui ne trouve plus rien est ROUGE
-// elle aussi, sans quoi la liste survivrait a ce qu elle protege et couvrirait
-// un jour une citation neuve.
+// Le motif prefere le FAUX POSITIF, visible et inscrit en liste blanche nommee, au
+// FAUX NEGATIF silencieux. D ou le second test : une entree de liste blanche qui ne
+// trouve plus rien est ROUGE, sans quoi elle couvrirait un jour une citation neuve.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
@@ -30,9 +19,8 @@ import path from 'node:path';
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 
 const ARBRES = ['src', 'bin', 'tests', 'scripts', 'docs'];
-// `CLAUDE.md` ajoute au solde de la dette (2026-08-13) : l exclure d EXCLUS ne
-// suffisait pas, il n a JAMAIS ete dans l assiette — preuve par controle
-// negatif, le filet reste vert avec ses trois citations mortes encore en place.
+// Les Markdown de la racine ne sont sous aucun des ARBRES : sans cette liste, ils ne
+// sont jamais lus, qu ils figurent ou non dans EXCLUS.
 const MARKDOWN_RACINE = ['ARCHITECTURE.md', 'README.md', 'CLAUDE.md'];
 
 const DOSSIERS_IGNORES = new Set(['node_modules', '.git', 'dist']);
@@ -40,17 +28,12 @@ const EXTENSIONS = new Set(['.js', '.mjs', '.cjs', '.ts', '.mts', '.tsx', '.html
 
 // Exclus EN BLOC, chacun pour une raison nommee.
 const EXCLUS = [
-  // Rapport DATE sur `4a4dc46` et materiel qui le rejoue : ses scripts adressent
-  // l arbre qu ils ont mesure. Les reecrire mentirait sur la mesure.
+  // Rapport d audit DATE et materiel qui le rejoue : ses scripts adressent l arbre
+  // qu ils ont mesure. Les reecrire mentirait sur la mesure.
   'docs/audit-qualite-code.md',
   'docs/audit/',
   // Plans et specs DATES, du meme genre — et git-ignores.
   'docs/superpowers/',
-  // DETTE SOLDEE (2026-08-13) : `CLAUDE.md` et `tests/CLAUDE.md` figuraient ici
-  // tant que le plan de l etape 2 interdisait d y toucher — trois citations de
-  // l arbre mort dans le premier, une citation `.test.js` d avant le step 1
-  // dans le second. Les deux sont corriges et BALAYES depuis : les retirer
-  // d ici etait la condition de solde inscrite dans ce commentaire meme.
   // Ce fichier-ci : la liste blanche cite NECESSAIREMENT ce qu elle protege, et
   // l en-tete nomme les trois racines mortes pour dire pourquoi elles le sont.
   // Se balayer soi-meme rendrait une liste blanche qui se couvre ELLE-MEME —
@@ -81,15 +64,13 @@ const LISTE_BLANCHE = [
   { fichier: 'tests/unit/watchdog-alert-content.test.mjs', fragment: '"session_id" lib/server/observatory --stats', raison: 'commande rg SIMULEE dans un evenement : le test asserte le libelle de l alerte' },
   { fichier: 'tests/unit/watchdog-alert-content.test.mjs', fragment: "file_path: '/repo/lib/hook.js'", raison: 'chemin simule hors de ce depot' },
 
-  // RECITS HISTORIQUES DATES — la phrase nomme l adresse d AVANT, et la reecrire
-  // la rendrait FAUSSE. Ce ne sont pas des citations perimees : ce sont des
-  // citations DE la perimee.
-  { fichier: 'tests/repo/documentation-citations.test.mjs', fragment: 'vers `netgain/docs/`', raison: 'constat C7 : un dossier qui n a JAMAIS existe ici — le citer est tout le propos' },
-  { fichier: 'docs/sources-externes.md', fragment: 'netgain/docs/calibration-observatoire-m1.md', raison: 'constat C7, idem : l adresse morte que ce fichier existe pour remplacer' },
-  { fichier: 'docs/sources-externes.md', fragment: '`netgain/docs/` tant que le moteur y', raison: 'ou vivaient ces documents dans le depot PRIVE, avant le demenagement du moteur' },
+  // RECITS D AVANT — la phrase nomme l adresse d avant pour dire qu elle est d avant ;
+  // la reecrire la rendrait fausse.
+  { fichier: 'docs/sources-externes.md', fragment: 'netgain/docs/calibration-observatoire-m1.md', raison: 'l adresse morte que ce fichier existe pour remplacer' },
+  { fichier: 'docs/sources-externes.md', fragment: '`netgain/docs/` tant que le moteur y', raison: 'la phrase nomme l adresse d avant de ces documents, comme adresse d avant : la reecrire la rendrait fausse' },
 
-  // FAUX POSITIF CONNU — un `lib/` VIVANT, sous un arbre que le deplacement ne touche pas.
-  { fichier: 'docs/sources-externes.md', fragment: 'docs/audit/scripts/lib/', raison: '`docs/audit/scripts/lib/` existe : materiel de l audit, hors perimetre du deplacement' },
+  // FAUX POSITIF CONNU — un `lib/` VIVANT, sous `docs/audit/scripts/`, pas une racine morte.
+  { fichier: 'docs/sources-externes.md', fragment: 'docs/audit/scripts/lib/', raison: '`docs/audit/scripts/lib/` existe : un `lib/` vivant sous le materiel de l audit, pas une racine morte' },
 ];
 
 function fichiersBalayes() {
@@ -135,7 +116,7 @@ const couvertePar = (occ, liste = LISTE_BLANCHE) =>
 const orphelinesDe = (liste, occurrencesVues) =>
   liste.filter(e => !occurrencesVues.some(o => couvertePar(o, [e])));
 
-test('aucune adresse d avant le deplacement ne subsiste hors liste blanche', () => {
+test('aucune citation de lib/, public/ ou netgain/ hors liste blanche', () => {
   // Arrange
   const toutes = occurrences();
 
@@ -168,20 +149,15 @@ test('chaque entree de la liste blanche protege encore quelque chose', () => {
   );
 });
 
-// \u2500\u2500 D9 \u2014 les citations INTERNES d un ancien nom `*.test.js` \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// ── Les citations d un ancien nom `*.test.js` ───────────────────────────────
 //
-// Angle mort distinct de D8 : `RACINE_MORTE` guette un DOSSIER mort
-// (`lib/`, `public/`, `netgain/`), pas un NOM DE FICHIER qui a change
-// d extension. Le step 1 a renomme 39 `.test.js` en `.test.cjs` : une
-// citation qui garde encore l ancien nom pointe vers un fichier qui n existe
-// plus sous cette adresse, exactement le meme defaut que D8, ici sur
-// l extension plutot que sur le dossier.
+// `RACINE_MORTE` guette un DOSSIER mort, pas un NOM DE FICHIER qui a change
+// d extension : les tests CommonJS s appelaient `*.test.js` avant leur renommage
+// en `.test.cjs`, et une citation de l ancien nom pointe vers un fichier absent.
 //
-// Deux listes NEUVES, posees PAR-DESSUS `fichiersBalayes()` (reutilise tel
-// quel, jamais reimplemente : lui seul porte les exclusions communes — dont,
-// jusqu au solde de la dette du 2026-08-13, `tests/CLAUDE.md`). Ni l une ni
-// l autre ne touche `EXCLUS` ni `LISTE_BLANCHE` : y ajouter changerait ce que
-// les deux tests ci-dessus prouvent (mesure).
+// Deux listes posees PAR-DESSUS `fichiersBalayes()`, reutilise tel quel : lui seul
+// porte les exclusions communes. Ni l une ni l autre ne touche `EXCLUS` ni
+// `LISTE_BLANCHE` : y ajouter changerait ce que les deux tests ci-dessus prouvent.
 const EXCLUS_TEST_JS = [
   // Litteraux fabriques ('a.test.js', 'b.test.js'...) : donnees de test pour
   // `formatId` et le reporter node:test, pas des citations d un fichier reel.
@@ -190,10 +166,8 @@ const EXCLUS_TEST_JS = [
 ];
 
 // Ancre sur un identifiant (lettres/chiffres/tiret/underscore) immediatement
-// avant `.test.js` : matche `pricing.test.js`, pas une mention nue comme
-// \u00ab 42 `.test.js` \u00bb (ARCHITECTURE.md, table du pont \u00a7 9) \u2014 un DECOMPTE, pas
-// la citation d un fichier ; ce nombre est revu au commit de bascule
-// (tache 5, qui refait tout le tableau d un coup), pas ici.
+// avant `.test.js` : matche `pricing.test.js`, pas l extension nue d un decompte
+// comme « 42 `.test.js` », qui ne cite aucun fichier.
 const CITATION_TEST_JS = /[A-Za-z0-9_-]+\.test\.js\b/;
 
 // Une entree = { fichier, fragment, raison } : une citation d un ancien nom

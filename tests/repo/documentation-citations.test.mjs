@@ -1,8 +1,3 @@
-// C7 (audit de qualité de code, docs/audit-qualite-code.md) : trois fichiers
-// citaient le relevé de calibration de l'Observatoire par un chemin relatif
-// vers `netgain/docs/`, un dossier qui n'a jamais existé dans ce dépôt. Un
-// lecteur suit la citation, ne trouve rien, et n'a aucun repli.
-//
 // Ce filet n'est PAS un test unitaire (il lit le vrai disque, cf. `tests/CLAUDE.md`
 // § 4) : c'est une vérification d'hygiène du dépôt, d'où `tests/repo/`.
 //
@@ -11,12 +6,12 @@
 // ailleurs (dépôt privé de la thèse) se citent par `docs/sources-externes.md`,
 // qui les recense et dit, pour chacun, ce qui en tient lieu DANS ce dépôt.
 //
-// Trois restrictions, chacune pour une raison mesurée (sonde du 2026-08-11) :
+// Trois restrictions, chacune pour une raison mesurée :
 //   1. commentaires seulement — dans le CODE, un nom de fichier Markdown est un
 //      nom de fichier lu à l'exécution (`path.join(claudeDir, 'CLAUDE.md')`) ou
 //      un chemin de bouchon de test, pas une citation ;
 //   2. tokens contenant une barre oblique — `CLAUDE.md` nu ne désigne pas une
-//      adresse mais une famille de fichiers (21 sites, tous licites) ;
+//      adresse mais une famille de fichiers ;
 //   3. chemins absolus et URL exclus — ce ne sont pas des chemins de ce dépôt.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

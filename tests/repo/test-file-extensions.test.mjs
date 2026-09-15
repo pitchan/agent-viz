@@ -1,4 +1,4 @@
-// D10 — l extension d un fichier de test est un CONTRAT, pas un detail.
+// L extension d un fichier de test est un CONTRAT, pas un detail.
 //
 // Les deux executeurs enumerent par motif d extension, jamais par contenu :
 //   vitest        include: tests/**/*.test.{cjs,mjs,ts}   (vitest.config.mts)
@@ -6,14 +6,12 @@
 // Un fichier de tests/ nomme *.test.<autre extension> n est lu par AUCUN des
 // deux : il ne rougit jamais, ne tourne jamais, et sa presence dans l arbre se
 // lit comme une couverture. Le defaut est SILENCIEUX — la famille exacte que ce
-// dossier existe pour attraper (cf. D8 : le faux positif visible prefere au
-// faux negatif silencieux).
+// dossier existe pour attraper (le faux positif visible prefere au faux negatif
+// silencieux).
 //
-// Le cas concret : l extension `.test.js`. Avant le step 1, 39 fichiers la
-// portaient ; le renommage en `.test.cjs` l a rendue morte, et rien n empechait
-// une main distraite d en recreer un — aucune consigne ne le disait, aucun
-// filet ne le voyait. D9 (voisin) guette les CITATIONS d un ancien nom ;
-// celui-ci guette la PRESENCE d un fichier qu aucun executeur ne lira.
+// Le cas le plus probable : `.test.js`, l extension des tests CommonJS avant leur
+// renommage en `.test.cjs`. `stale-path-citations.test.mjs` guette les CITATIONS d un
+// ancien nom ; celui-ci guette la PRESENCE d un fichier qu aucun executeur ne lira.
 //
 // Meme famille que ses voisins de `tests/repo/` : il lit le vrai disque, ce
 // n est pas un test unitaire (cf. `tests/CLAUDE.md` § 4).
@@ -85,7 +83,7 @@ test('tout fichier *.test.* ou *.spec.* sous tests/ porte une extension que les 
   const invisibles = tous.filter(rel => !EXTENSIONS_LUES.has(path.extname(rel)));
 
   // Assert — l assiette est dite AVANT le verdict : un balayage qui ne voit
-  // rien passerait aussi, et ne prouverait rien (119 fichiers au 2026-08-13).
+  // rien passerait aussi, et ne prouverait rien.
   assert.ok(tous.length >= 100, `assiette suspecte : ${tous.length} fichiers de test vus, attendu >= 100`);
   assert.deepEqual(
     invisibles,

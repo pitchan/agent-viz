@@ -1,47 +1,15 @@
-// doc/36 § 3.0 ter — la SEULE surface du produit qu aucun instrument ne regarde.
+// Chaque point d entree de `package.json` (les `bin`, `main`, chaque entree de `files`)
+// designe quelque chose sur le disque. Ni le typecheck ni le build ne les regardent, et
+// npm IGNORE EN SILENCE une entree `files` absente : pas un plantage, un silence.
 //
-// Relevee a la fin de l etape 2 de la migration, par la premiere revue qui ait
-// installe le paquet et lance le produit : sept taches, sept revues
-// independantes, dix commits et une etiquette de version — et personne n avait
-// execute `node bin/agent-viz.js --version`. Les deux `bin`, le `main` et
-// chaque entree de `files` de `package.json` ne sont vus ni par le typecheck, ni
-// par le build, ni par les tests, ni par le filet de citations. Verifie par
-// commande au moment d ecrire ce fichier : les deux seuls tests qui lisent le
-// `package.json` de la racine y lisent `scripts.build` et `version`, jamais un
-// point d entree.
+// PORTEE : une entree qui DESIGNE quelque chose ne dit ni que ce quelque chose est
+// COMPLET, ni que le point d entree S EXECUTE — resoudre n est pas tourner.
 //
-// Et npm IGNORE EN SILENCE une entree `files` inexistante. C est ce qui a rendu
-// invisible, pendant deux taches de l etape 2, le fait qu un `npm pack` n aurait
-// pas livre le moteur : des entrees de `files` designaient un dossier que le
-// meme commit venait de supprimer, sans qu aucune commande ne rougisse. Pas un
-// plantage, un silence.
+// PRECONDITION : un des deux `bin` et une entree de `files` vivent sous `dist/engine/`,
+// genere et git-ignore. Ce filet exige un arbre CONSTRUIT : `npm run build` d abord.
 //
-// PORTEE — ecrite parce qu une commande dont on ignore la portee finit par
-// servir de preuve de ce qu elle ne regarde pas :
-//   - ce filet dit qu une entree DESIGNE quelque chose sur le disque. Il ne dit
-//     pas que ce quelque chose soit COMPLET : aucun filet ne verifie plus la
-//     completude du build depuis le retrait de `tests/install/paths.test.ts`
-//     avec le moteur de carte (etape 6 bis, doc/36, doc/47 tache 3) ;
-//   - il ne dit pas non plus que le point d entree S EXECUTE. Resoudre n est pas
-//     tourner, et l etape 3 est precisement celle qui peut casser l execution en
-//     laissant la resolution intacte — une racine passee en `"type": "module"`
-//     ne deplace aucun fichier. D ou les trois commandes de fin d etape, qui
-//     restent : `node bin/agent-viz.js --version`,
-//     `node dist/engine/cli.js --version`, `npm pack --dry-run --ignore-scripts`.
-//
-// PRECONDITION : un des deux `bin` et une entree de `files` vivent sous
-// `dist/engine/`, genere et git-ignore. Ce filet exige donc un arbre CONSTRUIT,
-// au meme titre qu une douzaine d autres — `npm run build` d abord.
-//
-// MOTIFS DE GLOB : le champ `files` accepte des motifs ; ce depot n en emploie
-// aucun. Ce filet traite chaque entree comme un chemin LITTERAL, donc un motif y
-// rougirait, nommement. C est voulu — un faux positif se raye a la main, la ou un
-// faux negatif se lit comme une preuve. Etendre ce filet aux motifs devient alors
-// une decision explicite, jamais un effet de bord.
-//
-// Ce filet n est PAS un test unitaire (il lit le vrai disque) : c est une
-// verification d hygiene du depot, d ou `tests/repo/` — meme famille que
-// `stale-path-citations.test.mjs`.
+// Chaque entree de `files` est un chemin LITTERAL (le depot n emploie aucun glob) : un motif
+// y rougirait nommement, un faux positif visible plutot qu un faux negatif silencieux.
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, statSync, mkdtempSync, rmSync } from 'node:fs';
@@ -100,34 +68,13 @@ test('chaque point d entree declare resout sur le disque', () => {
   );
 });
 
-// L auto-nettoyage du build. L etape 3 a supprime le marqueur ESM de
-// `dist/engine/` et son poseur : la racine etant passee en `"type": "module"`,
-// le marqueur n a plus d objet. Mais un `dist/engine/package.json` DEJA pose sur
-// le disque survit a une recompilation — `tsc` ecrase ce qu il emet, il n efface
-// pas ce qu il n emet plus. D ou l effacement en tete du script.
-//
-// Son absence a ete mesuree SILENCIEUSE : `npm run build` sort en 0 et `npm
-// pack` repart a 172 fichiers au lieu de 171, le tarball reembarquant un
-// marqueur perime. Aucune commande ne rougit. Or plus aucun test ne lisait
-// `scripts.build` depuis que la forme bon marche qui le faisait a ete effacee
-// dans le meme commit (206d1ad) : ce test est cette forme, rendue.
-//
-// PORTEE — meme discipline que le filet ci-dessus : il lit le SCRIPT, il ne
-// lance pas le build. Il dit que l effacement est declare et qu il PRECEDE la
-// compilation ; il ne dit pas que le build reussisse, ce dont `prepublishOnly`
-// repond deja. Lancer `tsc` ici couterait des secondes a chaque run pour
-// redire ce qui est verifie ailleurs.
+// `tsc` ecrase ce qu il emet mais n efface pas ce qu il n emet plus : sans l effacement en
+// tete du script build, un fichier perime de `dist/engine/` repart dans le tarball, exit 0.
+// Ce test lit le SCRIPT sans lancer `tsc` : `prepublishOnly` repond du build lui-meme.
 test('le script build efface dist/engine avant de compiler', () => {
-  // Arrange — les deux positions dans le script, en clair. `search` rend -1
-  // quand le motif manque, ce qui distingue « absent » de « mal place ».
-  //
-  // SPECIFICATEUR (etape 4, tache 9) : le script d avant appelait
-  // `rmSync('dist/engine', ...)` directement — la cible suivait l appel dans
-  // le texte. Celui d apres partage l effacement de `dist/engine` ET
-  // `dist/server` dans un seul `rmSync`, via `['dist/engine','dist/server']
-  // .forEach(d=>...rmSync(d,...))` : la cible PRECEDE desormais l appel. Le
-  // motif reconnait les deux ordres — l exigence qu il verifie ne bouge pas :
-  // `rmSync` doit toujours porter sur `dist/engine`, quelque part avant `tsc`.
+  // Arrange — `search` rend -1 quand le motif manque, ce qui distingue « absent » de
+  // « mal place ». Le motif accepte la cible apres l appel, `rmSync('dist/engine', ...)`,
+  // comme avant lui, `['dist/engine', ...].forEach(d => ... rmSync(d, ...))`.
   const build = typeof PKG.scripts?.build === 'string' ? PKG.scripts.build : '';
   const effacement = build.search(
     /rmSync\([^)]*['"]dist\/engine['"]|\[[^\]]*['"]dist\/engine['"][^\]]*\][^;]*rmSync\(/,
@@ -153,10 +100,9 @@ test('le script build efface dist/engine avant de compiler', () => {
 });
 
 test('package.json declare encore ses trois familles de points d entree', () => {
-  // Arrange — c est l ASSIETTE du test ci-dessus, et elle vit ici plutot qu en
-  // double a l interieur de lui : un `package.json` prive de `bin`, de `main` ou
-  // de `files` lui donnerait moins d entrees a verifier, donc un vert obtenu en
-  // ne regardant rien. Ce second test est le seul a nommer cette panne-la.
+  // Arrange — c est l ASSIETTE du premier test : un `package.json` prive de `bin`, de
+  // `main` ou de `files` lui donnerait moins d entrees a verifier, donc un vert obtenu
+  // en ne regardant rien. Ce test est le seul a nommer cette panne-la.
   const manques = [];
 
   // Act
