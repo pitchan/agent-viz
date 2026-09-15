@@ -19,10 +19,9 @@ import { pricingDriftAlert } from './viz-pricing-drift-alert.ts';
 import { connectionPresentation } from './viz-topbar-status.ts';
 import { resetErrors } from './viz-errors.ts';
 
-// Nothing here tells the watchdog whether we can still hear the agent. That
-// question belonged to a detector running in the tab; detection now runs on
-// the server, which keeps listening whether or not a tab is open, and answers
-// it from its own catch-up state.
+// Nothing here tells the watchdog whether we can still hear the agent: detection runs on
+// the server, which keeps listening whether or not a tab is open and answers that question
+// from its own catch-up state.
 
 // Render a small pill badge identifying the source agent. Returns HTML safe to
 // inline (label is fixed, no user input).
@@ -230,11 +229,9 @@ export async function poll(force?: boolean) {
     }
     if (firstBatch && state.nodes.size) { firstBatch = false; _pendingFitView = true; }
     scheduleRender();
-    // Swallowed on purpose, and it costs nothing now: a failed poll used to
-    // have to be reported, because the watchdog ran here and had to be told
-    // that the coming silence was ours and not the agent's. Detection has left
-    // the tab, so a poll that did not answer means only that this round showed
-    // nothing new — the next one, or the stream, will catch up.
+    // Swallowed on purpose: detection runs on the server, so a poll that did not answer
+    // means only that this round showed nothing new — the next one, or the stream, will
+    // catch up.
   } catch {}
 }
 
@@ -371,9 +368,8 @@ function pauseApp() {
   _paused = true;
   if (sseSource) { sseSource.close(); sseSource = null; sseConnected = false; }
   stopPollFallback();
-  // We stop listening on purpose here, and it no longer needs saying: the
-  // server never stopped, so the silence that follows is ours alone and
-  // nothing concludes anything from it.
+  // We stop listening on purpose, and nobody needs telling: the server keeps listening,
+  // so nothing concludes anything from the tab's silence.
   stopDurationsTicker();
   pauseTick();
   if (vis.rafHandle != null) { cancelAnimationFrame(vis.rafHandle); vis.rafHandle = null; }

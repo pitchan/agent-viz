@@ -318,16 +318,9 @@ function onPostToolUseFailure(evt: HookEvent, sid: string, ts: string) {
     setRunning(n.id, false);
   }
   settleAgentFromAgentToolResponse(evt, ts, 'error');
-  // HORS du `if (n)`, et c'est tout l'objet du correctif : un echec dont le
-  // noeud manque — PreToolUse non recu, noeud deja ramasse — n'etait jusqu'ici
-  // compte ni trace nulle part.
-  //
-  // Mais EN DERNIER, et ce n'est pas indifferent : `recordError` previent ses
-  // abonnes de facon synchrone, et l'abonne repeint le flux, dont les couleurs
-  // se lisent sur le STATUT des noeuds. Enregistrer d'abord faisait repeindre
-  // avant la mutation ci-dessus, et la ligne gardait la couleur de son type.
-  // Le defaut ne se voyait que sur la DERNIERE erreur d'une session — chaque
-  // erreur repeignait les precedentes — donc jamais sur un cas a une erreur.
+  // HORS du `if (n)` : un echec dont le noeud manque (PreToolUse non recu, noeud deja
+  // ramasse) se compte aussi. Et EN DERNIER : l'abonne de `recordError`, synchrone, repeint
+  // le flux d'apres le STATUT des noeuds, qui doit deja porter la mutation ci-dessus.
   recordError(evt);
 }
 
@@ -375,13 +368,12 @@ export function processEvent(evt: HookEvent) {
   layoutDirtyRoots.add(`s:${sid}`);
   const handler = evt.hook_event_name ? EVENT_HANDLERS[evt.hook_event_name] : undefined;
   if (handler) handler(evt, sid, ts);
-  // No watchdog feed here any more. The events this function receives are the
-  // ones a tab happened to be open for; the server sees all of them, and it is
-  // where detection lives now.
+  // No watchdog feed here: this function receives only the events a tab happened to be
+  // open for, while the server sees all of them and runs detection.
   markNarratorDirty();
 }
 
-// Le format vit dans viz-duration.mjs (constat C8) ; ici on ne garde que la
+// Le format vit dans viz-duration.ts ; ici on ne garde que la
 // traduction de « pas de durée » propre à la carte du graphe : `null`, que
 // `viz-canvas` et le panneau de détail savent déjà taire.
 export function calcDuration(start: string | null | undefined, end: string | null | undefined): string | null {
@@ -455,7 +447,7 @@ function layoutAgent(agent: VizNode, dirFromParent: number) {
   });
 
   if (subAgents.length === 0) {
-    // No sub-agents → tools fan along the outward axis (legacy behaviour).
+    // No sub-agents → tools fan along the outward axis.
     const toolDist = 90 + visibleTools.length * 8;
     const toolSpread = Math.min(Math.PI * 1.2, visibleTools.length * 0.35);
     visibleTools.forEach((tool, ti) => {

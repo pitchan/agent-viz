@@ -38,7 +38,7 @@ function el(tag: string, className?: string | null, text?: string): HTMLElement 
   return node;
 }
 
-// Les trois intentions (doc/44) : chaque bouton répond à « Que fais-tu de ce
+// Les trois intentions : chaque bouton répond à « Que fais-tu de ce
 // conseil ? » dans les mots de l'utilisateur, et sa conséquence est écrite
 // dessous — le contrat au moment du clic, pas dans un mode d'emploi ailleurs.
 
@@ -90,7 +90,7 @@ export function recommendationCard(rec: Recommendation, { actionable }: { action
       btn.dataset.status = status;
       buttons.appendChild(choice(btn, CHOICE_CAPTIONS[status]));
     }
-    // « Non merci » : câblé avec sa raison (doc/42) — il ne passe pas par la
+    // « Non merci » : câblé avec sa raison — il ne passe pas par la
     // délégation data-status, qui partirait au serveur sans raison.
     buttons.appendChild(choice(
       refusalControls(reason => changeStatus(api, rec.id, 'arbitrated', reason)),
@@ -170,7 +170,7 @@ export async function ackEpisodes(apiClient: ApiClient, episodes: Alert[]) {
 // Les pannes ne passent pas par le magasin de l'observatoire : elles viennent
 // du chien de garde. Une erreur s'AFFICHE sans effacer la liste deja rendue —
 // un bloc vide sans un mot serait indiscernable de « aucune panne », le pire
-// mode de panne du seul panneau charge de dire qu'il y en a eu (doc/32).
+// mode de panne du seul panneau charge de dire qu'il y en a eu.
 async function loadFailures() {
   const node = document.getElementById('advisor-failures')!;
   const erreur = document.getElementById('advisor-failures-error')!;
@@ -182,8 +182,8 @@ async function loadFailures() {
       onAckGroup: episodes => ackEpisodes(api, episodes).then(
         () => loadFailures(),
         // L'etat vrai d'abord, le message ensuite : recharge PUIS pose le
-        // motif d'interruption — l'ordre inverse le faisait effacer par le
-        // chemin de succes du rechargement (revue finale doc/32).
+        // motif d'interruption — dans l'ordre inverse, le chemin de succes du
+        // rechargement l'effacerait.
         err => loadFailures().finally(() => {
           erreur.textContent = `Acquittement interrompu : ${(err as Error).message}`;
         }),

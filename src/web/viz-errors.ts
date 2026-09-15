@@ -1,32 +1,16 @@
 // viz-errors.ts — le registre des echecs d'outils de la session affichee.
 //
-// Module pur : pas de DOM. Il existe parce que le compteur « N errors » du
-// bandeau se calculait en balayant les noeuds du graphe, ce qui le rendait
-// faux de trois facons, toutes trois mesurees au navigateur :
+// Module pur : pas de DOM. Il capte a l'EVENEMENT, pas au noeud survivant : il ne
+// connait pas le graphe, et retient de quoi comprendre l'echec sans lui, plus
+// l'identifiant du noeud a rejoindre quand il est encore la.
 //
-//   1. le ramasse-miettes efface un noeud d'outil fini au bout de dix minutes,
-//      donc le compteur retombait a zero sans que rien ne soit resolu ;
-//   2. un echec arrive sans son noeud — `PreToolUse` non recu, noeud deja
-//      ramasse — n'etait compte nulle part, parce que tout le traitement de
-//      l'echec vivait sous un `if (n)` ;
-//   3. les noeuds d'agent, eux, ne sont JAMAIS ramasses : le meme chiffre
-//      melangeait donc deux durees de vie.
+// Compter les noeuds serait faux trois fois : le ramasse-miettes efface un outil fini
+// au bout de dix minutes, un echec peut arriver sans noeud (`PreToolUse` non recu,
+// noeud ramasse), et les noeuds d'agent ne sont jamais ramasses.
 //
-// Le remede tient en une phrase : on capte a l'EVENEMENT, pas au noeud
-// survivant. Le registre ne connait pas le graphe ; il retient seulement de
-// quoi comprendre l'echec sans lui, plus l'identifiant du noeud a rejoindre
-// quand il est encore la.
-//
-// Depuis, le registre a appris a faire VIEILLIR ses erreurs — honnetement,
-// c'est-a-dire sans jamais interpreter. « 1 error » affiche toute la session
-// mettait dans le meme sac la sonde rattrapee trente secondes plus tard et
-// l'agent qui boucle sur le meme echec. Trois faits comptables les separent :
-//   - la repetition : le meme echec (outil + sujet, ou message a defaut de
-//     sujet) s'empile sur sa ligne au lieu d'en creer une ;
-//   - la continuite : chaque ligne sait combien d'outils ont REUSSI depuis sa
-//     derniere occurrence — au lecteur d'en conclure que l'agent s'est
-//     rattrape, le registre ne le pretend jamais ;
-//   - le dernier verdict : le tout dernier outil de la session a-t-il echoue ?
+// Les erreurs VIEILLISSENT, sans jamais etre interpretees : trois faits comptables
+// separent la sonde rattrapee de l'agent qui boucle — la repetition, la continuite
+// (outils reussis depuis), le dernier verdict ; tests/unit/errors-register.test.mjs.
 //
 // Portee : une session. `clearState` le vide au changement de session, sinon
 // le rejeu du journal compterait deux fois et le volet melangerait deux

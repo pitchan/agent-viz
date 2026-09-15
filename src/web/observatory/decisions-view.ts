@@ -1,12 +1,12 @@
-// decisions-view.ts — la section « Décisions rendues » (le journal, doc/44)
+// decisions-view.ts — la section « Décisions rendues » (le journal)
 // et le contrôle « Non merci » d'une carte active.
 //
-// Rendering only, comme failures-view.js : le classement décide ce qui est au
+// Rendering only, comme failures-view.ts : le classement décide ce qui est au
 // journal (serveur), le magasin recharge après chaque geste. Deux rails de
 // clic, volontairement distincts : « Réactiver » porte data-status et passe
 // par la délégation existante de la page ; « Consigner » est câblé ICI, avec
 // sa raison — il ne porte PAS de data-status, sinon la délégation partirait
-// au serveur sans raison (piège doc/42, conservé tel quel).
+// au serveur sans raison.
 
 import { decisionLine } from './format.ts';
 
@@ -31,7 +31,7 @@ function button(className: string, label?: string): HTMLButtonElement {
 }
 
 // La section repliée, ajoutée au bout de la liste des conseils. Le compte
-// reste lisible section fermée (décision : jamais silencieux) ; aucune
+// reste lisible section fermée, jamais silencieux ; aucune
 // section quand il n'y a rien — un tiroir vide se lirait comme une panne.
 // Le journal mêle les trois décisions (adopté, en veille, refusé) : une seule
 // destination pour « où est passée ma carte ? », et un Réactiver partout.

@@ -13,7 +13,7 @@ import { initPeriodSelector } from './period-selector.ts';
 
 // Une ligne de GET /analysis/sessions — projectPath/project calqués sur
 // SessionListRow (service.ts, jamais importé : frontière navigateur/Node).
-// `null` = ligne antérieure à M1.1, jamais une valeur devinée.
+// `null` = une ligne stockée sans projet, jamais une valeur devinée.
 interface SessionSummaryRow {
   id: string;
   projectPath: string | null;
@@ -28,8 +28,8 @@ interface SessionSummaryRow {
 }
 
 // Le rapport détaillé d'UNE session (drill-down), sous-ensemble du rapport
-// du moteur (src/engine — jamais importé ici, frontière navigateur/Node,
-// doc/36 §2) reduit aux champs que ce panneau affiche.
+// du moteur (src/engine — jamais importé ici, frontière navigateur/Node)
+// reduit aux champs que ce panneau affiche.
 interface SessionReport {
   sessionId: string;
   netTokens: number;

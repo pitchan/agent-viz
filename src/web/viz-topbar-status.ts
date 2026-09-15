@@ -1,16 +1,11 @@
 // viz-topbar-status.ts — what the topbar's health witnesses say, in one place.
 //
-// Pure module: no DOM. The connection light and the watchdog bell used to be
-// two identical green dots — one informational, one a button — with nothing to
-// tell them apart. Each now carries its own words, and those words live here,
-// where a unit test can pin them; viz-network.js and viz-ui.js only apply them.
-//
-// The errors chip joined them for the same reason, one version later: it read
-// "1 errors" — wrong plural, no affordance, no scope — and a user asked, quite
-// reasonably, "1 error, but WHERE?".
+// Pure module: no DOM. The connection light, the watchdog bell and the errors chip each carry
+// their own words, so that none reads as another's twin; those words live here, where a unit
+// test can pin them, and viz-network.ts and viz-ui.ts only apply them.
 
-// The label is the fix for the anonymous dot: a light that says LIVE needs no
-// tooltip to be understood, the tooltip only adds the "of what".
+// The label names the light: a light that says LIVE needs no tooltip to be
+// understood, the tooltip only adds the "of what".
 export function connectionPresentation(connected: boolean) {
   return connected
     ? { label: 'LIVE', title: 'Receiving live events from the agent-viz daemon' }
@@ -18,8 +13,7 @@ export function connectionPresentation(connected: boolean) {
 }
 
 // The bell is a button in both states, and only the tooltip can say so when
-// there is nothing to show — which is precisely when the old green dot read
-// as dead weight.
+// there is nothing to show — which is precisely when a bare dot reads as dead weight.
 export function watchdogPresentation(activeCount: number) {
   if (activeCount > 0) {
     const s = activeCount > 1 ? 's' : '';
@@ -44,8 +38,8 @@ export function watchdogPresentation(activeCount: number) {
 // it counts THIS session and nothing else.
 //
 // It takes the registry's summary, not a bare count, because one number cannot
-// say the thing users actually asked about: "1 error" stayed red all session
-// for a probe the agent corrected thirty seconds later. Two states now:
+// tell a probe the agent corrected thirty seconds later from an agent looping on
+// the same failure. Two states:
 // - alarm: an error keeps repeating, or the very last tool call failed —
 //   the two mechanical signs that the session needs eyes NOW;
 // - calm: errors happened, the session has moved on since.

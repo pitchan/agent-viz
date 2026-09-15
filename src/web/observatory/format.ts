@@ -22,7 +22,7 @@ export interface RecommendationEvidence {
 }
 
 // Une recommandation telle que le classement serveur la rend — jamais
-// importee de src/server/ (frontiere navigateur/Node, doc/36 §2).
+// importee de src/server/ (frontiere navigateur/Node).
 // status/statusAt/statusReason facultatifs : decisions-view.ts n'en lit qu'un sous-ensemble.
 export interface Recommendation {
   id: number;
@@ -168,7 +168,7 @@ function formatDayMonthYear(iso: string) {
   return `${formatDayMonth(iso)}/${new Date(iso).getFullYear()}`;
 }
 
-// The decision journal (doc/44): the user's intention in their own words,
+// The decision journal: the user's intention in their own words,
 // never the machine statuses. Dates and reasons are enforced at write time;
 // a hole says so, never guesses.
 const DECISION_VERBS: Record<string, string> = { accepted: 'Adopté', ignored: 'Mis en veille', arbitrated: 'Refusé' };
@@ -235,9 +235,9 @@ export function periodHeader(period: Period | null | undefined) {
   return `Fenêtre : ${period.days} j — du ${formatDayMonth(period.from)} au ${formatDayMonth(period.to)}`;
 }
 
-// Le resume du tiroir Conseils, en deux niveaux (doc/32) : une phrase de tete
-// que tout le monde comprend, puis le detail etiquete. Memes chiffres
-// qu'avant — pure mise en forme, aucun calcul nouveau.
+// Le resume du tiroir Conseils, en deux niveaux : une phrase de tete que tout
+// le monde comprend, puis le detail etiquete. Pure mise en forme des chiffres du
+// resume, aucun calcul.
 export function summaryHeadline(summary: Summary | null | undefined) {
   if (!summary || !summary.period) return '';
   return `Sur ${summary.period.days} jours : ${summary.sessions} sessions, `

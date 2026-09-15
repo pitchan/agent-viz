@@ -290,14 +290,13 @@ export function tokenContext(t: TokenBucket | null | undefined) {
   return countOrZero(t.lastIn) + countOrZero(t.lastCacheCreate) + countOrZero(t.lastCacheRead);
 }
 
-// C4 (2026-08-11) — complétude du coût, agrégée sur plusieurs seaux.
+// Complétude du coût, agrégée sur plusieurs seaux.
 //
 // `costUsd` n'est jamais un montant faux : c'est la somme des messages dont le
 // TARIF est connu, donc une BORNE INFÉRIEURE exacte du coût réel. Quand un
 // modèle absent de la table embarquée a produit des jetons, le serveur pose
-// `costComplete: false` sur le seau et nomme le modèle — c'est ce que le
-// pilote temps réel ignorait entièrement, montrant un montant net de toute
-// réserve pendant que la page Observatoire, elle, disait « coût partiel ».
+// `costComplete: false` sur le seau et nomme le modèle : la pastille temps réel
+// porte alors la même réserve que la page Observatoire (« coût partiel »).
 //
 // Un seau SANS le champ (enveloppe d'un serveur antérieur, rejeu d'un ancien
 // instantané) compte comme complet : l'enveloppe SSE est additive, et
@@ -336,7 +335,7 @@ export function formatCost(usd: number | null | undefined) {
   return '$' + (usd / 1000).toFixed(1) + 'k';
 }
 
-// C4 (2026-08-11) — le montant assorti de ce qu'il PRÉTEND. Trois énoncés,
+// Le montant assorti de ce qu'il PRÉTEND. Trois énoncés,
 // trois vérités différentes :
 //
 //   complet            → « $4.17 ». C'est le coût.
@@ -350,9 +349,8 @@ export function formatCost(usd: number | null | undefined) {
 //                        « au moins $0 » serait vrai et ne prétendrait RIEN,
 //                        ce qui est pire qu'avouer l'absence.
 //
-// Le mot « partiel » — celui qu'emploie déjà la page Observatoire, à six
-// endroits — tient dans l'infobulle, où il y a la place de le qualifier et de
-// nommer les modèles fautifs. La pastille n'a la place que de l'énoncé.
+// Le mot « partiel » — celui qu'emploie déjà la page Observatoire — tient dans
+// l'infobulle, où il y a la place de le qualifier et de nommer les modèles fautifs. La pastille n'a la place que de l'énoncé.
 export function formatCostBound(usd: number | null | undefined, complete: boolean) {
   if (complete) return formatCost(usd);
   return usd && usd > 0 ? `au moins ${formatCost(usd)}` : 'coût indisponible';

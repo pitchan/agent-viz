@@ -21,10 +21,9 @@
   --glass-hover: rgba(102, 204, 255, 0.08);
   --text-primary: #d0e8f8;
   /* Contrastes mesures sur le fond des panneaux (#090d1b, --glass-bg sur
-     --void). Les valeurs precedentes — .6 et .3 — donnaient 4,4:1 et 1,9:1
-     pour du texte de 11 px : sous le seuil AA de 4,5:1, c'est-a-dire illisible
-     pour qui ne voit pas parfaitement. La hierarchie des trois niveaux est
-     conservee, elle passe juste au-dessus du plancher. */
+     --void) : du texte de 11 px exige 4,5:1 (seuil AA), sous lequel il est
+     illisible pour qui ne voit pas parfaitement. La hierarchie des trois
+     niveaux est conservee, juste au-dessus du plancher. */
   --text-dim: rgba(102, 204, 255, 0.78);   /* 6,8:1 */
   --text-muted: rgba(102, 204, 255, 0.62); /* 4,7:1 */
 }
@@ -67,14 +66,14 @@ body {
   border-bottom: 1px solid var(--glass-border);
   display: flex; align-items: center; padding: 0 20px; gap: 16px;
   z-index: 100;
-  /* Rien ne s'echappe de la fenetre. Mesure a 1248px avec une invite longue et
-     la pastille de budget remplie : le bandeau RECLAMAIT 1484px, la boite de
-     filtre sortait de 216px et la page defilait horizontalement. */
+  /* Rien ne s'echappe de la fenetre : avec une invite longue et la pastille de
+     budget remplie, le bandeau reclame plus que la largeur, et sans cet
+     `overflow` la page defilerait horizontalement. */
   overflow: hidden;
 }
-/* Ce qui a une largeur propre ne se replie jamais sur deux lignes. Sous la
-   pression, le logo passait a 38px de haut et le groupe de compteurs a 58 —
-   dans une barre haute de 48. C'est ce debordement VERTICAL qui se voyait. */
+/* Ce qui a une largeur propre ne se replie jamais sur deux lignes : sous la
+   pression, le logo et le groupe de compteurs passeraient sur deux lignes et
+   deborderaient VERTICALEMENT une barre haute de 48 px. */
 .logo, #connection-status, #watchdog-pill, .sep, .stat { flex: none; white-space: nowrap; }
 /* L'invite absorbe la pression EN PREMIER : elle porte deja son ellipse, donc
    elle se raccourcit sans rien perdre d'irremplacable. */
@@ -130,8 +129,8 @@ body {
 .sep { width: 1px; height: 24px; background: var(--glass-border); }
 
 /* Connection witness — a labeled light, like a recorder's REC lamp. The label
-   is what makes it self-explanatory: the bare dot next to the (equally green)
-   watchdog dot read as its twin. */
+   is what makes it self-explanatory: a bare dot next to the watchdog bell reads
+   as its twin. */
 #connection-status {
   display: inline-flex; align-items: center; gap: 6px;
   font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
@@ -150,7 +149,7 @@ body {
 
 /* Watchdog bell — quiet and gray when there is nothing to say, red with a
    count when alerts are active. Border, hover and pointer make it read as the
-   button it always was. */
+   button it is. */
 .watchdog-pill {
   display: inline-flex; align-items: center; gap: 5px;
   height: 22px; padding: 0 8px;
@@ -264,10 +263,9 @@ body {
 .error-item.reachable { cursor: pointer; }
 .error-item.reachable:hover { background: rgba(255, 85, 102, 0.1); border-color: rgba(255, 85, 102, 0.35); }
 .error-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-/* `min-width: 0` est ce qui manquait : par defaut un element flexible refuse de
-   descendre sous la largeur de son contenu, et un nom d'outil MCP n'offre aucune
-   coupure naturelle. Mesure : a 68 caracteres il reclamait 409px dans une carte
-   de 402 et chassait l'heure 66px HORS du cadre, invisible. */
+/* `min-width: 0` : par defaut un element flexible refuse de descendre sous la
+   largeur de son contenu, et un nom d'outil MCP n'offre aucune coupure
+   naturelle — sans lui, l'heure serait chassee HORS du cadre. */
 .error-tool {
   font-size: 12px; font-weight: 700; color: var(--error);
   min-width: 0; overflow-wrap: anywhere;
@@ -307,8 +305,8 @@ body {
   transition: all 0.2s;
 }
 .stat:hover { border-color: var(--glass-border); background: var(--glass-hover); }
-/* A counter that is also a button has to look like one before it is hovered —
-   that was the original complaint: a number with no way in. */
+/* A counter that is also a button has to look like one before it is hovered:
+   otherwise it reads as a number with no way in. */
 .stat-button {
   font-family: inherit; cursor: pointer;
   border-color: var(--glass-border);
@@ -529,12 +527,9 @@ canvas { display: block; width: 100%; height: 100%; }
   letter-spacing: 0.5px; text-transform: uppercase;
 }
 /* ─── Boutons de l'observatoire ───────────────────────────────────────────
-   UNE definition pour tous les boutons des panneaux. Avant, chaque endroit
-   redecrivait son look, et ceux qui n'en declaraient aucun — « Tout
-   acquitter », « Copier », « Purger la base » — retombaient sur le bouton
-   natif de Windows : aplat gris #f0f0f0, bordure outset, padding nul. La
-   purge y peignait son texte en rgba(102,204,255,.6), soit 1,3:1 de
-   contraste. Un bouton = .obs-btn ; la variante dit son ROLE, jamais son
+   UNE definition pour tous les boutons des panneaux : un bouton sans classe
+   retombe sur le bouton natif de Windows (aplat gris #f0f0f0, bordure outset,
+   padding nul). Un bouton = .obs-btn ; la variante dit son ROLE, jamais son
    apparence. */
 .obs-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
@@ -566,7 +561,7 @@ canvas { display: block; width: 100%; height: 100%; }
   color: #100305; background: var(--error); border-color: var(--error); font-weight: 600;
 }
 .obs-btn--icon { min-width: 26px; padding: 4px 8px; font-size: 15px; line-height: 1; }
-/* Le clavier doit VOIR ou il est : aucune regle de focus n'existait. */
+/* Le clavier doit VOIR ou il est. */
 .obs-btn:focus-visible, .period-btn:focus-visible,
 .failure-cmd:focus-visible, .failure-group-head:focus-visible {
   outline: 2px solid var(--holo-bright); outline-offset: 2px;
@@ -588,11 +583,9 @@ canvas { display: block; width: 100%; height: 100%; }
 #advisor-summary, #analysis-summary, #pricing-summary,
 #advisor-footer { flex-shrink: 0; }
 /* Conseils a DEUX blocs de contenu — les pannes puis les recommandations — et
-   un seul ascenseur pour les deux. Quand seul #advisor-list defilait, deplier
-   un groupe de pannes poussait les recommandations ET le pied de page hors du
-   panneau, sans aucun ascenseur pour les rattraper : mesure du 2026-08-09,
-   liste haute de 0 px pour 1158 px de contenu, bouton de purge a y=697 dans un
-   panneau qui s'arretait a y=649. */
+   un seul ascenseur pour les deux : si seul #advisor-list defilait, deplier un
+   groupe de pannes pousserait les recommandations ET le pied de page hors du
+   panneau, sans ascenseur pour les rattraper. */
 #advisor-body, #analysis-list, #pricing-body {
   flex: 1; min-height: 0; overflow-y: auto;
 }
@@ -627,7 +620,7 @@ canvas { display: block; width: 100%; height: 100%; }
 }
 .advisor-card-buttons { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-start; }
 .advisor-rest-title, .advisor-empty { font-size: 11px; color: var(--text-dim); margin: 16px 0 8px; }
-/* Le registre de decisions (doc/44) : chaque intention est une colonne
+/* Le registre de decisions : chaque intention est une colonne
    bouton + legende — le contrat au moment du clic. */
 #advisor-motto { font-size: 11px; color: var(--text-muted); margin: 6px 0 2px; font-style: italic; }
 .advisor-choice { display: flex; flex-direction: column; gap: 4px; max-width: 240px; }
@@ -709,8 +702,8 @@ canvas { display: block; width: 100%; height: 100%; }
 .failure-group.is-acked {
   border-left-color: var(--text-muted); background: rgba(102, 204, 255, 0.03); opacity: .7;
 }
-/* `display: flex` sur un <summary> efface le triangle de repli du navigateur :
-   plus rien ne disait que la ligne s'ouvrait. Le chevron est redessine. */
+/* `display: flex` sur un <summary> efface le triangle de repli du navigateur,
+   qui dit que la ligne s'ouvre : le chevron est redessine. */
 .failure-group-head {
   cursor: pointer; display: flex; gap: 10px; align-items: center;
   padding: 5px 6px; margin: 0 -6px; border-radius: 6px; list-style: none;

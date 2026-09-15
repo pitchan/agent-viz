@@ -20,12 +20,9 @@ import { truncate } from './viz-alert-format.ts';
 // justement sur un message d'erreur qu'on ne peut pas se le permettre.
 export const MESSAGE_MAX = 220;
 
-// `hasNode` est FOURNI par l'appelant, et ce n'est pas un detail : un echec
-// orphelin porte un `tool_use_id` comme les autres — c'est son `PreToolUse` qui
-// manque, pas son identifiant. Deduire la rejoignabilite du seul identifiant
-// annoncait donc une ligne cliquable qui ne menait nulle part (defaut trouve au
-// navigateur, pas a la lecture). Ce module ne connait pas le graphe ; seul
-// l'appelant sait si le noeud existe encore, et il le dit.
+// `hasNode` est FOURNI par l'appelant : un echec orphelin porte un `tool_use_id` comme les
+// autres — c'est son `PreToolUse` qui manque —, et ce module ne connait pas le graphe.
+// Deduire la rejoignabilite du seul identifiant annoncait une ligne cliquable morte.
 // Le sous-ensemble d'une ligne du registre (viz-errors.ts) que l'affichage lit.
 interface ErrorLike {
   toolName?: string;
@@ -67,7 +64,7 @@ export function errorRow(rec: ErrorLike, hasNode = false) {
 
 // Le titre repond a la question posee devant l'ecran : « une erreur, oui,
 // mais de quoi ? ». Le bandeau ne montre qu'une session a la fois, et le volet
-// doit le dire — sinon le chiffre reste aussi flottant qu'avant.
+// doit le dire — sinon le chiffre ne dit pas de quelle session il parle.
 export function errorsPanelTitle(sessionId: string | null | undefined, count: number) {
   const s = count === 1 ? '' : 's';
   const tete = `${count} error${s}`;

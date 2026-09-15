@@ -181,8 +181,7 @@ function pluralize(label: string, n: number) {
   return label.toLowerCase() + 's';
 }
 
-// Context slot: hot directory derived from recent file tools. Sub-agent
-// branches are added in later tasks. Returns a string or null.
+// Context slot: hot directory derived from recent file tools. Returns a string or null.
 function computeContext(state: NarratorState, vis: NarratorVis) {
   const filePaths: string[] = [];
   const entries = state.timelineEntries;
@@ -202,7 +201,7 @@ function computeContext(state: NarratorState, vis: NarratorVis) {
   return commonPathPrefix(filePaths);
 }
 
-// Le format vit dans viz-duration.mjs (constat C8) ; le `?` reste ici : dans une
+// Le format vit dans viz-duration.ts ; le `?` reste ici : dans une
 // phrase, l'absence de durée doit s'écrire, une phrase trouée se lit comme un
 // bug d'affichage.
 function formatSessionDuration(startIso: string | null, endIso: string | null) {

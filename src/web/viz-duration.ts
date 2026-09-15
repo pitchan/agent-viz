@@ -1,10 +1,9 @@
 // viz-duration.ts — combien de temps ça a duré, écrit pour être lu d'un coup
 // d'œil dans une carte, un fil ou une phrase de narrateur.
 //
-// Trois fichiers portaient cette même arithmétique (constat C8) : deux seuils,
-// 1 s et 1 min, et une décimale au-delà. Ils s'accordaient exactement sur le
-// domaine nominal et ne divergeaient QUE hors contrat — où deux d'entre eux
-// affichaient `NaNm`.
+// Une seule arithmétique pour la carte du graphe, le fil et le narrateur : deux
+// seuils, 1 s et 1 min, et une décimale au-delà. Trois copies s'accorderaient sur le
+// domaine nominal et ne divergeraient QUE hors contrat, là où rien ne les compare.
 //
 // D'où la frontière : ce module dit ce qu'est une durée et comment on l'écrit.
 // Ce qui n'en est pas une reçoit `null`, et l'appelant garde SON mot pour ce

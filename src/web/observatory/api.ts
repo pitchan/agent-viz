@@ -71,8 +71,8 @@ export function requestPurge(opts: WindowOpts = {}) {
 
 export const fetchConfigAudit = () => getJson('/config/audit');
 export const fetchRecommendations = () => getJson('/recommendations');
-// La raison n'accompagne qu'un arbitrage (doc/42) ; absente, l'URL reste
-// celle des statuts historiques.
+// La raison n'accompagne qu'un arbitrage ; absente, l'URL est celle des
+// autres statuts.
 // `id` est l'identifiant numerique d'une recommandation (voir decisions-view.ts et
 // le Number(...) de advisor-view.ts, seul autre appelant reel).
 export const setRecommendationStatus = (id: number, status: string, reason?: string) =>

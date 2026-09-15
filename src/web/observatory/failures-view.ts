@@ -1,9 +1,9 @@
-// failures-view.ts — le bloc « Pannes » en accordeon par cause (doc/32).
+// failures-view.ts — le bloc « Pannes » en accordeon par cause.
 //
 // Rendu et interactions LOCALES seulement : depli d'une commande longue, retour
 // de copie. Aucun acces reseau — l'acquittement sort d'ici comme une INTENTION
 // (`onAckGroup`), advisor-view l'orchestre. Le regroupement et les phrases
-// viennent de failures-format.js, les remedes de remedies.js.
+// viennent de failures-format.ts, les remedes de remedies.ts.
 
 import { groupAlerts, causeLabel, episodeLabel, failuresSummary, projectLabel, panelAlerts, type AlertGroup } from './failures-format.ts';
 import { remedyFor, type Remedy } from './remedies.ts';
@@ -26,9 +26,8 @@ function stamp(ms: number) {
 
 const SANS_COMMANDE = 'commande non consignée (alerte ancienne)';
 
-// La commande d'un episode. Vide chez badInvocation = anterieure a la
-// consigne du subject (doc/32) : le dire vaut mieux qu'un trou, qui se lirait
-// comme un bug du bloc.
+// La commande d'un episode. Vide chez badInvocation = une alerte consignee sans
+// `subject` : le dire vaut mieux qu'un trou, qui se lirait comme un bug du bloc.
 function commandes(alert: Alert): string[] {
   if (alert.type === 'stuck') {
     return alert.tools

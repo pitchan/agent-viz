@@ -182,7 +182,7 @@ function buildProvenanceBlock(provenance: Provenance) {
   }
   const meta = document.createElement('p');
   meta.className = 'pricing-notice-meta';
-  // Le moteur n'a plus de version propre : il est livré dans agent-viz, à sa version.
+  // Le moteur est livré dans agent-viz : sa version est celle d'agent-viz.
   meta.textContent = `Moteur netgain (agent-viz v${provenance.engineVersion}) — analyse SCAN_VERSION ${provenance.scanVersion} — source des prix : ${provenance.priceSource}`;
   wrap.appendChild(meta);
   return wrap;

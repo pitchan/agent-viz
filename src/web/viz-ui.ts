@@ -57,10 +57,8 @@ function feedItemHTML(e: TimelineEntry) {
   const n = state.nodes.get(e.nodeId);
   const dur = n && n.duration ? n.duration : '';
   const isRunning = n && n.status === 'running';
-  // Status wins over type. A failed Read used to carry the same amber dot as
-  // twenty successful ones — measured in the browser: twenty-one identical
-  // dots, not one of them red. The error colour was already in getTypeColor,
-  // simply never reached, because no timeline entry is ever of type 'error'.
+  // Status wins over type: no timeline entry is ever of type 'error', so getTypeColor
+  // alone would give a failed Read the same amber dot as twenty successful ones.
   const color = (n && n.status === 'error') ? COLORS.error : getTypeColor(e.type);
   const isActive = state.selected === e.nodeId;
   return `<div class="feed-item${isActive ? ' active' : ''}${isRunning ? ' running' : ''}" data-node="${e.nodeId}">
@@ -125,10 +123,9 @@ export function focusNode(nodeId: string) {
       vis.camera.targetY = -vn.targetY + canvasMod.H / 2 / vis.camera.targetZoom;
     }
   }
-  // La selection change une ligne DEJA rendue, et le flux ne fait qu'ajouter :
-  // sans forcer, le surlignage n'apparaissait qu'a la prochaine reconstruction
-  // fortuite. C'est un clic d'utilisateur, pas un evenement de flux — repeindre
-  // soixante lignes est sans effet mesurable, et le geste se voit arriver.
+  // La selection change une ligne DEJA rendue, et le flux ne fait qu'ajouter : sans forcer,
+  // le surlignage attendrait la prochaine reconstruction fortuite. C'est un clic d'utilisateur,
+  // pas un evenement de flux — repeindre soixante lignes est sans effet mesurable.
   markFeedFullRebuild();
   renderFeed();
   markDirty();
@@ -198,10 +195,8 @@ function tokenCardsHTML(n: VizNode) {
   let contextSize = 0;
   let totalCost = 0;
   let modelLabel = '';
-  // C4 : la même réserve que la pastille. Sans ça, le montant honnête de la
-  // barre du haut et un montant net de toute réserve dans le panneau de détail
-  // cohabiteraient à un clic l'un de l'autre — le constat rouvert un cran plus
-  // bas.
+  // La même réserve que la pastille : sans elle, le montant réservé de la barre du haut
+  // et un montant sans réserve dans le panneau de détail cohabiteraient à un clic.
   let cout: ReturnType<typeof costCompleteness> = { complete: true, unknownModels: [], malformedUsageMessages: 0 };
   if (n.type === 'session') {
     // Session's cumulative = main + all subagents (useful for raw volume view).
@@ -233,7 +228,7 @@ function tokenCardsHTML(n: VizNode) {
   const modelCard = modelLabel
     ? `<div class="meta-card"><div class="meta-label">Model</div><div class="meta-value">${esc(modelLabel)}</div></div>`
     : '';
-  // C4 : la carte s'affiche AUSSI quand le montant est nul mais incomplet —
+  // La carte s'affiche AUSSI quand le montant est nul mais incomplet —
   // sinon une session dont aucun modèle n'est tarifé ferait disparaître la
   // carte, et l'absence se lirait comme « rien dépensé ».
   const costCard = (totalCost > 0 || !cout.complete)
@@ -318,11 +313,9 @@ export function updateBudget() {
   // Hide while we have no model info yet — the pill flickering empty is worse
   // than not appearing until the first assistant message lands.
   //
-  // C4 (2026-08-11) : la condition ne porte plus sur `contextMax`. Le serveur
-  // ne posait `lastModel` que pour un modèle TARIFÉ, si bien qu'une session
-  // n'employant que des modèles hors table faisait disparaître la pastille
-  // entièrement — ni coût, ni contexte, ni modèle, alors que le modèle et le
-  // volume de jetons, eux, sont parfaitement connus. Seule la FENÊTRE manque.
+  // La condition porte sur `lastModel`, que le serveur pose aussi pour un modèle hors
+  // table, et non sur `contextMax` : le modèle et les jetons d'une telle session sont
+  // connus, seule la FENÊTRE manque.
   if (!main || !main.lastModel) {
     els.pill.hidden = true;
     return;
@@ -337,7 +330,7 @@ export function updateBudget() {
   // own model on the server side, so a multi-model session sums cleanly).
   let totalCost = main.costUsd || 0;
   for (const b of state.tokens.perAgent.values()) totalCost += b.costUsd || 0;
-  // C4 : la même somme porte sa réserve. Un seul seau incomplet suffit à
+  // La même somme porte sa réserve. Un seul seau incomplet suffit à
   // rendre le total incomplet.
   const cout = costCompleteness([main, ...state.tokens.perAgent.values()]);
 
@@ -417,13 +410,9 @@ export function updateStats() {
   runEl.textContent = String(running);
   runEl.classList.toggle('has-running', running > 0);
 
-  // The error count is NOT derived from the nodes any more. Deriving it made
-  // the chip lie twice: the GC drops a finished tool node after ten minutes
-  // (the count fell back to zero on its own) while agent nodes are never
-  // dropped (those errors stayed forever) — one number, two lifetimes. The
-  // registry counts what actually happened in this session. Keeping the old
-  // scan alongside it would put two different totals one click apart, which is
-  // the mistake the C4 note above already commemorates for cost.
+  // The error count comes from the registry, not from the nodes: the GC drops a finished
+  // tool node after ten minutes while agent nodes are never dropped, so a scan of the nodes
+  // would mix two lifetimes in one number.
   renderErrorsPill();
 }
 
@@ -519,7 +508,7 @@ function updateLiveDurations() {
   for (const n of state.nodes.values()) {
     if (n.status === 'running' && n.startTime) {
       anyRunning = true;
-      // Même format que les nœuds terminés (constat C8) : le compteur qui tourne
+      // Même format que les nœuds terminés : le compteur qui tourne
       // et le chiffre figé ne peuvent pas s'écrire différemment. Une durée
       // impossible ne remplace pas la précédente — la ligne du fil la tait
       // (`n.duration || ''`), et c'est exactement ce qu'on veut y voir.
@@ -619,7 +608,7 @@ document.getElementById('watchdog-pill')!.addEventListener('click', () => {
   // Le badge AUSSI, pas seulement le volet : la vivacite se juge a l'instant
   // de la lecture, et peindre les deux du meme instant est ce qui interdit
   // l'ecran incoherent « cloche a 1, volet vide » entre deux rechargements.
-  // (Le volet etant visible desormais, renderWatchdogPill le rend aussi.)
+  // (Le volet est visible a cette ligne : renderWatchdogPill le rend aussi.)
   if (opening) renderWatchdogPill();
 });
 
@@ -637,11 +626,9 @@ document.getElementById('alerts-list')!.addEventListener('click', (e) => {
 });
 
 // ─── Errors chip + errors popup ───────────────────────────────────────────
-// The third topbar witness, and the one that stayed mute the longest: it read
-// "1 errors" with no way in, while the failure's own message was already in
-// the page, one unmarked click away. It follows the watchdog bell's shape —
-// a counting button that opens a list — with one difference that matters: an
-// alert is acknowledged, an error is only read. There is no Ack here.
+// The third topbar witness: a counting button that opens the list of the session's
+// failures, each with its own message — the watchdog bell's shape, with one difference
+// that matters: an alert is acknowledged, an error is only read. There is no Ack here.
 //
 // Rows come from the registry, not from the graph, so a row survives the node
 // it points at. When the node is gone the row stays and simply stops promising
@@ -786,10 +773,9 @@ renderWatchdogPill();
 // up on whatever a broken stream missed. Live pushes come through SSE.
 //
 // `finally`, not `then`: a first read that failed is a reason to keep trying,
-// not to stop before starting. Chained off `then` — as this line first was —
-// one rejection at load would leave the timer unarmed and the badge frozen on
-// an empty list for the rest of the session, saying nothing. Whatever refuses
-// is said out loud for the same reason.
+// not to stop before starting. Chained off `then`, one rejection at load would
+// leave the timer unarmed and the badge frozen on an empty list for the rest of
+// the session, saying nothing. Whatever refuses is said out loud for the same reason.
 initAlertReader()
   .catch(err => console.error('[viz] first alert read failed:', err))
   .finally(() => setInterval(refreshAlerts, 30_000));

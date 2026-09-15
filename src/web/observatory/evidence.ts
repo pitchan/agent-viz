@@ -9,12 +9,9 @@ import { formatTokens, formatBytes } from './format.ts';
 
 // R1 names the marker the engine journaled and where the prefix broke. The
 // rule decides which one dominates; this file only puts it into French.
-// "Marqueur", never "cause" (corrected 2026-08-05): of the three, only
-// modelSwitch has a proven mechanism (caches are model-scoped). toolsAppeared
-// is a temporal coincidence — the official docs state that deferred tool
-// loading appends to the history and preserves the cache, and our controlled
-// test agreed (+265 tk, full re-read). Asserting it as a cause was false
-// information served to the user.
+// "Marqueur", never "cause": only modelSwitch has a proven mechanism (caches are model-scoped).
+// toolsAppeared is a coincidence: deferred tool loading appends to the history and preserves the
+// cache (official docs; our controlled test agrees, +265 tk fully re-read).
 // The three *Changed markers come from message.diagnostics.cache_miss_reason
 // (Claude Code ≥ ~2.1.220): the client compared the request to the previous one
 // and named the block that changed. First-hand facts — the wording may assert
@@ -87,8 +84,8 @@ const EVIDENCE_BY_RULE: Record<string, ((e: any) => string[]) | undefined> = {
     ...(e.dominantMarker === 'noMarker' ? diagnosedDetailLine(e.markerTokens) : []),
     `cassure ${R1_DEPTH_LABEL[e.dominantDepth]} (${formatTokens(e.depthTokens[e.dominantDepth])} jetons)`,
     `${Math.round(e.shareOfNetPercent)} % des jetons nets de ces sessions`,
-    // Absent from M1-era evidence: an optional detail, not a required field —
-    // shown only once it carries a real figure, never as a false zero.
+    // `noMarkerDetailTokens` is absent from evidence stored before the engine split it out:
+    // an optional detail, shown only once it carries a real figure, never as a false zero.
     ...(e.noMarkerDetailTokens && e.noMarkerDetailTokens.earlyMcp > 0 ? [
       `dont cassures en début de session à serveurs MCP : ${formatTokens(e.noMarkerDetailTokens.earlyMcp)} jetons`
       + ' — cause probable (étude : corrélation ×6,3 sur 1 700 sessions)',
@@ -122,20 +119,18 @@ const EVIDENCE_BY_RULE: Record<string, ((e: any) => string[]) | undefined> = {
     `sessions de ${e.medianDurationSeconds} s (médiane)`,
     `${formatTokens(e.subagentTokens)} jetons de sous-agents`,
   ],
-  // R7 (doc/41) : des faits « dans la session » — une vérification lancée hors
+  // R7 : des faits « dans la session » — une vérification lancée hors
   // session (CI, terminal humain) est invisible, la formulation le dit.
   R7: (e: R7Evidence) => {
     const lines = [
       `${e.sessionsNoVerification} session${e.sessionsNoVerification > 1 ? 's' : ''} modifiant des fichiers sans aucune vérification lancée`,
-      // « close » est tombé (revue doc/41) : la règle ne teste jamais la fin de
-      // session — une session encore vivante peut être là. Le fait dit reste vrai.
+      // Pas « close » : la règle ne teste jamais la fin de session — une session
+      // encore vivante peut être là.
       `${e.sessionsWithTail} session${e.sessionsWithTail > 1 ? 's' : ''} avec des modifications postérieures à la dernière vérification`,
       `${e.filesUnverifiedBySession} fichier${e.filesUnverifiedBySession > 1 ? 's' : ''} laissé${e.filesUnverifiedBySession > 1 ? 's' : ''} sans preuve dans la session (cumul par session)`,
-      // « après la dernière vérification » mentait pour la population
-      // MAJORITAIRE (revue finale) : une session sans aucune vérification n'a
-      // pas de « dernière », et le compteur y vaut TOUTE la session — 87 % des
-      // sessions éditantes du relevé de calibration (doc/41). La phrase dit donc
-      // ce qui est mesuré, et nomme le cas limite au lieu de le taire.
+      // Pas « après la dernière vérification » : une session sans aucune vérification,
+      // le cas MAJORITAIRE, n'a pas de « dernière » et le compteur y vaut TOUTE la
+      // session. La phrase dit ce qui est mesuré, et nomme ce cas au lieu de le taire.
       `${formatTokens(e.tokensAfterLastVerification)} jetons émis sans preuve dans la session`
       + " (toute la session quand aucune vérification n'a été lancée)"
       + ' — travail à risque, pas gaspillage prouvé',

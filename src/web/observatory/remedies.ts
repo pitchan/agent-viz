@@ -1,10 +1,10 @@
 // remedies.ts — le remede pret a l'emploi de chaque motif alertant, en un seul
 // endroit.
 //
-// Contrat (doc/32) : chaque motif alertant (`workstationSetting: true` dans
+// Contrat : chaque motif alertant (`workstationSetting: true` dans
 // src/engine/watchdog/invocation-patterns.ts) a une entree EXPLICITE ici. `null` est une
 // reponse : « aucun remede honnete » — le filet en est l'exemple oblige, sa
-// cause n'etant pas caracterisee (doc/30). Un motif absent de la table est un
+// cause n'etant pas caracterisee. Un motif absent de la table est un
 // oubli, et le test le dit. Jamais de conseil invente.
 //
 // Module pur : ni DOM, ni reseau, ni import a l'execution — une table et une fonction.
@@ -43,7 +43,7 @@ export const REMEDES: Record<string, Remedy> = {
       + '- Pour créer ou remplir un fichier, utiliser l’outil Write — jamais un heredoc.\n'
       + '- Un heredoc de plus de ~4 Ko arrive tronqué : guillemet jamais refermé.\n',
   },
-  // Le FILET (doc/30) : il ne se declenche que lorsque aucune ancre ne
+  // Le FILET : il ne se declenche que lorsque aucune ancre ne
   // reconnait la forme — la cause n'est pas caracterisee, donc aucun remede
   // honnete. `null` est la reponse, pas une case vide.
   'inv-bash-unbalanced-quote': null,

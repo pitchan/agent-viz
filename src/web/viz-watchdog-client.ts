@@ -32,10 +32,9 @@
 
 import { isFresh } from './viz-alert-freshness.ts';
 // Les deux routes du journal des pannes sont décrites une seule fois, dans le
-// client HTTP de l'Observatoire (constat C6). La pastille en garde la POLITIQUE
-// — ne rien vider sur une lecture ratée, remettre l'alerte à l'écran sur un
-// acquittement refusé — mais plus l'adresse ni la charge : c'est le contrat de
-// route, pas le traitement d'erreur, que les deux pages portaient en double.
+// client HTTP de l'Observatoire. La pastille en garde la POLITIQUE — ne rien vider
+// sur une lecture ratée, remettre l'alerte à l'écran sur un acquittement refusé —,
+// pas l'adresse ni la charge, qui sont le contrat de route commun aux deux pages.
 // La couture `_fetch` reste ici et voyage avec l'appel : le client la reçoit en
 // paramètre, il ne la garde pas.
 //
@@ -83,13 +82,9 @@ let firstRead = true;
 // in a number, and ids already carry punctuation (loop:s1:Bash).
 const keyOf = (a: LiveAlert) => `${a.id}\u0000${a.createdAt}`;
 
-// Les cles serveur vivantes au moment de la DERNIERE notification — donc ce
-// que l'interface montre en ce moment. C'est a CET etat-la qu'un rechargement
-// doit se comparer. Le recalculer au debut du rechargement avec l'horloge
-// courante rendait l'expiration invisible : une alerte morte entre deux
-// rechargements manquait deja des DEUX cotes de la comparaison, aucun retrait
-// n'etait signale, et la cloche restait allumee a vie sur un volet vide
-// (vecu sur capture : cloche a « 1 », « No active alerts »).
+// Les cles serveur vivantes au moment de la DERNIERE notification — ce que l'interface
+// montre. Un rechargement se compare a CET etat : recalcule avec l'horloge courante, une
+// alerte expiree manquait des deux cotes, et la cloche restait allumee sur un volet vide.
 let shownKeys = new Set<string>();
 
 function notify(newAlerts: LiveAlert[]) {
@@ -228,8 +223,7 @@ export async function acknowledgeAlert(id: string, createdAt: number): Promise<v
   // 400 on a malformed key, 503 while the port is served but the watchdog is
   // not built yet — a real window. Nothing was written down, so the alert is
   // coming back at the next reload: showing it again now is the difference
-  // between a visible refusal and the silent failure this whole chantier
-  // repairs.
+  // between a visible refusal and a silent failure.
   serverAlerts.set(id, held);
   if (wasActive) activeIds.add(id);
   notify([]);

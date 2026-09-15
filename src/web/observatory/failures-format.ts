@@ -12,7 +12,7 @@
 // et la part DOM ne l'est pas.
 
 // Les alertes arrivent vérifiées par viz-alert-shape.ts, à l'entrée du
-// navigateur : ce fichier lit le type du détecteur et ne regarde plus la forme.
+// navigateur : ce fichier lit le type du détecteur et ne vérifie pas la forme.
 import type { Alert, AlertType } from '../../engine/watchdog/detector.ts';
 
 // Une cause (groupKey) et ses episodes, du plus recent au plus ancien.
@@ -50,9 +50,8 @@ function failureNote(occurrences: Alert['occurrences']) {
 // C'est ici, et nulle part ailleurs, que `inv-bash-windows-path-unquoted`
 // redevient une phrase. Elle se compose du seul `patternId` — jamais du
 // message d'erreur, qui n'est pas consigne (verrou watchdog-bad-invocation).
-// La commande, elle, vit desormais dans `subject`, consignee integrale depuis
-// l'arbitrage doc/32 du 2026-08-09, et s'affiche dans le depliage : la
-// phrase du motif n'a donc toujours rien d'autre a composer, et c'est voulu —
+// La commande, elle, vit dans `subject`, consignee integrale, et s'affiche dans
+// le depliage : la phrase du motif n'a rien d'autre a composer, et c'est voulu —
 // elle nomme le reglage a poser, pas l'incident.
 //
 // Chaque phrase dit ce qui a ete mal ecrit, pas ce que l'outil a repondu : ce
@@ -62,20 +61,14 @@ const MOTIFS: Record<string, string> = {
   'inv-bash-cd-too-many-args': 'un changement de dossier vers un chemin non protégé',
   'inv-bash-trailing-backslash-in-path': 'un guillemet double non fermé — typiquement un chemin Windows terminé par un antislash',
   'inv-bash-heredoc-too-large': 'un guillemet simple non fermé — typiquement un heredoc trop gros pour la ligne de commande',
-  // Cette phrase decrit un SYMPTOME sans nommer de remede, et c'est
-  // exactement pourquoi elle est juste ici — et seulement ici. Le motif qui
-  // la porte est le FILET : il ne se declenche que lorsque aucune des deux
-  // ancres ne reconnait la forme, c'est-a-dire quand la cause n'est pas
-  // caracterisee. Dire « un guillemet ouvert et jamais referme » est alors
-  // tout ce qu'on sait honnetement. C'est quand ce motif couvrait DEUX causes
-  // connues que la phrase mentait par omission.
+  // Un SYMPTOME sans remede, juste ici seulement : ce motif est le FILET, qui ne se
+  // declenche que si aucune des deux ancres ne reconnait la forme. La cause n'etant
+  // pas caracterisee, « un guillemet ouvert et jamais referme » est tout ce qu'on sait.
   'inv-bash-unbalanced-quote': 'un guillemet ouvert et jamais refermé',
   'inv-bash-syntax-error': 'une syntaxe que le shell POSIX ne sait pas lire',
-  // Phrase INERTE aujourd'hui, et gardée sciemment : le motif est passé hors
-  // du sous-ensemble qui alerte (il ne distinguait un cmdlet d'un binaire
-  // absent que par la casse du nom), donc aucune alerte ne le porte plus. Elle
-  // reste parce qu'elle est juste, et qu'un motif re-calibré la retrouverait —
-  // pas parce qu'on a oublié de la retirer.
+  // Phrase INERTE, gardée à dessein : le motif est hors du sous-ensemble qui alerte
+  // (`workstationSetting: false`, il ne distingue un cmdlet d'un binaire absent que par
+  // la casse du nom). Elle reste juste, et un motif re-calibré la retrouverait.
   'inv-cross-shell-cmdlet-in-posix': 'une commande PowerShell lancée sous un shell POSIX',
   'inv-ps-command-not-found': 'une commande que PowerShell ne connaît pas',
   'inv-ps-parameter-not-found': 'un paramètre que cette commande PowerShell n’a pas',
@@ -130,7 +123,7 @@ export function failureLine(alert: Alert) {
 // peut pas rejouer sans la dupliquer : `standing` -> `activeIds`, evenementiel
 // -> fraicheur de deux minutes. Sur trente jours, une boucle non acquittee de
 // la semaine derniere n'est pas un incident en cours ; l'annoncer comme tel
-// rejouerait la confusion que la tache 9 a paye pour trancher.
+// confondrait la memoire des pannes avec l'etat present.
 //
 // Donc un compte, et le mot exact de ce qui est compte.
 export function failuresSummary(alerts: Alert[]) {
@@ -143,24 +136,22 @@ export function failuresSummary(alerts: Alert[]) {
 //
 // Des FAUTES, pas des etats passagers. `stuck` decrit un etat qui se resout
 // tout seul : en vivant il a sa pastille et sa notification bureau, qui
-// nomment chaque commande en vol (DETAIL_LINES.stuck, viz-alert-format.mjs) ;
-// en memoire, declenche des 3 minutes de silence, il noyait les vraies fautes
-// sous des commandes simplement longues — 67 des 73 non-acquittees mesurees
-// en prod le 2026-08-20. Un etat qui se resout seul n'est pas une dette du
-// lecteur : il n'a pas a reclamer d'acquittement.
+// nomment chaque commande en vol (DETAIL_LINES.stuck, viz-alert-format.ts) ;
+// en memoire, declenche des 3 minutes de silence, il noierait les vraies fautes
+// sous des commandes simplement longues. Un etat qui se resout seul n'est pas une
+// dette du lecteur : il n'a pas a reclamer d'acquittement.
 //
 // Le filtre est NOMME, jamais en creux : seul `stuck` est ecarte, et un
-// detecteur ajoute demain s'affiche sans toucher a ce filtre. Et les
-// formulations stuck restent dans les tables ci-dessus : le contrat se verifie
-// des deux cotes du detecteur, et le jour ou cette decision se rejoue, tout est
-// encore la.
+// detecteur ajoute demain s'affiche sans toucher a ce filtre. Les formulations
+// stuck restent dans les tables ci-dessus : le contrat se verifie des deux cotes
+// du detecteur, et montrer `stuck` ici ne demande que de retirer ce filtre.
 export function panelAlerts(alerts: Alert[]) {
   return alerts.filter(a => a.type !== 'stuck');
 }
 
 // ── Regroupement par cause ─────────────────────────────────────────────────
 //
-// Une ligne par CAUSE, plus jamais une ligne par episode (doc/32). La clef dit
+// Une ligne par CAUSE, jamais une ligne par episode. La clef dit
 // ce qui se corrige d'un seul geste : le motif pour un appel mal forme (le meme
 // reglage traverse les outils), type+outil pour les repetitions et les orages
 // (une boucle sur Bash et une sur Grep sont deux histoires), le type seul pour
@@ -192,14 +183,14 @@ export function groupAlerts(alerts: Alert[]): AlertGroup[] {
   });
   // « À traiter » d'abord — c'est la question que la page pose — puis le plus
   // recent : une panne d'hier soir se cherche avant celle du mois dernier.
-  // Comparateur numerique : les deux booleens se convertissent en 0/1, comme
-  // la soustraction `true - false` le faisait deja implicitement en JS.
+  // Comparateur numerique : TypeScript refuse l'arithmetique sur des booleens,
+  // `Number` les convertit en 0/1.
   groupes.sort((a, b) => Number(b.unacked > 0) - Number(a.unacked > 0) || b.lastAt - a.lastAt);
   return groupes;
 }
 
 // La cause se nomme SANS les chiffres d'un episode : « meme commande 4× » est
-// un fait d'episode, pas un nom de cause (revue doc/32). L'outil ne se dit que
+// un fait d'episode, pas un nom de cause. L'outil ne se dit que
 // s'il est uniforme — jamais celui d'un episode arbitraire.
 function outilUniforme(episodes: Alert[]) {
   const outils = new Set(episodes.map(e => e.toolName));
