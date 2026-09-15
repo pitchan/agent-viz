@@ -64,7 +64,7 @@ function evaluate(ctx: EvaluationContext): R2Recommendation[] {
         costComplete: loaded.every(s => s.costComplete),
       },
       action: 'Désactiver ce serveur par défaut et ne l’activer que dans les projets qui s’en servent '
-        + '(effet non mesuré en M1 — action à tester).',
+        + '(effet non mesuré : action à tester).',
     });
   }
   return recs;

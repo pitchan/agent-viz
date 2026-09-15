@@ -73,8 +73,8 @@ export function renderPrefixBreakdown(b: PrefixBreakdown): string | null {
 }
 
 /**
- * Conseils « préfixe modifié » — les 3 gestes utilisateur dont le mécanisme a été prouvé
- * en laboratoire (verdict v0.8.0), jamais déduits de ces journaux (étiquette explicite).
+ * Conseils « préfixe modifié » — les 3 gestes utilisateur dont le mécanisme a été mesuré
+ * en laboratoire, jamais déduits de ces journaux (étiquette explicite).
  * Affichés seulement quand prefixChange domine (≥) les causes réelles de re-création :
  * growth (fausse alerte) et unknown (indéterminé) sont exclus de la comparaison.
  */
@@ -88,7 +88,7 @@ export function renderPrefixAdvice(
   const ms = b.markers.modelSwitch;
   const seen = ms.events > 0 ? ` — vu ici ×${fmtInt(ms.events)} (${fmtInt(ms.tokens)} tk)` : '';
   return [
-    'conseil (mécanismes prouvés en labo v0.8.0, pas déduits de ces journaux) :',
+    'conseil (mécanismes mesurés en laboratoire, pas déduits de ces journaux) :',
     `  · ne pas changer de modèle en cours de session — re-création totale, espaces de cache disjoints${seen}`,
     '  · se méfier des bascules de modèle silencieuses (alias + mode plan) — préférer l’identifiant complet du modèle',
     '  · limiter les reprises rapides après une modification d’environnement (git, CLAUDE.md, réglages, mise à jour) — l’enveloppe est rebâtie à la reprise',

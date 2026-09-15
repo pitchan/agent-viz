@@ -149,7 +149,7 @@ describe('conseil « préfixe modifié » dans le rendu terminal', () => {
     ]);
     const text = renderReport(await runDoctor({ claudeDir: adviceDir }));
     expect(text).toContain('préfixe modifié — marqueurs : sans marqueur ×1');
-    expect(text).toContain('conseil (mécanismes prouvés en labo v0.8.0, pas déduits de ces journaux)');
+    expect(text).toContain('conseil (mécanismes mesurés en laboratoire, pas déduits de ces journaux)');
     expect(text).toContain('ne pas changer de modèle en cours de session');
     expect(text).toContain('l’enveloppe est rebâtie à la reprise');
   });

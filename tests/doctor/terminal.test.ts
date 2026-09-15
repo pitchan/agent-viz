@@ -108,7 +108,7 @@ describe('renderPrefixAdvice — conseils quand le préfixe modifié domine les 
     expect(renderPrefixAdvice(causes, emptyPrefixBreakdown())).toBeNull();
   });
 
-  test('dominant → étiquette labo + les 3 gestes du verdict v0.8.0', () => {
+  test('dominant → étiquette laboratoire + les 3 gestes', () => {
     const causes = emptyChurnCauses();
     causes.prefixChange = { events: 5, tokens: 200000 };
     causes.expiration = { events: 1, tokens: 40000 };
@@ -116,7 +116,7 @@ describe('renderPrefixAdvice — conseils quand le préfixe modifié domine les 
     expect(lines).not.toBeNull();
     const s = lines!.join('\n');
     expect(s).toContain('conseil');
-    expect(s).toContain('labo v0.8.0');
+    expect(s).toContain('mesurés en laboratoire');
     expect(s).toContain('pas déduits de ces journaux');
     expect(s).toContain('ne pas changer de modèle en cours de session');
     expect(s).toContain('bascules de modèle silencieuses');

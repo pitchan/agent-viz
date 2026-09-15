@@ -75,7 +75,7 @@ function buildProvenance({ engineVersion, priceSource }: ProvenanceOptions): Pro
       {
         titre: 'Une seule table pour tout le produit',
         corps: 'La pastille temps réel de la barre du haut est tarifée par la MÊME table embarquée '
-          + 'que ce panneau (unification du 05/08/2026). Une vigie compare chaque jour cette table '
+          + 'que ce panneau. Une vigie compare chaque jour cette table '
           + 'au dépôt public LiteLLM : toute dérive (tarif changé en amont, nouveau modèle) '
           + 'déclenche une alerte visible au lieu d’un écart silencieux. Réseau injoignable = '
           + 'silence normal, jamais une erreur.',
