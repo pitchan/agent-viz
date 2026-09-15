@@ -2,8 +2,8 @@
 'use strict';
 // agent-viz HTTP server entry point — boot wiring only.
 //
-// Owns: port binding, shutdown of any prior instance, the initial scan +
-// periodic housekeep schedule, and the fs.watch on the events dir that
+// Owns: port binding (an occupied port is never freed by force), the initial
+// scan + periodic housekeep schedule, and the fs.watch on the events dir that
 // promotes newly-arriving .jsonl files into sessionIndex.
 //
 // Everything else (request handling, session bookkeeping, transcript
@@ -12,7 +12,6 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execSync } from 'node:child_process';
 
 import {
   DIR,
@@ -26,8 +25,9 @@ import { dispatch, setServer } from './routes.ts';
 import { startPricingRefresh, onPricingDrift } from './pricing.ts';
 import { getObservatoryService } from './observatory/index.ts';
 import { startWatchdog } from './watchdog/index.ts';
+import { bindPort, portInUseMessage } from './bind-port.ts';
 
-const PORT = process.env.PORT || 3333;
+const PORT = Number(process.env.PORT || 3333);
 
 // Watch the events dir for new session files (filling sessionIndex live).
 fs.watch(DIR, (_, filename) => {
@@ -48,30 +48,7 @@ fs.watch(DIR, (_, filename) => {
   }
 });
 
-// Try to gracefully stop any prior agent-viz on the same port, then fall back
-// to OS-level kill via netstat + taskkill (Windows).
-async function killOldServer() {
-  const shutdownOk = await new Promise(resolve => {
-    const req = http.request({ hostname: '127.0.0.1', port: PORT, path: '/shutdown', method: 'POST', timeout: 2000 }, res => {
-      res.resume();
-      res.on('end', () => resolve(true));
-    });
-    req.on('error', () => resolve(false));
-    req.on('timeout', () => { req.destroy(); resolve(false); });
-    req.end();
-  });
-  if (shutdownOk) { await new Promise(r => setTimeout(r, 500)); return; }
-  try {
-    const out = execSync(`netstat -ano | findstr ":${PORT}" | findstr "LISTEN"`, { encoding: 'utf8', timeout: 3000 });
-    const match = out.match(/LISTENING\s+(\d+)/);
-    if (match) {
-      try { execSync(`taskkill /PID ${match[1]} /F`, { timeout: 3000 }); } catch {}
-      await new Promise(r => setTimeout(r, 1000));
-    }
-  } catch {}
-}
-
-function startServer() {
+async function startServer(): Promise<void> {
   // No CORS header: the server bind is loopback-only and the UI is same-origin.
   // A wildcard would let any visited site read transcripts from localhost.
   const server = http.createServer((req, res) => {
@@ -82,16 +59,15 @@ function startServer() {
   });
   setServer(server);
   // Bind to loopback only — never expose transcripts to the LAN.
-  // `PORT` reste `string | number` (voir sa déclaration : ni renommée ni
-  // retypée, la sensibilité du fichier l'exige) — `Number()` à la frontière de
-  // cet appel est la même coercion que `server.listen` ferait lui-même en
-  // interne pour une chaîne, sans changer PORT ni killOldServer.
-  server.listen(Number(PORT), '127.0.0.1', () => {
-    console.log(`agent-viz listening on http://localhost:${PORT}`);
-  });
+  const outcome = await bindPort(server, PORT);
+  if (!outcome.bound) {
+    console.error(portInUseMessage(PORT));
+    process.exit(1);
+  }
+  console.log(`agent-viz listening on http://localhost:${PORT}`);
 }
 
-killOldServer().then(async () => {
+async function boot(): Promise<void> {
   // LiteLLM is a watchdog now: drift reports surface on the SSE stream and in
   // the alerts popup; it never writes prices.
   onPricingDrift(report => broadcastSSE({ type: 'pricingDrift', drifts: report.drifts }));
@@ -119,5 +95,7 @@ killOldServer().then(async () => {
     liveFrom: liveHandoffOffset,
     broadcastAlert: alert => broadcastSSE({ type: 'alert', alert }),
   });
-  startServer();
-});
+  await startServer();
+}
+
+boot();

@@ -423,7 +423,7 @@ Claude Code / Copilot CLI
                     └─ la page se met à jour                  (viz-network.ts:111)
 ```
 
-Chaud, éphémère, purgé toutes les heures (`src/server/server.ts:116`). Le hook
+Chaud, éphémère, purgé toutes les heures (`src/server/server.ts:84`). Le hook
 **n'attend jamais** le démon : un démon éteint ne ralentit pas la session de
 l'utilisateur.
 
@@ -438,7 +438,7 @@ l'utilisateur.
                     └─ les trois pages d'analyse     (src/web/observatory/)
 ```
 
-Froid, rejoué au démarrage puis toutes les heures (`src/server/server.ts:117` — la
+Froid, rejoué au démarrage puis toutes les heures (`src/server/server.ts:85` — la
 ligne voisine de celle du flux A, même cadence, deux objets différents). **Les
 transcripts sont la source de vérité ; la base est un dérivé jetable.** La
 supprimer ne perd que les statuts posés à la main sur les recommandations.
