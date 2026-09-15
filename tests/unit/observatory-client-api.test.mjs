@@ -127,7 +127,7 @@ test('setRecommendationStatus encode la raison d’arbitrage dans l’URL', asyn
   }
 });
 
-test('sans raison, l’URL de statut reste celle d’avant', async () => {
+test('sans raison, l’URL de statut ne porte que le statut', async () => {
   // Arrange
   const { calls, restore } = stubFetch({ id: 3, status: 'new' });
   try {
@@ -140,7 +140,7 @@ test('sans raison, l’URL de statut reste celle d’avant', async () => {
   }
 });
 
-// Non-regression (revue doc/32) : donner un corps a postJson ne doit pas en
+// Non-regression : donner un corps a postJson ne doit pas en
 // donner un aux POST existants — la route de scan n'en attend aucun.
 test('requestScan et requestPurge continuent de poster SANS corps', async () => {
   const { calls, restore } = stubFetch({ started: true });

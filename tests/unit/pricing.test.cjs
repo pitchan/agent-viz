@@ -6,13 +6,9 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { getPrice } = require('../../src/server/pricing.ts');
-// MODIFIÉ LE 2026-08-11 PAR C4 — `computeCost` et la normalisation ne sortent
-// plus de `src/server/pricing.js` : elles avaient UNE jumelle dans le moteur,
-// les deux avaient divergé, et la définition unique vit désormais en
-// TypeScript. Ces filets suivent la fonction là où elle est, importée
-// directement du moteur. Le nom aussi change : `normalizeId` →
-// `normalizeModel`, le nom du moteur — un seul nom dans le produit, comme
-// `CLAUDE_CONFIG_DIR` après C5.
+// `computeCost` et `normalizeModel` n'ont qu'une définition, celle du moteur :
+// ces filets l'importent de src/engine/core/pricing.ts, et src/server/pricing.ts
+// n'en porte pas de copie.
 const { computeCost, normalizeModel } = require('../../src/engine/core/pricing.ts');
 
 test('normalizeModel strips provider prefixes and date/version suffixes', () => {
@@ -27,14 +23,9 @@ test('normalizeModel strips provider prefixes and date/version suffixes', () => 
 });
 
 test('normalizeModel strips regional routing prefixes and single-digit version suffixes', () => {
-  // Root cause of most of the 109 false "modele-nouveau" alerts: LiteLLM
-  // carries per-region routing ids (global./us./eu./au.anthropic.) that
-  // never normalized down to the canonical id.
-  //
-  // C4 : jusqu'au 2026-08-11 cette connaissance-là n'existait QUE côté serveur.
-  // Le moteur l'ignorait, si bien qu'il annonçait « coût partiel » sur un
-  // identifiant régional que le serveur tarifait sans réserve — la divergence
-  // courait dans le sens inverse de ce que la fiche d'audit supposait.
+  // LiteLLM carries per-region routing ids (global./us./eu./au.anthropic.): left
+  // un-normalized, each raises a false "modele-nouveau" alert, and a regional id
+  // reads as unpriced. The normalization lives in the engine only.
   assert.equal(normalizeModel('us.anthropic.claude-opus-4-7'), 'claude-opus-4-7');
   assert.equal(normalizeModel('global.anthropic.claude-fable-5'), 'claude-fable-5');
   assert.equal(normalizeModel('claude-opus-4-6-v1'), 'claude-opus-4-6');
@@ -100,9 +91,9 @@ test('computeCost sums input/output/cache contributions', () => {
   // 2000 * 3.75e-6 = 0.0075
   // 10000 * 3e-7 = 0.003
   // Total = 0.021
-  // C4 : le retour est un CONTRAT `{ usd, known, model }`, plus un nombre nu —
-  // c'est ce qui permet de dire « ce montant est incomplet » au lieu de rendre
-  // un zéro qu'on ne sait pas distinguer d'un vrai zéro.
+  // Le retour est un CONTRAT `{ usd, known, model }`, pas un nombre nu : il permet
+  // de dire « ce montant est incomplet » au lieu de rendre un zéro qu'on ne sait pas
+  // distinguer d'un vrai zéro.
   assert.equal(cost.known, true);
   assert.ok(Math.abs(cost.usd - 0.021) < 1e-9, `got ${cost.usd}`);
 });
@@ -147,15 +138,9 @@ test('computeCost splits mixed 5m+1h cache creations correctly', () => {
   assert.ok(Math.abs(cost.usd - 0.007875) < 1e-9, `got ${cost.usd}`);
 });
 
-// MODIFIÉ LE 2026-08-11 PAR C4 — filet de caractérisation passé au rouge, et
-// c'est le résultat voulu : le comportement qu'il gravait EST le constat.
-//
-// AVANT : un modèle sans tarif rendait `0`. Un zéro qu'aucun appelant ne
-//   pouvait distinguer d'un vrai zéro ; le titre disait « rather than
-//   NaN/throw », ce qui compare le zéro à un plantage et non à la vérité.
-// APRÈS : `{ usd: null, known: false }`. Le montant n'est pas inventé, et
-//   l'appelant SAIT que son total est incomplet — ce qui remonte jusqu'à la
-//   pastille temps réel.
+// Un modèle sans tarif rend `{ usd: null, known: false }`, jamais `0` : le montant
+// n'est pas inventé, et l'appelant SAIT que son total est incomplet, jusqu'à la
+// pastille temps réel.
 test('computeCost reports an unknown model as unpriced, never as a zero', () => {
   const cost = computeCost(
     { input_tokens: 1000, output_tokens: 500 },
@@ -241,7 +226,7 @@ test('computeCost prices 1.2M tokens of 1h cache on fable-5 at ~$24 (not $0.02)'
   assert.ok(Math.abs(cost.usd - 24.0) < 1e-9, `got ${cost.usd}`);
 });
 
-test('normalizeModel strips the [1m] context-window suffix (netgain mirror)', () => {
+test('normalizeModel strips the [1m] context-window suffix', () => {
   assert.equal(normalizeModel('claude-fable-5[1m]'), 'claude-fable-5');
   assert.equal(normalizeModel('claude-opus-4-8[1m]'), 'claude-opus-4-8');
 });
@@ -300,17 +285,8 @@ test('a changed upstream tariff is REPORTED as drift, never applied to the map',
   assert.equal(getPrice('claude-fable-5').input, 1e-5);
 });
 
-// MODIFIÉ LE 2026-08-11 PAR C4 — ces deux filets caractérisaient un
-// avertissement dont la sonde a prouvé qu'il n'était JAMAIS émis en
-// production : le seul appelant, `tokens.js`, passait un objet prix, et la
-// branche était gardée par `typeof modelOrPrice === 'string'`. Prouvé par
-// mutation le 2026-08-11 — un `throw` dans cette branche faisait tomber 2
-// tests sur 788, ces deux-ci, tous deux des appels directs. Aucun test
-// serveur, aucun test d'intégration.
-//
-// Ce qui distingue un zéro VOULU d'un tarif inconnu n'est donc plus une trace
-// écrite dans un journal que personne ne lit (établi par C5), mais le champ
-// `known` du contrat — et il voyage jusqu'à l'écran.
+// Ce qui distingue un zéro VOULU d'un tarif inconnu est le champ `known` du
+// contrat, qui voyage jusqu'à l'écran, et non une trace dans le journal du démon.
 test('un zéro VOULU est connu, et ne rend pas le total incomplet', () => {
   for (const m of ['<synthetic>', 'ministral-3:latest']) {
     const r = computeCost({ input_tokens: 1000, output_tokens: 50 }, m);
@@ -324,8 +300,8 @@ test('un modèle hors de la liste des zéros voulus est inconnu, sans rien journ
   const r = computeCost({ input_tokens: 10 }, 'mystery-model-9');
   assert.equal(r.usd, null);
   assert.equal(r.known, false);
-  // TÉMOIN : plus aucune trace. L'information ne passe plus par le journal du
-  // démon, elle passe par le contrat.
+  // TÉMOIN : aucune trace. L'information passe par le contrat, pas par le journal
+  // du démon.
   assert.equal(spy.mock.callCount(), 0);
 });
 
@@ -358,9 +334,9 @@ test('a new canonical Claude model absent from the embedded table is reported', 
 });
 
 test('sonnet-5 at the intro rate is NOT a drift during the launch window, IS one after', () => {
-  // The 2026-08-05 measurement: LiteLLM stores the intro rate as "current" —
-  // same billing today, a representation difference. After 2026-09-01 the
-  // embedded table switches to the sticker rate; a stale feed becomes a drift.
+  // LiteLLM stores the intro rate as "current": during the launch window the billing
+  // is the same, only the representation differs. From 2026-09-01 the embedded table
+  // switches to the sticker rate, and a stale feed becomes a drift.
   const { _internals } = require('../../src/server/pricing.ts');
   const feed = {
     'claude-sonnet-5': {
@@ -376,12 +352,9 @@ test('sonnet-5 at the intro rate is NOT a drift during the launch window, IS one
 });
 
 test('a vigil pass never touches the price map: the dated period survives', () => {
-  // Anti-regression lock for the T11 Critical: no code path may write the
-  // price map from LiteLLM anymore. Feed the CATALOG (sticker) rate for
-  // sonnet-5 — during the launch window the embedded table's CURRENT tariff
-  // is the intro rate, so the sticker feed is a drift by construction — and
-  // confirm the dated period (intro rate, valid until 2026-09-01) is still
-  // exactly what getPrice returns afterwards.
+  // Anti-regression lock: no code path writes the price map from LiteLLM. A sticker
+  // feed for sonnet-5 is a drift by construction during the launch window, and the
+  // dated intro period (valid until 2026-09-01) still comes out of getPrice after it.
   const { _internals } = require('../../src/server/pricing.ts');
   const feed = {
     'claude-sonnet-5': {
@@ -398,7 +371,7 @@ test('a vigil pass never touches the price map: the dated period survives', () =
 });
 
 test('historical models and regional variants never alert', () => {
-  // Decision Vincent 2026-08-05: "absent from the table" alone is not "new" —
+  // "Absent from the table" alone is not "new" —
   // historical ids (claude-opus-4-1) and un-normalized regional routing
   // variants (us./global.anthropic.) are also absent, but are not news.
   const { _internals } = require('../../src/server/pricing.ts');
@@ -439,9 +412,8 @@ test('a version above the family max alerts as modele-nouveau', () => {
 });
 
 test('regional premium endpoints are different SKUs, not tariff drift', () => {
-  // Measured on the real feed 2026-08-05: us./eu./au.anthropic.* carry a
-  // uniform +10% premium over the base (direct-API) tariff the embedded
-  // table represents. That premium is a legitimate different SKU, not a
+  // On the real feed, us./eu./au.anthropic.* carry a uniform +10% premium over the
+  // base (direct-API) tariff the embedded table represents: a different SKU, not a
   // drift of the canonical model — the bare key is the only one compared.
   const { _internals } = require('../../src/server/pricing.ts');
   const base = {

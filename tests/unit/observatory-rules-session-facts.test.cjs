@@ -72,12 +72,9 @@ test('R3 stays silent with no candidate filters at all', () => {
   assert.deepEqual(r3.evaluate(ctx([session('s1', toolReport([], 1000 * KB))])), []);
 });
 
-// Population restriction decided on 2026-07-27 from the calibration relevé: of
-// the 17 families that cleared the thresholds, 15 were agent tools rather than
-// commands. R3's action is "target the command — filter, pagination, narrower
-// test", and an agent tool has no filter to add, so telling the user their Read
-// calls are large is not an action. Scope deliberately narrow: two pieces of
-// advice that hold beat seventeen of which fifteen are inapplicable.
+// R3's action is "target the command — filter, pagination, narrower test": an
+// agent tool has no filter to add, so its large outputs are not an action. The
+// calibration relevé found most families above the thresholds were agent tools.
 test('R3 ignores agent-tool families — only a shell command has a filter to add', () => {
   for (const family of ['Read', 'Grep', 'Agent', 'Glob', 'WebFetch', 'WebSearch',
     'PowerShell', 'ExitPlanMode', 'Bash', 'mcp__mdb-explorer__mdb_geocode']) {

@@ -1,5 +1,5 @@
 'use strict';
-// The two structural M1.1 decisions, pinned: persistence always scans 90 days
+// The two structural rules, pinned: persistence always scans 90 days
 // while advice reads the chosen window on the human basis only; every
 // recommendation is stamped with the period it was observed on.
 

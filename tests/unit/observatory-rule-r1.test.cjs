@@ -13,7 +13,7 @@ const { evaluateAll, RULES } = require('../../src/server/observatory/rules/regis
 
 // The engine guarantees that each breakdown sums exactly to prefixChange, so
 // the default puts every unclaimed token on modelSwitch: tests that say nothing
-// about markers describe the pre-existing "model was switched" case.
+// about markers describe the plain "model was switched" case.
 function session(id, { project = 'F--proj', prefixChange = 0, compaction = 0, expiration = 0,
   systemChanged = 0, toolsChanged = 0, messagesChanged = 0,
   toolsAppeared = 0, noMarker = 0, depth = null,
@@ -152,12 +152,9 @@ test('when nothing in the journal explains the break, R1 emits no action at all'
 test('when deferred tools were loaded mid-session, R1 emits no action either', () => {
   const recs = r1.evaluate(ctx([session('s1', { prefixChange: 50000, toolsAppeared: 50000 })]));
   assert.equal(recs[0].evidence.dominantMarker, 'toolsAppeared');
-  // Official Anthropic docs: loading a deferred tool through tool search
-  // APPENDS the definition to the conversation history — the prefix is
-  // untouched, the cache is preserved. Our own controlled test agreed
-  // (+265 tk, full cache re-read — doc/10, condition C). The marker is a
-  // temporal coincidence, not a mechanism: prescribing "load tools up front"
-  // is false information, so the card must be informative (null action).
+  // Official docs: a deferred tool loaded through tool search is APPENDED to the
+  // history, the cache is preserved (our controlled test re-read it in full). The
+  // marker is a coincidence, not a mechanism: the card stays informative.
   assert.equal(recs[0].action, null);
 });
 
@@ -185,10 +182,9 @@ test('a diagnosed messages_changed break stays informative too', () => {
   assert.equal(recs[0].action, null);
 });
 
-// The DB stores session reports computed by the engine that scanned them: after
-// an upgrade, reports written by an older engine legitimately lack the newer
-// marker cells. Caught live on 2026-08-19: a copied pre-0.24 DB made R1 throw
-// ("Cannot read properties of undefined") and the card vanished entirely.
+// A report scanned before a marker was added lacks its cell, and stays in the DB
+// after an upgrade. Throwing there ("Cannot read properties of undefined") made
+// the whole R1 card vanish until a re-scan.
 test('a report stored by an older engine (missing marker cells) still evaluates, absent cells read zero', () => {
   const s = session('s1', { prefixChange: 50000, noMarker: 50000 });
   const markers = s.report.context.prefixBreakdown.markers;

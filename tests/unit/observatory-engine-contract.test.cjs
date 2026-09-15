@@ -39,11 +39,11 @@ test('the SessionReport shape the product consumes is present and typed', async 
   // moves the clock is seen rather than absorbed by R6's duration.
   assert.equal(r.endedAt, '2026-07-01T10:01:30.000Z');
 
-  // M1.1 — session shape. The M1 fixture prompt is a RAW STRING, so the
+  // Session shape. The fixture prompt is a RAW STRING, so the
   // engine must classify it headless: pinning that value proves the sort.
   assert.equal(r.sessionKind, 'headless');
 
-  // M1.1 — silent-break ventilation: same shape as every ChurnCauseStat,
+  // Silent-break ventilation: same shape as every ChurnCauseStat,
   // and the sub-buckets always sum to the parent bucket (homogeneity rule).
   const nm = r.context.prefixBreakdown.markers.noMarker;
   assert.equal(typeof nm.tokens, 'number');
@@ -113,7 +113,7 @@ test('a blocks-shaped prompt session is classified interactive', async () => {
   assert.equal(r.sessionKind, 'interactive');
 });
 
-test('the engine exposes the embedded price table and its version (v0.5.0 surface)', () => {
+test('the engine exposes the embedded price table and its version', () => {
   const table = engine.priceTable();
   assert.equal(table.source, 'netgain-table-embarquee');
   assert.equal(table.unit, 'usd-par-jeton');
@@ -121,7 +121,7 @@ test('the engine exposes the embedded price table and its version (v0.5.0 surfac
   assert.ok(table.entries.every(e => e.label && e.maxInput > 0 && typeof e.current.input === 'number'));
   assert.ok(Array.isArray(table.zeroCost) && table.zeroCost.length >= 2);
   assert.match(engine.version, /^\d+\.\d+\.\d+$/);
-  // Un seul outil, une seule version : le moteur ne peut plus dériver du produit.
+  // Un seul outil, une seule version : la version du moteur est celle du paquet.
   assert.equal(engine.version, require('../../package.json').version);
 });
 

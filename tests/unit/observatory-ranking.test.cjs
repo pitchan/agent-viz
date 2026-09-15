@@ -1,6 +1,6 @@
 'use strict';
 // Ranking: cost weighted by confidence, split by cost basis, with freshness
-// and the "+50 % before a decided recommendation comes back" rule (doc/44) —
+// and the "+50 % before a decided recommendation comes back" rule —
 // accepted and ignored share the return rail, arbitrated never returns alone.
 
 const { test } = require('node:test');
@@ -35,7 +35,7 @@ test('an unknown confidence scores zero rather than crashing the page', () => {
   assert.equal(scoreOf(rec(4, { confidence: 'inconnue' })), 0);
 });
 
-test('une adoption revient seulement passé +50 % de son coût au moment du clic (doc/44)', () => {
+test('une adoption revient seulement passé +50 % de son coût au moment du clic', () => {
   assert.equal(isEligible(rec(1, { status: 'accepted', estimatedCostUsd: 14, costAtStatusUsd: 10 })), false);
   assert.equal(isEligible(rec(2, { status: 'accepted', estimatedCostUsd: 15, costAtStatusUsd: 10 })), true);
 });
@@ -109,7 +109,7 @@ test('an empty input yields empty structures, never undefined', () => {
   assert.deepEqual(rankByBasis([], { lastScanAt: SCAN }), { groups: [], stale: [], decided: [] });
 });
 
-// ─── Le registre de décisions (doc/44) : trois destinations, un journal ────
+// ─── Le registre de décisions : trois destinations, un journal ─────────────
 
 test('un arbitrage ne revient jamais de lui-même, quel que soit le coût', () => {
   assert.equal(isEligible(rec(1, { status: 'arbitrated', estimatedCostUsd: 99, costAtStatusUsd: 1 })), false);

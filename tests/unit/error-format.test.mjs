@@ -111,7 +111,7 @@ test('la ligne dit combien de fois l erreur est revenue', () => {
 });
 
 test('une erreur survenue une seule fois ne s affuble pas d un ×1', () => {
-  // Arrange / Act / Assert — et une ligne d'avant le compteur non plus
+  // Arrange / Act / Assert — et une ligne sans `count` non plus
   assert.equal(errorRow(rec({ count: 1 })).repeat, '');
   assert.equal(errorRow(rec()).repeat, '');
 });

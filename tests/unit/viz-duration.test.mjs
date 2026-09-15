@@ -1,17 +1,10 @@
-// C8 (audit de qualité de code, docs/audit-qualite-code.md) : la même durée
-// était formatée par trois fonctions différentes — `calcDuration`
-// (viz-layout.js), `formatSessionDuration` (viz-narrator.js) et une expression
-// sans nom dans `updateLiveDurations` (viz-ui.js). Aucun test ne les couvrait.
+// Une seule écriture d'une durée pour trois appelants : `calcDuration`
+// (viz-layout.ts), `formatSessionDuration` (viz-narrator.ts) et
+// `updateLiveDurations` (viz-ui.ts).
 //
-// Une sonde différentielle les a mises côte à côte sur la même grille : sur le
-// domaine nominal (0 → 1 h) les trois répondent EXACTEMENT la même chose. Elles
-// ne divergeaient que hors contrat, et là brutalement — sur une date illisible,
-// deux d'entre elles affichaient `NaNm` à l'écran, la troisième `?`.
-//
-// D'où le partage retenu : le module dit ce qu'est une durée et comment on
-// l'écrit ; il rend `null` pour ce qui n'en est pas une, et chaque appelant
-// garde SON mot pour ce cas — `null` pour la carte du graphe, `?` pour le
-// narrateur. Le format est commun, la phrase de repli ne l'est pas.
+// Le module dit ce qu'est une durée et comment on l'écrit ; il rend `null` pour ce
+// qui n'en est pas une, et chaque appelant garde SON mot pour ce cas — `null` pour
+// la carte du graphe, `?` pour le narrateur. Le format est commun, le repli non.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -27,8 +20,7 @@ test('à partir d une seconde, elle passe aux secondes avec une décimale', () =
   assert.equal(formatDuration(1000), '1.0s');
   assert.equal(formatDuration(1500), '1.5s');
   // 59 999 ms donne « 60.0s » et non « 1.0m » : l arrondi de la décimale se fait
-  // APRÈS le choix de l unité. Les trois implémentations d origine partageaient
-  // ce comportement au caractère près ; le partager n était pas le corriger.
+  // APRÈS le choix de l unité, comportement épinglé au caractère près.
   assert.equal(formatDuration(59_999), '60.0s');
 });
 
@@ -46,6 +38,6 @@ test('ce qui n est pas une durée ne reçoit pas de mot ici', () => {
   const rendus = horsContrat.map(formatDuration);
 
   // Assert — `null`, pas une chaîne : c est à l appelant de dire « ? », « — »
-  // ou rien du tout. Avant C8, deux des trois écrivaient `NaNm` à l écran.
+  // ou rien du tout, jamais `NaNm`.
   assert.deepEqual(rendus, horsContrat.map(() => null));
 });

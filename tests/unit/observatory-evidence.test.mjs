@@ -16,10 +16,9 @@ test('R1 states the sessions, the rebuilt-prefix tokens and the journaled marker
       '12 % des jetons nets de ces sessions']);
 });
 
-// Corrected 2026-08-05: "cause dominante" asserted causality the measurement
-// does not carry. Only modelSwitch has a proven mechanism; toolsAppeared is a
-// temporal coincidence (official docs: deferred tool loading preserves the
-// cache), so the wording must not read as a cause.
+// Only modelSwitch has a proven mechanism: toolsAppeared is a temporal
+// coincidence (official docs: deferred tool loading preserves the cache), so the
+// wording never reads as a cause — "cause dominante" is refused.
 test('R1 presents toolsAppeared as an observed coincidence, never as a cause', () => {
   const lines = evidenceLines({ ruleId: 'R1', evidence: { sessions: ['a'], prefixChangeTokens: 50000,
     markerTokens: { modelSwitch: 0, toolsAppeared: 50000, noMarker: 0 }, dominantMarker: 'toolsAppeared',
@@ -30,8 +29,7 @@ test('R1 presents toolsAppeared as an observed coincidence, never as a cause', (
   assert.ok(!lines.some(l => l.includes('cause dominante')));
 });
 
-// The case that made the fix necessary: no journaled cause must read as such,
-// never as a model switch measured at zero.
+// No journaled cause reads as such, never as a model switch measured at zero.
 test('R1 says so plainly when no marker explains the break', () => {
   assert.deepEqual(
     evidenceLines({ ruleId: 'R1', evidence: { sessions: ['a'], prefixChangeTokens: 25261379,
@@ -173,7 +171,7 @@ const recR1 = dominantMarker => ({
   },
 });
 
-test('les trois marqueurs R1 gardent leur statut epistemique — contractuel (doc/32)', () => {
+test('les trois marqueurs R1 gardent leur statut epistemique — contractuel', () => {
   const attendus = {
     modelSwitch: /changement de modèle — mécanisme certain/,
     toolsAppeared: /coïncidence observée, sans mécanisme établi/,
@@ -186,7 +184,7 @@ test('les trois marqueurs R1 gardent leur statut epistemique — contractuel (do
   }
 });
 
-// Fixture autonome : la forme d'evidence R7 (doc/41) que consomme evidenceLines.
+// Fixture autonome : la forme d'evidence R7 que consomme evidenceLines.
 const recR7 = excludedPendingRescan => ({
   ruleId: 'R7',
   evidence: {
@@ -215,9 +213,9 @@ test('R7 met la queue non verifiee en francais, sans accuser de gaspillage', () 
     'aucune session ecartee : pas de ligne de re-analyse, pas de zero decoratif');
 });
 
-// F1 (revue doc/41) : « close » affirmait une cloture que le capteur ne mesure
-// pas — la regle ne teste jamais la fin de session, une session encore vivante
-// dont les dernieres editions ne sont pas verifiees entre dans sessionsWithTail.
+// « close » affirmerait une cloture que le capteur ne mesure pas : la regle ne teste
+// jamais la fin de session, et une session encore vivante dont les dernieres
+// editions ne sont pas verifiees entre dans sessionsWithTail.
 test('R7 ne declare jamais la session close — la cloture n est pas mesuree', () => {
   // Arrange
   const rec = recR7(0);
@@ -230,11 +228,9 @@ test('R7 ne declare jamais la session close — la cloture n est pas mesuree', (
     `le fait lui-meme doit rester dit : ${JSON.stringify(lines)}`);
 });
 
-// Revue finale de branche : « jetons emis apres la derniere verification » ment
-// pour la population MAJORITAIRE. Une session sans aucune verification n'a pas
-// de « derniere verification » : `tokensAfterLastVerification` y vaut TOUTE la
-// session, et ces sessions sont 87 % des editantes (sonde doc/41). La phrase dit
-// donc ce qui est mesure, et nomme le cas limite au lieu de le taire.
+// Une session sans aucune verification n'a pas de « derniere verification » :
+// `tokensAfterLastVerification` y vaut TOUTE la session. La phrase dit donc ce qui
+// est mesure, et nomme ce cas limite, le plus frequent, au lieu de le taire.
 test('R7 ne date pas les jetons d une derniere verification qui n existe pas toujours', () => {
   // Arrange
   const rec = recR7(0);

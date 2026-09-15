@@ -96,19 +96,9 @@ test('accumulateUsage stores the canonical id (normalized) regardless of input t
   }
 });
 
-// MODIFIÉ LE 2026-08-11 PAR C4 — ce filet de caractérisation est passé au
-// rouge, et c'est le résultat voulu : le comportement qu'il décrivait était
-// précisément le constat.
-//
-// AVANT : un modèle sans tarif laissait TOUS les champs de tarification
-//   intacts — `lastModel` restait `null`, et le seau ne gardait aucune trace
-//   du fait que le total ne comptait pas ce message. Le commentaire disait
-//   « pricing stays at zero », ce qui décrivait bien le code mais masquait sa
-//   conséquence : le montant affiché devenait une sous-estimation muette.
-// APRÈS : le montant reste inchangé (il n'y a toujours rien à compter, et il
-//   reste une borne inférieure exacte), mais le seau NOMME le modèle et marque
-//   le total incomplet, et `lastModel` retient l'identifiant rapporté pour que
-//   la pastille ne disparaisse pas quand aucun modèle n'est tarifé.
+// Un modèle sans tarif laisse le montant inchangé (borne inférieure exacte), mais
+// le seau NOMME le modèle et marque le total incomplet ; `lastModel` retient
+// l'identifiant rapporté, pour que la pastille ne disparaisse pas.
 test('accumulateUsage with an unknown model names it and marks the cost incomplete', () => {
   const b = newBucket();
   accumulateUsage(b, { input_tokens: 1000, output_tokens: 500 }, 'claude-mythical-99-99');
@@ -116,7 +106,7 @@ test('accumulateUsage with an unknown model names it and marks the cost incomple
   // pas la mesure.
   assert.equal(b.in, 1000);
   assert.equal(b.costUsd, 0);
-  // Ce que C4 ajoute : le modèle est retenu et l'incomplétude est dite.
+  // Le modèle est retenu et l'incomplétude est dite.
   assert.equal(b.lastModel, 'claude-mythical-99-99');
   assert.equal(b.costComplete, false);
   assert.deepEqual(b.unknownModels, ['claude-mythical-99-99']);
@@ -191,7 +181,7 @@ test('accumulateUsage with different msgIds cumulates normally', () => {
 // `tests/repo/no-local-engine-primitives.test.mjs`.
 // ---------------------------------------------------------------------------
 
-test('C3 — le seau porte les DEUX ventilations de cache, que seul le moteur suivait', () => {
+test('le seau porte les DEUX ventilations de cache', () => {
   // Arrange
   const b = newBucket();
   assert.equal(b.cacheCreate1h, 0, 'le seau neuf les expose à zéro');
@@ -210,13 +200,10 @@ test('C3 — le seau porte les DEUX ventilations de cache, que seul le moteur su
   assert.equal(b.cacheCreate5m, 40);
 });
 
-// CHANGEMENT DE COMPORTEMENT VOULU. Avant, le serveur
-// faisait `bucket.in += usage.input_tokens || 0` : un nombre en CHAÎNE donnait
-// `0 + "100"` = "0100", et le seau partait en texte pour toute la session,
-// jusque dans l'enveloppe SSE. `Infinity` — le seul poison qu'un JSON valide
-// puisse porter, via `1e999` — passait aussi. La garde commune ramène les deux
-// à zéro. Aucun transcript réel n'en porte : mesuré, 0 sur 833 fichiers.
-test('C3 — un champ qui n\'est pas un nombre fini vaut zéro, et le seau reste numérique', () => {
+// La garde commune ramène à zéro un nombre en CHAÎNE (sans elle, `0 + "100"` =
+// "0100" et le seau part en texte jusque dans l'enveloppe SSE) et `Infinity`,
+// qu'un JSON valide porte via `1e999`.
+test('un champ qui n\'est pas un nombre fini vaut zéro, et le seau reste numérique', () => {
   // Arrange
   const b = newBucket();
 
@@ -273,12 +260,9 @@ test('après un usage inexploitable, le message sain suivant redonne sa propre t
   assert.equal(b.lastCacheRead, 50500);
 });
 
-// L'ARBITRAGE DE C3, verrouillé ici : un identifiant VIDE n'est pas un
-// identifiant. Le serveur le faisait déjà ; c'est le MOTEUR qui a changé de
-// sens (il dédupliquait sur ""), et ce test empêche qu'une future unification
-// l'emporte dans l'autre sens — celui qui SOUS-COMPTE, en fusionnant des
-// messages distincts dépourvus d'identifiant.
-test('C3 — un identifiant vide ne déduplique pas : deux messages, deux comptes', () => {
+// Un identifiant VIDE n'est pas un identifiant : dédupliquer sur "" fusionnerait
+// des messages distincts dépourvus d'identifiant, et SOUS-COMPTERAIT.
+test('un identifiant vide ne déduplique pas : deux messages, deux comptes', () => {
   // Arrange
   const b = newBucket();
 
@@ -291,18 +275,16 @@ test('C3 — un identifiant vide ne déduplique pas : deux messages, deux compte
 });
 
 // ---------------------------------------------------------------------------
-// C4 (2026-08-11) — le seau porte la COMPLÉTUDE du coût, et la porte jusqu'à
-// l'enveloppe SSE. Avant : un message sur un modèle sans tarif était
-// entièrement IGNORÉ (ni coût, ni lastModel, ni contextMax) et rien ne le
-// disait — mesuré, une session de deux messages dont un inconnu affichait
-// $0.50 pour un coût réel de ~$1.00, sans la moindre réserve.
+// Le seau porte la COMPLÉTUDE du coût jusqu'à l'enveloppe SSE : un message sur un
+// modèle sans tarif marque le coût incomplet et nomme le modèle, au lieu d'être
+// ignoré en silence.
 // ---------------------------------------------------------------------------
 const { tokensMessage, ensureTokens } = require('../../src/server/tokens.ts');
 
 const AT = '2026-08-11T12:00:00.000Z';
 const usage = () => ({ input_tokens: 40_000, output_tokens: 8_000, cache_read_input_tokens: 200_000 });
 
-test('C4 — un modèle tarifé laisse le coût COMPLET', () => {
+test('un modèle tarifé laisse le coût complet', () => {
   const b = newBucket();
   accumulateUsage(b, usage(), 'claude-opus-5', 'm1', AT);
   assert.equal(b.costComplete, true);
@@ -310,7 +292,7 @@ test('C4 — un modèle tarifé laisse le coût COMPLET', () => {
   assert.ok(b.costUsd > 0);
 });
 
-test('C4 — un modèle SANS TARIF marque le coût incomplet et se nomme', () => {
+test('un modèle SANS TARIF marque le coût incomplet et se nomme', () => {
   const b = newBucket();
   accumulateUsage(b, usage(), 'claude-opus-5', 'm1', AT);
   const coutConnu = b.costUsd;
@@ -322,11 +304,9 @@ test('C4 — un modèle SANS TARIF marque le coût incomplet et se nomme', () =>
   assert.equal(b.costUsd, coutConnu);
 });
 
-test('C4 — un ZÉRO VOULU ne rend PAS le coût incomplet', () => {
-  // `<synthetic>` : 80 occurrences sur les 833 transcripts de la machine.
-  // C'est le cas qui interdit de marquer l'incomplétude sur un simple test de
-  // nullité du tarif — le serveur ne savait pas distinguer « 0 $ voulu » de
-  // « tarif inconnu », et aurait signalé « partiel » sur des sessions justes.
+test('un ZÉRO VOULU ne rend PAS le coût incomplet', () => {
+  // `<synthetic>` coûte 0 $ voulu : un simple test de nullité du tarif le prendrait
+  // pour un tarif inconnu, et signalerait « partiel » sur des sessions justes.
   const b = newBucket();
   accumulateUsage(b, usage(), '<synthetic>', 'm1', AT);
   accumulateUsage(b, usage(), 'claude-opus-5', 'm2', AT);
@@ -334,7 +314,7 @@ test('C4 — un ZÉRO VOULU ne rend PAS le coût incomplet', () => {
   assert.deepEqual(b.unknownModels, []);
 });
 
-test('C4 — un modèle inconnu est nommé UNE fois, pas une par message', () => {
+test('un modèle inconnu est nommé UNE fois, pas une par message', () => {
   const b = newBucket();
   accumulateUsage(b, usage(), 'claude-opus-6', 'm1', AT);
   accumulateUsage(b, usage(), 'claude-opus-6', 'm2', AT);
@@ -342,10 +322,9 @@ test('C4 — un modèle inconnu est nommé UNE fois, pas une par message', () =>
   assert.deepEqual(b.unknownModels, ['claude-opus-6', 'zzz-autre-modele']);
 });
 
-test('C4 — lastModel retient le DERNIER modèle rapporté, tarifé ou non', () => {
-  // Avant : lastModel n'était posé que par un modèle tarifé, si bien qu'une
-  // session n'utilisant QUE des modèles inconnus masquait la pastille
-  // entièrement — ni coût, ni contexte, ni modèle à l'écran.
+test('lastModel retient le DERNIER modèle rapporté, tarifé ou non', () => {
+  // Un lastModel posé seulement par un modèle tarifé masquerait la pastille d'une
+  // session n'utilisant QUE des modèles inconnus : ni coût, ni contexte, ni modèle.
   const b = newBucket();
   accumulateUsage(b, usage(), 'claude-opus-6', 'm1', AT);
   assert.equal(b.lastModel, 'claude-opus-6');
@@ -353,7 +332,7 @@ test('C4 — lastModel retient le DERNIER modèle rapporté, tarifé ou non', ()
   assert.equal(b.costComplete, false);
 });
 
-test('C4 — un identifiant régional est tarifé comme sa forme canonique', () => {
+test('un identifiant régional est tarifé comme sa forme canonique', () => {
   const b = newBucket();
   accumulateUsage(b, usage(), 'us.anthropic.claude-opus-4-7', 'm1', AT);
   const c = newBucket();
@@ -363,7 +342,7 @@ test('C4 — un identifiant régional est tarifé comme sa forme canonique', () 
   assert.equal(b.lastModel, 'claude-opus-4-7');
 });
 
-test('C4 — la complétude traverse l\'enveloppe SSE', () => {
+test('la complétude traverse l\'enveloppe SSE', () => {
   const rec = {};
   ensureTokens(rec);
   accumulateUsage(rec.tokens.main, usage(), 'claude-opus-6', 'm1', AT);

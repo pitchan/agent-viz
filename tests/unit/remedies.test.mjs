@@ -1,4 +1,4 @@
-// Le contrat de la table des remedes (doc/32) : chaque motif ALERTANT a une
+// Le contrat de la table des remedes : chaque motif ALERTANT a une
 // entree EXPLICITE — un remede complet, ou `null` qui dit « absence deliberee ».
 // C'est ce qui distingue un motif sans remede honnete d'un oubli de developpement.
 import { test } from 'node:test';
@@ -21,7 +21,7 @@ test('tout remede non-null porte une consigne francaise et un extrait a coller',
   }
 });
 
-test('le filet vaut null : sa cause n est pas caracterisee (doc/30)', () => {
+test('le filet vaut null : sa cause n est pas caracterisee', () => {
   assert.equal(REMEDES['inv-bash-unbalanced-quote'], null);
 });
 

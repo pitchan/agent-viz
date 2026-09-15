@@ -1,4 +1,4 @@
-// La carte de conseil (doc/44) : trois intentions dans les mots de
+// La carte de conseil : trois intentions dans les mots de
 // l'utilisateur, leur conséquence écrite sous chaque bouton, et le bandeau
 // d'une carte décidée qui re-surface. Faux document, comme decisions-view.
 import { test } from 'node:test';

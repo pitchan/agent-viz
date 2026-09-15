@@ -1,7 +1,7 @@
 'use strict';
-// An M1 (v0.3.x) observatory.db must gain the M1.1 columns without losing a
-// single row — recommendation statuses are the only data a re-scan cannot
-// rebuild.
+// An observatory.db without the session_kind and period columns must gain them
+// without losing a single row — recommendation statuses are the only data a
+// re-scan cannot rebuild.
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -12,15 +12,15 @@ const { DatabaseSync } = require('node:sqlite');
 
 const { openStore } = require('../../src/server/observatory/store.ts');
 
-// Copy of the M1 schema as shipped in v0.3.1 (before this change) — the
-// point of the test is opening a database built by the PREVIOUS version.
+// Copy of a sessions schema without session_kind and period — the point of the
+// test is opening a database written before those columns existed.
 const M1_SESSIONS = `CREATE TABLE sessions (
   id TEXT PRIMARY KEY, project TEXT, transcript_path TEXT,
   file_mtime INTEGER, file_size INTEGER, scan_version INTEGER,
   started_at TEXT, ended_at TEXT, model_main TEXT,
   net_tokens INTEGER, cost_usd REAL, cost_complete INTEGER, report_json TEXT)`;
 
-test('opening an M1 database adds session_kind and period columns, rows intact', () => {
+test('opening a database without session_kind and period adds both columns, rows intact', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'obs-mig-'));
   const dbPath = path.join(dir, 'observatory.db');
   const db = new DatabaseSync(dbPath);
@@ -39,9 +39,8 @@ test('opening an M1 database adds session_kind and period columns, rows intact',
   }
 });
 
-// Copie du schéma des recommandations tel que livré en 0.17.0 (avant le
-// statut « arbitré ») — le test ouvre une base construite par la version
-// PRÉCÉDENTE, statuts posés compris.
+// Copie d'un schéma des recommandations sans les colonnes du statut arbitré — le
+// test ouvre une base écrite avant ces colonnes, statuts posés compris.
 const V017_RECOMMENDATIONS = `CREATE TABLE recommendations (
   id INTEGER PRIMARY KEY, rule_id TEXT, subject TEXT,
   created_at TEXT, updated_at TEXT, last_seen_at TEXT,
@@ -51,7 +50,7 @@ const V017_RECOMMENDATIONS = `CREATE TABLE recommendations (
   evidence_json TEXT, action TEXT,
   status TEXT DEFAULT 'new', cost_at_status_usd REAL)`;
 
-test('une base 0.17.0 gagne status_reason et status_at, statuts posés intacts', () => {
+test('une base sans les colonnes du statut arbitré gagne status_reason et status_at, statuts posés intacts', () => {
   // Arrange
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'obs-mig3-'));
   const dbPath = path.join(dir, 'observatory.db');

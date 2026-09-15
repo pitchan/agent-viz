@@ -219,7 +219,7 @@ test('composeNarrator: session done → "session done · N tools · Xm" tone don
 });
 
 test('composeNarrator: session done sans borne de fin → la phrase garde son « ? »', () => {
-  // Arrange — constat C8 : le FORMAT est commun aux trois vues, le mot de repli
+  // Arrange — le FORMAT est commun aux trois vues, le mot de repli
   // ne l'est pas. Dans une phrase, l'absence de durée doit s'écrire ; une carte
   // du graphe, elle, se contente de ne rien afficher.
   const state = freshState();

@@ -1,7 +1,7 @@
 'use strict';
 // The 'done' broadcast is the client's reload signal: it must fire only after
 // the recomputed advice is stored, or a post-purge reload reads a still-empty
-// recommendations table (bug seen live on 2026-08-04).
+// recommendations table.
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');

@@ -127,10 +127,9 @@ test('costLabel leads with measured bytes for byte-based rules when partial', ()
   assert.ok(label.includes('au moins 1,50 $'));
 });
 
-// R7 (doc/41) chiffre en jetons mesurés comme R1/R5/R6 : sans entrée dans la
-// table des quantités de tête, sa carte perdait sa quantité mesurée dès qu'un
-// modèle sans tarif rendait les dollars partiels — le chiffre qui porte le
-// constat disparaissait au moment précis où les dollars ne valaient plus rien.
+// R7 (jetons mesurés, comme R1/R5/R6) a son entrée dans la table des quantités de
+// tête : sans elle, sa carte perdait sa quantité mesurée dès qu'un modèle sans
+// tarif rendait les dollars partiels, au moment où ce chiffre porte seul le constat.
 test('costLabel leads with the measured tokens at risk for R7 when partial', () => {
   const rec = {
     ruleId: 'R7', estimatedCostUsd: 12.5, costBasis: 'jetons-mesures',
@@ -184,7 +183,7 @@ test('summaryHeadline : la periode, les sessions, le cout — en francais clair'
   assert.equal(summaryHeadline({ sessions: 3 }), '', 'sans periode, pas de phrase inventee');
 });
 
-test('summaryDetails : les memes chiffres qu avant, etiquetes, rien de supprime', () => {
+test('summaryDetails : jetons nets, cache relu et source de prix, chacun etiquete', () => {
   const s = {
     netTokens: 67_700_000, cacheReadTokens: 1_660_400_000,
     priceSource: 'netgain-table-embarquee', costComplete: true,
@@ -209,7 +208,7 @@ test('modelLabel derives readable labels, Claude 5 single-digit families include
   assert.equal(modelLabel(''), '');
 });
 
-// ─── Le journal des décisions (doc/44) : une ligne par carte décidée ───────
+// ─── Le journal des décisions : une ligne par carte décidée ────────────────
 
 test('decisionLine : un refus porte la date en JJ/MM/AAAA puis la raison, en français', () => {
   assert.equal(
@@ -239,7 +238,7 @@ test('decisionLine sans date consignée le dit, sans deviner', () => {
     'Refusé (date non consignée) — déjà pesé');
 });
 
-// ─── Le bandeau de retour (doc/44) : une carte décidée qui re-surface ──────
+// ─── Le bandeau de retour : une carte décidée qui re-surface ───────────────
 
 test('returnBanner : une adoption revenue interpelle sur le geste, pourcentage arrondi', () => {
   assert.equal(

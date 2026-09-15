@@ -1,20 +1,14 @@
 'use strict';
-// Filet de CARACTÉRISATION pour src/server/session-index.js — second et dernier
-// morceau de préparation de C2 (docs/audit-qualite-code.md : le décodage JSONL
-// est réimplémenté sur 7 fichiers côté serveur).
+// Filet de CARACTÉRISATION pour src/server/session-index.ts : `indexSessionInitial`
+// décode la première ligne (4 premiers Ko) pour en tirer `_source`, et
+// `countNewlinesStreaming` compte les sauts de ligne.
 //
-// Périmètre volontairement étroit : on épingle `indexSessionInitial` et
-// `countNewlinesStreaming`, parce que la première porte l'une des sept
-// réimplémentations du décodage — elle lit les 4 premiers Ko du fichier,
-// découpe sur '\n', et analyse la première ligne pour en tirer `_source`.
 // `sessionFilePath`, `latestSession` et la branche de création de `touchIndex`
-// restent non couverts À DESSEIN : ils ne participent pas au geste que C2 va
-// consolider, et gonfler un pourcentage n'est pas le but.
+// restent non couverts À DESSEIN : gonfler un pourcentage n'est pas le but.
 //
-// Nature : CARACTÉRISATION. Ces tests épinglent le comportement ACTUEL, y
-// compris ses angles morts. Un test qui devient rouge pendant C2 pose une
-// question — « ce changement est-il voulu ? » — il ne demande pas à être
-// contourné.
+// Nature : CARACTÉRISATION. Ces tests épinglent le comportement ACTUEL, angles
+// morts compris : un test rouge pose la question « ce changement est-il voulu ? »,
+// il ne demande pas à être contourné.
 
 const fs = require('node:fs');
 const os = require('node:os');
@@ -73,7 +67,7 @@ test('countNewlinesStreaming rend 0 sur un fichier absent, sans lever', async ()
   assert.equal(await countNewlinesStreaming(path.join(DIR, 'jamais-ecrit.jsonl')), 0);
 });
 
-// ── indexSessionInitial : le geste de décodage que C2 va consolider ─────────
+// ── indexSessionInitial : le décodage de la première ligne ──────────────────
 
 test('la source de l’agent est reprise du champ _source du premier événement', async () => {
   const { fp, id } = poseUnFichier(evenement({ _source: 'copilot' }) + '\n' + evenement({ _source: 'claude' }) + '\n');
@@ -95,14 +89,9 @@ test('CARACTÉRISATION — _source absent laisse agentSource indéfini, jamais �
     'le commentaire du module l’exige : ne pas coercer silencieusement vers « claude »');
 });
 
-// CHANGEMENT DE COMPORTEMENT VOULU.
-//
-// Ce test épinglait la perte : le BOM faisait échouer le `JSON.parse` local de
-// la sonde, `_source` était perdu, et seule une ligne sur `console.error` en
-// gardait trace. Il est passé au ROUGE au moment où `indexSessionInitial` a
-// adopté `decodeJsonlLine`. Changement voulu, même arbitrage que partout :
-// tolérer le BOM, comme le moteur.
-test('C2 — une première ligne préfixée d’un BOM ne fait plus perdre agentSource', async () => {
+// Le décodage commun tolère le BOM, comme le moteur : une première ligne qui en
+// porte un garde sa source d'agent.
+test('une première ligne préfixée d’un BOM garde agentSource', async () => {
   const BOM = String.fromCharCode(0xFEFF);
   const { fp, id } = poseUnFichier(BOM + evenement({ _source: 'copilot' }) + '\n');
 
@@ -115,9 +104,9 @@ test('C2 — une première ligne préfixée d’un BOM ne fait plus perdre agent
 });
 
 test('CARACTÉRISATION — une première ligne illisible laisse toujours une trace journalisée', async () => {
-  // Le décodeur ne lève plus, donc le `catch` ne peut plus servir de filet :
-  // c'est le verdict `{ok:false}` qui doit être lu. On vérifie que l'échec reste
-  // VISIBLE — la leçon de C1 : ne jamais échouer en silence.
+  // Le décodeur ne lève jamais, donc aucun `catch` ne sert de filet : c'est le
+  // verdict `{ok:false}` qui doit être lu. On vérifie que l'échec reste VISIBLE,
+  // jamais silencieux.
   const { fp, id } = poseUnFichier('{tronquee\n' + evenement({ _source: 'copilot' }) + '\n');
   const erreurs = [];
   const original = console.error;

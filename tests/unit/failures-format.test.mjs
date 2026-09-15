@@ -138,11 +138,9 @@ test('chaque cause du releve dit ce qui a ete mal ecrit, pas ce que l outil a re
 });
 
 test('la phrase du filet est celle qui sert quand la cause n est pas caracterisee', () => {
-  // Elle est de nouveau VIVANTE depuis le 2026-08-08 : le filet alerte, donc
-  // une alerte la porte. Elle reste malgre tout la seule phrase du bloc a
-  // decrire un symptome sans nommer de remede, et c est juste — le filet ne se
-  // declenche que lorsque aucune des deux ancres ne reconnait la forme,
-  // c est-a-dire quand la cause n est pas caracterisee.
+  // Le filet alerte, donc une alerte porte cette phrase : la seule du bloc qui
+  // decrit un symptome sans nommer de remede, parce que le filet ne se declenche
+  // que lorsque aucune des deux ancres ne reconnait la forme.
   const l = failureLine({ ...invocation, patternId: 'inv-bash-unbalanced-quote' });
   assert.match(l.headline, /guillemet ouvert et jamais refermé/);
   assert.doesNotMatch(l.headline, /réglage du poste de travail/);
@@ -170,11 +168,9 @@ test('tout type d alerte du detecteur a sa formulation francaise', () => {
   }
 });
 
-// Le bloc est la MEMOIRE des pannes, pas leur vivacite : sur 30 jours,
-// « non acquittees » et « en cours » sont deux choses differentes, et c'est la
-// pastille qui dit la seconde (`standing` -> activeIds, evenementiel ->
-// fraicheur). Un compte rouge sous-entendant « en cours » rejouerait exactement
-// la confusion que la tache 9 a paye pour trancher.
+// Le bloc est la MEMOIRE des pannes, pas leur vivacite : sur 30 jours, « non
+// acquittees » et « en cours » different, et c'est la pastille qui dit la
+// seconde (`standing` -> activeIds, evenementiel -> fraicheur).
 //
 // Mutation attrapee : remplacer le libelle par un quantificateur de vivacite.
 test('le resume compte les non acquittees, il ne prononce pas « en cours »', () => {

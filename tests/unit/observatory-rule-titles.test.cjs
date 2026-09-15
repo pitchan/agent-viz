@@ -1,10 +1,9 @@
 'use strict';
 // Le verrou : aucune règle ne nomme elle-même son projet.
 //
-// Quatre règles recollaient chacune « — projet <slug> » dans leur titre. Le
-// libellé est désormais posé en un seul endroit (project-label.js, appelé par
-// service.scan). Ce fichier empêche la duplication de revenir — y compris par
-// une règle écrite plus tard.
+// Le libellé « — projet <slug> » est posé en un seul endroit (project-label.ts,
+// appelé par service.scan). Ce fichier empêche une règle, y compris une règle
+// écrite plus tard, de le recoller dans son titre.
 //
 // Une fixture unique fait tirer TOUTES les règles à sujet projet. C'est
 // délibéré : un invariant qui se contente d'itérer sur les règles qu'il sait
@@ -61,7 +60,7 @@ const ALL_FIRING_SESSION = {
     toolResults: { byTool: {}, totalBytes: 0, candidateFilters: [] },
     subagents: { sidecarCount: 1, spawnToolUses: 2, byType: {} },
     // R7 : la session édite, vérifie, puis laisse une queue de 2 éditions
-    // après sa dernière preuve — le champ de SCAN_VERSION 8 (doc/41).
+    // après sa dernière preuve — le champ de SCAN_VERSION 8.
     verification: {
       verifications: 1,
       verificationsFailed: 0,
@@ -81,9 +80,9 @@ const ALL_FIRING_SESSION = {
   },
 };
 
-// R7 ne parle qu'au-dessus d'un plancher de sessions par projet (seuil calibré,
-// doc/41) : la fixture en fournit trois, d'identités distinctes et de rapport
-// identique. Les autres règles agrègent déjà par projet et tirent tout autant.
+// R7 ne parle qu'au-dessus d'un plancher de sessions par projet (seuil calibré) :
+// la fixture en fournit trois, d'identités distinctes et de rapport identique.
+// Les autres règles agrègent déjà par projet et tirent tout autant.
 const SESSIONS = ['s1', 's2', 's3'].map(id => ({ ...ALL_FIRING_SESSION, id }));
 
 const ctx = { sessions: SESSIONS, configItems: [] };

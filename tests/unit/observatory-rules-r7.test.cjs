@@ -1,5 +1,5 @@
 'use strict';
-// R7 — modifications laissées sans vérification (doc/41). Le fait vient du champ
+// R7 — modifications laissées sans vérification. Le fait vient du champ
 // verification du rapport stocké ; une session d'avant SCAN_VERSION 8 ne l'a
 // pas et est écartée, jamais devinée.
 
@@ -76,7 +76,7 @@ test('R7 compte les sessions ecartees faute du champ v8 dans la reco qu elle eme
   assert.equal(recs[0].estimatedCostUsd, 10, 'la session ecartee ne pese pas dans le cout');
 });
 
-// F1 (revue doc/41) : la regle ne filtre JAMAIS sur la fin de session — aucun
+// La regle ne filtre JAMAIS sur la fin de session — aucun
 // test d'endedAt ci-dessus. Une session encore vivante peut donc entrer dans la
 // reco, et le titre ne peut pas affirmer une cloture que rien ne mesure.
 test('R7 ne titre pas une cloture de session, un fait qu elle ne mesure pas', () => {

@@ -1,4 +1,4 @@
-// La section « Décisions rendues » (le journal, doc/44) et le contrôle
+// La section « Décisions rendues » (le journal) et le contrôle
 // « Non merci » d'une carte active, testés sur un faux document — même parti
 // que failures-view.test.mjs : pas de navigateur, pas de jsdom.
 import { test } from 'node:test';

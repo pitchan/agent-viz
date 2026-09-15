@@ -90,9 +90,8 @@ test('subagent agent_progress line populates perAgent bucket with model + cost',
   assert.ok(bucket, 'agent bucket should be created');
   assert.equal(bucket.in, 2000);
   assert.equal(bucket.lastModel, 'claude-haiku-4-5');
-  // Verify the subagent bucket got the FULL newBucket shape — historically a
-  // partial inline literal here meant pricing fields were undefined and
-  // costUsd += ... would return NaN.
+  // Verify the subagent bucket got the FULL newBucket shape — a partial inline
+  // literal here leaves pricing fields undefined, and costUsd += ... returns NaN.
   assert.equal(typeof bucket.costUsd, 'number');
   assert.ok(!Number.isNaN(bucket.costUsd));
   // Haiku: 2000*1e-6 + 100*5e-6 = 0.002 + 0.0005 = 0.0025
@@ -308,7 +307,7 @@ test('parseTranscriptEvent dispatches via rec.agentSource — copilot is no-op',
 });
 
 test('parseTranscriptEvent with agentSource=undefined still parses as Claude', () => {
-  // Pre-0.2.0 sessions: agentSource missing. Must keep working.
+  // A session recorded without --source has no agentSource: it must keep working.
   const rec = freshRec();
   // rec.agentSource stays undefined
   const line = JSON.stringify({

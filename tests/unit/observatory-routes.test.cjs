@@ -156,7 +156,7 @@ test('POST /recommendations/:id accepts a known status, rejects anything else', 
   assert.equal((await call('abc', 'ignored')).statusCode, 400);
 });
 
-// ─── Statut « arbitré » (doc/42) : la raison entre par la même route ───────
+// ─── Statut « arbitré » : la raison entre par la même route ────────────────
 
 test('POST arbitrated transmet la raison décodée au service', async () => {
   // Arrange

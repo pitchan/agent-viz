@@ -58,11 +58,9 @@ test('the thresholds fixed by the spec are exactly the spec values', () => {
   assert.equal(THRESHOLDS.R6.minSubagentShare, 0.3);
 });
 
-// The seven calibrated values are pinned here, not just declared as
-// 'calibration'. They are the outcome of a measurement on 90 days of real
-// history (relevé of 2026-07-27, docs/sources-externes.md; sonde doc/41 of
-// 2026-08-17 for R7): changing one silently would change which advice a user is
-// given, with no trace of why.
+// The seven calibrated values are pinned, not just declared 'calibration': they
+// come from a measurement on 90 days of real history (docs/sources-externes.md),
+// and changing one silently would change which advice a user is given.
 test('the calibrated thresholds are exactly the values the measurement retained', () => {
   assert.equal(THRESHOLDS.R1.minShareOfNet, 0.20,
     'raised from the 0.05 first proposed: 0.05 flagged 9 projects out of 14');

@@ -31,9 +31,9 @@ test('every adapter honors the same contract (Liskov)', () => {
   }
 });
 
-test('getAdapter: null/undefined defaults to claude (pre-0.2.0 sessions)', () => {
-  // Pre-0.2.0 hooks did not stamp _source. Those sessions must keep working
-  // as Claude — the historical default at the time the data was produced.
+test('getAdapter: null/undefined defaults to claude (sessions without _source)', () => {
+  // A hook command installed without --source stamps no _source: those sessions
+  // are still on disk and must keep reading as Claude.
   assert.equal(getAdapter(undefined), TRANSCRIPT_ADAPTERS.claude);
   assert.equal(getAdapter(null), TRANSCRIPT_ADAPTERS.claude);
   assert.equal(getAdapter('claude'), TRANSCRIPT_ADAPTERS.claude);
@@ -74,7 +74,7 @@ test('copilot adapter declares tokens unsupported and parseUsageLine is a no-op'
 // Ce test épingle cette tolérance ici : sans lui, une mutation qui détruisait une
 // des trois formes reconnues par l'adaptateur claude laissait ce fichier VERT, et
 // seuls `transcript.test.cjs` et `transcript-subagents.test.cjs` rougissaient.
-test('C2 — une ligne d’usage préfixée d’un BOM est désormais comptabilisée', () => {
+test('une ligne d’usage préfixée d’un BOM est comptabilisée', () => {
   const BOM = String.fromCharCode(0xFEFF);
   const ligne = JSON.stringify({
     type: 'assistant', isSidechain: false,

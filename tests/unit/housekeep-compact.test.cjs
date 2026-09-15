@@ -1,20 +1,11 @@
 'use strict';
-// Filet de CARACTÉRISATION pour src/server/housekeep.js — préparation de C2
-// (docs/audit-qualite-code.md : le décodage JSONL est réimplémenté sur 7
-// fichiers côté serveur).
-//
-// Pourquoi ce fichier existe : la mesure de couverture de l'audit donnait
-// `housekeep.js` à 20,5 %, mais les 31 lignes « couvertes » sont les `require`
-// et les accolades fermantes — AUCUN corps de fonction ne s'exécutait jamais.
-// `compactSession` porte l'une des sept réimplémentations du décodage JSONL ;
-// la consolider sans filet reviendrait à changer un comportement que personne
-// n'a jamais observé.
+// Filet de CARACTÉRISATION pour src/server/housekeep.ts : `compactSession` garde
+// la queue d'un fichier de session et résume toute son histoire, en décodant chaque
+// ligne par `decodeJsonlLine`.
 //
 // Nature des tests : CARACTÉRISATION, pas spécification. Ils épinglent le
-// comportement ACTUEL, verrues comprises — notamment le fait que ce décodeur
-// ne tolère PAS le BOM, contrairement à d'autres des sept. Si l'un d'eux
-// devient rouge, la bonne question est « le changement est-il voulu ? », pas
-// « comment le faire repasser au vert ? ».
+// comportement ACTUEL, verrues comprises : un test rouge pose la question « le
+// changement est-il voulu ? », pas « comment le faire repasser au vert ? ».
 
 const fs = require('node:fs');
 const os = require('node:os');
@@ -110,7 +101,7 @@ test('sans entrée dans l’index, la compaction ne fait rien du tout', async ()
   assert.equal(fs.existsSync(s.resume), false);
 });
 
-// --- Le cœur de C2 : ce que ce décodeur fait des lignes qu'il n'arrive pas à lire.
+// --- Ce que ce décodeur fait des lignes qu'il n'arrive pas à lire.
 
 test('CARACTÉRISATION — une ligne illisible est comptée dans totalEvents mais perdue pour les outils', async () => {
   const bonnes = Array.from({ length: COMPACT_KEEP_EVENTS + 20 }, (_, i) => evenementOutil(i));
@@ -132,17 +123,9 @@ test('CARACTÉRISATION — une ligne illisible est comptée dans totalEvents mai
   }
 });
 
-// CHANGEMENT DE COMPORTEMENT VOULU.
-//
-// Ce test épinglait l’inverse jusqu’au passage à la primitive commune : une
-// ligne préfixée d’un BOM ailleurs qu’en tête de fichier était rejetée par le
-// `JSON.parse` local, et l’événement disparaissait du résumé sans un mot. Il
-// est passé au ROUGE quand `compactSession` a adopté `decodeJsonlLine` — c’est
-// exactement ce pour quoi il avait été écrit : rendre le changement visible et
-// obliger à le valider, au lieu de le laisser passer inaperçu.
-//
-// Arbitrage retenu : tolérer le BOM partout, comme le moteur le fait déjà.
-test('C2 — un BOM est désormais toléré où qu’il soit dans le fichier', async () => {
+// Un BOM au milieu du fichier ne fait pas disparaître l’événement du résumé : le
+// décodage commun le tolère partout, comme dans le moteur.
+test('un BOM est toléré où qu’il soit dans le fichier', async () => {
   const BOM = String.fromCharCode(0xFEFF);
   const lignes = Array.from({ length: COMPACT_KEEP_EVENTS + 20 }, (_, i) => evenementOutil(i));
   lignes[3] = BOM + lignes[3]; // au milieu : aucun `content.trim()` ne peut l’atteindre

@@ -67,10 +67,8 @@ test('une durée nominale s écrit ici comme partout ailleurs', () => {
   assert.equal(rendu, '1.5s');
 });
 
-test('une date illisible ne met plus « NaNm » sur la carte', () => {
-  // Arrange — constat C8 : avant la mise en commun, cette entrée produisait
-  // littéralement la chaîne « NaNm » à l'écran, là où le narrateur, lui,
-  // refusait déjà de l'écrire.
+test('une date illisible ne met jamais « NaNm » sur la carte', () => {
+  // Arrange — une date de fin illisible
   const debut = '2025-01-01T00:00:00.000Z';
 
   // Act
@@ -81,10 +79,9 @@ test('une date illisible ne met plus « NaNm » sur la carte', () => {
 });
 
 // ─── L'échec d'un outil entre au registre, noeud ou pas ─────────────────────
-// `onPostToolUseFailure` faisait tout son travail sous un `if (n)`. Un échec
-// dont le noeud manque — `PreToolUse` non reçu, noeud déjà ramassé — n'était
-// alors compté ni tracé nulle part. Le registre capte à l'événement ; ces deux
-// tests interdisent le retour en arrière.
+// Le registre capte à l'événement, hors de tout `if (n)` : un échec dont le noeud
+// manque — `PreToolUse` non reçu, noeud déjà ramassé — est compté et tracé quand
+// même. Ces tests interdisent de le remettre sous la garde du noeud.
 
 test('un échec dont le noeud existe marque le noeud ET entre au registre', () => {
   // Arrange
@@ -144,7 +141,7 @@ test('quand le registre prévient, le noeud porte DÉJÀ le statut error', () =>
 });
 
 test('un échec SANS noeud correspondant entre quand même au registre', () => {
-  // Arrange — aucun PreToolUse : c'est le cas orphelin, invisible avant.
+  // Arrange — aucun PreToolUse : c'est le cas orphelin.
   const sid = 'abc12345-0000-0000-0000-000000000000';
 
   // Act

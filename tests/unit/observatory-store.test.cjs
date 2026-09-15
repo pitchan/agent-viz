@@ -216,7 +216,7 @@ test('purge empties every table and the store stays usable', () => {
   } finally { cleanup(h); }
 });
 
-// ─── Statut « arbitré » (doc/42) : raison et date portées par le même rail ──
+// ─── Statut « arbitré » : raison et date portées par le même rail ───────────
 
 test('une recommandation neuve n’a ni raison ni date de statut', () => {
   const h = tmpStore();

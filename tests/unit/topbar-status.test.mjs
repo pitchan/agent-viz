@@ -1,9 +1,10 @@
-// Ce que ce fichier protege : ce que DISENT les deux temoins du bandeau.
-// Deux pastilles vertes identiques et muettes — l'une informative (connexion),
-// l'autre un bouton (chien de garde) — etaient indistinguables a l'ecran.
-// Le remede est un module pur qui fixe le vocabulaire des deux temoins ;
-// le DOM ne fait qu'appliquer. C'est ici que le vocabulaire est epingle,
-// parce qu'aucun test unitaire de ce repo ne rend le DOM.
+// Ce que ce fichier protege : ce que DISENT les temoins du bandeau, pour qu'une
+// pastille informative (connexion) et un bouton (chien de garde) ne se confondent
+// pas a l'ecran.
+//
+// Un module pur fixe le vocabulaire des temoins ; le DOM ne fait qu'appliquer.
+// C'est ici que le vocabulaire est epingle, parce qu'aucun test unitaire de ce
+// repo ne rend le DOM.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -25,7 +26,7 @@ test('deconnecte, le voyant dit OFFLINE', () => {
 });
 
 test('connecte, l infobulle dit ce qui est recu et d ou', () => {
-  // « Connected » seul n'expliquait rien : connecte a quoi ? Le mot qui
+  // « Connected » seul n'explique rien : connecte a quoi ? Le mot qui
   // manque est le demon — c'est lui que le voyant surveille.
   assert.match(connectionPresentation(true).title, /daemon/i);
 });
@@ -48,7 +49,7 @@ test('sans alerte, la cloche est au repos', () => {
 
 test('sans alerte, l infobulle invite quand meme au clic', () => {
   // La cloche au repos reste un bouton : si l'infobulle ne le dit pas,
-  // rien d'autre ne le dira — c'etait exactement le defaut d'origine.
+  // rien d'autre ne le dira.
   assert.match(watchdogPresentation(0).title, /click/i);
 });
 
@@ -79,24 +80,19 @@ test('la cloche porte un nom pour les lecteurs d ecran, dans les deux etats', ()
 });
 
 // ─── La pastille des erreurs : un compteur qui mene quelque part ─────────────
-// Troisieme temoin du bandeau, et le meme defaut que les deux premiers avant
-// leur correction : « 1 errors » se lisait sans savoir OU etait cette erreur,
-// ni meme que le chiffre etait cliquable.
+// Troisieme temoin du bandeau : « 1 errors » seul ne dit ni OU est cette erreur,
+// ni que le chiffre est cliquable.
 //
-// Puis un second defaut, trouve comme le premier par un utilisateur devant
-// l'ecran : « 1 error » rouge TOUTE la session, pour une sonde rattrapee
-// trente secondes plus tard. La pastille distingue desormais deux etats a
-// partir des faits du registre — l'alarme (un echec se repete, ou le tout
-// dernier outil a echoue) et le calme (il y a eu des erreurs, la session a
-// continue depuis).
+// La pastille distingue deux etats a partir des faits du registre : l'alarme (un
+// echec se repete, ou le tout dernier outil a echoue) et le calme (il y a eu des
+// erreurs, la session a continue depuis).
 
 // Le resume tel que le registre le rend ; chaque test ne nomme que ce qui
 // l'ecarte du calme.
 const resume = (total, extra = {}) => ({ total, hasRepeat: false, lastFailed: false, ...extra });
 
 test('une erreur s accorde au singulier', () => {
-  // Le bandeau affichait litteralement « 1 errors ». La faute est visible a
-  // l'oeil nu sur la capture d'ecran d'un utilisateur — elle se corrige ici.
+  // « 1 errors » est une faute visible a l'oeil nu : l'accord se fixe ici.
   // Arrange
   const p = errorsPresentation(resume(1));
   // Act — lecture pure, l'Act est la construction ci-dessus
@@ -132,7 +128,7 @@ test('des qu il y a une erreur, la pastille le signale', () => {
 test('l infobulle dit qu on peut cliquer, meme a zero', () => {
   // Exactement la lecon de la cloche : une pastille qui est un bouton dans les
   // deux etats doit le dire dans les deux etats, sinon elle se lit comme un
-  // simple chiffre mort — le reproche d'origine.
+  // simple chiffre mort.
   assert.match(errorsPresentation(resume(0)).title, /click/i);
   assert.match(errorsPresentation(resume(3)).title, /click/i);
 });
@@ -149,8 +145,8 @@ test('la pastille porte un nom pour les lecteurs d ecran, dans les deux etats', 
 });
 
 test('des erreurs passees SANS signe d insistance restent calmes', () => {
-  // Le cas vecu : une sonde `ls` ratee, corrigee au coup suivant, et un
-  // « 1 error » rouge qui se lit comme un probleme ouvert toute la session.
+  // Le cas type : une sonde `ls` ratee, corrigee au coup suivant, ne laisse pas un
+  // « 1 error » rouge qui se lirait comme un probleme ouvert toute la session.
   // Arrange
   const p = errorsPresentation(resume(2));
   // Act — lecture pure

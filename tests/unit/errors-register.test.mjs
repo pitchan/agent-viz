@@ -1,15 +1,9 @@
-// Ce que ce fichier protege : qu'une erreur d'outil RESTE retrouvable.
+// Ce que ce fichier protege : qu'une erreur d'outil RESTE retrouvable, et que le
+// chiffre du bandeau dise la verite sur la session.
 //
-// Le bandeau comptait les erreurs en balayant les noeuds du graphe. Trois
-// consequences, toutes mesurees au navigateur avant ce correctif :
-// le ramasse-miettes efface un noeud d'outil fini au bout de dix minutes, donc
-// le compteur retombait a zero sans que rien ne soit resolu ; un echec arrive
-// sans son noeud (`PreToolUse` manque, noeud deja ramasse) n'etait compte nulle
-// part ; et le message d'erreur, pourtant present dans l'evenement, n'avait
-// aucune porte d'entree.
-//
-// Le remede est ce registre : il capte a l'EVENEMENT, pas au noeud survivant.
-// C'est la seule facon que le chiffre du bandeau dise la verite sur la session.
+// Le registre capte l'echec a l'EVENEMENT, pas au noeud survivant : le
+// ramasse-miettes efface un noeud d'outil fini au bout de dix minutes, et un
+// echec peut arriver sans son noeud (`PreToolUse` manque, noeud deja ramasse).
 
 import test, { beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -172,10 +166,9 @@ test('un evenement ignore ne reveille personne', () => {
 
 // ─── Vieillissement honnete : repetition, continuite, dernier verdict ───────
 //
-// La pastille disait « 1 error » toute la session, qu'il s'agisse d'une sonde
-// rattrapee trente secondes plus tard ou d'un agent qui boucle sur le meme
-// echec. Le registre apprend ici a distinguer les deux SANS interpreter :
-// il compte (repetitions, succes ecoules), il ne conclut jamais.
+// « 1 error » seul ne distingue pas une sonde rattrapee trente secondes plus tard
+// d'un agent qui boucle sur le meme echec. Le registre distingue les deux SANS
+// interpreter : il compte (repetitions, succes ecoules), il ne conclut jamais.
 
 test('une erreur neuve dit : jamais repetee, rien reussi depuis', () => {
   // Arrange / Act

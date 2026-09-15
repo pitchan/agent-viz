@@ -41,7 +41,7 @@ test('le tri ordonne, il ne se contente pas de renverser', () => {
 });
 
 test('le flux node:test ne rend que les tests, pas le fichier qui les porte', () => {
-  // Arrange — echantillon capture au step 1
+  // Arrange — echantillon du flux node:test
   // L'echantillon est volontairement DESORDONNE : si le tri disparaissait de
   // l'adaptateur, un echantillon deja trie laisserait le test au vert.
   const evenements = [
@@ -56,7 +56,7 @@ test('le flux node:test ne rend que les tests, pas le fichier qui les porte', ()
 });
 
 test('le JSON de vitest rend les memes identites que le flux node:test', () => {
-  // Arrange — echantillon capture au step 4
+  // Arrange — echantillon du JSON de vitest
   const json = {
     testResults: [{
       name: 'F:/DEV/agent-viz/tests/unit/a.test.js',

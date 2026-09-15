@@ -64,10 +64,9 @@ test('l episode montre la commande en defaut ; sans commande consignee, il le di
   assert.equal(cmds[1].textContent, 'commande non consignée (alerte ancienne)');
 });
 
-// Decision du 2026-08-20 : le bloc est la memoire des FAUTES, et `stuck` est
-// un etat passager qui se resout tout seul — en memoire il noyait les vraies
-// pannes (67 des 73 non-acquittees en prod). Sa place vivante ne bouge pas :
-// pastille et notification bureau nomment chaque commande en vol.
+// Le bloc est la memoire des FAUTES : `stuck`, etat passager qui se resout tout
+// seul, y noyait les vraies pannes. Sa place vivante est la pastille et la
+// notification bureau, qui nomment chaque commande en vol.
 const stuck = (sur = {}) => invocation({
   type: 'stuck', toolName: '', patternId: '', subject: '', count: 2, standing: true,
   tools: [{ toolName: 'Bash', subject: 'npm run build' }, { toolName: 'Read', subject: 'a.js' }],
@@ -150,10 +149,9 @@ test('sans onAckGroup la vue reste muette cote reseau : aucun bouton d acquittem
   assert.equal(parClasse(node, 'failure-ack').length, 0);
 });
 
-// Deplier une commande tronquee etait un geste de SOURIS uniquement : ni role,
-// ni tabindex, ni annonce de l etat (WCAG 2.1.1 et 4.1.2). La ligne « non
-// consignee » n a rien a deplier — elle reste du texte inerte, pas un faux
-// bouton qui ment a la synthese vocale.
+// Une commande tronquee se deplie aussi au clavier : role, tabindex et annonce de
+// l etat (WCAG 2.1.1 et 4.1.2). La ligne « non consignee » n a rien a deplier : elle
+// reste du texte inerte, pas un faux bouton qui ment a la synthese vocale.
 test('la commande tronquee se deplie au clavier et annonce son etat', () => {
   const node = fauxElement('div');
   renderFailures(node, [invocation(), invocation({ subject: '', createdAt: T0 - 1000 })]);

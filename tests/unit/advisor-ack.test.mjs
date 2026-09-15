@@ -1,7 +1,7 @@
 // L'acquittement groupe : sequentiel, seuls les non-acquittes, la premiere
 // erreur arrete la serie et remonte — le rechargement (en finally chez
 // l'appelant) affiche alors l'etat VRAI : les acquittes le restent, le reste
-// reste « a traiter ». Pas de « tout est vert » menteur (doc/32).
+// reste « a traiter ». Pas de « tout est vert » menteur.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ackEpisodes } from '../../src/web/observatory/advisor-view.ts';

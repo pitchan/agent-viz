@@ -1,6 +1,6 @@
 'use strict';
-// P3 cross-rule pointer: R1's cautious noMarker text gives way to a pointer
-// at the project's R2 card — only under the three spec conditions, and the
+// Cross-rule pointer: R1's cautious noMarker text gives way to a pointer at the
+// project's R2 card — only under the three conditions of applyCrossLinks, and the
 // wording always carries the "étude" (correlation, not causation) label.
 
 const { test } = require('node:test');
