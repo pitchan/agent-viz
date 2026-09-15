@@ -1,9 +1,9 @@
 'use strict';
-// service.js — le chien de garde cote serveur.
+// service.ts — le chien de garde cote serveur.
 //
 // Possede l'instance du detecteur et decide de ce qui merite d'etre consigne.
-// Ne connait ni fichier (c'est journal.js), ni HTTP (ce sont les routes), ni
-// dossier d'evenements (c'est catch-up.js).
+// Ne connait ni fichier (c'est journal.ts), ni HTTP (ce sont les routes), ni
+// dossier d'evenements (c'est catch-up.ts).
 //
 // Le detecteur est servi au navigateur ET charge par le serveur : un import()
 // dynamique sur un specificateur relatif STATIQUE, que tsc resout et reecrit
@@ -76,7 +76,7 @@ async function createWatchdogService({
     // Ce que ce recouvrement ne repare PAS, et ne peut pas reparer : la
     // relecture du fichier a l'ouverture du journal, faite avant que le service
     // existe. C'est pourquoi celui qui construit les deux doit leur donner la
-    // meme horloge — voir `initWatchdog` dans index.js, qui est le seul endroit
+    // meme horloge — voir `initWatchdog` dans index.ts, qui est le seul endroit
     // du produit ou les deux se rencontrent.
     list(opts: { sinceDays?: number } = {}) { return journal.readAll({ ...opts, now: now() }); },
     // Ce que `list` ne peut PAS dire. Le journal est la memoire : il rend ce

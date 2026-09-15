@@ -1,5 +1,5 @@
 'use strict';
-// Smoke test for the cumulative + last-wins logic in src/server/tokens.js.
+// Smoke test for the cumulative + last-wins logic in src/server/tokens.ts.
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');

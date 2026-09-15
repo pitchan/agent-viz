@@ -1,5 +1,5 @@
 'use strict';
-// Adapter registry. Pattern follows src/server/routes.js — declarative
+// Adapter registry. Pattern follows src/server/routes.ts — declarative
 // dispatch table keyed by session._source. Liskov contract enforced by
 // the test suite, not by inheritance.
 

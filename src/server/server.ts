@@ -7,7 +7,7 @@
 // promotes newly-arriving .jsonl files into sessionIndex.
 //
 // Everything else (request handling, session bookkeeping, transcript
-// tailing, token tracking, file reading) lives in src/server/*.js.
+// tailing, token tracking, file reading) lives in src/server/*.ts.
 
 import http from 'node:http';
 import fs from 'node:fs';

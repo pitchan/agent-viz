@@ -1,6 +1,6 @@
 'use strict';
 // Configuration inventory — what is loaded. What is *used* is a different
-// question and lives in mcp-usage.js.
+// question and lives in mcp-usage.ts.
 //
 // Metadata only: names, scopes, counts and file sizes. The content of a
 // CLAUDE.md or a SKILL.md is never read into a stored field.

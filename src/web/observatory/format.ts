@@ -1,7 +1,7 @@
 // format.ts — display helpers for the observatory pages.
 //
 // Pure functions only, no DOM at import time, so they can be unit-tested.
-// formatTokens is NOT redefined here: viz-state.js already owns it and is
+// formatTokens is NOT redefined here: viz-state.ts already owns it and is
 // importable under Node.
 
 import { formatTokens } from '../viz-state.ts';
@@ -117,7 +117,7 @@ export function costBasisLabel(basis: string) {
 // per rule, reusing the evidence keys the rules already persist; a rule
 // without a quantity (R2) keeps the plain partial wording. Ranking is NOT
 // affected: ordering tokens against dollars would break the homogeneity rule,
-// so ranking.js keeps scoring the (lower-bound) dollars.
+// so ranking.ts keeps scoring the (lower-bound) dollars.
 const LEAD_QUANTITY_BY_RULE: Record<string, ((e: RecommendationEvidence) => string) | undefined> = {
   R1: e => `${formatTokens(e.prefixChangeTokens)} jetons mesurés`,
   R5: e => `${formatTokens(e.reprocessedTokens)} jetons mesurés`,
@@ -279,7 +279,7 @@ export function formatUsdExact(n: number) {
   return n > 0 && s === '0,00 $' ? '< 0,01 $' : s;
 }
 
-// Human label derived from the canonical id — same rule as viz-ui.js
+// Human label derived from the canonical id — same rule as viz-ui.ts
 // labelForModel, extended to single-digit Claude 5 families ("Opus 5",
 // "Fable 5"). No external data; callers keep the raw id in `title`.
 export function modelLabel(id: string | null | undefined) {

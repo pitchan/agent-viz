@@ -1,4 +1,4 @@
-// api.js — the observatory's HTTP client. These tests stub the global fetch
+// api.ts — the observatory's HTTP client. These tests stub the global fetch
 // so the query strings it builds (project, days, includeMachine) are checked
 // without a real server.
 import { test } from 'node:test';

@@ -1,5 +1,5 @@
 'use strict';
-// journal.js — la memoire des pannes : un fichier en ajout seul.
+// journal.ts — la memoire des pannes : un fichier en ajout seul.
 //
 // Possede `~/.agent-viz/alerts.jsonl` et rien d'autre : ne connait ni
 // detecteur, ni HTTP. Deux sortes de lignes — `alert` (une panne consignee) et
@@ -46,7 +46,7 @@ const DEFAULT_PATH = path.join(os.homedir(), '.agent-viz', 'alerts.jsonl');
 const JOUR_MS = 86_400_000;
 
 // Retention : 90 jours, la fenetre la plus large que le produit offre
-// (WINDOW_DAYS = [7, 30, 90] dans observatory/service.js). Au-dela, la ligne
+// (WINDOW_DAYS = [7, 30, 90] dans observatory/service.ts). Au-dela, la ligne
 // ne sert plus rien que l'interface puisse montrer — mais sans borne elle
 // serait relue et parsee a chaque demarrage, gardee en RAM a vie, et balayee
 // par chaque `readAll`, que le panneau appelle a chaque rafraichissement.

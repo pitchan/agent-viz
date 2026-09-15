@@ -2,7 +2,7 @@
 //
 // Owns the <canvas>, ctx, DPR-aware sizing, pan/zoom, hit-test, particle
 // system, grid background, and the main `tick` render driver. Per-node
-// painting lives in viz-drawers.js; this file just iterates and dispatches.
+// painting lives in viz-drawers.ts; this file just iterates and dispatches.
 // Other modules mutate `state`/`vis` and call `markDirty()` (viz-state) to
 // trigger a redraw — they do not call into anything here directly except
 // through `setCanvasCallbacks` (UI wires showDetail/renderFeed for clicks).

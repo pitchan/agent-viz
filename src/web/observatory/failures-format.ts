@@ -8,7 +8,7 @@
 // cote, texte fabrique a l'affichage de l'autre.
 //
 // Module pur : ni DOM, ni reseau, ni horloge implicite. Meme partage que
-// src/web/observatory/analysis-view.js, dont la part testable est exportee nue
+// src/web/observatory/analysis-view.ts, dont la part testable est exportee nue
 // et la part DOM ne l'est pas.
 
 // Les alertes arrivent vérifiées par viz-alert-shape.ts, à l'entrée du

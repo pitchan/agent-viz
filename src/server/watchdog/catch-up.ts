@@ -1,5 +1,5 @@
 'use strict';
-// catch-up.js — le rattrapage au demarrage.
+// catch-up.ts — le rattrapage au demarrage.
 //
 // Les watchers d'evenements posent leur curseur a la FIN du fichier
 // (event-reader.watchSession) : rien de ce qui est deja sur le disque ne
@@ -58,7 +58,7 @@ async function catchUpFromDisk(
   try {
     names = await fsp.readdir(dir);
   } catch (err) {
-    // Meme partage qu'a la lecture du journal (journal.js, `load`). ENOENT est
+    // Meme partage qu'a la lecture du journal (journal.ts, `load`). ENOENT est
     // le silence legitime : aucune session n'a encore ete enregistree, il n'y a
     // rien a rattraper. Tout le reste — EACCES, ENOTDIR, un verrou d'antivirus
     // ou de sauvegarde sous Windows — veut dire que le passe EXISTE et qu'on ne

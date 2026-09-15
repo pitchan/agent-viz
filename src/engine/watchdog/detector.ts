@@ -730,7 +730,7 @@ export function createWatchdog({
     // that triggered it. This is the whole point of the journal: an incident
     // that happened while the server was down must still be recorded, with
     // the time it really happened. Deciding what is recent enough to SHOUT
-    // about belongs to the display — viz-alert-freshness.mjs.
+    // about belongs to the display — viz-alert-freshness.ts.
     //
     // The dedup lock is judged in the event's own time, not ours. A start-up
     // sweep replays a whole file without a single tick in between, so this is

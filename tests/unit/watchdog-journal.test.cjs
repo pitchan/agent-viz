@@ -336,7 +336,7 @@ test('la fenetre coupe sur l heure de l evenement, plus recent d abord', (t) => 
 test('une alerte a l horloge en avance est gardee, et vient en tete', (t) => {
   // Horloge de machine decalee : `createdAt` vient de l'evenement, pas du
   // serveur. Une memoire ne jette pas un fait parce qu'il la surprend. Le
-  // prix de ce choix est ecrit dans journal.js : une horloge fausse d'un an
+  // prix de ce choix est ecrit dans journal.ts : une horloge fausse d'un an
   // produit une alerte epinglee en tete a vie.
   const j = createJournal({ filePath: tmp(t), now: () => T });
   j.append(alertAt(T - 3600_000, 'loop:s1:Passe'));

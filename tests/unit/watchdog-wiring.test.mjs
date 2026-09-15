@@ -268,7 +268,7 @@ test('event-reader: ce que le chien de garde voit part sur le flux, apres l even
   // de toute la chaine.
   //
   // On OBSERVE dans la callback, on AFFIRME dehors. Assertion et observation
-  // ne peuvent pas tenir au meme endroit ici : `sse.js` enveloppe chaque
+  // ne peuvent pas tenir au meme endroit ici : `sse.ts` enveloppe chaque
   // ecriture client dans un `try { … } catch {}` pour se debarrasser des
   // clients morts, et il y avalerait donc aussi l'`AssertionError`. Un controle
   // pose dans la callback ne peut pas faire echouer ce test — il en aurait

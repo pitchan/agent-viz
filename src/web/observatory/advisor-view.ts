@@ -1,7 +1,7 @@
 // advisor-view.ts — "Conseils" page.
 //
-// Rendering only: ranking is done server-side, wording by evidence.js, numbers
-// by format.js, state by store.js. One block per cost basis, each saying it is
+// Rendering only: ranking is done server-side, wording by evidence.ts, numbers
+// by format.ts, state by store.ts. One block per cost basis, each saying it is
 // not comparable with the other — and no total anywhere, because a same
 // session feeds several rules.
 

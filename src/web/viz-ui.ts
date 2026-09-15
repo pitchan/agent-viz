@@ -262,7 +262,7 @@ document.getElementById('detail-close')!.addEventListener('click', () => {
 });
 
 // ─── Budget pill (model · context% · cost) ───────────────────────────────
-// Driven by SSE `tokens` snapshots — see viz-network.js. Reads only the main
+// Driven by SSE `tokens` snapshots — see viz-network.ts. Reads only the main
 // thread bucket (matches what /context reports); subagent costs are folded in
 // for the cumulative dollar amount.
 // Cache paresseux : `null` veut dire « pas encore cherche », pas « absent ».

@@ -1,5 +1,5 @@
 'use strict';
-// index.js — le cablage du chien de garde cote serveur.
+// index.ts — le cablage du chien de garde cote serveur.
 //
 // Une seule instance, atteignable par ses deux appelants : event-reader (qui
 // lui pousse les evenements) et les routes (qui lisent le journal). Le service
@@ -92,7 +92,7 @@ async function fabriquer({ journalPath, now = Date.now, ...rest }: WatchdogOpts)
     // dire installation abimee, jamais etat normal. Mais le chien de garde est
     // un supplement — il ne doit pas emporter le serveur avec lui. On se
     // plaint une fois, on rend null, et tout le produit continue sans lui.
-    // Meme parti que `journal.js` devant un journal illisible.
+    // Meme parti que `journal.ts` devant un journal illisible.
     //
     // La promesse rejetee reste memorisee resolue a null : pas de nouvelle
     // tentative, donc pas de seconde plainte. Un fichier absent du paquet ne
@@ -110,8 +110,8 @@ function setCatchingUp(v: unknown): void { _catchingUp = !!v; }
 // doit se taire, et il doit se retaire meme si la lecture echoue.
 //
 // `dir` n'a PAS de valeur par defaut, et c'est voulu. Le dossier des
-// evenements est deja defini a deux endroits du produit (`src/server/hook.js` et
-// `src/server/session-index.js`, qui l'exporte sous le nom `DIR`) ; en poser
+// evenements est deja defini a deux endroits du produit (`src/server/hook.ts` et
+// `src/server/session-index.ts`, qui l'exporte sous le nom `DIR`) ; en poser
 // une troisieme copie ici creerait une constante qui peut diverger des deux
 // autres, et un balayage qui lit le vide ne dit rien — c'est la promesse du
 // produit qui tomberait sans symptome. Sans valeur par defaut, l'appelant ne
@@ -149,12 +149,12 @@ interface StartWatchdogOpts {
 // relus ; rattraper avant que l'instance existe ferait rendre 0 a `runCatchUp`,
 // et le passe ne serait jamais relu.
 //
-// Pourquoi cette sequence vit ici et pas dans `src/server/server.js` : `server.js` est
+// Pourquoi cette sequence vit ici et pas dans `src/server/server.ts` : `server.ts` est
 // un point d'entree, il se charge en ouvrant un port et en tuant le serveur
 // d'avant. Aucun test ne peut l'appeler, donc rien de ce qu'on y ecrirait ne
 // serait essayable — or les trois pieges de cette sequence (l'ordre, le dossier
 // nomme, l'exception qui remonte) sont precisement ceux qu'on ne voit pas a la
-// lecture. `server.js` garde ce qui est a lui : le vrai dossier et le vrai flux.
+// lecture. `server.ts` garde ce qui est a lui : le vrai dossier et le vrai flux.
 //
 // Tout ce qui appartient au serveur est donc INJECTE, et ce module ne gagne
 // aucun `require` : `dir` (c'est `session-index` qui fait autorite sur le
@@ -164,7 +164,7 @@ interface StartWatchdogOpts {
 // et ce module n'a pas a la connaitre pour se dire ignorant du flux.
 //
 // `cadenceMs` est injecte aussi, avec la valeur du client d'aujourd'hui
-// (viz-watchdog-client.js) : on demenage `stuck`, on ne change pas son
+// (viz-watchdog-client.ts) : on demenage `stuck`, on ne change pas son
 // comportement en meme temps. Et `init` passe a `initWatchdog` ce qu'on lui
 // aurait passe directement — meme raison que `journalPath` : sans cela, la
 // seule branche que la production emprunte serait la seule qu'aucun test ne
@@ -178,7 +178,7 @@ async function startWatchdog(
 ): Promise<NodeJS.Timeout> {
   // Meme patron que `runCatchUp` devant un dossier absent, et pour la meme
   // raison : ce que l'appelant oublie ici, RIEN d'autre ne peut le dire.
-  // `src/server/server.js` est le seul appelant de production et c'est le seul fichier
+  // `src/server/server.ts` est le seul appelant de production et c'est le seul fichier
   // qu'aucun test ne peut charger — il ouvre un port et tue le serveur d'avant.
   // Un `liveFrom` oublie ne casse rien de visible : il remet simplement les deux
   // chemins a lire les memes octets, et le produit se met a annoncer des
@@ -250,7 +250,7 @@ async function startWatchdog(
 // serait passe en lance-et-oublie — il relit ce dont `unwatchSession` vient de
 // retirer la frontiere, et le double comptage revient : trois appels distincts
 // annonces comme quatre (mesure, pas hypothese). Voir `unwatchSession` dans
-// src/server/event-reader.js.
+// src/server/event-reader.ts.
 export {
   initWatchdog, getWatchdogService, setCatchingUp, runCatchUp,
   startWatchdog,

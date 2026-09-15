@@ -288,7 +288,7 @@ function makeTail(filePath: string): Tail {
 
 // Lazy initializer for the transcript slice on the session record. Holds the
 // main transcript tail plus a per-sub-agent tail map under a single namespace
-// so transcript.js doesn't stamp loose fields onto the shared record object.
+// so transcript.ts doesn't stamp loose fields onto the shared record object.
 function ensureTranscriptSlice(rec: SessionWithSlices): TranscriptSlice {
   if (!rec.transcript) {
     rec.transcript = {

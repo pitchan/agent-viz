@@ -32,7 +32,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const INSTALL_HOOKS = fileURLToPath(new URL('../../src/server/install-hooks.ts', import.meta.url));
 const PREFIXE = 'agent-viz-entrypoint-';
 
-// Sous-chaine RELEVEE de la sortie reelle (`node src/server/install-hooks.js
+// Sous-chaine RELEVEE de la sortie reelle (`node src/server/install-hooks.ts
 // --user --check`), jamais devinee. Elle n est emise que par `cliMain`, et
 // `cliMain` n est appele que depuis la branche gardee : mesure du meme step, un
 // import du module ne produit RIEN — ni sur stdout, ni sur stderr, ni sur le

@@ -203,7 +203,7 @@ interface DriftReport {
   drifts: Drift[];
 }
 
-// Drift consumer registration — server.js plugs the SSE broadcast in here, so
+// Drift consumer registration — server.ts plugs the SSE broadcast in here, so
 // this module keeps zero I/O of its own.
 let _onDrift: ((report: DriftReport) => void) | null = null;
 function onPricingDrift(fn: (report: DriftReport) => void): void { _onDrift = fn; }

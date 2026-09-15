@@ -7,8 +7,8 @@
 //   rec.id, rec.eventCount, rec.size, rec.mtime, rec.agentSource,
 //   rec.promptCache, rec.promptWindow      (this module)
 //   rec.transcript = { main, subagents (Map<agentId,tail>),
-//                      _mainPending, _closed }            (transcript.js)
-//   rec.tokens = { main, perAgent, _broadcastTimer }     (tokens.js)
+//                      _mainPending, _closed }            (transcript.ts)
+//   rec.tokens = { main, perAgent, _broadcastTimer }     (tokens.ts)
 
 import fs from 'node:fs';
 const fsp = fs.promises;
@@ -61,7 +61,7 @@ function sessionFilePath(sid: string): string {
 
 function idFromPath(fp: string): string { return path.basename(fp, '.jsonl'); }
 
-// Session IDs come from Claude Code (UUID) or fall back to "unknown" in hook.js.
+// Session IDs come from Claude Code (UUID) or fall back to "unknown" in hook.ts.
 // We restrict to safe filename chars to prevent path traversal via crafted ?session=
 // or ?clear= values being concatenated into path.join(DIR, sid + '.jsonl').
 function validSessionId(sid: unknown): sid is string {

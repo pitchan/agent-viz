@@ -1,7 +1,7 @@
 // confirm-button.ts — two-step confirmation for a destructive action, without
 // any browser dialog: the first click arms the button (label + colour), only
 // a second click within the delay fires the action, the timeout quietly
-// disarms. Same component style as period-selector.js.
+// disarms. Same component style as period-selector.ts.
 export function initConfirmButton(
   node: HTMLElement,
   { armedLabel, onConfirm, disarmDelayMs = 5000 }: { armedLabel: string; onConfirm: () => void; disarmDelayMs?: number },

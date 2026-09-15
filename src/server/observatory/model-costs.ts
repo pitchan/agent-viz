@@ -1,5 +1,5 @@
 'use strict';
-// Per-model totals for the « Jetons & tarifs » panel — the twin of summary.js:
+// Per-model totals for the « Jetons & tarifs » panel — the twin of summary.ts:
 // window totals, nothing else. Dollars come from the engine's per-message
 // accumulation (report.tokens.costByModel), NEVER recomputed from token
 // buckets: recomputing would lose the dated tariff and the 5min/1h cache

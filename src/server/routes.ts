@@ -61,14 +61,14 @@ const PORT = process.env.PORT || 3333;
 const PROJECT_ROOT = path.join(import.meta.dirname, '..', '..');
 const HTML = path.join(PROJECT_ROOT, 'index.html');
 
-// HTTP server reference for graceful shutdown — wired by server.js once the
+// HTTP server reference for graceful shutdown — wired by server.ts once the
 // instance has been created. Without this, /shutdown would have to live in
-// server.js itself.
+// server.ts itself.
 let _server: Server | null = null;
 function setServer(s: Server): void { _server = s; }
 
 // Reject cross-origin POSTs to destructive endpoints. CLI/programmatic callers
-// (lifecycle.js, curl) have no Origin header and are allowed; browsers always
+// (lifecycle.ts, curl) have no Origin header and are allowed; browsers always
 // send Origin on cross-origin requests, so a malicious site can't hit /shutdown
 // or /events?clear from a tab in another origin.
 function sameOrigin(req: IncomingMessage): boolean {
@@ -79,7 +79,7 @@ function sameOrigin(req: IncomingMessage): boolean {
 
 // ─── Handlers ──────────────────────────────────────────────────────────────
 
-// Instant push from hook.js — bypasses fs.watch latency.
+// Instant push from hook.ts — bypasses fs.watch latency.
 function notifyHandler(req: IncomingMessage, res: ServerResponse): void {
   let body = '';
   // `'data'` sur `IncomingMessage` (aucun encodage posé) rend TOUJOURS un

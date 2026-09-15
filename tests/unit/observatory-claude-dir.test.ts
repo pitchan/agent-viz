@@ -43,7 +43,7 @@ async function resoudreAvec(env: Record<string, string | undefined>) {
   let vu: any = null;
   let vuConfig: any = null;
 
-  // Les CINQ voisins d'`observatory/index.js`, bouchonnés par leur spécificateur
+  // Les CINQ voisins d'`observatory/index.ts`, bouchonnés par leur spécificateur
   // résolu depuis CE fichier — c'est ainsi que `vi.doMock` les apparie.
   vi.doMock('../../src/server/observatory/store.ts', () => ({ openStore: () => ({}) }));
   vi.doMock('../../src/server/observatory/engine.ts', () => ({ engine: {} }));

@@ -176,7 +176,7 @@ export const vis = {
 };
 
 // ─── Render scheduler ─────────────────────────────────────────────────────
-// The rAF driver lives in viz-canvas.js (tick). It registers itself here so
+// The rAF driver lives in viz-canvas.ts (tick). It registers itself here so
 // markDirty/requestRender can schedule frames without a circular import.
 let _tickFn: FrameRequestCallback | null = null;
 export function setTickFn(fn: FrameRequestCallback) { _tickFn = fn; }

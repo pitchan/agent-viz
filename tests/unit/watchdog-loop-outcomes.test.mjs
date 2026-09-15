@@ -104,7 +104,7 @@ test('une interruption humaine n est pas un echec de la commande', () => {
 // producteur reste AUTO-COHERENTE : plafonner la liste a cinq ferait dire
 // « called 5× » d'une boucle de deux cent quarante, sans qu'aucune assertion
 // de libelle ni de plafond d'affichage ne bronche — le plafond d'affichage
-// vit dans viz-alert-format.mjs et dit lui-meme combien il en a laisse de
+// vit dans viz-alert-format.ts et dit lui-meme combien il en a laisse de
 // cote. Un compte faux dans le journal, lui, y reste quatre-vingt-dix jours.
 //
 // La propriete affirmee est donc : l'alerte porte TOUTES les repetitions

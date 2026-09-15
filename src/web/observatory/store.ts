@@ -2,7 +2,7 @@
 //
 // The two views read from here and never fetch on their own; the HTTP client
 // arrives as a parameter so this module is testable without a server. Same
-// role as viz-state.js for the canvas view, scoped to the observatory.
+// role as viz-state.ts for the canvas view, scoped to the observatory.
 
 // Les payloads serveur (summary, recommendations, sessions, modelCosts,
 // pricing) restent `unknown` : ce fichier les fait circuler sans jamais lire
@@ -83,7 +83,7 @@ async function run(work: () => Promise<Partial<ObservatoryState>>) {
 }
 
 // The window and the human/machine toggle are shared by both pages — a
-// single logical selector, not one per view (period-selector.js renders it).
+// single logical selector, not one per view (period-selector.ts renders it).
 export const setPeriodDays = (days: number) => patch({ periodDays: days });
 export const setIncludeMachine = (flag: boolean) => patch({ includeMachine: flag });
 

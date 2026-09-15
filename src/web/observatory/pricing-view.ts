@@ -1,8 +1,8 @@
 // pricing-view.ts — « Jetons & tarifs » page: the per-model cost breakdown,
 // the applied tariff sheet, and the provenance notice.
 //
-// Rendering only, on the analysis-view.js model: state comes from store.js,
-// data from api.js. The panel speaks with ONE voice — agent-viz and netgain
+// Rendering only, on the analysis-view.ts model: state comes from store.ts,
+// data from api.ts. The panel speaks with ONE voice — agent-viz and netgain
 // are one product; it names its single price source and shows how every
 // number is made.
 

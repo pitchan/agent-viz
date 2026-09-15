@@ -2,7 +2,7 @@
 //
 // Pure decision module. Given state + vis + now, returns the one-line caption
 // to display under the topbar. No DOM, no fetch — render is plugged in via
-// setRenderFn() by viz-ui.js. Tests can import composeNarrator/commonPathPrefix
+// setRenderFn() by viz-ui.ts. Tests can import composeNarrator/commonPathPrefix
 // without triggering any side effect (no setInterval at import time).
 
 import { formatDuration } from './viz-duration.ts';
@@ -211,7 +211,7 @@ function formatSessionDuration(startIso: string | null, endIso: string | null) {
 }
 
 // ─── Dirty / render driver ────────────────────────────────────────────────
-// viz-ui.js wires renderNarrator() via setRenderFn() at module init. Bursts
+// viz-ui.ts wires renderNarrator() via setRenderFn() at module init. Bursts
 // of markNarratorDirty() coalesce into a single render per microtask. The
 // 1 Hz tick (resumeTick / pauseTick) just calls markNarratorDirty() —
 // "Xs ago" clocks are advanced by the same render path as event-driven

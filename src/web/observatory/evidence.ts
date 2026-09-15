@@ -2,7 +2,7 @@
 //
 // One entry per rule, in a table: a rule missing from here would display a
 // recommendation with no figures, which the founding rule forbids. Kept apart
-// from format.js because it changes for a different reason — a new rule, not a
+// from format.ts because it changes for a different reason — a new rule, not a
 // new display convention.
 
 import { formatTokens, formatBytes } from './format.ts';

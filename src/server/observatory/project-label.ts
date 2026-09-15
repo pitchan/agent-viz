@@ -35,7 +35,7 @@ function projectResolver(sessions: Session[] | undefined): (slug: string) => str
     const byFolder = variants.get(s.project) ?? new Map<string, string>();
     // Clé insensible à la casse : Windows l'ignore, donc f:\DEV\x et f:\dev\x
     // sont le MÊME dossier et ne doivent pas passer pour une ambiguïté (même
-    // précédent que r2-unused-mcp.js:22). La valeur d'affichage est choisie
+    // précédent que r2-unused-mcp.ts:22). La valeur d'affichage est choisie
     // par ordre lexicographique, jamais « la dernière vue » — sinon le libellé
     // dépendrait de l'ordre des sessions.
     const folder = cwd.toLowerCase();

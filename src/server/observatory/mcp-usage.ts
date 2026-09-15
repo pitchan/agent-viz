@@ -1,5 +1,5 @@
 'use strict';
-// What was actually called — the counterpart of config-audit.js.
+// What was actually called — the counterpart of config-audit.ts.
 //
 // Tool names are shaped mcp__<server>__<tool>; the server name is everything
 // between the first and the last pair of double underscores, which can itself

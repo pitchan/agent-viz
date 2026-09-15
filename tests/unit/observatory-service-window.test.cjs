@@ -70,7 +70,7 @@ function fakeDeps({ rows = [] } = {}) {
 }
 
 function serviceOf(deps) {
-  // Mirror the real composition (index.js): default advice window 30, scan window 90.
+  // Mirror the real composition (index.ts): default advice window 30, scan window 90.
   return createObservatoryService({
     engine: deps.engine, store: deps.store,
     collectConfig: async () => [],

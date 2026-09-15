@@ -220,7 +220,7 @@ function unwatchSession(fp: string): void {
   // detector, and the double counting comes straight back — measured, three
   // distinct calls reported as four. Unreachable today only because runCatchUp
   // runs once at boot, before housekeep can unwatch anything. See the note on
-  // runCatchUp where watchdog/index.js exports it.
+  // runCatchUp where watchdog/index.ts exports it.
   fedFrom.delete(fp);
   const t = debounceTimers.get(fp);
   if (t) { clearTimeout(t); debounceTimers.delete(fp); }

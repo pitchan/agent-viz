@@ -411,7 +411,7 @@ test('catch-up: un dossier illisible se plaint, un dossier absent se tait', asyn
   // rattrapage NE FAIT PAS son travail. Rendre 0 sans un mot le rendrait
   // indiscernable d un dossier legitimement vide : c est la promesse du
   // produit qui tomberait sans symptome. Meme partage qu a la lecture du
-  // journal (journal.js:load).
+  // journal (journal.ts:load).
   const fichier = path.join(neufDossier('avtest-pasundossier-'), 'x.jsonl');
   fs.writeFileSync(fichier, flot());
   const casse = await enEcoutant(() => catchUpFromDisk(s, fichier));
@@ -419,7 +419,7 @@ test('catch-up: un dossier illisible se plaint, un dossier absent se tait', asyn
   assert.match(casse.dits.join('\n'), /dossier d evenements illisible/);
 });
 
-// ─── Le cablage (index.js) ────────────────────────────────────────────────
+// ─── Le cablage (index.ts) ────────────────────────────────────────────────
 // Le module tient une instance unique dans une variable de module : chaque
 // test en reprend une neuve en vidant le cache de `require`, plutot que
 // d ajouter au produit une porte de remise a zero qui n existe que pour eux.

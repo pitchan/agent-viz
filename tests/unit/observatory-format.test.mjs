@@ -99,7 +99,7 @@ test('scanProgressLabel counts every handled session, silent when idle or done',
 });
 
 // formatTokens is not redefined by the observatory — it is re-exported from
-// viz-state.js. Pinned here so a page never quietly gets two token formats.
+// viz-state.ts. Pinned here so a page never quietly gets two token formats.
 test('formatTokens comes from viz-state and keeps its existing rendering', async () => {
   const { formatTokens } = await import('../../src/web/observatory/format.ts');
   const { formatTokens: original } = await import('../../src/web/viz-state.ts');
