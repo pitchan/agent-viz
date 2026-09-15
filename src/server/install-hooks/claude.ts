@@ -14,6 +14,7 @@ import {
 } from './settings-io.ts';
 import { resolveScope, resolveHookCommand, ensureGitignore, findProjectRoot, scanInstalled } from './scopes.ts';
 import { inPath } from './detect.ts';
+import { backupHookFile } from './backup.ts';
 
 export function auditSettings(
   settings: ClaudeSettings, desiredCommand: string | undefined,
@@ -71,11 +72,12 @@ export function installClaude({ scope, cwd, packageRoot }: AgentOpts = {}) {
   if (missing.length === 0 && updated.length === 0) {
     const crossScope = claudeInstalledScopes(cwd, packageRoot)
       .filter(s => s.scope !== target.scope);
-    return { target, action: 'noop', missing, updated, present, coexisting, command: cmd, crossScope };
+    return { target, action: 'noop', missing, updated, present, coexisting, command: cmd, backup: null, crossScope };
   }
 
   for (const ev of updated) refreshStaleCommand(settings, ev, cmd.command);
   for (const ev of missing) addHook(settings, ev, cmd.command);
+  const backup = backupHookFile(target.file);
   writeSettings(target.file, settings);
 
   let gitignore: { changed: boolean; reason?: string } | null = null;
@@ -91,7 +93,7 @@ export function installClaude({ scope, cwd, packageRoot }: AgentOpts = {}) {
   const crossScope = claudeInstalledScopes(cwd, packageRoot)
     .filter(s => s.scope !== target.scope);
 
-  return { target, action, missing, updated, present, coexisting, command: cmd, gitignore, crossScope };
+  return { target, action, missing, updated, present, coexisting, command: cmd, backup, gitignore, crossScope };
 }
 
 export function claudeSweepTargets(cwd: string | undefined, { packageRoot }: { packageRoot?: string } = {}): ResolvedTarget[] {
@@ -108,17 +110,21 @@ export function uninstallClaude({ scope, cwd, packageRoot }: AgentOpts = {}) {
   const targets = scope
     ? [resolveScope({ scope, cwd, packageRoot })]
     : claudeSweepTargets(cwd, { packageRoot });
-  const results: Array<ResolvedTarget & { removed: number; exists: boolean }> = [];
+  const results: Array<ResolvedTarget & { removed: number; exists: boolean; backup: string | null }> = [];
   for (const t of targets) {
     if (!fs.existsSync(t.file)) {
-      results.push({ ...t, removed: 0, exists: false });
+      results.push({ ...t, removed: 0, exists: false, backup: null });
       continue;
     }
     const settings = readSettings(t.file);
     let total = 0;
     for (const ev of EVENTS) total += removeHook(settings, ev);
-    if (total > 0) writeSettings(t.file, settings);
-    results.push({ ...t, removed: total, exists: true });
+    let backup: string | null = null;
+    if (total > 0) {
+      backup = backupHookFile(t.file);
+      writeSettings(t.file, settings);
+    }
+    results.push({ ...t, removed: total, exists: true, backup });
   }
   return { results };
 }

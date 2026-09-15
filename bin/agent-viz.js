@@ -64,6 +64,8 @@ Usage:
                                    --source=claude|copilot   set the source agent tag
   agent-viz [<command>] --help   Show this help (never runs the command).
   agent-viz --version            Print version.
+
+Before changing or deleting a hooks file, agent-viz copies it to ~/.agent-viz/backups/ (last 30 copies per file).
 `);
 }
 
@@ -183,6 +185,7 @@ async function cmdStart(flags) {
                    : 'installed';
         console.log(`${c.ok('✓')} ${label} hooks ${verb} ${c.hint('→')} ${c.dim(r.target.file)}`);
         console.log(c.dim(`  scope: ${r.target.scope}, mode: ${r.command.mode}`));
+        if (r.backup) console.log(c.dim(`  backup: ${r.backup}`));
         if (r.missing && r.missing.length > 0) console.log(`  added on: ${r.missing.join(', ')}`);
         if (r.updated && r.updated.length > 0) console.log(`  refreshed on (was stale): ${r.updated.join(', ')}`);
         if (r.gitignore && r.gitignore.changed) {
@@ -261,6 +264,7 @@ async function cmdStop(flags) {
           if (r.removed > 0) {
             totalRemoved += r.removed;
             console.log(`${c.ok('✓')} ${label} hooks removed ${c.hint('→')} ${c.dim(r.file)} (${r.scope})`);
+            if (r.backup) console.log(c.dim(`  backup: ${r.backup}`));
           }
         }
       }
@@ -390,6 +394,7 @@ async function cmdInstallHooks(flags) {
     console.log(`${label}:`);
     console.log(c.dim(`  settings : ${r.target.file}  (scope: ${r.target.scope})`));
     console.log(c.dim(`  hook cmd : ${r.command.command}  (mode: ${r.command.mode})`));
+    if (r.backup) console.log(c.dim(`  backup   : ${r.backup}`));
     if (r.action === 'noop') {
       console.log(`  ${c.ok('✓')} already installed and up to date.`);
     } else {
@@ -443,6 +448,7 @@ async function cmdUninstallHooks(flags) {
       if (r.removed > 0) console.log(`${label}: ${c.ok('✓')} removed ${r.removed} from ${c.dim(r.file)} (${r.scope})`);
       else if (r.exists) console.log(c.dim(`${label}:   nothing to remove in ${r.file} (${r.scope})`));
       else console.log(c.dim(`${label}:   ${r.file} does not exist (${r.scope})`));
+      if (r.backup) console.log(c.dim(`${label}:   backup: ${r.backup}`));
     }
   }
   // Une erreur ne doit jamais se lire comme « rien à retirer » (décision D3) :

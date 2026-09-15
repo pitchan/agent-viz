@@ -48,7 +48,7 @@ npm install --save-dev @vcueto/agent-viz
 npx agent-viz
 ```
 
-Adds `agent-viz` as a dev dependency. The hook command embedded in `settings.json` points at the local `node_modules/.bin/agent-viz` (fast, no npx overhead). Scope defaults to `<root>/.claude/settings.local.json` (gitignored).
+Adds `agent-viz` as a dev dependency. The hook command embedded in `settings.json` points at the local `node_modules/.bin/agent-viz` (fast, no npx overhead). Scope defaults to user level (`~/.claude/settings.json`), as for the global install. To limit the hook to this repo, see [Hook management](#hook-management).
 
 ## Daily usage
 
@@ -131,16 +131,41 @@ agent-viz uninstall-hooks --user    # remove from user scope only
 
 When writing to `settings.local.json`, agent-viz appends the file to your `.gitignore` (only if a `.gitignore` already exists, never creates one).
 
+### Backups
+
+Before `start`, `stop`, `install-hooks` or `uninstall-hooks` changes or deletes a hooks file, agent-viz copies the file as it is to `~/.agent-viz/backups/<source path>/<UTC time>.json`. In `<source path>`, every character other than a letter, a digit, `.`, `_` or `-` becomes `-`: `/home/me/.claude/settings.json` gives `-home-me-.claude-settings.json`. The last 30 copies of each file are kept. A file that does not exist yet is not copied.
+
+The command prints the path of each copy under the file it changed:
+
+```
+✓ Claude Code hooks refreshed → /home/me/.claude/settings.json
+  scope: user, mode: absolute
+  backup: /home/me/.agent-viz/backups/-home-me-.claude-settings.json/2026-09-14T10-05-07.123Z.json
+```
+
+If the copy fails, the hooks file is left unchanged and the command prints the reason: `backup of /home/me/.claude/settings.json failed, file left unchanged: <reason>`.
+
+To restore a copy, copy it back by hand. `settings.json` also holds settings that are not hooks (model, plugins, status line): an old copy brings them back as they were, so compare first. A Copilot file deleted by `stop` is restored the same way, to `~/.copilot/hooks/agent-viz.json`.
+
+```bash
+cp ~/.claude/settings.json ~/.claude/settings.json.before-restore   # keep the current file
+diff ~/.claude/settings.json "<backup path>"                        # see what changes
+cp "<backup path>" ~/.claude/settings.json                          # restore
+```
+
 ## Coexistence with other hooks
 
 agent-viz **never replaces or removes hooks you didn't add**. Claude Code runs every hook registered for an event in parallel, so any custom hook you already had (logger, security check, etc.) keeps working alongside agent-viz.
 
-When you install, agent-viz reports any sibling hooks already registered on the same events:
+When you run `agent-viz install-hooks`, it reports any sibling hooks already registered on the same events:
 
 ```
-✓ Hooks installed → ~/.claude/settings.json
-  added on: PreToolUse, PostToolUse, Stop, SessionStart
-  coexisting hooks (run in parallel, untouched):
+Claude Code:
+  settings : /home/me/.claude/settings.json  (scope: user)
+  hook cmd : node "<package dir>/bin/agent-viz.js" hook --source=claude  (mode: absolute)
+  backup   : /home/me/.agent-viz/backups/-home-me-.claude-settings.json/2026-09-14T10-05-07.123Z.json
+  ✓ added: UserPromptSubmit, PreToolUse, PostToolUse, PostToolUseFailure, Stop, SessionStart
+  Coexisting hooks (run in parallel, untouched):
     - PreToolUse: 1 other(s)
 ```
 

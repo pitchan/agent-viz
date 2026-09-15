@@ -1,0 +1,115 @@
+// La copie d'un fichier de hooks sur un vrai dossier temporaire : les octets
+// d'avant, un dossier par fichier source, les 30 dernières copies. Les pannes
+// passent par un faux `io` bâti sur le vrai `fs`, jamais par un `fs` modifié en place.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { backupHookFile } from '../../src/server/install-hooks/backup.ts';
+
+const T0 = Date.UTC(2026, 8, 14, 10, 5, 7, 123);
+const CRLF = '{\r\n  "a": 1\r\n}\r\n';
+
+// Un fichier de hooks dans un dossier dont le nom porte une espace, et la racine
+// des copies à côté, pas encore créée.
+function fichierSource() {
+  const dossier = fs.mkdtempSync(path.join(os.tmpdir(), 'avtest-backup-'));
+  const file = path.join(dossier, 'src dir', 'settings.local.json');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, CRLF);
+  return { dossier, file, root: path.join(dossier, 'backups') };
+}
+
+function dossierDesCopies(root, file) {
+  return path.join(root, file.replace(/[^A-Za-z0-9._-]/g, '-'));
+}
+
+function nomDeCopie(ms) {
+  return new Date(ms).toISOString().replace(/:/g, '-') + '.json';
+}
+
+// Trente copies plus anciennes que T0, d'une milliseconde chacune.
+function poserTrenteCopies(dir) {
+  fs.mkdirSync(dir, { recursive: true });
+  for (let k = 30; k >= 1; k--) fs.writeFileSync(path.join(dir, nomDeCopie(T0 - k)), 'ancienne');
+}
+
+function erreurFs(code, detail) {
+  return Object.assign(new Error(`${code}: ${detail}`), { code });
+}
+
+test('la copie garde les octets tels quels, fins de ligne CRLF comprises, et rend son chemin dans le dossier nommé d\'après le fichier source', () => {
+  // Arrange
+  const { file, root } = fichierSource();
+  // Act
+  const copie = backupHookFile(file, { root, now: () => T0 });
+  // Assert
+  assert.equal(copie, path.join(dossierDesCopies(root, file), '2026-09-14T10-05-07.123Z.json'));
+  assert.deepEqual(fs.readFileSync(copie), Buffer.from(CRLF));
+});
+
+test('un fichier absent ne se copie pas : rien n\'est rendu et la racine des copies n\'est pas créée', () => {
+  // Arrange
+  const { dossier, root } = fichierSource();
+  const absent = path.join(dossier, 'absent.json');
+  // Act
+  const copie = backupHookFile(absent, { root, now: () => T0 });
+  // Assert
+  assert.equal(copie, null);
+  assert.equal(fs.existsSync(root), false);
+});
+
+test('au-delà de 30 copies, la plus ancienne part et un fichier posé là par quelqu\'un d\'autre reste', () => {
+  // Arrange
+  const { file, root } = fichierSource();
+  const dir = dossierDesCopies(root, file);
+  poserTrenteCopies(dir);
+  fs.writeFileSync(path.join(dir, 'notes.txt'), 'posé à la main');
+  // Act
+  backupHookFile(file, { root, now: () => T0 });
+  // Assert
+  const noms = fs.readdirSync(dir);
+  assert.equal(noms.filter(nom => nom.endsWith('Z.json')).length, 30);
+  assert.equal(noms.includes(nomDeCopie(T0 - 30)), false, 'la plus ancienne copie devait partir');
+  assert.ok(noms.includes(nomDeCopie(T0)), 'la nouvelle copie devait rester');
+  assert.ok(noms.includes('notes.txt'), 'un fichier étranger ne devait être ni compté ni supprimé');
+});
+
+test('deux copies dans la même milliseconde : la seconde lève EEXIST et la première garde les octets d\'origine', () => {
+  // Arrange
+  const { file, root } = fichierSource();
+  const premiere = backupHookFile(file, { root, now: () => T0 });
+  fs.writeFileSync(file, '{"reecrit":true}\n');
+  // Act
+  const appel = () => backupHookFile(file, { root, now: () => T0 });
+  // Assert
+  assert.throws(appel, (e) =>
+    e.message.startsWith(`backup of ${file} failed, file left unchanged: EEXIST`) && e.cause.code === 'EEXIST');
+  assert.equal(fs.readFileSync(premiere, 'utf8'), CRLF);
+});
+
+test('une copie qui échoue lève en nommant le fichier de hooks et garde l\'erreur fs en cause', () => {
+  // Arrange
+  const { file, root } = fichierSource();
+  const refus = erreurFs('EACCES', 'permission denied, copyfile');
+  const io = { ...fs, copyFileSync: () => { throw refus; } };
+  // Act
+  const appel = () => backupHookFile(file, { root, io, now: () => T0 });
+  // Assert
+  assert.throws(appel, (e) =>
+    e.message === `backup of ${file} failed, file left unchanged: EACCES: permission denied, copyfile` && e.cause === refus);
+});
+
+test('une purge qui échoue lève aussi, en nommant le fichier de hooks', () => {
+  // Arrange
+  const { file, root } = fichierSource();
+  poserTrenteCopies(dossierDesCopies(root, file));
+  const refus = erreurFs('EBUSY', 'resource busy or locked, unlink');
+  const io = { ...fs, unlinkSync: () => { throw refus; } };
+  // Act
+  const appel = () => backupHookFile(file, { root, io, now: () => T0 });
+  // Assert
+  assert.throws(appel, (e) =>
+    e.message === `backup of ${file} failed, file left unchanged: EBUSY: resource busy or locked, unlink` && e.cause === refus);
+});

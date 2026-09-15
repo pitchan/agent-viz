@@ -17,7 +17,7 @@ interface CliAuditResult {
   error?: string;
 }
 interface CliUninstallResult {
-  results: Array<{ file: string; scope: Scope; removed: number; exists: boolean }>;
+  results: Array<{ file: string; scope: Scope; removed: number; exists: boolean; backup: string | null }>;
   error?: string;
 }
 interface CliInstallResult {
@@ -26,6 +26,7 @@ interface CliInstallResult {
   action: string;
   missing: string[];
   updated: string[];
+  backup: string | null;
   error?: string;
 }
 
@@ -92,6 +93,7 @@ export function cliMain(argv: string[]): void {
         total += r.removed;
         if (r.removed > 0) console.log(`[${agent}] ✓ retiré ${r.removed} de ${r.file} (${r.scope})`);
         else if (r.exists) console.log(`[${agent}]   rien à retirer dans ${r.file} (${r.scope})`);
+        if (r.backup) console.log(`[${agent}]   backup: ${r.backup}`);
       }
     }
     // Une erreur ne doit jamais se lire comme « rien à retirer » (décision D3) :
@@ -120,6 +122,7 @@ export function cliMain(argv: string[]): void {
     }
     console.log(`[${agent}] settings : ${r.target.file}  (scope: ${r.target.scope})`);
     console.log(`[${agent}] hook cmd : ${r.command.command}  (mode: ${r.command.mode})`);
+    if (r.backup) console.log(`[${agent}] backup   : ${r.backup}`);
     if (r.action === 'noop') {
       console.log(`[${agent}] ✓ déjà installé et à jour.`);
       continue;

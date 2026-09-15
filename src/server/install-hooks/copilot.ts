@@ -12,6 +12,7 @@ import { AGENT_CONFIG, GITIGNORE_EXTRAS, eventsFor } from './config.ts';
 import { resolveScope, resolveHookCommand, ensureGitignore, findProjectRoot, scanInstalled } from './scopes.ts';
 import { inPath, dirHasFiles } from './detect.ts';
 import { writeJsonAtomic } from './atomic-write.ts';
+import { backupHookFile } from './backup.ts';
 
 interface CopilotHookEntry {
   type: string;
@@ -206,13 +207,14 @@ export function installCopilot({ scope, cwd, packageRoot }: AgentOpts = {}) {
     if (missing.length === 0 && updated.length === 0) {
       const crossScope = copilotInstalledScopes(cwd, packageRoot)
         .filter(s => s.scope !== target.scope);
-      return { target, action: 'noop', missing, updated, present, coexisting, command: cmd, crossScope };
+      return { target, action: 'noop', missing, updated, present, coexisting, command: cmd, backup: null, crossScope };
     }
     content = mergeCopilotHooks(existing, cmd.command);
     action = (missing.length && updated.length) ? 'installed+updated'
            : missing.length ? 'installed' : 'updated';
   }
 
+  const backup = backupHookFile(target.file);
   writeJsonAtomic(target.file, content);
 
   let gitignore: { changed: boolean; reason?: string } | null = null;
@@ -223,7 +225,7 @@ export function installCopilot({ scope, cwd, packageRoot }: AgentOpts = {}) {
   const crossScope = copilotInstalledScopes(cwd, packageRoot)
     .filter(s => s.scope !== target.scope);
 
-  return { target, action, missing, updated, present, coexisting, command: cmd, gitignore, crossScope };
+  return { target, action, missing, updated, present, coexisting, command: cmd, backup, gitignore, crossScope };
 }
 
 // All scopes the agent uses, in sweep order. Used by uninstall for "no scope"
@@ -242,10 +244,10 @@ export function uninstallCopilot({ scope, cwd, packageRoot }: AgentOpts = {}) {
   const targets = scope
     ? [resolveScope({ scope, cwd, agent: 'copilot', packageRoot })]
     : copilotSweepTargets(cwd, { packageRoot });
-  const results: Array<ResolvedTarget & { removed: number; exists: boolean }> = [];
+  const results: Array<ResolvedTarget & { removed: number; exists: boolean; backup: string | null }> = [];
   for (const t of targets) {
     if (!fs.existsSync(t.file)) {
-      results.push({ ...t, removed: 0, exists: false });
+      results.push({ ...t, removed: 0, exists: false, backup: null });
       continue;
     }
     const content = readCopilotFile(t.file);
@@ -269,6 +271,7 @@ export function uninstallCopilot({ scope, cwd, packageRoot }: AgentOpts = {}) {
         removed += arr.length - others.length;
         if (others.length > 0) kept[ev] = others;
       }
+      const backup = backupHookFile(t.file);
       if (Object.keys(kept).length > 0) {
         // Des entrées tierces coexistent : retrait chirurgical, on ne supprime
         // pas le fichier qui les porte.
@@ -280,9 +283,9 @@ export function uninstallCopilot({ scope, cwd, packageRoot }: AgentOpts = {}) {
         // registre, cf. tâche 1.
         fs.unlinkSync(t.file);
       }
-      results.push({ ...t, removed, exists: true });
+      results.push({ ...t, removed, exists: true, backup });
     } else {
-      results.push({ ...t, removed: 0, exists: true });
+      results.push({ ...t, removed: 0, exists: true, backup: null });
     }
   }
   return { results };
