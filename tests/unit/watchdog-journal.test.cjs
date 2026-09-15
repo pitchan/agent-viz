@@ -33,11 +33,8 @@ const plaintes = (spy, motif) =>
   spy.mock.calls.filter(c => String(c.arguments[0]).includes(motif)).length;
 
 // La forme reelle que produit makeAlert (src/engine/watchdog/detector.ts), tous champs
-// compris. `acknowledged: false` en fait partie, et c'est un piege a signaler :
-// une fois sur le disque ce champ est FIGE — la ligne n'est jamais reecrite,
-// donc il dira false meme apres un acquittement. C'est `readAll` qui recalcule
-// depuis les lignes `ack` et qui fait autorite ; la tache 8 ne doit jamais lire
-// `acknowledged` depuis le fichier.
+// compris. Piege : `acknowledged: false` est FIGE sur le disque, la ligne n'etant jamais
+// reecrite ; seul `readAll`, qui recalcule depuis les lignes `ack`, fait autorite.
 const alertAt = (createdAt, id = 'loop:s1:Bash') => ({
   id, type: 'loop', sessionId: 's1', toolName: 'Bash', count: 4, createdAt,
   message: 'Bash called 4x with the same input in 12s',
@@ -59,8 +56,8 @@ test('une alerte ecrite se relit', (t) => {
 
 test('l alerte est relue telle qu elle est venue, champ pour champ', (t) => {
   // Le journal ne connait ni detecteur ni forme d'alerte au-dela de (id,
-  // createdAt) : ce que les taches suivantes liront doit etre l'original, pas
-  // une projection appauvrie. Seul `ackAt` est ajoute.
+  // createdAt) : ce qu'il rend doit etre l'alerte d'origine, pas une projection
+  // appauvrie. Seul `ackAt` est ajoute.
   const filePath = tmp(t);
   const original = alertAt(T);
   createJournal({ filePath, now: () => T }).append(original);
@@ -166,12 +163,9 @@ test('l acquittement recalcule bat le champ fige du fichier', (t) => {
 });
 
 test('un acquittement au createdAt en chaine survit au redemarrage', (t) => {
-  // Le point d'acquittement du produit est une route HTTP (tache 8), ou tout
-  // parametre de requete arrive en CHAINE. `keyOf` fabrique une chaine, donc
-  // sans normalisation a la frontiere la cle correspond en memoire vive, la
-  // ligne part bien sur le disque, et c'est `ingest` qui la refuse a la
-  // relecture : l'alerte acquittee revient. La panne ne se voit qu'apres un
-  // redemarrage — la verifier en memoire vive ne prouve rien.
+  // Une route HTTP livre ses parametres en CHAINE : sans normalisation, la cle correspond en
+  // memoire vive mais `ingest` refuse la ligne a la relecture, et l'alerte acquittee revient.
+  // La panne ne se voit qu'apres un redemarrage : la verifier en memoire vive ne prouve rien.
   const filePath = tmp(t);
   const j = createJournal({ filePath, now: () => T });
   j.append(alertAt(T));
@@ -198,7 +192,7 @@ test('un acquittement sans cle est refuse, pas ecrit en silence', (t) => {
   j.appendAck('loop:s1:Bash', '', T + 5000);
   j.appendAck('loop:s1:Bash', null, T + 5000);
   // Et le blanc, pas seulement le vide : `Number('   ')` vaut 0 lui aussi, et
-  // `?createdAt=%20` sur la route de la tache 8 suffit a l'envoyer.
+  // `?createdAt=%20` sur la route d'acquittement suffit a l'envoyer.
   j.appendAck('loop:s1:Bash', '   ', T + 5000);
   assert.equal(lignes(filePath).length, 1, 'aucune ligne que la relecture rejetterait');
   assert.equal(j.readAll({ now: T })[0].acknowledged, false, 'ni acquittement en memoire');
@@ -258,11 +252,9 @@ test('la ligne dit quand c est l horloge du serveur qui a parle', (t) => {
 });
 
 test('un acquittement sans horodatage utilisable retombe sur l horloge du serveur', (t) => {
-  // `at` ne fait pas partie de la cle : il ne dit pas QUELLE alerte est
-  // acquittee, seulement QUAND. Refuser perdrait une action reelle de
-  // l'utilisateur — le panneau resterait allume sur une alerte qu'il vient
-  // d'eteindre, il recliquerait, une ligne de plus, sans fin. La tache 8
-  // acquitte par une route HTTP : un parametre absent arrive `undefined`.
+  // `at` ne dit pas QUELLE alerte est acquittee, seulement QUAND. Refuser perdrait un geste
+  // reel : le panneau resterait allume, l'utilisateur recliquerait, une ligne de plus, sans
+  // fin. Par la route HTTP d'acquittement, un parametre absent arrive `undefined`.
   const filePath = tmp(t);
   const spy = t.mock.method(console, 'error', () => {});
   const j = createJournal({ filePath, now: () => T + 9000 });
@@ -357,24 +349,9 @@ test('une ligne illisible est sautee, jamais fatale', (t) => {
     'une ligne illisible ne declenche pas a elle seule une reecriture');
 });
 
-// Observation laissee ouverte par C2, arbitree et CORRIGEE le 2026-08-11.
-//
-// `null` est du JSON parfaitement VALIDE : la primitive rend { ok:true,
-// value:null }, et `rec.kind` — hors du `try`, ligne 160 — levait. Le voisin
-// ci-dessus promet qu'une ligne illisible est sautee, jamais fatale ; une ligne
-// valant `null` faisait mentir cette promesse, parce qu'elle n'est justement pas
-// illisible.
-//
-// CE QUE CA COUTAIT, etabli en executant `initWatchdog` sur les quatre formes,
-// et non deduit d'une lecture : le serveur ne tombait PAS — `createJournal` est
-// construit dans un try/catch. C'est le CHIEN DE GARDE ENTIER qui disparaissait
-// pour toute la duree du processus, avec pour seul message « detection
-// indisponible, les pannes ne seront pas surveillees : Cannot read properties of
-// null ». Ce message accuse une installation abimee. Le vrai cout n'etait donc
-// pas l'arret, c'etait le MAUVAIS DIAGNOSTIC : on aurait cherche un fichier
-// manquant dans le paquet pendant qu'une ligne du journal etait en cause.
-// Controles : une ligne tronquee, un fichier vide et une alerte valide laissaient
-// tous les trois le chien de garde en place — `null` etait seul a le tuer.
+// `null` est du JSON VALIDE : la primitive rend { ok:true, value:null }, et `rec.kind` levait
+// dessus. Le chien de garde entier disparaissait alors, sous un « detection indisponible »
+// qui accusait l'installation au lieu d'une ligne du journal.
 test('une ligne valant null est sautee comme les autres, et n emporte pas le chien de garde', (t) => {
   // Arrange
   const filePath = tmp(t);
@@ -412,16 +389,10 @@ test('une ligne qui n est pas un enregistrement est sautee, pas comptee perimee'
     'du bruit ne declenche pas a lui seul une reecriture du fichier');
 });
 
-// CHANGEMENT DE COMPORTEMENT VOULU.
-//
-// Le decodage d'une ligne passe desormais par la primitive commune du moteur,
-// qui tolere le BOM (U+FEFF). Avant, le `JSON.parse` local de `load` rejetait
-// la ligne prefixee d'un BOM et l'alerte disparaissait de la memoire des
-// pannes sans un mot — perdue pour de bon, puisque la compaction suivante
-// l'effacait aussi du fichier.
-//
-// Arbitrage retenu : tolerer le BOM partout, comme le moteur le fait deja.
-test('C2 — une alerte prefixee d un BOM est relue au lieu d etre perdue', (t) => {
+// Le decodage d'une ligne passe par la primitive commune du moteur, qui tolere le BOM
+// (U+FEFF). Un `JSON.parse` local rejetterait la ligne, et la compaction suivante effacerait
+// l'alerte du fichier : perdue pour de bon, sans un mot.
+test('une alerte prefixee d un BOM est relue au lieu d etre perdue', (t) => {
   // Arrange
   const filePath = tmp(t);
   const BOM = String.fromCharCode(0xFEFF);
@@ -437,13 +408,10 @@ test('C2 — une alerte prefixee d un BOM est relue au lieu d etre perdue', (t) 
     'le BOM ne doit plus couter une panne consignee');
 });
 
-// Suite du meme changement, et propre a ce fichier-ci : `gardees` retient la
-// ligne BRUTE, pas l'enregistrement re-serialise. Une ligne au BOM desormais
-// gardee est donc RECOPIEE telle quelle — BOM compris — dans le fichier
-// compacte. Ce test fige le fait que le demarrage suivant la relit quand meme ;
-// sans lui, la tolerance au BOM n'aurait fait que deplacer la perte d'un cran,
-// de la lecture vers la compaction.
-test('C2 — le BOM recopie par la compaction se relit au demarrage suivant', (t) => {
+// `gardees` retient la ligne BRUTE : une ligne au BOM est RECOPIEE telle quelle, BOM compris,
+// dans le fichier compacte. Ce test fige que le demarrage suivant la relit ; sans lui, la
+// perte pourrait passer de la lecture a la compaction.
+test('le BOM recopie par la compaction se relit au demarrage suivant', (t) => {
   // Arrange
   const filePath = tmp(t);
   const BOM = String.fromCharCode(0xFEFF);
@@ -470,9 +438,8 @@ test('un premier demarrage ne se plaint pas', (t) => {
 });
 
 test('un journal illisible se plaint, il ne repart pas vide en silence', (t) => {
-  // Le cas Windows : antivirus ou sauvegarde qui tient le fichier (EBUSY),
-  // droits perdus (EACCES). Traiter ca comme un premier demarrage repartirait
-  // avec `seen` vide, et le rattrapage de la tache 6 rendrait alors `true` sur
+  // Le cas Windows : antivirus ou sauvegarde qui tient le fichier (EBUSY), droits perdus
+  // (EACCES). Repartir avec `seen` vide ferait rendre `true` au rattrapage de demarrage sur
   // tout l'historique : tout rediffuse, un doublon par alerte dans le fichier.
   const filePath = tmp(t);
   fs.mkdirSync(filePath);                       // EISDIR a la lecture

@@ -70,8 +70,8 @@ test('une charge illisible laisse une trace dans _hook-errors.log', async () => 
   }
 });
 
-// Garde-fou de NON-RÉGRESSION, pas un contrôle étalonnant : ce cas passe déjà
-// avant le correctif. Il existe pour qu'un retrait de BOM trop gourmand, ou un
+// Garde-fou de NON-RÉGRESSION, pas un contrôle étalonnant : ce cas passe avec ou
+// sans la tolérance au BOM. Il existe pour qu'un retrait de BOM trop gourmand, ou un
 // journal d'erreur écrit à tort, se voie immédiatement sur le chemin normal.
 test('non-régression : une charge normale, sans BOM, reste capturée et sans erreur journalisée', async () => {
   const evt = { session_id: 'sess-normale-1', hook_event_name: 'PostToolUse', tool_name: 'Edit' };

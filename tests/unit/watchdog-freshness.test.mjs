@@ -1,13 +1,13 @@
-// What the removal of the freshness gate must NOT break.
+// What detection must keep doing with no freshness gate inside it.
 //
-// The gate used to live inside processEvent, and that is exactly what made the
-// tool forget: an hour-old incident raised nothing, so nothing could ever be
-// written down about it. It is gone from detection. The watchdog now records
-// what it sees, whenever it saw it, stamped with the real time of the
-// triggering event. Deciding what is recent enough to SHOW moved to
-// viz-alert-freshness.mjs — see tests/unit/alert-freshness.test.mjs.
+// A recency gate in processEvent would make the tool forget: an hour-old incident
+// would raise nothing, so nothing could ever be written down about it.
 //
-// What has not changed, and is what this file pins:
+// The watchdog records what it sees, whenever it saw it, stamped with the real time
+// of the triggering event. Deciding what is recent enough to SHOW belongs to
+// src/web/viz-alert-freshness.ts — see tests/unit/alert-freshness.test.mjs.
+//
+// What this file pins:
 //
 //   * Every window a detector measures is measured in the event stream's own
 //     time. That, and not a recency cut, is what stops a 90s history replayed
@@ -16,7 +16,7 @@
 //     started has to count.
 //   * stuck is a band, not a threshold — silent long enough to be stuck, not
 //     so long that the session is simply over — it withdraws its own alert
-//     when the condition lapses, and it still refuses to conclude anything
+//     when the condition lapses, and it refuses to conclude anything
 //     from a silence it could not have heard.
 
 import { test } from 'node:test';
@@ -254,8 +254,8 @@ test('loop still fires while blind — it judges events, never their absence', (
 });
 
 // ─── standing: a state does not go out of date ─────────────────────────────
-// Moving freshness to the display gave the badge a two-minute expiry it never
-// had. For an event-driven alert that is right — it reports something that is
+// Freshness judged at the display gives the badge a two-minute expiry. For an
+// event-driven alert that is right — it reports something that is
 // over. For stuck it would be a lie: createdAt is frozen by the dedup rule, so
 // at minute five of a session that is still frozen the watchdog says stuck and
 // the badge says nothing. The alert declares which kind it is; the display
@@ -309,17 +309,13 @@ test('stuck: standing is not immortal — the detector still takes its alert bac
 });
 
 // ─── The dedup registry is not the display ─────────────────────────────────
-// The gate used to sit BETWEEN book-keeping and emission, so it also kept a
-// stale alert out of `activeAlerts`. Without it, an alert the display filters
-// away still holds the dedup lock — and since the identity is
-// `loop:<session>:<tool>` with no entry in it, one ghost silences that tool for
-// the rest of the session, unacknowledgeably (the button only exists for what
-// the display renders).
+// The display filters stale alerts, but the dedup lock lives in detection: with an identity
+// of `loop:<session>:<tool>` and no end of episode, one ghost would silence that tool for the
+// rest of the session, unacknowledgeably — the button only exists for what the display renders.
 //
-// The answer is not to put freshness back into detection: "should we shout?"
-// and "is this still the same incident?" are different questions. The second
-// already has its mechanism — `isStale` — and each detector answers it from
-// its own definition.
+// "Should we shout?" and "is this still the same incident?" are different questions.
+// Freshness answers the first at the display; `isStale` answers the second, each
+// detector from its own definition.
 
 test('loop: un episode clos ne verrouille pas le suivant', () => {
   const clock = clockAt();

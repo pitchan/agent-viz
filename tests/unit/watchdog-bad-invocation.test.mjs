@@ -18,7 +18,7 @@
 //     butant sur le meme reglage sont deux faits, et le meme reglage manquant
 //     n'est qu'une alerte ;
 //   - le `message` (notification) ne sort aucun texte ; `subject` porte la
-//     commande declenchante — doc/32.
+//     commande declenchante.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -28,18 +28,17 @@ const T = 1_700_000_000_000;
 const SID = 'sid1';
 const iso = ms => new Date(ms).toISOString();
 
-// Echantillons repris du releve (doc/27, cf. docs/sources-externes.md), caviardes.
+// Echantillons repris du releve decrit dans docs/sources-externes.md, caviardes.
 // Ce ne sont pas des messages inventes.
 
-// L'incident du 5 aout : trois sous-agents de la meme session butant a quelques
+// L'incident releve : trois sous-agents de la meme session butant a quelques
 // minutes d'intervalle sur `cd F:\DEV\… && …` sous l'outil Bash.
 const CHEMIN_WINDOWS =
   'Exit code 1 /usr/bin/bash: line 1: cd: D:dvf-postgis-pipelinefrontend: No such file or directory';
 
 // Un second reglage du poste, pour verifier que deux motifs distincts du meme
-// acteur font deux alertes. Cause A du releve doc/30 : un chemin de dossier
+// acteur font deux alertes. Cause A du second releve : un chemin de dossier
 // termine par un antislash, que le shell POSIX lit comme un guillemet echappe.
-// 11 occurrences.
 const ANTISLASH_FINAL =
   'Exit code 2 /usr/bin/bash: eval: line 1: unexpected EOF while looking for matching `"\'';
 
@@ -54,12 +53,9 @@ const HEREDOC_TROP_GROS =
 const QUOTE_SANS_ANCRE =
   'Exit code 2 /usr/bin/bash: line 42: unexpected EOF while looking for matching `"\'';
 
-// Invocation reconnue, mais PAS un reglage du poste : une cmdlet PowerShell
-// sous bash ne se distinguait d'un binaire absent que par la CASSE du nom
-// (`Docker-Compose` sonnait, `docker-compose` se taisait — le meme echec). 1
-// occurrence en 90 jours contre 51 pour le binaire absent : classee POUR ETRE
-// EXCLUE, jamais dite — et pas comptee non plus. Se taire est ici le bon
-// comportement : un binaire absent n a pas de reglage de poste.
+// Invocation reconnue, mais PAS un reglage du poste : le motif ne distingue une cmdlet
+// PowerShell d'un binaire absent que par la CASSE du nom. Classee POUR ETRE EXCLUE, jamais
+// dite ni comptee : un binaire absent n a pas de reglage de poste.
 const CMDLET_SOUS_BASH =
   'Exit code 127 /usr/bin/bash: line 1: Select-String: command not found';
 
@@ -228,9 +224,9 @@ test('deux motifs differents du meme acteur sont deux alertes', () => {
 });
 
 test('une cmdlet PowerShell sous bash est reconnue mais ne dit rien', () => {
-  // Le filtre est unique et c est `workstationSetting` : ce motif est passe a
-  // false parce qu il ne distinguait un cmdlet d un binaire absent que par la
-  // casse du nom. Le detecteur n a rien a decider ici — il lit le drapeau.
+  // Le filtre est unique et c est `workstationSetting` : ce motif est a false parce qu il ne
+  // distingue un cmdlet d un binaire absent que par la casse du nom. Le detecteur n a rien a
+  // decider ici — il lit le drapeau.
   const wd = createWatchdog({ now: () => T });
   assert.deepEqual(leve(wd, echec({ id: 'z1', error: CMDLET_SOUS_BASH })), []);
   assert.equal(wd.getActiveAlerts().length, 0);
@@ -244,9 +240,8 @@ test('un heredoc trop gros leve une alerte, avec son propre motif', () => {
 });
 
 test('une forme non caracterisee sonne quand meme, sous le motif du filet', () => {
-  // C est la garantie de non-silence de toute la scission. Avant elle, toute
-  // forme estampillee unexpected EOF sonnait ; si le filet se taisait, la
-  // scission RETRECIRAIT la couverture au lieu de l affiner.
+  // La garantie de non-silence : toute forme estampillee unexpected EOF sonne. Si le filet
+  // se taisait, les formes qu aucune des deux ancres ne reconnait deviendraient muettes.
   const wd = createWatchdog({ now: () => T });
   const a = leve(wd, echec({ id: 'q1', error: QUOTE_SANS_ANCRE }));
   assert.equal(a.length, 1, 'une forme non reconnue ne doit jamais se taire');
@@ -303,7 +298,7 @@ test('le temps qui passe ne rouvre pas le verrou de deduplication', () => {
 
 // ─── Le sujet : la commande declenchante, jamais le message ni le motif seul ──
 
-test('l alerte consigne la commande declenchante — arbitrage doc/32 du 2026-08-09', () => {
+test('l alerte consigne la commande declenchante', () => {
   const wd = createWatchdog({ now: () => T });
   const [alerte] = leve(wd, echec({ tool_input: { command: 'cd F:\\DEV\\agent-viz && npm test' } }));
   assert.ok(alerte, 'le chemin Windows doit lever une alerte');
@@ -315,9 +310,7 @@ test('l alerte consigne la commande declenchante — arbitrage doc/32 du 2026-08
 });
 
 test('le texte de l erreur, lui, ne se consigne toujours pas — seul subject porte du texte', () => {
-  // La retention (doc/32) s arrete a la commande declenchante : rien du
-  // message d erreur ne traverse. Verrou repris de l ancien test de
-  // non-retention, ampute a tort lors de la reecriture.
+  // La retention s arrete a la commande declenchante : rien du message d erreur ne traverse.
   const wd = createWatchdog({ now: () => T });
   const [alerte] = leve(wd, echec({ tool_input: { command: 'npm run build' } }));
   const serialisee = JSON.stringify(alerte);

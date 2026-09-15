@@ -1,12 +1,11 @@
-// Une fois les échecs visibles, le pire cas documenté — un agent qui relance
-// la même commande qui plante — satisfait les DEUX détecteurs : loop (même
-// entrée, quatre fois) et retryStorm (trois échecs d'affilée). Deux pastilles
-// pour une seule panne, c'est très exactement la fatigue d'alerte que ce
-// produit existe pour éviter.
+// Le pire cas documenté — un agent qui relance la même commande qui plante —
+// satisfait les DEUX détecteurs : loop (même entrée, quatre fois) et retryStorm
+// (trois échecs d'affilée). Deux pastilles pour une seule panne, c'est très
+// exactement la fatigue d'alerte que ce produit existe pour éviter.
 //
-// La correction n'est pas une préséance, c'est une disjonction. Répéter le
+// La règle n'est pas une préséance, c'est une disjonction. Répéter le
 // MÊME appel qui échoue est le sujet de loop, et loop le dit mieux : il nomme
-// la commande et compte les répétitions. retryStorm cesse donc de compter un
+// la commande et compte les répétitions. retryStorm ne compte donc pas un
 // échec qui répète le précédent, et ne garde que ce que loop ne peut pas voir
 // — une série d'appels DIFFÉRENTS qui échouent tous.
 //
@@ -123,9 +122,9 @@ test('la meme boucle ASSEZ RAPIDE pour loop laisse loop parler seul', () => {
   assert.deepEqual(raised.map(a => a.type), ['loop']);
 });
 
-// Les échecs de ces tests portent `tool_input`, comme ceux de la vraie machine
-// (le relevé gelé de la sonde le prouve). C'est indispensable : un scénario
-// dont l'échec ne porte pas sa charge ne reproduit pas la panne qu'il épingle.
+// Les échecs de ces tests portent `tool_input`, comme la charge relevée sur la machine
+// (`tests/fixtures/post-tool-use-failure.json`). C'est indispensable : un scénario dont
+// l'échec ne porte pas sa charge ne reproduit pas la panne qu'il épingle.
 
 const lecture = (id, ts) => ({
   hook_event_name: 'PreToolUse', session_id: SID, tool_name: 'Read',
@@ -134,10 +133,8 @@ const lecture = (id, ts) => ({
 });
 
 test('une boucle noyee dans dix autres appels reste vue par loop', () => {
-  // Le cas qui a résisté trois rondes. Avec un tampon partagé de dix entrées,
-  // ces lectures évinçaient les occurrences du build : loop devenait muet, et
-  // retryStorm essayait de PRÉVOIR ce silence depuis l'extérieur. Compté par
-  // signature, il n'y a plus rien à prévoir — une boucle est une boucle, que
+  // Un tampon partagé de dix entrées laissait ces lectures évincer les occurrences du
+  // build : loop devenait muet. Compté par signature, une boucle reste une boucle, que
   // d'autres outils travaillent en même temps ou non.
   const wd = createWatchdog({ now: () => T + 60_000 });
   const raised = [];
@@ -157,10 +154,10 @@ test('une boucle noyee dans dix autres appels reste vue par loop', () => {
     'plus aucune eviction : loop voit ses quatre occurrences et parle seul');
 });
 
-test('un filet de trois appels intercales ne cache plus rien non plus', () => {
-  // La bande étroite de la ronde 2 : trois appels par cycle laissaient loop
-  // sous son seuil pour toujours tout en le faisant paraître vivant. Elle
-  // n'existe plus, il n'y a plus de seuil de capacité à franchir.
+test('une boucle entrecoupee de trois appels par cycle reste vue par loop', () => {
+  // Avec un tampon partagé, trois appels par cycle laissaient loop sous son seuil pour
+  // toujours tout en le faisant paraître vivant. Compté par signature, aucun seuil de
+  // capacité n'existe.
   const wd = createWatchdog({ now: () => T + 60_000 });
   const raised = [];
   for (let i = 1; i <= 4; i++) {
@@ -177,9 +174,9 @@ test('un filet de trois appels intercales ne cache plus rien non plus', () => {
 });
 
 test('une sequence mixte a,a,a,a,b ne met pas deux pastilles sur un fait', () => {
-  // Les répétitions n'alimentent plus le compteur d'orage : seul le premier
-  // « a » et le « b » comptent. Sans quoi deux répétitions plus un échec
-  // distinct suffisaient à faire tirer retryStorm par-dessus loop.
+  // Les répétitions n'alimentent pas le compteur d'orage : seuls le premier « a » et le
+  // « b » comptent. Sans quoi deux répétitions plus un échec distinct suffiraient à faire
+  // tirer retryStorm par-dessus loop.
   const wd = createWatchdog({ now: () => T + 60_000 });
   const raised = [];
   ['a', 'a', 'a', 'a', 'b'].forEach((c, i) => {
@@ -229,7 +226,7 @@ test('ce qui sort de la fenetre sort AUSSI de la carte des identifiants', () => 
 });
 
 test('l alerte est une photographie : ce qui arrive apres ne la reecrit pas', () => {
-  // `loop` tient maintenant un tableau vivant par signature. L'alerte doit en
+  // `loop` tient un tableau vivant par signature. L'alerte doit en
   // prendre une copie : sinon l'appel suivant la ferait grandir, et une issue
   // connue après coup réécrirait ce qu'elle affirmait au moment des faits.
   const wd = createWatchdog({ now: () => T + 60_000 });

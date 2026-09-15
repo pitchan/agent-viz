@@ -1,10 +1,10 @@
 'use strict';
-// Le service est la jonction entre un module de detection pur (ESM, ecrit
-// pour le navigateur) et un serveur CommonJS. Ce fichier fige ce qui doit
+// Le service est la jonction entre le module de detection pur
+// (src/engine/watchdog/detector.ts) et le serveur. Ce fichier fige ce qui doit
 // rester vrai de cette jonction : ce qui est diffuse a deja ete consigne, un
 // rattrapage n'ecrit rien deux fois, et pendant un rattrapage `stuck` se tait.
 //
-// Une note sur les horloges, parce qu'elle a coute un faux vert. Le detecteur
+// Une note sur les horloges, parce qu'une erreur ici donne un faux vert. Le detecteur
 // et le journal ont chacun la leur, et elles doivent etre la MEME : le journal
 // perime a la relecture ce qui est vieux pour son horloge a lui, si bien qu'un
 // journal reste sur l'heure reelle pendant que le detecteur rejoue 2023
@@ -247,19 +247,9 @@ test('catch-up: relit les fichiers en entier, deux fois sans doublon', async () 
   assert.equal(lignes(filePath), 1, 'le rattrapage est idempotent — mesure sur le FICHIER');
 });
 
-// Meme famille que la ligne `null` du journal, arbitree le 2026-08-11, et
-// trouvee par le meme balayage : `null` est du JSON VALIDE, donc la primitive
-// rend { ok:true, value:null } et `service.onEvent(null)` levait — verifie en
-// executant le vrai service : « TypeError: Cannot read properties of null
-// (reading '_ts') ».
-//
-// LE COUT N'EST PAS LE MEME QUE POUR LE JOURNAL, et il faut le dire avec
-// precision : `runCatchUp` propage, et l'appelant du demarrage RATTRAPE
-// deliberement, avec un commentaire qui l'explique — le serveur demarre. Mais
-// la boucle s'arrete a la ligne fautive : tout ce qui suit dans CE fichier, et
-// tous les fichiers d'evenements suivants, ne sont jamais relus. Une seule
-// ligne de bruit suffit donc a faire perdre le passe entier, sous un message
-// qui dit seulement « rattrapage interrompu ».
+// `null` est du JSON VALIDE : la primitive rend { ok:true, value:null } et `service.onEvent(null)`
+// levait. `runCatchUp` propage et le demarrage rattrape, mais la boucle s'arretait a la ligne
+// fautive : la suite du fichier et les fichiers suivants n'etaient jamais relus.
 test('catch-up: une ligne valant null est sautee, le rattrapage continue', async () => {
   // Arrange — la ligne fautive est au MILIEU : si la boucle s'arrete, les
   // evenements qui suivent ne sont pas relus et le compte le dit.
@@ -306,22 +296,15 @@ test('catch-up: une ligne illisible est sautee, celles d apres passent', async (
   assert.equal(s.list({ sinceDays: 90 }).length, 1);
 });
 
-// 2026-08-11 — C2 : ce que la migration de `catch-up.js` vers la primitive
-// commune `decodeJsonlLine` a CHANGE pour l appelant, et que rien ne tenait.
-//
-// Avant, la ligne franchissait la garde `!line.trim()` — U+FEFF appartient aux
-// blancs d ECMAScript, `trim` le retirait donc — puis `JSON.parse` recevait la
-// ligne BRUTE, BOM compris, et levait. Le `catch { continue; }` avalait tout :
-// l evenement etait perdu SANS UN MOT, donc invisible et indetectable. Mesure
-// avant migration sur ce meme flot : `fed` rendait 2 au lieu de 3.
+// `catch-up.ts` decode chaque ligne par `decodeJsonlLine`, qui tolere le BOM. Un `JSON.parse`
+// de la ligne BRUTE levait sur ce BOM, qu un `!line.trim()` laissait passer, et le `catch`
+// perdait l evenement sans un mot.
 test('catch-up: une ligne prefixee d un BOM est relue, pas perdue', async () => {
   // Arrange
   const dir = tmpDir();
-  // Le BOM en 2e position, pas en 1re. Un fichier ecrit en UTF-8-BOM n en porte
-  // qu un, en tete ; mais une reprise d ecriture ou un concatenat en pose un en
-  // plein milieu, et ce cas-la n avait aucun `trim` de circonstance pour le
-  // sauver. C est aussi celui qui distingue la tolerance VOULUE de la tolerance
-  // incidente que C2 decrit.
+  // Le BOM en 2e position : un fichier UTF-8-BOM n en porte qu un, en tete, mais une reprise
+  // d ecriture ou une concatenation en pose un en plein milieu, ou aucun `trim` ne le retire.
+  // C est ce cas qui distingue une tolerance voulue d une tolerance par accident.
   const lines = [
     JSON.stringify(pre(1, T + 1000)),
     '\uFEFF' + JSON.stringify(pre(2, T + 2000)),
@@ -421,7 +404,7 @@ test('catch-up: un dossier illisible se plaint, un dossier absent se tait', asyn
 
 // ─── Le cablage (index.ts) ────────────────────────────────────────────────
 // Le module tient une instance unique dans une variable de module : chaque
-// test en reprend une neuve en vidant le cache de `require`, plutot que
+// test en reprend une neuve sous une URL neuve (`?neuf=`), plutot que
 // d ajouter au produit une porte de remise a zero qui n existe que pour eux.
 
 let serie = 0;
@@ -504,7 +487,7 @@ test('index: un module de detection introuvable degrade, il ne tue pas le serveu
 test('index: un balayage sans dossier se plaint au lieu de passer pour un dossier vide', async () => {
   const idx = await neufIndex();
   await idx.initWatchdog({ journalPath: tmpFile(), now: HORLOGE });
-  // `runCatchUp` n a plus de dossier par defaut : l appelant doit le nommer.
+  // `runCatchUp` n a pas de dossier par defaut : l appelant doit le nommer.
   // S il l oublie, `catchUpFromDisk` rendrait 0 sans un mot — indiscernable
   // d un dossier legitimement vide. La plainte est la seule difference.
   const { valeur, dits } = await enEcoutant(() => idx.runCatchUp());

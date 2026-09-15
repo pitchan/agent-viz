@@ -203,11 +203,10 @@ test('un releve reel de PostToolUseFailure marque bien son occurrence en echec',
     'un seul echec connu sur quatre se dit comme tel, jamais « all »');
 });
 
-// `error` et `duration_ms` ne sont consommes par aucun detecteur aujourd hui,
-// et c est exactement pourquoi ils ont besoin d une assertion : sans elle, les
-// retirer du releve laisserait la suite verte et ce que la sonde de la tache 1
-// avait etabli serait perdu en silence. On epingle la FORME, pas un libelle.
-test('le releve garde la forme que la sonde a etablie', () => {
+// Aucun detecteur ne consomme `error` ni `duration_ms`, d ou cette assertion : sans elle,
+// les retirer de la charge relevee laisserait la suite verte, et leur forme reelle serait
+// perdue en silence. On epingle la FORME, pas un libelle.
+test('la charge relevee porte error en chaine et duration_ms en nombre', () => {
   assert.equal(typeof failureEvent.error, 'string',
     'error est une chaine plate, pas l objet structure qu annonçait une source secondaire');
   assert.match(failureEvent.error, /^Exit code \d+\n[\s\S]+$/,

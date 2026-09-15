@@ -171,7 +171,7 @@ test('traduction seulement : la route ne peut atteindre aucun autre module', () 
   // Les DEUX formes, et la seconde n est pas theorique : les gestionnaires sont
   // deja `async`, donc `await import('../watchdog')` y est licite et atteint
   // exactement le meme module. Une garde posee sur la seule forme `require` est
-  // une garde posee d un seul cote — le defaut le plus frequent de ce chantier.
+  // une garde posee d un seul cote.
   //
   // Le prix est connu, et il faut le dire : cette assertion regarde le TEXTE,
   // commentaires compris. Le jour ou ce module aura une vraie raison de
@@ -181,12 +181,11 @@ test('traduction seulement : la route ne peut atteindre aucun autre module', () 
     'la surface HTTP du chien de garde ne depend de rien, c est ce qui la borne');
   assert.doesNotMatch(source, /\bimport\s*\(/,
     'ni par require, ni par import() — les gestionnaires sont async');
-  // La TROISIEME forme, et c est la bascule en ES modules qui la rend
-  // necessaire : dans un module ES, la forme qu une dependance prend d abord
-  // est l import STATIQUE, que ni `require(` ni `import(` ne voit. Une garde
-  // qui ne peut plus rougir sur la forme la plus probable est une garde morte
-  // (regle du motif mort). L ancre `^` en mode multiligne evite `import.meta`
-  // (pas d espace apres le mot) et la forme dynamique `import(` (deja couverte).
+  // La TROISIEME forme : dans un module ES, la forme qu une dependance prend d abord
+  // est l import STATIQUE, que ni `require(` ni `import(` ne voit. Une garde qui ne
+  // rougit pas sur la forme la plus probable est une garde morte. L ancre `^` en mode
+  // multiligne evite `import.meta` (pas d espace apres le mot) et la forme dynamique
+  // `import(` (deja couverte).
   assert.doesNotMatch(source, /^\s*import[\s{*'"]/m,
     'ni par un import statique — c est la forme qu une dependance prend en ES modules');
   // La QUATRIEME forme. `export … from './y.js'` est une dependance statique au
@@ -411,11 +410,9 @@ test('POST /alerts/ack: une requete coupee repond, elle ne reste pas en suspens'
 });
 
 test('POST /alerts/ack honore le refus du journal : jamais 200', async () => {
-  // `ack` rend un booleen parce que le journal peut REFUSER. Jeter cette
-  // reponse ferait dire 200 sur un acquittement qui n'a pas eu lieu :
-  // l'utilisateur verrait son geste pris en compte et l'alerte reviendrait non
-  // acquittee au redemarrage suivant. C'est exactement la panne muette que ce
-  // chantier repare.
+  // `ack` rend un booleen parce que le journal peut REFUSER. Jeter cette reponse ferait
+  // dire 200 sur un acquittement qui n'a pas eu lieu : l'utilisateur verrait son geste pris
+  // en compte et l'alerte reviendrait non acquittee au redemarrage suivant.
   const res = await ack(faux({ ack: () => false }), { id: 'x', createdAt: 42 });
   assert.notEqual(res.code, 200, 'un refus ne se dit pas 200');
   assert.equal(res.code, 500);

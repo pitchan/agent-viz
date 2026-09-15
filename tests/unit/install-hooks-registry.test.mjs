@@ -81,10 +81,9 @@ test('l\'install préserve les entrées tierces du fichier — la postcondition 
     commandes.includes('echo hook-d-un-tiers'),
     `entrée tierce détruite par l'install : ${JSON.stringify(commandes)}`,
   );
-  // …et notre hook a bien été rafraîchi au passage : la commande exacte
-  // annoncée par le résultat a atteint le disque, l'ancienne a disparu — ni
-  // l'une ni l'autre n'était vraie tant que `mergeCopilotHooks` préservait
-  // l'entrée périmée au lieu de la remplacer.
+  // …et notre hook a bien été rafraîchi au passage : la commande annoncée a atteint
+  // le disque et l'ancienne a disparu, deux faits faux quand `mergeCopilotHooks`
+  // préservait l'entrée périmée au lieu de la remplacer.
   assert.equal(result.copilot.coexisting.PreToolUse, 1);
   assert.ok(commandes.includes(result.copilot.command.command));
   assert.ok(!commandes.includes(notre));
@@ -141,9 +140,8 @@ test('uninstall ne supprime pas le fichier qui porte encore des entrées tierces
 
 test('aller-retour install → uninstall → install : le cycle stop/start reste réinstallable', () => {
   // Arrange — NOTRE entrée plus une entrée tierce, exactement l'état qu'un
-  // utilisateur a sur le disque avant un `agent-viz stop` suivi d'un `start`.
-  // Chaque test précédent ne regardait QU'UNE opération isolée : c'est ce qui a
-  // laissé passer un refus définitif au 2e install (cf. D2 bis de la spec).
+  // utilisateur a sur le disque avant un `agent-viz stop` suivi d'un `start`. Des tests
+  // d'une opération isolée laissaient passer un refus définitif au 2e install.
   const root = sandboxProject('avtest-liskov-allerretour-');
   const packageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'avtest-pkg-'));
   const file = path.join(root, '.github', 'hooks', 'agent-viz.json');
@@ -204,7 +202,7 @@ test('un 3e agent hypothétique serait affiché : le rendu ne nomme aucun agent 
     new URL('../../src/server/install-hooks/cli.ts', import.meta.url), 'utf8',
   );
 
-  // Assert — plus aucun accès en dur `result.claude` / `result.copilot`
+  // Assert — aucun accès en dur `result.claude` / `result.copilot`
   for (const nom of noms) {
     assert.ok(
       !source.includes(`result.${nom}`),

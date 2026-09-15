@@ -21,8 +21,7 @@ import path from 'node:path';
 // des sa lecture ; et un journal sans chemin explicite vit dans
 // `os.homedir()/.agent-viz`. Les deux sont, sur cette machine, le vrai dossier
 // d'evenements et la vraie memoire des pannes de l'utilisateur — celle ou
-// l'instrument de mesure du projet depose ses sessions. Un test de la tache 6
-// y a lu 747 evenements reels avant correction : le piege est actif, pas
+// l'instrument de mesure du projet depose ses sessions : le piege est actif, pas
 // theorique. `os.tmpdir()` et `os.homedir()` relisent l'environnement a chaque
 // appel, donc les detourner ici suffit, et le fichier de test tourne dans son
 // propre processus (`node --test` en donne un par fichier).
@@ -204,8 +203,8 @@ test('cablage: ce qui est diffuse est deja consigne', async () => {
 
 // ─── Le lecteur d'evenements ─────────────────────────────────────────────────
 // `event-reader` tient l'instance du module `watchdog` qu'il a chargee ; les
-// tests du demarrage, plus bas, s'en fabriquent une neuve en vidant le cache de
-// `require`. Ce test-ci doit donc passer AVANT que l'instance partagee soit
+// tests du demarrage, plus bas, s'en fabriquent une neuve sous une URL neuve
+// (`?neuf=`). Ce test-ci doit donc passer AVANT que l'instance partagee soit
 // initialisee — la precondition est verifiee plutot que supposee.
 
 test('event-reader: sans chien de garde, le flux d evenements passe quand meme', async () => {
@@ -225,14 +224,9 @@ test('event-reader: sans chien de garde, le flux d evenements passe quand meme',
   assert.equal(liveHandoffOffset(fp), fs.statSync(fp).size);
 });
 
-// C2, 2026-08-11 : le verdict sur une ligne vient desormais de la primitive
-// commune du moteur, et le lecteur vif tolere donc le BOM comme tout le reste.
-// La ligne eprouvee ici n'est PAS la premiere du fichier, et c'est tout
-// l'interet : un BOM en tete a toujours survecu par accident, parce que le
-// `text.trim()` du lecteur le nettoyait avant le decoupage. Au milieu, il
-// n'avait rien pour le sauver — le `JSON.parse` local levait et le `catch {}`
-// faisait disparaitre l'evenement sans un mot, invisible pour le canevas ET
-// indetectable pour le chien de garde. C'est la perte silencieuse que C2 ferme.
+// Le lecteur vif decode chaque ligne par la primitive commune du moteur, qui tolere le BOM.
+// La ligne eprouvee est au MILIEU : en tete, le `text.trim()` du lecteur retire le BOM ; au
+// milieu, un `JSON.parse` local levait et l'evenement disparaissait sans un mot.
 test('event-reader: une ligne prefixee d un BOM en milieu de fichier atteint le canevas', async () => {
   // Arrange
   const recus = ecouterSSE();
@@ -390,11 +384,9 @@ test('cablage: la frontiere est l octet ou le vif a NOURRI, pas son curseur', as
   const avant = lignes(journalPartage);
   const { valeur } = await enEcoutant(() => idx.runCatchUp(path.dirname(fp), liveHandoffOffset));
   assert.equal(valeur, 1, 'le balayage ne relit que ce qui precede la premiere pature');
-  // Trois appels reels, comptes trois fois. Frontiere posee sur le curseur : le
-  // detecteur en compte CINQ. Frontiere reecrite a chaque lecture : QUATRE. Les
-  // deux franchissent le seuil de `loop` et produisent une alerte annoncant une
-  // boucle que personne n a faite — une ligne DURABLE dans un journal en ajout
-  // seul, que la tache 8 servira en HTTP.
+  // Trois appels reels, comptes trois fois. Frontiere sur le curseur : CINQ ; reecrite a chaque
+  // lecture : QUATRE. Les deux franchissent le seuil de `loop` et ecrivent au journal, en ajout
+  // seul, une ligne DURABLE annoncant une boucle que personne n a faite.
   assert.equal(lignes(journalPartage), avant, 'trois appels comptes trois fois');
 });
 
@@ -428,10 +420,8 @@ test('cablage: la frontiere s efface avec le watcher et avec la compaction', asy
 test('event-reader: un detecteur qui leve se dit une fois, et le canevas continue', async () => {
   const idx = await import('../../src/server/watchdog/index.ts');
   assert.ok(idx.getWatchdogService(), 'precondition : le service est en place');
-  // Sans garde, l enveloppe `catch {}` de la boucle (elle est la pour
-  // JSON.parse) avalerait l exception : le chien de garde cesserait de produire
-  // des alertes POUR TOUJOURS et rien ne le dirait — le trou muet exact que le
-  // solde 4 ferme dix lignes plus loin.
+  // Sans garde, l enveloppe `catch {}` de la boucle avalerait l exception : le chien de
+  // garde cesserait de produire des alertes POUR TOUJOURS, et rien ne le dirait.
   const boum = { ...pre(9, T + 9000, 'sess-boum'), _boum: true };
   const contenu = JSON.stringify(boum) + '\n' + JSON.stringify(boum) + '\n';
   const recus = ecouterSSE();
@@ -671,8 +661,7 @@ const SOURCE_SERVEUR = fs.readFileSync(
 // L'appel, et RIEN que l'appel. Un `[\s\S]*?` parti de `startWatchdog({`
 // balaierait jusqu'a la fin du fichier : n'importe quel `dir: DIR` ecrit PLUS
 // BAS satisferait l'assertion pendant que l'appel, lui, passerait un faux
-// dossier. Injoignable tant que le fichier s'arrete juste apres l'appel —
-// c'est-a-dire jusqu'a ce que la tache 8 y ajoute une ligne.
+// dossier.
 //
 // La borne est un COMPTAGE D'ACCOLADES, et il faut dire ce qu'elle n'est pas :
 // elle ignore les chaines et les commentaires. Une accolade non appariee
@@ -733,10 +722,9 @@ test('serveur: l enveloppe SSE est composee ici, et le canal n est pas broadcast
 
 test('index: initWatchdog(null) ne fabrique pas une promesse rejetee', async () => {
   const idx = await neufIndex();
-  // La destructuration des parametres est HORS du `try` de `fabriquer` : un
-  // `null` litteral y produit un TypeError, donc une promesse rejetee
-  // memorisee — exactement le rejet non attrape que la tache 6 avait ferme
-  // pour le module de detection absent.
+  // La destructuration des parametres est HORS du `try` de `fabriquer` : un `null` litteral y
+  // produit un TypeError, donc une promesse rejetee memorisee — le meme rejet non attrape que
+  // `initWatchdog` evite pour un module de detection absent.
   const service = await idx.initWatchdog(null);
   assert.ok(service, 'un appelant qui passe null merite un service, pas un plantage');
   assert.equal(idx.getWatchdogService(), service);

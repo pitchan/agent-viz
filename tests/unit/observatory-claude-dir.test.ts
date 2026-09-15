@@ -1,35 +1,18 @@
-// C5 (docs/audit-qualite-code.md) : DEUX variables d'environnement désignaient le
-// même dossier de configuration dans un SEUL paquet npm — `CLAUDE_CONFIG_DIR`
-// ici (src/server/observatory/index.js:24), `NETGAIN_CLAUDE_DIR` côté moteur
-// (src/engine/doctor/index.ts:112). Poser l'une ne déplaçait que la moitié
-// correspondante : deux vues du même produit sur deux jeux de sessions, sans
-// qu'aucun message n'avertisse de l'écart.
+// Le serveur et le moteur lisent le dossier de configuration par une seule primitive,
+// `resolveClaudeDir` (src/engine/core/claude-dir.ts) : côté serveur, `getObservatoryService`
+// (src/server/observatory/index.ts) l'appelle. `CLAUDE_CONFIG_DIR` vit, `NETGAIN_CLAUDE_DIR` est ignorée.
 //
-// Les quatre croisements ont été prouvés PAR EXÉCUTION avant qu'une ligne soit
-// écrite, sur le code d'avant :
-//   NETGAIN_CLAUDE_DIR posée → moteur 1 session · serveur `~/.claude`
-//   CLAUDE_CONFIG_DIR  posée → moteur 0 session · serveur dossier posé
+// Ce fichier est le filet de la moitié SERVEUR : il ne teste pas la primitive
+// (`tests/core/claude-dir.test.ts` s'en charge) mais le BRANCHEMENT, sans lequel un
+// `getObservatoryService` resté sur sa propre expression divergerait en silence.
 //
-// Ce fichier est le filet de la moitié SERVEUR. Il ne teste pas la primitive —
-// `tests/core/claude-dir.test.ts` s'en charge — mais le BRANCHEMENT :
-// sans lui, une primitive parfaite pourrait coexister avec une ligne 24 restée
-// sur sa propre expression, et les deux moitiés redivergeraient en silence.
+// Les cinq voisins du module de composition sont BOUCHONNÉS avant son chargement : seule la
+// résolution s'exécute, sans base ni socket. Le bouchon de `./store` n'est pas un confort : sans
+// lui, charger ce module ouvre `~/.agent-viz/observatory.db`, la base de mesure de la machine.
 //
-// Comment on observe la valeur sans ouvrir de base ni de socket : les cinq
-// voisins du module de composition sont BOUCHONNÉS avant qu'il soit chargé, ce
-// qui laisse la seule résolution s'exécuter pour de vrai. Le bouchon de
-// `./store` n'est pas un confort : sans lui, charger ce module ouvre
-// `~/.agent-viz/observatory.db`, c'est-à-dire la base de mesure de la machine.
-//
-// POURQUOI CE FICHIER EST LE SEUL À AVOIR MIGRÉ VERS VITEST (D13). Il tenait
-// ses bouchons par `require.cache`, mécanisme que la bascule en ES modules rend
-// INERTE — mesuré : la substitution rend le VRAI voisin, la purge rend la MÊME
-// instance, et les deux moitiés meurent en silence, `exit=0`. L'amorçage de
-// bouchons n'a pas d'équivalent ES natif : `vi.resetModules()` + `vi.doMock()`
-// + `await import()` est le seul remède à propriété prouvée identique — une
-// instance neuve par appel, et les cinq voisins remplacés AVANT le chargement.
-// Le prix, écrit ici : ses 6 tests quittent la sémantique de référence de
-// `node --test`.
+// Ce fichier tourne sous vitest seul : sur un module ES, `require.cache` est inerte (la substitution
+// rend le vrai voisin, la purge la même instance). `vi.resetModules()` + `vi.doMock()` + `await import()`
+// donnent une instance neuve par appel, les cinq voisins remplacés AVANT le chargement.
 import { test, vi } from 'vitest';
 import assert from 'node:assert';
 import path from 'node:path';
@@ -104,13 +87,9 @@ test('sans rien de posé, c’est <home>/.claude', async () => {
   );
 });
 
-// `.claude.json` porte l'inventaire MCP que lit la carte R2. La même variable le
-// déplace — établi PAR EXÉCUTION sur Claude Code 2.1.226, dans un home jetable :
-// posée, le fichier est écrit DANS le dossier de configuration ; non posée, à
-// côté du home. Le produit le cherchait au home dans les deux cas : c'est ce qui
-// fait disparaître R2 du protocole de contrôle (USERPROFILE jetable +
-// CLAUDE_CONFIG_DIR réel), un coût accepté d'avance dans la recette, alors qu'il
-// était ce défaut-ci.
+// `.claude.json` porte l'inventaire MCP que lit la carte R2, et `CLAUDE_CONFIG_DIR` le déplace
+// (établi PAR EXÉCUTION sur Claude Code 2.1.226) : posée, dans le dossier ; non posée, à côté du
+// home. Le chercher au home faisait disparaître R2 sous un home jetable et un dossier réel.
 test('CLAUDE_CONFIG_DIR déplace AUSSI .claude.json — dans le dossier, pas au home', async () => {
   assert.strictEqual(
     (await resoudreAvec({ CLAUDE_CONFIG_DIR: AILLEURS, NETGAIN_CLAUDE_DIR: undefined })).claudeJsonPath,
@@ -124,11 +103,9 @@ test('sans variable, .claude.json reste à CÔTÉ du dossier, pas dedans', async
   assert.notStrictEqual(vu.claudeJsonPath, path.join(vu.claudeDir, '.claude.json'));
 });
 
-// Une variable VIDE est une variable non posée. Le serveur le faisait déjà par
-// `||` ; le moteur, lui, employait `??` et scannait la chaîne vide en annonçant
-// « 0 session(s) découverte(s) sous  » — une cécité totale et silencieuse. C'est
-// le sens du serveur qui a été retenu des deux côtés : ce test le VERROUILLE ici
-// pour qu'une future unification ne l'emporte pas dans l'autre sens.
+// Une variable VIDE est une variable non posée. Lue par `??`, la chaîne vide faisait scanner
+// « sous  » et annoncer « 0 session(s) découverte(s) », une cécité silencieuse : ce test
+// verrouille le repli sur le home côté serveur.
 test('une variable VIDE retombe sur le home', async () => {
   assert.strictEqual(
     (await resoudreAvec({ CLAUDE_CONFIG_DIR: '', NETGAIN_CLAUDE_DIR: undefined })).claudeDir,

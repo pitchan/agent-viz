@@ -1,4 +1,4 @@
-// The badge no longer detects anything: the server does, and it remembers.
+// The badge detects nothing: the server does, and it remembers.
 // What the badge still owes the user is the live case — say what is wrong NOW
 // — so it filters the server's journal. Two sieves, not one, because the
 // journal is memory and memory has no notion of liveness:
@@ -100,7 +100,7 @@ test('une alerte externe vieille de dix minutes reste affichée : ni l\'âge ni 
   assert.deepEqual(ids(mod.getActiveAlerts()), ['pricingDrift:x']);
 });
 
-test('le module ne detecte plus rien', async () => {
+test('le module n expose ni feedEvent ni setObserving', async () => {
   const { mod } = await freshClient({});
   assert.equal(mod.feedEvent, undefined, 'la detection a demenage au serveur');
   assert.equal(mod.setObserving, undefined, 'la cecite du navigateur n a plus d objet');
@@ -147,12 +147,9 @@ test('un incident evenementiel perime ne redevient pas vif parce que le serveur 
 // ─── Expiry between two polls must turn the badge OFF ─────────────────────
 
 test('une alerte qui expire entre deux chargements est retiree — et l abonne est PREVENU', async () => {
-  // Le cas vecu (capture du 2026-08-19) : cloche a « 1 », volet « No active
-  // alerts ». La vivacite se juge a l'instant de la lecture, mais la pastille
-  // n'est repeinte que sur notification — et l'expiration n'en produisait
-  // aucune : au chargement suivant, `before` etait recalcule avec l'horloge
-  // COURANTE, donc l'alerte expiree manquait deja des DEUX cotes de la
-  // comparaison. Aucun retrait signale, cloche allumee a vie.
+  // Le symptome : cloche a « 1 », volet « No active alerts ». La pastille n'est repeinte que
+  // sur notification ; un `before` recalcule avec l'horloge COURANTE perdait l'alerte expiree
+  // des DEUX cotes de la comparaison, et aucun retrait n'etait signale.
   // Arrange — une alerte evenementielle fraiche, affichee
   const { mod, calls, at } = await freshClient({ alerts: [evt(T - 1000, 'a')] });
   assert.deepEqual(ids(mod.getActiveAlerts()), ['a']);
@@ -208,11 +205,9 @@ test('une alerte externe n est pas re-annoncee a chaque rechargement', async () 
 });
 
 test('le retrait d une alerte previent quand meme l interface', async () => {
-  // La SEULE voie qui ETEINT la pastille. Un retrait ne porte aucune alerte —
-  // le serveur a cesse de compter un `stuck`, ou un autre onglet vient de
-  // l acquitter — donc n avertir que sur `raised.length` laisserait l alerte
-  // affichee jusqu a ce qu autre chose bouge. C est ce que gardait le
-  // commentaire de l ancienne boucle de battement, retire avec elle.
+  // La SEULE voie qui ETEINT la pastille. Un retrait ne porte aucune alerte — le serveur a
+  // cesse de compter un `stuck`, ou un autre onglet vient de l acquitter — donc n avertir que
+  // sur `raised.length` laisserait l alerte affichee jusqu a ce qu autre chose bouge.
   const { mod, journal, calls } = await freshClient({ alerts: [evt(T - 1000, 'a')] });
   assert.deepEqual(ids(mod.getActiveAlerts()), ['a'], 'controle positif : elle est la');
   journal.alerts = [];
@@ -412,12 +407,9 @@ test('un rechargement en echec laisse la pastille sur ce qu elle savait', async 
 });
 
 test('un 200 dont le corps est illisible laisse aussi la pastille sur ce qu elle savait', async () => {
-  // Arrange — meme principe que le test precedent, sur l autre facon d echouer :
-  // le statut dit oui, le corps n est pas du JSON. Un client HTTP partage rend
-  // volontiers `null` dans ce cas ; le prendre pour un journal vide viderait la
-  // pastille, c est-a-dire ferait passer une lecture ratee pour un retour au
-  // calme. Cas non couvert avant C6, et c est celui que la mise en commun
-  // pouvait casser en silence.
+  // Arrange — l autre facon d echouer : le statut dit oui, le corps n est pas du JSON, et le
+  // client HTTP partage rend alors `null`. Le prendre pour un journal vide ferait passer une
+  // lecture ratee pour un retour au calme.
   const { mod } = await freshClient({ alerts: [evt(T - 1000, 'a')] });
   assert.deepEqual(ids(mod.getActiveAlerts()), ['a'], 'controle positif : elle le savait');
 

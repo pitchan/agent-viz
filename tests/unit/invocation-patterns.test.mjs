@@ -1,9 +1,9 @@
 // Tests unitaires de src/engine/watchdog/invocation-patterns.ts — la table de motifs
 // qui distingue « l'agent n'a pas su appeler » de « la commande a répondu non ».
 //
-// La table vient d'un relevé sur 370 sessions et 587 échecs réels (doc/27 du
-// dépôt privé, cf. docs/sources-externes.md). Les échantillons ci-dessous sont
-// repris de ses extraits, caviardés ; ce ne sont pas des messages inventés.
+// La table vient d'un relevé d'échecs réels décrit dans docs/sources-externes.md.
+// Les échantillons ci-dessous sont repris de ses extraits, caviardés ; ce ne sont
+// pas des messages inventés.
 //
 // Six choses sont vérifiées ici et nulle part ailleurs :
 //   - la LANGUE : sur cette machine 100 % des messages PowerShell sont en
@@ -16,8 +16,8 @@
 //     et « Exit code N » reste le dernier filet, jamais le premier.
 //   - le COÛT (section 6) : classify tourne synchrone dans la boucle du
 //     démon, donc aucun motif n'a le droit de rétro-explorer.
-//   - le TÉMOIN DU RELEVÉ (section 8) : les 37 expressions sont celles du
-//     relevé, écart par écart déclaré, et aucun écart n'élargit.
+//   - le TÉMOIN DES RELEVÉS (section 8) : les 39 expressions sont celles des
+//     deux relevés, écart par écart déclaré, et aucun écart n'élargit.
 //   - la VIE PRIVÉE : la sortie est tirée d'un vocabulaire fermé, fixé au
 //     chargement — c'est cela, et non un test de sous-chaîne, qui interdit
 //     qu'un morceau du texte reçu ressorte.
@@ -135,9 +135,8 @@ const SAMPLES = [
    'Exit code 1 /usr/bin/bash: line 1: cd: D:dvf-postgis-pipelinefrontend: No such file or directory'],
   ['inv-bash-cd-too-many-args',
    'Exit code 1 /usr/bin/bash: line 1: cd: too many arguments'],
-  // Deux causes disjointes, mesurees le 2026-08-08 (doc/30) : 11 antislash
-  // final avant le guillemet fermant, 8 heredoc au-dela de 8 Ko. Elles se
-  // separent sur le message SEUL — 19/19 — et sur deux ancres a la fois : la
+  // Deux causes disjointes : un antislash final avant le guillemet fermant, un heredoc
+  // au-dela de 8 Ko. Elles se separent sur le message SEUL, par deux ancres a la fois : la
   // voie d'appel (`eval:` / `-c:`) ET le caractere cherche (`"` / `'`).
   ['inv-bash-trailing-backslash-in-path',
    'Exit code 2 /usr/bin/bash: eval: line 1: unexpected EOF while looking for matching `"\''],
@@ -196,9 +195,8 @@ const SAMPLES = [
 
 // Le sous-ensemble « réglage du poste » : le seul qui donnera lieu à une
 // alerte. Exactement ces onze motifs.
-// `inv-cross-shell-cmdlet-in-posix` n en fait pas partie : 1 occurrence en 90
-// jours, et il ne distinguait un cmdlet PowerShell d un binaire absent que par
-// la CASSE du nom.
+// `inv-cross-shell-cmdlet-in-posix` n en fait pas partie : il ne distingue un
+// cmdlet PowerShell d un binaire absent que par la CASSE du nom.
 // `inv-bash-unbalanced-quote` en fait partie : le filtre de `badInvocation`
 // (src/engine/watchdog/detector.ts) rend null AVANT le compteur, donc un motif
 // qui n alerte pas ne compte pas non plus, il est classe puis jete.
@@ -279,7 +277,7 @@ test('chaque motif du releve reconnait son echantillon, et aucun ne le lui prend
   }
 });
 
-test('les 37 motifs de la table ont tous un echantillon dans ce fichier', () => {
+test('chaque motif de la table a un echantillon dans ce fichier', () => {
   assert.deepEqual(SAMPLES.map(([id]) => id), PATTERNS.map(p => p.id));
 });
 
@@ -336,13 +334,7 @@ test('les cinq motifs PowerShell sont classes sur leurs echantillons francais', 
   }
 });
 
-// Le garde d ancrage .NET est plus bas, section 7. Celui qui se trouvait ici
-// — `/FullyQualifiedErrorId|CategoryInfo/.test(p.re.source)` — a ete retire
-// plutot que garde : il cherchait son ancre N IMPORTE OU dans la source, donc
-// une simple alternation le defaisait, et il ADMETTAIT `CategoryInfo` que la
-// decision du 2026-08-08 exclut nommement. Un mutant qui ancrait
-// `inv-ps-argument-type` sur `CategoryInfo : InvalidArgument:` y survivait :
-// le test admettait exactement ce que la decision interdit.
+// Le garde d ancrage .NET est plus bas, section 7.
 
 // ─── 2. Le zero faux positif : la moitie de la valeur du module ────────────
 
@@ -530,9 +522,8 @@ test('CHAQUE motif de shell POSIX exige l estampille line N: du shell', () => {
   // compte en prose — « les cinq motifs POSIX » — l invariant se perime des
   // qu on ajoute une ligne.
   //
-  // La famille POSIX porte DEUX prefixes, et l oublier est ce qui vient
-  // d arriver : `inv-cross-shell-cmdlet-in-posix` ne commence pas par
-  // `inv-bash-`. Le compte est verrouille comme celui des motifs PowerShell
+  // La famille POSIX porte DEUX prefixes : `inv-cross-shell-cmdlet-in-posix` ne
+  // commence pas par `inv-bash-`. Le compte est verrouille comme celui des motifs PowerShell
   // plus bas — un huitieme motif de shell fera echouer ce test, ce qui est le
   // seul moyen de forcer quelqu un a verifier qu il porte bien l estampille.
   const posix = PATTERNS.filter(p => /^inv-(?:bash|cross-shell)-/.test(p.id));
@@ -546,8 +537,7 @@ test('CHAQUE motif de shell POSIX exige l estampille line N: du shell', () => {
 test('LIMITE ECRITE : un journal de conteneur atteint le sous-ensemble qui alerte', () => {
   // `CMD`/`RUN` en forme shell lancent `sh -c`, donc un conteneur estampille
   // `-c: line N:` exactement comme le harnais le fait. La regle « l estampille
-  // distingue l emis du cite » ne couvre pas ce cas, et la scission a double le
-  // nombre de motifs alertants qui y sont exposes.
+  // distingue l emis du cite » ne couvre pas ce cas.
   //
   // Ce test ne decrit PAS un comportement voulu. Il rend la limite visible
   // dans la suite plutot qu en production. S il casse, c est qu on l a
@@ -558,12 +548,9 @@ test('LIMITE ECRITE : un journal de conteneur atteint le sous-ensemble qui alert
 });
 
 test('le filet generique ALERTE, parce qu un motif muet ne compte pas non plus', () => {
-  // Une version anterieure de la scission l avait mis a false en le disant
-  // « compte sans etre dit ». Le filtre de `badInvocation`, dans
-  // src/engine/watchdog/detector.ts, rend null AVANT le compteur : un motif non
-  // alertant est classe puis jete.
-  // Et avant la scission, toute forme estampillee unexpected EOF sonnait —
-  // n alerter que sur eval: et -c: rendait muette une troisieme forme.
+  // `workstationSetting: false` ne veut pas dire « compte sans etre dit » : le filtre de
+  // `badInvocation` (src/engine/watchdog/detector.ts) rend null AVANT le compteur. A false, le
+  // filet rendrait muette toute forme unexpected EOF qu aucune des deux ancres ne reconnait.
   const p = PATTERNS.find(x => x.id === 'inv-bash-unbalanced-quote');
   assert.equal(p.class, 'invocation');
   assert.equal(p.workstationSetting, true, 'le filet doit alerter, sinon il se tait');
@@ -578,10 +565,9 @@ test('chaque ancre refuse l echantillon de l autre cause', () => {
 
 // ═══ 5. CITER n est pas EMETTRE ════════════════════════════════════════════
 //
-// Le defaut le plus grave qu une revue independante a trouve dans ce module :
-// le sous-ensemble qui alerte se declenchait sur du travail normal. 18 de ses
-// 20 textes hostiles l atteignaient, dont — le cas le plus parlant — un `cat`
-// du document de conception de ce detecteur, qui cite l erreur en clair.
+// Le risque le plus grave de ce module : un sous-ensemble qui alerte sur du travail
+// normal, par exemple un `cat` du document de conception de ce detecteur, qui cite
+// l erreur en clair.
 //
 // Le principe qui repare : si un texte porte la preuve qu un PROGRAMME a
 // tourne et rendu un rapport — glyphe de runner de test, pile d execution,
@@ -608,8 +594,7 @@ const VERDICTS_SPECIFIQUES = [
   'vrd-npm-script', 'vrd-compiler-diagnostic',
 ];
 
-// Le rapport d un `node --test` rouge dont l assertion CITE le message de
-// bash. C est la premiere ligne du tableau de la revue.
+// Le rapport d un `node --test` rouge dont l assertion CITE le message de bash.
 const NODE_TEST_CITANT_BASH = [
   'Exit code 1',
   '\u2139 tests 12',
@@ -691,15 +676,15 @@ test('les motifs de verdict specifiques passent avant le sous-ensemble qui alert
 });
 
 test('vrd-exit-code-bare reste le dernier filet, derriere tout ce qui alerte', () => {
-  // Le piege que la revue a verifie : devant les motifs d invocation, ce motif
-  // vole tout — « Exit code N » ouvre presque tout echec Bash — et le
-  // detecteur devient muet. C est la pire panne possible pour cet outil.
+  // Le piege : devant les motifs d invocation, ce motif vole tout — « Exit code N »
+  // ouvre presque tout echec Bash — et le detecteur devient muet. C est la pire
+  // panne possible pour cet outil.
   const dernierAlertant = Math.max(...PATTERNS.filter(p => p.workstationSetting).map(p => idx(p.id)));
   assert.ok(idx('vrd-exit-code-bare') > dernierAlertant);
   assert.equal(PATTERNS.at(-1).id, 'vrd-exit-code-bare');
 });
 
-test('les deux motifs neufs precedent le filet qui les avalerait', () => {
+test('les deux motifs a ancre precedent le filet qui les avalerait', () => {
   // Le filet matche `line \d+: unexpected EOF ...`, donc les deux formes
   // specifiques aussi. Place devant elles, il prendrait tout et le detecteur
   // redeviendrait muet sur les deux causes a la fois.
@@ -708,14 +693,9 @@ test('les deux motifs neufs precedent le filet qui les avalerait', () => {
 });
 
 test('un binaire absent ne sonne pas, quelle que soit la casse de son nom', () => {
-  // Le defaut D3 : `inv-cross-shell-cmdlet-in-posix` ne distinguait un cmdlet
-  // PowerShell d un binaire absent que par la casse du nom, ce qui n est pas
-  // un critere. Il pesait 1 occurrence, 1 projet, 1 acteur en 90 jours contre
-  // 51 pour `env-binary-missing`. Il reste classe POUR ETRE EXCLU, et n est
-  // pas compte non plus — le filtre du detecteur rend null avant son compteur.
-  // A la difference du filet, rien ne se perd a le taire : `env-binary-missing`,
-  // place au-dessus, classe deja le meme echec, et un binaire absent n a aucun
-  // reglage de poste a offrir.
+  // Ce motif ne distingue un cmdlet PowerShell d un binaire absent que par la casse du nom :
+  // il est classe POUR ETRE EXCLU, jamais compte. Un `command not found` en minuscules tombe
+  // sous `vrd-exit-code-bare`, ou sous aucun motif sans « Exit code » ; aucun des deux ne sonne.
   const p = PATTERNS.find(x => x.id === 'inv-cross-shell-cmdlet-in-posix');
   assert.equal(p.workstationSetting, false);
   assert.ok(idx('env-binary-missing') < idx('inv-cross-shell-cmdlet-in-posix'),
@@ -734,19 +714,18 @@ test('classify ne retro-explore pas sur un long train de blancs', () => {
   // La forme qui declenche : `^\s*` sous le drapeau `m`, ou `\s` couvre `\n`.
   // A chaque debut de ligne le moteur avale tout le blanc qui suit puis
   // revient en arriere — exposant 2,00 mesure. `classify` tourne SYNCHRONE
-  // dans `feedWatchdog` (src/server/event-reader.js), donc ce retour arriere
+  // dans `feedWatchdog` (src/server/event-reader.ts), donc ce retour arriere
   // bloque le serveur HTTP et le flux SSE.
   //
-  // Le lorem ipsum de 1 Mo du test voisin ne le declenche PAS (7,9 ms) : il
-  // n a aucun debut de ligne. C est la seule forme de 1 Mo incapable de
-  // reveler le defaut, et c etait celle du test.
+  // Le lorem ipsum de 1 Mo du test voisin ne le declenche PAS (7,9 ms) : sans
+  // debut de ligne, il ne peut pas reveler le defaut.
   const blancs = '\n'.repeat(60_000);
   const t0 = process.hrtime.bigint();
   assert.equal(classify(blancs), null);
   const ms = Number(process.hrtime.bigint() - t0) / 1e6;
-  // 0,2 ms mesuree une fois les motifs rendus lineaires, ~3 500 ms avant.
-  // Le seuil est a mi-chemin en echelle logarithmique : ni sensible a la
-  // charge de la machine, ni indulgent envers le defaut.
+  // Motifs lineaires : 0,2 ms mesuree ; motifs qui retro-explorent : ~3 500 ms. Le seuil
+  // est a mi-chemin en echelle logarithmique : ni sensible a la charge de la machine, ni
+  // indulgent envers le defaut.
   assert.ok(ms < 300, `classify a pris ${ms.toFixed(0)} ms sur 60 Ko de lignes vides`);
 });
 
@@ -757,10 +736,9 @@ test('un long train de blancs suivi d un motif reste classe', () => {
 
 // ═══ 7. L ancrage .NET : verrouille sur CHAQUE alternative ══════════════════
 
-// Les alternatives de premier niveau d une expression : celles que `|` separe
-// hors de toute parenthese et de toute classe de caracteres. Un garde qui
-// cherche son ancre n importe ou dans la source se laisse defaire par une
-// simple alternation — c est le defaut D5.
+// Les alternatives de premier niveau d une expression : celles que `|` separe hors de toute
+// parenthese et de toute classe de caracteres. Un garde qui cherche son ancre n importe ou
+// dans la source se laisse defaire par une simple alternation.
 function alternativesDePremierNiveau(source) {
   const out = [];
   let courante = '', profondeur = 0, dansClasse = false;
@@ -794,11 +772,8 @@ test('CHAQUE alternative de CHAQUE motif PowerShell exige FullyQualifiedErrorId'
 });
 
 test('aucun motif PowerShell n admet CategoryInfo', () => {
-  // La decision du 2026-08-08 exclut `CategoryInfo` nommement : aucun des 37
-  // motifs du releve ne l utilise, la mention venait de l auteur et non de la
-  // mesure. Un garde qui l admet accepte exactement ce que la decision
-  // interdit — un mutant ancre sur `CategoryInfo : InvalidArgument:` y
-  // survivait.
+  // `CategoryInfo` est exclu : aucun des 37 motifs du releve ne l utilise. Un garde qui
+  // l admet laisse passer un mutant ancre sur `CategoryInfo : InvalidArgument:`.
   for (const p of PATTERNS) {
     assert.ok(!/CategoryInfo/.test(p.re.source),
       `${p.id} s ancre sur CategoryInfo, que la decision exclut`);
@@ -817,15 +792,15 @@ test('un message PowerShell prive de FullyQualifiedErrorId n est pas classe, Cat
 
 // ═══ 8. Les 39 expressions, verrouillees contre les deux releves ═══════════
 //
-// Sans ce test, tout elargissement passe : la revue a fait survivre cinq
-// mutants sur le chemin d alerte, dont `inv-bash-windows-path-unquoted`
+// Sans ce test, tout elargissement passe, par exemple
+// `inv-bash-windows-path-unquoted`
 // elargi a `/cd: [^\n]*: No such file or directory/`, ce qui ferait de toute
 // exploration ratee une alerte.
 //
-// Le releve (doc/27, cf. docs/sources-externes.md) vit dans le depot PRIVE de
-// la these et n est pas distribue avec agent-viz : ses 37 expressions sont donc
-// recopiees ici une fois, extraites programmatiquement de son bloc
-// `FAILURE_PATTERNS`, et ce fichier tient le role de temoin.
+// Le releve (cf. docs/sources-externes.md) vit dans un depot PRIVE et n est pas
+// distribue avec agent-viz : ses 37 expressions sont donc recopiees ici une fois,
+// extraites programmatiquement de son bloc `FAILURE_PATTERNS`, et ce fichier tient
+// le role de temoin.
 
 const RELEVE = new Map([
   ['harness-tool-disabled', String.raw`No such tool available: \S+\.[^]{0,40}not enabled in this context`, ''],
@@ -867,12 +842,10 @@ const RELEVE = new Map([
   ['vrd-exit-code-bare', String.raw`^\s*Exit code \d+`, ''],
 ].map(([id, source, flags]) => [id, { source, flags }]));
 
-// Le SECOND releve (doc/30, 2026-08-08, meme depot prive) : deux
-// motifs de plus, nes de la scission de `inv-bash-unbalanced-quote`, qui
-// fusionnait deux causes. Ils ne vont PAS dans RELEVE — celui-ci est le temoin
-// de doc/27, et les y glisser mentirait sur leur provenance, c est-a-dire sur
-// la seule chose que cette section existe pour tenir. Meme role, meme
-// discipline, autre source.
+// Le SECOND releve, du meme depot prive : deux motifs de plus, qui separent les
+// deux causes que `inv-bash-unbalanced-quote` reunit. Ils ne vont PAS dans RELEVE —
+// celui-ci est le temoin du premier releve, et les y glisser mentirait sur leur
+// provenance, la seule chose que cette section existe pour tenir.
 //
 // `String.raw` ne convient pas ici et c est la seule raison du changement de
 // style : un backtick ne peut pas figurer nu dans un litteral de gabarit, et
@@ -1001,8 +974,7 @@ test('un ecart declare ne fait que RESTREINDRE le motif du releve, jamais l elar
 // ═══ 9. Les branches d alternative du chemin d alerte ═══════════════════════
 
 // Les quatre identifiants .NET de `inv-ps-syntax`, chacun avec la prose
-// francaise que PowerShell met devant. Trois des quatre n etaient exerces par
-// aucun test, sur le chemin d alerte.
+// francaise que PowerShell met devant.
 const PS_SYNTAX_VARIANTES = [
   ['ExpectedValueExpression', [
     'Vous devez indiquer une expression de valeur apr\uFFFDs l\u2019op\uFFFDrateur \u00ab -match \u00bb.',
@@ -1030,11 +1002,9 @@ test('les quatre identifiants .NET de inv-ps-syntax sont exerces, un par un', ()
   }
 });
 
-// Les branches que le releve a observees mais dont ce fichier ne portait aucun
-// echantillon : 23 sur les 37 motifs, comptees et non estimees. Ce ne sont pas
-// des extraits du releve — ce sont des temoins minimaux, juste assez pour que
-// personne n ajoute une branche sans qu on sache si elle matche la forme
-// qu elle annonce. Les extraits reels, eux, sont dans SAMPLES.
+// Des temoins minimaux pour les branches qu aucun extrait de SAMPLES n exerce : pas des
+// extraits du releve, juste assez pour que personne n ajoute une branche sans qu on sache
+// si elle matche la forme qu elle annonce.
 const TEMOINS_DE_BRANCHE = [
   'Request interrupted by user',
   'Exit code 1\nrtk: not found on PATH',
@@ -1083,7 +1053,7 @@ test('chaque branche d alternative de CHAQUE motif a un echantillon', () => {
 test('les deux ancrages francais de la table sont exerces', () => {
   // « est introuvable » et « introuvable dans » sont les seuls ancrages
   // francais de la table, dans un module dont la these est le piege de la
-  // langue — et aucun test ne les touchait.
+  // langue.
   assert.deepEqual(classify("Exit code 1\nLe programme \u00ab rtk \u00bb est introuvable sur ce poste."),
     { id: 'env-binary-missing', class: 'environment' });
   assert.deepEqual(classify('<tool_use_error>Cha\u00eene introuvable dans le fichier</tool_use_error>'),
@@ -1094,7 +1064,7 @@ test('les deux ancrages francais de la table sont exerces', () => {
 
 test('PATTERNS est gele : un importateur ne peut pas detourner classify pour tout le monde', () => {
   // `PATTERNS` est exporte pour que le detecteur y lise `workstationSetting`
-  // au lieu de recopier la liste. Exporte non gele, il offrait aussi
+  // au lieu de recopier la liste. Exporte non gele, il offrirait aussi
   // `PATTERNS.unshift(...)` a n importe quel importateur — et l ordre de cette
   // table est la moitie de ce que le module garantit.
   assert.ok(Object.isFrozen(PATTERNS), 'la table n est pas gelee');
@@ -1115,7 +1085,7 @@ test('la sortie de classify est tiree d un vocabulaire ferme', () => {
   // C est CA la garantie, et non « la valeur n est pas un morceau du texte
   // recu » : rejoue sur les 587 echecs reels, cet oracle-la crie 10 fois,
   // parce que « verdict » est un mot que les scripts de ce depot impriment. Il
-  // marchait par chance sur les echantillons choisis.
+  // ne tient que par chance sur les echantillons choisis.
   //
   // Le vocabulaire est fixe au chargement du module et ne depend d aucune
   // entree : aucune chaine venue du texte ne peut donc en sortir.
