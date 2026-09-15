@@ -101,28 +101,23 @@ src/engine/cli.ts      le binaire `netgain`
 ```
 
 La racine du dépôt porte `{"type": "module"}` (`package.json`) : `src/engine/`
-est ES modules directement, sans marqueur de sous-arbre à maintenir. Avant
-l'étape 3, un marqueur `{"type": "module"}` versionné rendait ce sous-arbre ESM
-à l'intérieur d'une racine CommonJS, avec un jumeau écrit par le build dans
-`dist/engine/` ; les deux ont disparu avec la racine ESM.
+est ES modules directement, sans marqueur de sous-arbre à maintenir. Aucun
+`package.json` ne vit sous `src/`, ni pour le moteur ni pour le navigateur :
+
+```
+find src -name package.json           → vide
+```
 
 ### 2.3 Le navigateur
 
-**28 fichiers** — 27 `.ts`, `viz.css`. ES modules, servis en JavaScript, les
-types retirés à la requête (`node:module.stripTypeScriptTypes`, mode `strip`),
-en HTTP depuis `src/web/` (`src/server/routes.ts:373`).
+**Des modules `.ts` et une seule feuille de style, `viz.css`.** ES modules,
+servis en JavaScript, les types retirés à la requête
+(`node:module.stripTypeScriptTypes`, mode `strip`), en HTTP depuis `src/web/`
+(l'entrée `prefix: '/src/web/'` de `ROUTES`, dans `src/server/routes.ts`).
 
 ```
-find src/web -type f | wc -l          → 28      (27 ts · 1 css)
+find src/web -type f ! -name "*.ts"   → src/web/viz.css
 ```
-
-**Le 28ᵉ était le marqueur, et il a disparu à l'étape 3.** Ce répertoire portait
-lui aussi un `package.json` de deux lignes, `{ "type": "module" }`, dont le seul
-travail était de rendre ce sous-arbre ESM sous une racine CommonJS ; la bascule
-de la racine l'a rendu inutile, comme celui du moteur. Le décompte de fichiers
-baisse donc **sans qu'aucun module disparaisse** — c'est exactement la classe
-d'erreur contre laquelle le § 0 met en garde, et elle est écrite ici plutôt que
-subie.
 
 ```
 src/web/               viz-state · viz-canvas · viz-layout · viz-ui · viz-network
@@ -130,18 +125,18 @@ src/web/observatory/   les trois vues d'analyse : conseils, sessions, tarifs
                        (trois vues d'un seul document — il n'y a qu'un `.html`)
 ```
 
-**L'URL suit le disque** : la racine statique est `src/web/` et le préfixe servi
-est `/src/web/` (`routes.ts:373` et l'entrée `prefix` de `ROUTES`). Une table de
-correspondance URL→disque aurait été un mécanisme neuf ; l'étape 5 n'en crée
-pas — elle sert la source `.ts` directement, les types retirés à la requête.
-**Il n'existe aucun `dist/web/`, et ce chantier n'en crée pas** : c'est la cible
-abandonnée (doc/48).
+**L'URL suit le disque** : la racine statique est `src/web/` (`staticHandler`)
+et le préfixe servi est `/src/web/` (l'entrée `prefix` de `ROUTES`). Il n'y a
+aucune table de correspondance URL→disque : le serveur sert la source `.ts`
+directement, les types retirés à la requête. **Il n'existe aucun `dist/web/`** :
+le build ne compile que `src/engine/` et `src/server/` (`include` de
+`tsconfig.build.json`).
 
 Il ne parle au serveur que par le réseau, et depuis **trois fichiers** :
 
 | Fichier | Ce qu'il ouvre |
 |---|---|
-| `src/web/viz-network.ts` | le flux SSE `/stream` (l. 111) et les appels du temps réel |
+| `src/web/viz-network.ts` | le flux SSE `/stream` (`connectSSE`) et les appels du temps réel |
 | `src/web/observatory/api.ts` | le client HTTP des trois vues d'analyse |
 | `src/web/viz-watchdog-client.ts` | les alertes de surveillance |
 
@@ -166,9 +161,9 @@ fois.
 
 **Deux** sorties non-réseau existent par ailleurs, et aucune ne contredit la
 table du § 1 — ce sont des API du navigateur, pas du disque :
-`observatory/failures-view.ts:88` (`navigator.clipboard.writeText`) et
-`viz-ui.ts:768-777`, qui demande la permission puis lève une **notification
-système** (`new Notification(...)`). La seconde sort de la page plus visiblement
+`observatory/failures-view.ts` (`navigator.clipboard.writeText`) et
+`notifyDesktop`, dans `viz-ui.ts`, qui demande la permission puis lève une
+**notification système** (`new Notification(...)`). La seconde sort de la page plus visiblement
 que la première.
 
 ---
@@ -202,9 +197,9 @@ L'invariant réseau tient. L'invariant d'import se contrôle sur les liens en
 valeur, liste blanche comprise. Le moteur, lui, n'importe rien du produit,
 types compris.
 
-Trois règles l'établissent, et **chacune vient avec son contrôle négatif** —
-parce qu'une commande dont la sortie vide est la preuve doit d'abord prouver
-qu'elle *sait* ne pas être vide :
+Trois règles l'établissent, et **chacune vient avec son contrôle négatif** :
+une commande dont la sortie vide est la preuve doit d'abord prouver qu'elle
+*sait* ne pas être vide, et un test doit prouver qu'il sait rougir :
 
 ```sh
 # 1. Le moteur n'atteint pas le produit.
@@ -269,8 +264,8 @@ regarde pas, donc :
 - **la règle n° 3 ne voit que `import X from 'node:…'`** — `import 'node:fs'`,
   `require('node:fs')` et `await import('node:fs')` lui échappent tous les trois.
 
-Le second angle mort est **sans victime aujourd'hui**, vérifié en exécutant —
-et sa commande est écrite hors tableau, pour la raison dite juste après :
+Le second angle mort est **sans victime** : la commande ci-dessous voit les
+trois formes et rend vide, et son contrôle négatif rend les trois lignes :
 
 ```sh
 grep -rnE "(^|[^A-Za-z0-9_])(import|require)[[:space:]]*\(?[[:space:]]*['\"]node:" src/web/
@@ -291,35 +286,32 @@ spécificateur. Aucun outil de lint ne le remplace : ESLint ne franchit pas un
 import, le cas transitif lui échappe (mesuré sur trois configurations), et le
 dépôt n'a aucune configuration ESLint.
 
-Le déplacement a d'ailleurs **changé la forme** de la deuxième : avant, le moteur
-s'atteignait par `../netgain/dist/`, un segment que `(\.\./)*(lib|netgain)/`
-attrapait. Aujourd'hui il s'atteint par sa source, `../engine/core/…` —
-l'ancien motif serait **muet**, et muet n'est pas la même chose que vrai.
+**Pourquoi les contrôles négatifs sont écrits là plutôt que sous-entendus.** Sous
+`grep -E`, `\|` n'est pas une alternation mais un **tube littéral** : un motif
+`(server\|web)/` cherche la chaîne `server|web/`, ne trouve aucun import réel, et
+sa sortie vide se lirait comme une preuve. Le fait affirmé pourrait être vrai,
+mais la commande censée l'établir serait incapable d'échouer. Le contrôle
+négatif le montre :
 
-**Pourquoi les contrôles négatifs sont écrits là plutôt que sous-entendus.** La
-première rédaction de cette section portait un motif `(lib\|netgain)` sous
-`grep -E`, où `\|` n'est pas une alternation mais un **tube littéral** : la
-commande cherchait la chaîne `lib|netgain`, ne pouvait rien trouver, et sa sortie
-vide se lisait comme une preuve. Le fait affirmé était vrai — mais par accident,
-et la commande censée l'établir était incapable d'échouer.
+```sh
+echo "import x from '../server/usage.js'" | grep -cE "(server\|web)/"   # → 0
+echo "import x from '../server/usage.js'" | grep -cE "(server|web)/"    # → 1
+```
 
 **Le troisième cas mérite en plus son paragraphe, parce qu'un contrôle naïf se
-trompe dans l'autre sens — et le sens dans lequel il se trompe a changé avec le
-langage.** Avant l'étape 5, `grep -rn "node:" src/web/` rendait une ligne,
-`viz-invocation-patterns.mjs:193` : une expression régulière reconnaissant
-`node:internal/` dans le texte d'une trace d'erreur affichée à l'écran — et ce
-fichier a depuis quitté `src/web/` pour le moteur (§ 2.3, § 6). **Aujourd'hui
-la même commande rend sept lignes, et aucune n'est un import** : ce sont des
-paramètres TypeScript nommés `node`, annotés par leur type —
-`node: HTMLElement` dans `advisor-view.ts` (deux fois), `confirm-button.ts`,
-`decisions-view.ts`, `failures-view.ts`, `period-selector.ts`, et
-`node: VizNode` dans `viz-layout.ts`. `node` comme nom de paramètre (un nœud du
-DOM ou du graphe) est un choix ordinaire ; le `:` qui le suit est la syntaxe de
-type elle-même. Un contrôle qui chercherait la chaîne `node:` mentirait donc
-sept fois au lieu d'une, pour une raison sans rapport avec la précédente. Le
-contrôle juste porte sur les **instructions d'import**, pas sur le texte des
-fichiers — et le passage à TypeScript en est un argument de plus, pas
-seulement une note d'histoire.
+trompe dans l'autre sens.** `grep -rn "node:" src/web/` rend des lignes, et
+aucune n'est un import : ce sont des paramètres TypeScript nommés `node`,
+annotés par leur type (`node: HTMLElement`, `node: VizNode`). `node` comme nom
+de paramètre (un nœud du DOM ou du graphe) est un choix ordinaire ; le `:` qui
+le suit est la syntaxe de type elle-même. Un contrôle qui chercherait la chaîne
+`node:` signalerait donc des fautes qui n'en sont pas. Le contrôle juste porte
+sur les **instructions d'import**, pas sur le texte des fichiers. Que chaque
+ligne rendue soit un paramètre typé se vérifie ainsi :
+
+```sh
+grep -rn "node:" src/web/ | grep -vE "node: [A-Z][A-Za-z]*"          # → vide, exit 1
+echo "import fs from 'node:fs'" | grep -vE "node: [A-Z][A-Za-z]*"    # → 1 ligne, exit 0
+```
 
 **La règle n° 2 est tenue par un test de dépôt, `tests/repo/served-web-graph.test.mjs`.**
 Les règles n° 1 et n° 3 gardent leurs commandes, rejouées à la main. La règle
@@ -338,7 +330,7 @@ Extrait de la sortie :
 
 ```
 git grep -nE "from '(\.\./)+engine/" -- src/server
-  src/server/tokens.ts:21:import { addUsage, countOrZero, emptyUsageBucket, isDedupableMsgId } from '../engine/core/usage.ts';
+  src/server/tokens.ts:21:import { addUsage, countOrZero, emptyUsageBucket, isDedupableMsgId, usageVerdict } from '../engine/core/usage.ts';
   src/server/observatory/engine.ts:12:import { discoverSessions, parseSince, priceTable } from '../../engine/core/index.ts';
   src/server/transcript.ts:13:import { decodeJsonlLine } from '../engine/core/jsonl.ts';
 ```
@@ -409,32 +401,32 @@ la principale façon de se tromper sur ce produit.
 ```
 Claude Code / Copilot CLI
    └─ le hook lance `agent-viz hook`
-        ├─ écrit  ${tmpdir}/agent-events/<session>.jsonl     (dossier : hook.ts:25
-        │                                                     écriture : hook.ts:82)
+        ├─ écrit  ${tmpdir}/agent-events/<session>.jsonl     (hook.ts : DIR, runHook)
         └─ POST /notify au démon, sans attendre la réponse
-              └─ le démon diffuse en SSE sur /stream          (routes.ts:379)
-                    └─ la page se met à jour                  (viz-network.ts:111)
+              └─ le démon diffuse en SSE sur /stream          (routes.ts : streamHandler)
+                    └─ la page se met à jour                  (viz-network.ts : connectSSE)
 ```
 
-Chaud, éphémère, purgé toutes les heures (`src/server/server.ts:84`). Le hook
-**n'attend jamais** le démon : un démon éteint ne ralentit pas la session de
-l'utilisateur.
+Chaud, éphémère, purgé toutes les heures (`housekeep`, programmé dans
+`src/server/server.ts`). Le hook **n'attend jamais** le démon : un démon éteint
+ne ralentit pas la session de l'utilisateur.
 
 ### Flux B — l'observatoire
 
 ```
 ~/.claude/projects/<projet>/<session>.jsonl        (la source de vérité)
-   └─ le moteur découvre, décode, agrège, tarife    (src/engine/core/discovery.ts:32)
+   └─ le moteur découvre, décode, agrège, tarife    (src/engine/core/discovery.ts : discoverSessions)
         └─ le serveur range le résultat dans
-           ~/.agent-viz/observatory.db               (observatory/index.ts:17)
+           ~/.agent-viz/observatory.db               (observatory/index.ts : DB_PATH)
               └─ servi en JSON par HTTP
                     └─ les trois pages d'analyse     (src/web/observatory/)
 ```
 
-Froid, rejoué au démarrage puis toutes les heures (`src/server/server.ts:85` — la
-ligne voisine de celle du flux A, même cadence, deux objets différents). **Les
-transcripts sont la source de vérité ; la base est un dérivé jetable.** La
-supprimer ne perd que les statuts posés à la main sur les recommandations.
+Froid, rejoué au démarrage puis toutes les heures (`runAnalysisScan`, programmé
+dans `src/server/server.ts` à la même cadence que la purge du flux A : deux
+objets différents). **Les transcripts sont la source de vérité ; la base est un
+dérivé jetable.** La supprimer ne perd que les statuts posés à la main sur les
+recommandations.
 
 ---
 
@@ -448,31 +440,30 @@ Ils se comptent en deux temps, et les confondre fait manquer un hook.
 |---|---|---|
 | `agent-viz` | `bin/agent-viz.js` | l'utilisateur |
 | `netgain` | `dist/engine/cli.js` | l'utilisateur |
-| `main` | `dist/server/server.js` | déclaré pour `require('@vcueto/agent-viz')`, qu'aucun code connu n'appelle — mais le fichier lui-même est bien vivant : c'est l'émission du script que le démon lance (`src/server/lifecycle.ts:12`). **Ce qu'il rend a changé à l'étape 3 : voir juste sous cette table.** |
-| la page | `index.html` | le navigateur ; importe `./src/web/…` en 10 lignes |
+| `main` | `dist/server/server.js` | déclaré pour `require('@vcueto/agent-viz')`, qu'aucun code de ce dépôt n'appelle — mais le fichier lui-même est bien vivant : c'est l'émission du script que le démon lance (`SERVER_SCRIPT`, dans `src/server/lifecycle.ts`). **Ce qu'il rend à un appelant CommonJS est dit juste sous cette table.** |
+| la page | `index.html` | le navigateur ; importe ses modules depuis `./src/web/…` |
 
-**Le régime de modules de ces points d'entrée a changé à l'étape 3, et un seul
-d'entre eux le rend visible de l'extérieur.** `bin/agent-viz.js` et
-`dist/server/server.js` sont des ES modules depuis que la racine porte
-`"type": "module"` ; lancés par `node`, ils se comportent à l'identique. Mais
-`main` est aussi une **surface d'appel** : un projet CommonJS qui écrivait
-`require('@vcueto/agent-viz')` ne reçoit plus l'objet `module.exports`, il reçoit
-un **espace de noms de module figé** — y affecter une propriété est un no-op
-muet en mode non strict, mesuré. C'est la **seule** exception de comportement
-observable que l'étape 3 déclare sur le produit, et elle est écrite ici parce
-qu'aucun test ne peut l'attraper : rien, dans ce dépôt, n'appelle
-`require('@vcueto/agent-viz')`.
+**Ces points d'entrée sont des ES modules, et un seul d'entre eux le rend
+visible de l'extérieur.** `bin/agent-viz.js` et `dist/server/server.js` sont des
+ES modules parce que la racine porte `"type": "module"` ; lancés par `node`, ils
+n'en montrent rien. Mais `main` est aussi une **surface d'appel** : un projet
+CommonJS qui écrit `require('@vcueto/agent-viz')` reçoit un **espace de noms de
+module**, et non un objet `module.exports` ; y affecter une propriété est sans
+effet et sans erreur en mode non strict. Aucun test ne peut l'attraper : rien,
+dans ce dépôt, n'appelle `require('@vcueto/agent-viz')`.
+
+```
+git grep -nF "require('@vcueto/agent-viz')" -- src bin tests     → vide, exit 1
+```
 
 **Un test permanent tient les trois premières lignes de cette table**, plus
 chaque entrée du champ `files` — `tests/repo/package-entrypoints.test.mjs` : elles
-doivent résoudre sur le disque. Il est né à l'étape 3 de la migration, et sa
-raison d'être est un fait mesuré : c'était la **seule** surface du produit
-qu'aucun instrument ne regardait, ni le typecheck, ni le build, ni les tests, ni
-le filet de citations — et **npm ignore en silence une entrée `files`
-inexistante**. Ce qu'il ne dit pas : que le point d'entrée *s'exécute*. Résoudre
-n'est pas tourner, et c'est pourquoi chaque étape de la migration se termine
-encore par `node bin/agent-viz.js --version`, `node dist/engine/cli.js --version`
-et `npm pack --dry-run --ignore-scripts`.
+doivent résoudre sur le disque. Ni le typecheck ni le build ne lisent ces
+entrées, et **npm ignore en silence une entrée `files` inexistante** : `npm pack`
+rend `exit 0` sans la nommer. Ce qu'il ne dit pas : que le point d'entrée
+*s'exécute*. Résoudre n'est pas tourner : `tests/repo/bin-help.test.mjs` lance
+`bin/agent-viz.js` dans un vrai sous-processus, mais aucun test ne lance
+`dist/engine/cli.js`.
 
 **Ce que l'agent invoque tout seul** — un hook, sur un seul binaire :
 
@@ -482,16 +473,9 @@ et `npm pack --dry-run --ignore-scripts`.
 
 Le hook agent-viz a **deux modes**, et la différence compte : si la racine du
 paquet est un cache `npx` éphémère, la commande écrite ne contient **aucun
-chemin** (`src/server/install-hooks.ts:333-358`). L'installation globale ou
-locale produit la forme absolue ; `npx` produit la forme portable.
-
-**`bin/agent-viz.js` n'ayant pas bougé à l'étape 2, le hook agent-viz en mode
-`absolute` a survécu au déplacement** — c'est le hook du **moteur** qui a
-cassé, et lui seul. Le mécanisme qui le nommait et le réparait (`netgain
-status` / `netgain on`) a disparu avec l'étape 6 bis (2026-09, doc/36) : une
-configuration écrite avant la fusion et jamais réparée entre-temps reste
-orpheline, sans outil pour la retirer — mesuré sans exposition connue au jour
-du retrait (doc/36 § 1.4).
+chemin** (`resolveHookCommand`, dans `src/server/install-hooks/scopes.ts`).
+L'installation globale ou locale produit la forme absolue ; `npx` produit la
+forme portable.
 
 Ce que ce dépôt n'établit pas : **sous quelle forme Claude Code ou Copilot CLI
 remontent à l'utilisateur l'échec d'un hook** dont la commande ne trouve plus son
@@ -504,17 +488,19 @@ n'y paraît.
 
 | Qui écrit | Où | Chemin absolu ? |
 |---|---|---|
-| `src/server/install-hooks.ts` | **six** destinations possibles selon l'agent et la portée : `~/.claude/settings.json`, `<dépôt>/.claude/settings{,.local}.json`, `~/.copilot/hooks/agent-viz.json`, `<dépôt>/.github/hooks/agent-viz{,.local}.json` | **seulement en mode `absolute`** |
-| `src/server/install-hooks.ts` | ajoute une ligne au **`.gitignore` du dépôt de l'utilisateur**, quand il écrit un fichier de portée locale — jamais n'en crée un (l. 361-376) | sans objet |
+| `src/server/install-hooks/` | **six** destinations possibles selon l'agent et la portée : `~/.claude/settings.json`, `<dépôt>/.claude/settings{,.local}.json`, `~/.copilot/hooks/agent-viz.json`, `<dépôt>/.github/hooks/agent-viz{,.local}.json` | **seulement en mode `absolute`** |
+| `src/server/install-hooks/` | ajoute une ligne au **`.gitignore` du dépôt de l'utilisateur**, quand il écrit un fichier de portée locale — jamais n'en crée un (`ensureGitignore`, dans `scopes.ts`) | sans objet |
 
 La deuxième ligne est la plus intrusive des deux : c'est la seule qui touche un
 fichier **versionné** de l'utilisateur.
 
-`install-hooks.ts` reconnaît **quatre formes** de sa propre ligne
-(l. 144-148) : deux historiques — les deux formes `hook.js` d'avant les
-déplacements — et **deux formes courantes**, une par mode. C'est la trace de
-déplacements passés : le produit a déjà cassé ses propres installations, et il a
-appris à les recoudre plutôt qu'à les dupliquer.
+Pour Claude Code, l'installation reconnaît **quatre formes** de sa propre ligne
+(`isAgentVizHook`, dans `src/server/install-hooks/settings-io.ts`) : deux formes
+anciennes, qui nomment un `hook.js`, et **deux formes courantes**, une par mode.
+Une ligne reconnue n'est jamais doublée : l'installation la réécrit quand elle a
+la forme standard (`node "…"` ou `npx …`, `isStandardShape`), et la laisse telle
+quelle sinon. Pour Copilot CLI, toute commande qui nomme `agent-viz` et `hook`
+est reconnue (`isAgentVizCommand`, dans `copilot.ts`) et remplacée sur place.
 
 ---
 
@@ -535,16 +521,11 @@ source. La garde de `bin/agent-viz.js` le rappelle (§ 4) : elle arrête sur un
 fichier compilé manquant, et avertit quand une source `.ts` est plus récente que
 le dernier build.
 
-**Le nettoyage en tête de `build` a remplacé un geste inverse.**
-Jusqu'à l'étape 3, le build **écrivait** un fichier dans `dist/engine/` — le
-marqueur `{"type": "module"}` que la racine CommonJS rendait nécessaire — et il
-ne nettoyait rien. La racine devenue ESM, ce marqueur n'a plus d'objet ; mais
-`tsc` ne vide jamais son `outDir`, si bien que le résidu serait resté sur les
-postes qui l'avaient déjà construit, et serait parti dans le tarball **en
-silence, `exit=0`** (mesuré). Le `build` efface donc `dist/engine` et
-`dist/server` avant de compiler (`package.json`, script `build`). C'est un
-**changement de comportement observable**, déclaré comme tel :
-`prepare` exécute `build` chez qui installe depuis un dépôt git.
+**Le build commence par effacer `dist/engine` et `dist/server`** (`package.json`,
+script `build`), parce que `tsc` ne vide jamais son `outDir` : un fichier compilé
+dont la source a disparu resterait dans `dist/`, et partirait dans le tarball
+**en silence, `exit=0`**. `prepare` exécute `build` chez qui installe depuis un
+dépôt git : l'effacement a lieu chez lui aussi.
 
 ---
 
@@ -581,119 +562,36 @@ ligne : un ancrage `fichier:ligne` qui a glissé reste vert.
 npx vitest run     → tous passés, 130 fichiers
 ```
 
-Les deux arbres ont fusionné à plat à l'étape 2 : `netgain/tests/` a rejoint
-`tests/`, sans une seule collision de nom. Il reste **deux dialectes** dans le
-même dossier, et c'est ce qui explique le pont ci-dessous.
+Les deux exécuteurs ne lisent que `tests/` (`include` de `vitest.config.mts`,
+motif du script `test:node`), et ce dossier porte **deux dialectes** : c'est ce
+qui explique le pont ci-dessous.
 
 | Dialecte | Fichiers | Écrits en |
 |---|---|---|
 | CommonJS + ESM | 41 `.test.cjs` + 64 `.test.mjs` | `node:test` |
 | TypeScript | 25 `.test.ts` | l'API de vitest |
 
-**L'extension dit désormais le régime, et c'est l'étape 3 qui l'a rendue
-nécessaire.** Sous une racine `"type": "module"`, un `.js` **est** un module ES :
-`require()` n'y existe plus. Les 42 `.test.js` d'avant l'étape 3 ne pouvaient
-donc pas survivre à la bascule sous ce nom — et la panne aurait été **partielle**,
-donc lisible comme « ça marche presque » : un fichier qui ne requiert que des
-modules `node:` continuait de passer. **39** d'entre eux sont devenus `.test.cjs`
-par un `git mv` pur ; les **3** derniers manipulaient `require.cache`, un
-mécanisme que le régime ESM rend inerte, et ont été réécrits en même temps que
-renommés — deux en `.test.mjs`, un en `.test.ts`.
+**L'extension dit le régime.** Sous une racine `"type": "module"`, un `.js`
+**est** un module ES, où `require()` n'existe pas : un test CommonJS s'écrit en
+`.test.cjs`, un test ESM pour `node:test` en `.test.mjs`. Un fichier `.test.js`
+sous `tests/` ne serait lu par aucun des deux exécuteurs, qui ne lisent que
+`.test.cjs`, `.test.mjs` et, pour vitest, `.test.ts` ;
+`tests/repo/test-file-extensions.test.mjs` le refuse.
 
-**Les 105 fichiers en `node:test` passent par un pont** (`test-support/bridge/`),
-qui rend la surface `node:test` au-dessus des primitives de vitest. **L'addition,
-écrite pour qu'on puisse la refaire — et re-dérivée à l'étape 3, où l'ancienne
-version se contredisait elle-même** (elle totalisait 74 trois lignes sous un
-« 75 » mesuré) **puis au volet 1, où elle s'était de nouveau tue d'une ligne**
-(elle totalisait 75 sous un **76** mesuré à la fusion de l'étape 4 : la ligne
-manquante est ci-dessous, relevée après coup et non réécrite) :
-
-```
-70  préexistaient au pont (v0.12.8) — pas une ligne réécrite
-+2  étape 1  node-test-bridge.test.mjs · test-ids-format.test.mjs
-+1  étape 2  stale-path-citations.test.mjs        les trois racines mortes
-+3  étape 3  package-entrypoints.test.mjs         les points d'entrée déclarés
-             install-hooks-entrypoint.test.mjs    les gardes de point d'entrée
-             server-imports-load.test.mjs         la résolution, chargée pour de vrai
--1  étape 3  observatory-claude-dir passe à l'API vitest : il QUITTE le pont
-±0  étape 2 crée dist-esm-marker.test.mjs, étape 3 le supprime avec son sujet
-+1  étape 4  test-file-extensions.test.mjs        l'extension d'un test est un contrat
-             (ligne omise en son temps — c'est elle qui laissait l'addition à 75)
-+2  volet 1  observatory-rules-r7.test.cjs        la 7e règle de conseil
-             verification-commands.test.mjs       le classifieur, sous les DEUX exécuteurs
-±0  volet 1  verification.test.ts naît hors du pont : il tenait alors à l'API vitest,
-             faute de pouvoir charger les SOURCES du moteur sous `node --test`
-――
-78
-+6  18/08    error-format.test.mjs · errors-register.test.mjs · version-route.test.cjs
-             topbar-status.test.mjs · arbitration-view.test.mjs · observatory-service-status.test.cjs
-+3  19/08    install-hooks-registry.test.mjs · install-hooks-scan.test.mjs · file-size-budget.test.mjs
-+1  20/08    advisor-card.test.mjs
-+2  étape 5 (12/09)  served-ts-strip-check.test.mjs · static-ts-route.test.cjs
-――
-90
-+3  étape 6  build-guards.test.mjs · no-local-engine-primitives.test.mjs · served-web-graph.test.mjs
--1  étape 6  engine-require.test.cjs quitte l'arbre avec la primitive qu'il testait (le pont
-             part, tâche 3 de l'étape) — comptait pour 1 dans les 40 `.test.cjs` de 778eb67
-――
-92
-+1  étape 6, tâche 6  architecture-test-counts.test.mjs   ce paragraphe tient enfin ses
-                      trois comptes au disque, plutôt que de les affirmer
-――
-93
-+2  14/09  bin-help.test.mjs · cli-flags.test.mjs   aide, version et options de la ligne de commande
-――
-95
--1  14/09  pricing-engine-mirror.test.cjs quitte l'arbre avec la table recopiée qu'il comparait
-――
-94
-+1  14/09  lifecycle.e2e.test.mjs   start, status et stop sur de vrais processus et des ports de test
-――
-95
-+1  15/09  engines-readme-mirror.test.mjs   la plage de Node exigée, identique dans package.json, le lock et le README
-――
-96
-+1  15/09  bind-port.e2e.test.mjs   prise du port : occupé = rien tué et message, libre = écoute
-――
-97
-+1  15/09  relative-specifiers-exist.test.mjs   un import relatif d'un .ts de src/ ou tests/ désigne un fichier qui existe
-――
-98
-+1  15/09  install-hooks-atomic-write.e2e.test.mjs   un fichier de hooks passe par un temporaire, l'ancien survit à une écriture ratée
-――
-99
-+1  15/09  install-hooks-backup.e2e.test.mjs   la copie garde les octets d'avant, les 30 dernières par fichier source
-――
-100
-+1  15/09  install-hooks-backup-registry.e2e.test.mjs   chaque mutation d'un fichier de hooks passe d'abord par sa copie
-――
-101
-+1  15/09  bin-backup-line.test.mjs   le binaire imprime le chemin de la copie sous le fichier changé
-――
-102
-+1  15/09  readme-mirrors.test.mjs   les événements capturés et le nombre de copies gardées, identiques dans le README et le code
-――
-103
-+1  15/09  pricing-drift-alert.test.mjs   l'alerte de la vigie tarifaire : forme complète, hors session, une phrase par nature de dérive
-――
-104
-+1  15/09  alert-shape.test.mjs   la porte d'entrée des alertes dans le navigateur : la forme du détecteur passe, une ligne hors forme est écartée et comptée
-――
-105
-```
+**Les fichiers en `node:test` passent par un pont** (`test-support/bridge/`),
+qui rend la surface `node:test` au-dessus des primitives de vitest. Leur nombre
+est écrit une seule fois, à côté de la commande qui le refait, et
+`tests/repo/architecture-test-counts.test.mjs` le compare au disque :
 
 ```
 grep -rlE "(require\(|from )['\"]node:test['\"]" tests | wc -l   → 105
 ```
 
-Le test du pont a la propriété amusante de passer par ce qu'il teste dès qu'on
-l'exécute sous vitest. Le décompte du pont **grandit à chaque fichier `node:test`
-neuf, et baisse quand un fichier change de dialecte ou quitte l'arbre** — c'est pour ça qu'il est écrit en
-addition plutôt qu'en ordinal, un ordinal ne survivant pas au fichier suivant.
-*L'étape 3 en est la démonstration : elle ajoute trois fichiers, en retire un du
-pont sans le supprimer, et en supprime un autre — pour un seul fichier de plus au
-total (74 à `v0.14.0`, 75 à `v0.15.0`). Un ordinal, ou un total recopié, n'aurait
-rien vu.*
+Le test du pont, `tests/unit/node-test-bridge.test.mjs`, passe lui-même par le
+pont quand il tourne sous vitest. Le décompte du pont **grandit à chaque fichier
+`node:test` neuf, et baisse quand un fichier change de dialecte ou quitte
+l'arbre** : un total recopié ailleurs dans ce document vieillirait au fichier
+suivant sans que rien ne rougisse.
 
 Le pont est en trois fichiers, et sa forme n'est pas un choix esthétique — elle
 est imposée par le fait qu'**une seule couture ne suffit pas** :
@@ -733,7 +631,7 @@ grep -rhoE "from ['\"]\.[^'\"]*\.js['\"]" src/engine | wc -l                    
 echo "import x from './core/usage.js'" | grep -cE "from ['\"]\.[^'\"]*\.js['\"]"  → 1
 ```
 
-Le dialecte d'un test ne dépend donc plus de ce qu'il importe, seulement de l'API
+Le dialecte d'un test ne dépend donc pas de ce qu'il importe, seulement de l'API
 qu'il emploie : `tests/doctor/verification.test.ts` est un `.test.ts` parce qu'il
 écrit `import { test } from 'vitest'`. Le filet `tests/repo/relative-specifiers-exist.test.mjs`
 le tient : dans un `.ts` de `src/` ou de `tests/`, un spécificateur relatif désigne un
@@ -751,4 +649,4 @@ ligne de test s'exécute. Sa raison est mesurée : plusieurs tests chargent des
 modules qui, sous une garde qui lâche, écriraient dans le
 `~/.claude/settings.json` **réel** de la machine et rouvriraient la base de
 l'observatoire. Le mettre au harnais plutôt que dans chaque test **empêche** la
-fuite au lieu de la **constater** — et n'a demandé la réécriture d'aucun test.
+fuite au lieu de la **constater**.

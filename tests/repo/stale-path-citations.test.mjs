@@ -88,12 +88,6 @@ const LISTE_BLANCHE = [
   { fichier: 'docs/sources-externes.md', fragment: 'netgain/docs/calibration-observatoire-m1.md', raison: 'constat C7, idem : l adresse morte que ce fichier existe pour remplacer' },
   { fichier: 'docs/sources-externes.md', fragment: '`netgain/docs/` tant que le moteur y', raison: 'ou vivaient ces documents dans le depot PRIVE, avant le demenagement du moteur' },
 
-  // ARCHITECTURE.md nomme l arbre d avant pour dire ce qui a bouge et pourquoi ;
-  // reecrire ces phrases les rendrait fausses. Compte par commande, ancre sur
-  // l indentation d une entree : grep -c "^  { fichier: 'ARCHITECTURE" <ce fichier>
-  { fichier: 'ARCHITECTURE.md', fragment: "s'atteignait par `../netgain/dist/`", raison: '§ 3 : pourquoi l ancien motif de controle serait MUET aujourd hui' },
-  { fichier: 'ARCHITECTURE.md', fragment: '`netgain/tests/` a rejoint', raison: '§ 9 : la fusion a plat des deux arbres de tests' },
-
   // FAUX POSITIF CONNU — un `lib/` VIVANT, sous un arbre que le deplacement ne touche pas.
   { fichier: 'docs/sources-externes.md', fragment: 'docs/audit/scripts/lib/', raison: '`docs/audit/scripts/lib/` existe : materiel de l audit, hors perimetre du deplacement' },
 ];
