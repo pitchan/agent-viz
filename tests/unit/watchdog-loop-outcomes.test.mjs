@@ -208,7 +208,7 @@ test('un releve reel de PostToolUseFailure marque bien son occurrence en echec',
 // perdue en silence. On epingle la FORME, pas un libelle.
 test('la charge relevee porte error en chaine et duration_ms en nombre', () => {
   assert.equal(typeof failureEvent.error, 'string',
-    'error est une chaine plate, pas l objet structure qu annonçait une source secondaire');
+    'error est une chaine plate, pas un objet structure');
   assert.match(failureEvent.error, /^Exit code \d+\n[\s\S]+$/,
     'code de sortie puis stderr, colles par un \\n');
   assert.ok(Number.isFinite(failureEvent.duration_ms),

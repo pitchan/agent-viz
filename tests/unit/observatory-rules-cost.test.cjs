@@ -63,13 +63,13 @@ test('the thresholds fixed by the spec are exactly the spec values', () => {
 // and changing one silently would change which advice a user is given.
 test('the calibrated thresholds are exactly the values the measurement retained', () => {
   assert.equal(THRESHOLDS.R1.minShareOfNet, 0.20,
-    'raised from the 0.05 first proposed: 0.05 flagged 9 projects out of 14');
+    'at 0.05 the rule would flag 9 projects out of 14');
   assert.equal(THRESHOLDS.R3.minShareOfToolBytes, 0.05);
   assert.equal(THRESHOLDS.R3.minCount, 5);
   assert.equal(THRESHOLDS.R4.minShareOfReadBytes, 0.05);
   assert.equal(THRESHOLDS.R4.minBytes, 100 * 1024);
   assert.equal(THRESHOLDS.R7.minEditsAfterLastVerification, 1,
-    'sonde doc/41 du 2026-08-17 - p50 de queue = 4, une queue de 1 pese 13 pourcent des cas');
+    'p50 de queue = 4, une queue de 1 pese 13 pourcent des cas');
   assert.equal(THRESHOLDS.R7.minSessions, 3,
-    'sonde doc/41 du 2026-08-17 - a 2 la regle marque 3 projets sur 4, a 3 elle en marque 2/4 et couvre 94,6 pourcent des jetons a risque');
+    'a 2 la regle marque 3 projets sur 4, a 3 elle en marque 2/4 et couvre 94,6 pourcent des jetons a risque');
 });

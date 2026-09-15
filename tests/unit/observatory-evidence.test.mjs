@@ -150,7 +150,7 @@ test('R1 shows the earlyMcp line only when tokens are there, always with the ét
 
   const legacy = evidenceLines({ ruleId: 'R1', evidence: base });
   assert.ok(!legacy.some(l => l.includes('serveurs MCP')),
-    'an M1-era evidence without the field never crashes nor lies');
+    'evidence stored without the field never crashes nor lies');
 });
 
 test('an unknown rule still lists its session count instead of nothing', () => {

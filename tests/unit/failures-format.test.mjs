@@ -188,8 +188,8 @@ test('le resume compte les non acquittees, il ne prononce pas « en cours »', (
 // `stuck` decrit un etat passager qui se resout tout seul. En vivant il a sa
 // pastille et sa notification bureau, qui nomment chaque commande en vol ; en
 // memoire, declenche des 3 minutes de silence, il noyait les vraies fautes
-// sous des commandes simplement longues (mesure en prod : 67 des 73
-// non-acquittees). Un etat qui se resout seul n'est pas une dette du lecteur.
+// sous des commandes simplement longues. Un etat qui se resout seul n'est pas
+// une dette du lecteur.
 
 test('panelAlerts ecarte les silences (stuck) et garde tout le reste', () => {
   const kept = panelAlerts([

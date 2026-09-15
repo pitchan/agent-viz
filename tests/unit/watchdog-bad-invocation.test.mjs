@@ -88,7 +88,7 @@ const leve = (wd, evt) => wd.processEvent(evt).newAlerts.filter(a => a.type === 
 test('un chemin Windows avale par le shell POSIX est nomme, et par son motif', () => {
   const wd = createWatchdog({ now: () => T });
   const [alerte] = leve(wd, echec());
-  assert.ok(alerte, 'l incident du 5 aout doit lever une alerte');
+  assert.ok(alerte, 'le chemin Windows avale par le shell POSIX doit lever une alerte');
   assert.equal(alerte.type, 'badInvocation');
   assert.equal(alerte.patternId, 'inv-bash-windows-path-unquoted');
   assert.equal(alerte.toolName, 'Bash');
@@ -303,7 +303,7 @@ test('l alerte consigne la commande declenchante', () => {
   const [alerte] = leve(wd, echec({ tool_input: { command: 'cd F:\\DEV\\agent-viz && npm test' } }));
   assert.ok(alerte, 'le chemin Windows doit lever une alerte');
   assert.equal(alerte.subject, 'cd F:\\DEV\\agent-viz && npm test',
-    'la commande integrale, non tronquee — retention doc/32');
+    'la commande integrale, non tronquee');
   assert.ok(alerte.message.includes('inv-bash-windows-path-unquoted'));
   assert.ok(!alerte.message.includes('npm test'),
     'le message notification reste sans commande : seul subject la porte');

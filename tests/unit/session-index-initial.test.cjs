@@ -99,7 +99,7 @@ test('une première ligne préfixée d’un BOM garde agentSource', async () => 
 
   const rec = sessionIndex.get(id);
   assert.notEqual(rec, undefined);
-  assert.equal(rec.agentSource, 'copilot', 'le BOM ne doit plus coûter la source de l’agent');
+  assert.equal(rec.agentSource, 'copilot', 'le BOM ne coûte pas la source de l’agent');
   assert.equal(rec.eventCount, 1);
 });
 

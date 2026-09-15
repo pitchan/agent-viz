@@ -102,8 +102,8 @@ test('une alerte externe vieille de dix minutes reste affichée : ni l\'âge ni 
 
 test('le module n expose ni feedEvent ni setObserving', async () => {
   const { mod } = await freshClient({});
-  assert.equal(mod.feedEvent, undefined, 'la detection a demenage au serveur');
-  assert.equal(mod.setObserving, undefined, 'la cecite du navigateur n a plus d objet');
+  assert.equal(mod.feedEvent, undefined, 'la detection vit au serveur');
+  assert.equal(mod.setObserving, undefined, 'l observation ne se pilote pas depuis le navigateur');
 });
 
 // ─── The second sieve: what only the server knows ─────────────────────────

@@ -136,8 +136,8 @@ test('un BOM est toléré où qu’il soit dans le fichier', async () => {
   const resume = litResume(s.resume);
   const vus = new Set(resume.tools.map(t => t.id));
   assert.equal(vus.has('t3'), true,
-    'l’événement préfixé d’un BOM doit maintenant être décodé, pas perdu');
-  assert.equal(vus.size, lignes.length, 'aucune ligne ne doit plus manquer');
+    'l’événement préfixé d’un BOM est décodé, pas perdu');
+  assert.equal(vus.size, lignes.length, 'aucune ligne ne manque');
 });
 
 test('CARACTÉRISATION — une ligne vide au milieu est traitée comme une ligne illisible', async () => {

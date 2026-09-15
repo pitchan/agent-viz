@@ -210,7 +210,7 @@ test('the price map covers the Claude 5 family and Opus 4.8 (2026 rate card)', (
   assert.equal(sonnet5.label, 'Sonnet 5');
 
   const opus48 = getPrice('claude-opus-4-8');
-  assert.ok(opus48, 'opus-4-8 must resolve (was missing from the table)');
+  assert.ok(opus48, 'opus-4-8 must resolve');
   assert.equal(opus48.input, 5e-6);
   assert.equal(opus48.label, 'Opus 4.8');
 });

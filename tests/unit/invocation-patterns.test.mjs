@@ -902,7 +902,7 @@ const ECARTS = new Map([
   ['inv-bash-unbalanced-quote', {
     source: String.raw`line \d+: unexpected EOF while looking for matching`,
     flags: '', equivalent: false,
-    pourquoi: 'meme ancre. Il fut le motif alertant le plus volumineux du releve (16 occurrences) ; doc/30 a montre qu il fusionnait deux causes et l a scinde en deux motifs plus specifiques. Il reste alertant, en dernier des trois : il ne se declenche que sur les formes qu aucune ancre ne reconnait, et l estampille reste ce qui distingue l emis du cite.',
+    pourquoi: 'meme ancre. Il reste alertant, en dernier des trois : il ne se declenche que sur les formes qu aucune ancre ne reconnait, et l estampille reste ce qui distingue l emis du cite.',
   }],
   ['inv-bash-syntax-error', {
     source: String.raw`line \d+: syntax error near unexpected token`,
