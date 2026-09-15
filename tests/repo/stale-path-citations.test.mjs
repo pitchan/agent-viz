@@ -88,28 +88,10 @@ const LISTE_BLANCHE = [
   { fichier: 'docs/sources-externes.md', fragment: 'netgain/docs/calibration-observatoire-m1.md', raison: 'constat C7, idem : l adresse morte que ce fichier existe pour remplacer' },
   { fichier: 'docs/sources-externes.md', fragment: '`netgain/docs/` tant que le moteur y', raison: 'ou vivaient ces documents dans le depot PRIVE, avant le demenagement du moteur' },
 
-  // ARCHITECTURE.md — le document qui RACONTE le deplacement. Les ONZE entrees
-  // ci-dessous nomment l arbre d AVANT pour dire ce qui a bouge et pourquoi ;
-  // les reecrire les rendrait fausses, et le document perdrait justement ce
-  // qu il a de plus utile a la prochaine etape.
-  // Compte verifie par commande, jamais a l oeil — et la commande s ancre sur
-  // l indentation d une entree, sinon elle se compterait ELLE-MEME depuis ce
-  // commentaire (mesure : 12 au lieu de 11) :
-  //   grep -c "^  { fichier: 'ARCHITECTURE" tests/repo/stale-path-citations.test.mjs  -> 11
-  // La douzieme entree (le fragment `…/netgain/dist/cli.js` ; § 6, la queue
-  // d avant la fusion que `netgain status` nommait) a ete retiree a la tache 3
-  // de doc/47 : l etape 6 bis reecrit ce paragraphe (le mecanisme qui la
-  // reparait disparait avec `on`/`status`), donc le fragment cesse d exister.
-  { fichier: 'ARCHITECTURE.md', fragment: 'vivaient auparavant dans `lib/`', raison: '§ 2.1 : la fusion a plat des cinq fichiers du haut' },
-  { fichier: 'ARCHITECTURE.md', fragment: "`lib/server/` ; l'étape 2 les a fusionnés", raison: '§ 2.1, suite de la meme phrase' },
-  { fichier: 'ARCHITECTURE.md', fragment: '`lib/server/**` : un renommage verbatim', raison: '§ 2.1 : ce que la fusion a laisse invariant' },
-  { fichier: 'ARCHITECTURE.md', fragment: '"__dirname" 7474f41 -- lib/server', raison: '§ 2.1 : la commande qui compte les 5 traversees, sur l etat d AVANT — elle doit rester rejouable' },
-  { fichier: 'ARCHITECTURE.md', fragment: 'lib/server/engine-require.js:25', raison: '§ 2.1 : sa sortie, collee' },
-  { fichier: 'ARCHITECTURE.md', fragment: 'lib/server/observatory/engine.js:20', raison: '§ 2.1 : idem' },
-  { fichier: 'ARCHITECTURE.md', fragment: 'lib/server/observatory/engine.js:21', raison: '§ 2.1 : idem — deux sites dans un meme fichier, ce qui motive le decompte par SITE' },
+  // ARCHITECTURE.md nomme l arbre d avant pour dire ce qui a bouge et pourquoi ;
+  // reecrire ces phrases les rendrait fausses. Compte par commande, ancre sur
+  // l indentation d une entree : grep -c "^  { fichier: 'ARCHITECTURE" <ce fichier>
   { fichier: 'ARCHITECTURE.md', fragment: "s'atteignait par `../netgain/dist/`", raison: '§ 3 : pourquoi l ancien motif de controle serait MUET aujourd hui' },
-  { fichier: 'ARCHITECTURE.md', fragment: "`lib/`, `public/` et", raison: '§ 8 : les trois racines mortes, nommees comme mortes' },
-  { fichier: 'ARCHITECTURE.md', fragment: "`netgain/` n'existent plus", raison: '§ 8, suite de la meme phrase' },
   { fichier: 'ARCHITECTURE.md', fragment: '`netgain/tests/` a rejoint', raison: '§ 9 : la fusion a plat des deux arbres de tests' },
 
   // FAUX POSITIF CONNU — un `lib/` VIVANT, sous un arbre que le deplacement ne touche pas.
@@ -166,11 +148,8 @@ test('aucune adresse d avant le deplacement ne subsiste hors liste blanche', () 
   // Act
   const perimees = toutes.filter(o => !couvertePar(o));
 
-  // Assert — l assiette est dite AVANT le verdict : un balayage qui ne lit
-  // rien passerait aussi, et ne prouverait rien. Plancher 18 = compte reel
-  // (20) moins une marge de 2 : plus bas, une purge legitime du registre
-  // suffirait a rendre cette garde vide.
-  assert.ok(toutes.length >= 18, `assiette suspecte : ${toutes.length} occurrences vues, attendu >= 18`);
+  // Assert — pas de plancher : un balayage qui ne lit rien rend orphelines les
+  // entrees de LISTE_BLANCHE, et le test suivant rougit en les nommant.
   assert.deepEqual(
     perimees.map(o => `${o.fichier}:${o.ligne} \u2192 ${o.texte.trim()}`),
     [],

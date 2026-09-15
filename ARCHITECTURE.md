@@ -19,13 +19,13 @@ Les deux se soignent par la même discipline :
 
 > Une affirmation de structure est une **règle falsifiable, accompagnée de la
 > commande qui la vérifie** — pas une impression, et de préférence pas un
-> décompte. « Aucun module de `src/web/` n'importe `src/server/`, et voici le
-> `grep` qui rend 0 » vaut mieux que « `src/web/` contient 28 fichiers ».
+> décompte. « Le navigateur ne charge aucun module de `src/server/`, et voici le
+> test qui rougit sinon » vaut mieux que « `src/web/` contient 28 fichiers ».
 
-Les décomptes qui subsistent portent le commit où ils ont été relevés. Tous ceux
-de ce document ont été **re-mesurés le 2026-08-13, à l'issue de l'étape 3 de la
-migration (v0.15.0)**, par la commande citée à côté d'eux. S'ils ont vieilli, la
-commande le dira ; c'est tout ce qu'on leur demande.
+Les décomptes qui subsistent portent la commande qui les refait, écrite à côté
+d'eux, et jamais la date ou le commit du relevé. S'ils ont vieilli, la commande
+le dira ; c'est tout ce qu'on leur demande. Ce document décrit l'état présent :
+ce qui a changé, et quand, se lit dans les messages de commit.
 
 Deux détails de méthode, parce qu'ils ont mordu pendant la rédaction. Les
 fichiers se comptent avec `find`, **pas** avec `git ls-files "a/**/*.x"` — cette
@@ -65,50 +65,29 @@ l'avertissement du § 8.
 
 ### 2.1 Le serveur
 
-`src/server/` et le binaire sont des **ES modules** — la racine
-porte `"type": "module"` **depuis l'étape 3 de la migration**. Elle a porté
-`"type": "commonjs"` jusque-là, et c'est cette ligne unique qui commandait le
-régime des deux arbres à la fois.
+`src/server/` et le binaire sont des **ES modules** : la racine porte
+`"type": "module"` (`package.json`).
 
 ```
-src/server/     hook.ts · install-hooks.ts · lifecycle.ts · prompt-install.ts · server.ts
-src/server/               HTTP, SSE, table de routes, tarification d'affichage
-src/server/observatory/   orchestration des scans, base, provenance
+bin/agent-viz.js                  le binaire
+src/server/                       HTTP, SSE, table de routes, tarification d'affichage ;
+                                  les commandes du binaire (hook.ts · install-hooks.ts ·
+                                  lifecycle.ts · prompt-install.ts) et le démon (server.ts)
+src/server/install-hooks/         l'installation des hooks, par agent (Claude / Copilot) et par portée
+src/server/observatory/           orchestration des scans, base, provenance
 src/server/observatory/rules/     les règles de conseil, une par fichier
 src/server/transcript-adapters/   Claude / Copilot, un contrat commun
 src/server/watchdog/              surveillance et alertes
-bin/agent-viz.js                  le binaire
 ```
 
-Les cinq fichiers du haut vivaient auparavant dans `lib/`, un cran au-dessus de
-`lib/server/` ; l'étape 2 les a fusionnés **au même niveau**. C'était le seul
-choix qui laisse invariantes les **cinq** traversées `__dirname` de
-`lib/server/**` : un renommage verbatim les aurait toutes approfondies d'un
-cran, et l'arithmétique de `..` est la classe d'échec silencieuse.
-
-**Ces cinq traversées `__dirname` n'ont rien à voir avec les six traversées DE
-FRONTIÈRE serveur → moteur que l'étape 6 a retirées** : les cinq ponts de
-`src/server/` et l'`import()` dynamique d'`observatory/engine.ts`. Le voisinage des
-deux chiffres a déjà produit une erreur : une rédaction antérieure écrivait « six
-traversées `__dirname` (§ 4) », où un six périmé se lisait comme corroboré par un
-six juste. Ce sont deux objets différents — ici, **du calcul de chemin relatif au
-fichier** ; là, **des appels du serveur vers le build du moteur**. Le compte,
-mesuré sur l'état d'avant le déplacement :
-
 ```
-git grep -n "__dirname" 7474f41 -- lib/server
-  lib/server/engine-require.js:25          lib/server/routes.js:30
-  lib/server/observatory/engine.js:20      lib/server/watchdog/service.js:18
-  lib/server/observatory/engine.js:21                              → 5 sites
+find src/server -type d           → src/server et les sous-dossiers nommés ci-dessus, aucun autre
 ```
 
-Deux sites dans un même fichier : compter les **fichiers** en donne quatre, les
-**sites** cinq, et c'est la profondeur de chaque site qui décide — d'où le
-décompte par site.
-
-Sa table de routes est **déclarative** (`src/server/routes.ts:308`) : ajouter une
-route est une ligne de données, pas une branche de plus dans un aiguilleur. C'est
-le précédent que [CLAUDE.md](./CLAUDE.md) cite pour le principe ouvert/fermé.
+La table de routes du serveur est **déclarative** (`ROUTES`, dans
+`src/server/routes.ts`) : ajouter une route est une ligne de données, pas une
+branche de plus dans un aiguilleur. C'est le précédent que [CLAUDE.md](./CLAUDE.md)
+cite pour le principe ouvert/fermé.
 
 ### 2.2 Le moteur
 
@@ -201,15 +180,27 @@ Une phrase, et c'est le seul invariant structurel du produit :
 > **Le serveur appelle le moteur. Le navigateur ne parle qu'HTTP. Le moteur
 > ignore les deux autres.**
 
-Un sens unique, jamais de retour, **sur le réseau** — et ça, l'étape 5 n'y
-change rien. Elle change en revanche le **graphe d'import** : quatre fichiers
-de `src/web/` importent désormais deux fichiers du moteur par leur chemin
-relatif (`clockTime` et `toolSubject`, § 2.3, § 6). Ce n'est pas une fuite —
-le navigateur les reçoit par la **même route HTTP** que ses propres modules,
-jamais par un chargeur Node : la liste blanche du serveur ne nomme que ces
-deux chemins exacts (`src/server/routes.ts`, gestionnaire
-`engineStaticHandler`). L'invariant réseau tient ; l'invariant d'import, lui,
-se contrôle désormais à deux exceptions nommées près, pas à zéro.
+Un sens unique, jamais de retour, **sur le réseau**. Le **graphe d'import**,
+lui, compte deux sortes de liens :
+
+- **les imports en valeur**, que le navigateur demande au serveur. Hors de
+  `src/web/`, ils n'atteignent que les primitives du moteur que la table `ROUTES`
+  de `src/server/routes.ts` nomme par chemin exact et sert par
+  `engineStaticHandler`. La liste se lit dans la table, une ligne par primitive :
+  `grep -n "handler: engineStaticHandler" src/server/routes.ts`. Le navigateur
+  les reçoit par la même route HTTP que ses propres modules, jamais par un
+  chargeur Node : ce n'est pas une fuite.
+- **les imports de type**, écrits `import type { … } from '…'`, que le serveur
+  efface en retirant les types à la requête : la ligne devient blanche et aucun
+  fichier n'est demandé. Ils peuvent viser le moteur et le serveur. Un type
+  décrit ce que le serveur envoie sur le réseau, et il se lit à sa source au
+  lieu d'être recopié. Ce lien va dans le même sens que le réseau : le
+  navigateur lit le contrat du serveur, et le serveur n'importe jamais le
+  navigateur.
+
+L'invariant réseau tient. L'invariant d'import se contrôle sur les liens en
+valeur, liste blanche comprise. Le moteur, lui, n'importe rien du produit,
+types compris.
 
 Trois règles l'établissent, et **chacune vient avec son contrôle négatif** —
 parce qu'une commande dont la sortie vide est la preuve doit d'abord prouver
@@ -217,64 +208,64 @@ qu'elle *sait* ne pas être vide :
 
 ```sh
 # 1. Le moteur n'atteint pas le produit.
-grep -rEn "from ['\"].*(\.\./)+(src/)?(server|web)/" src/engine/      # → vide
+grep -rEn "from ['\"].*(\.\./)+(src/)?(server|web)/" src/engine/      # → vide, exit 1
 echo "import x from '../../server/usage.js'" \
-  | grep -En "from ['\"].*(\.\./)+(src/)?(server|web)/"              # → 1 ligne
+  | grep -En "from ['\"].*(\.\./)+(src/)?(server|web)/"              # → 1 ligne, exit 0
 
-# 2. Le navigateur n'importe jamais le serveur, et du moteur seulement les
-#    deux primitives de la liste blanche. `-a` est nécessaire : sans lui,
-#    grep traite viz-errors.ts (un octet nul volontaire) comme un fichier
-#    binaire et tait sa ligne.
-grep -arEn "^[[:space:]]*(import|export).*from ['\"].*(server|engine)/" src/web/ \
-  | grep -vE "engine/core/(clock-time|tool-subject)\.ts"             # → vide
-printf "import { x } from '../../engine/doctor/x.ts';\n" \
-  | grep -En "^[[:space:]]*(import|export).*from ['\"].*(server|engine)/" \
-  | grep -vE "engine/core/(clock-time|tool-subject)\.ts"             # → 1 ligne
+# 2. En valeur, le navigateur n'atteint hors de src/web/ que les primitives du
+#    moteur nommées par ROUTES, et jamais src/server/. Les lignes
+#    `import type { … } from` sont permises vers le moteur et le serveur, parce
+#    que le retrait des types les efface. Un test tient cette règle, pas un grep.
+npm test -- tests/repo/served-web-graph.test.mjs                    # → tous passés, exit 0
+#    Contrôles négatifs, dans le même fichier : R5 vérifie d'abord que son
+#    prédicat signale `src/server/pricing.ts`, et le test « frontière de type »
+#    vérifie qu'un import en valeur écrit sur trois lignes est vu et que seul
+#    `import type` est mis de côté.
 
 # 3. Le navigateur n'importe aucune API Node.
-grep -rEn "^[[:space:]]*import .* from ['\"]node:" src/web/          # → vide
+grep -rEn "^[[:space:]]*import .* from ['\"]node:" src/web/          # → vide, exit 1
 echo "import fs from 'node:fs'" \
-  | grep -En "^[[:space:]]*import .* from ['\"]node:"                # → 1 ligne
+  | grep -En "^[[:space:]]*import .* from ['\"]node:"                # → 1 ligne, exit 0
 ```
 
-Les six ont été **rejouées le 2026-09-12**, à l'issue de l'étape 5, et voici
-leurs six sorties :
+Les commandes des règles n° 1 et n° 3 rendent vide (`exit 1`), et leurs
+contrôles négatifs rendent chacun leur ligne (`exit 0`). Le test de la règle
+n° 2 porte ses propres contrôles négatifs.
 
-```
-1a  grep -rEn … src/engine/                             → (vide)      exit 1
-1b  echo "import x from '../../server/usage.js'" …      → 1:import x… exit 0
-2a  grep -arEn … src/web/ | grep -v …liste blanche…      → (vide)      exit 1
-2b  printf "import { x } from '…/engine/doctor/x.ts'" …  → 1:import {… exit 0
-3a  grep -rEn … src/web/                                 → (vide)      exit 1
-3b  echo "import fs from 'node:fs'" …                    → 1:import fs… exit 0
-```
+**Pourquoi la règle n° 2 est tenue par un test et non par un `grep`.** Un `grep`
+lit le texte ligne par ligne, et il se trompe sur cette règle de trois façons :
 
-**La ligne 2a n'est vide qu'APRÈS le filtre.** Sans lui, la même commande rend
-quatre lignes — `viz-alert-format.ts:11`, `viz-error-format.ts:14`,
-`viz-errors.ts:35`, `viz-layout.ts:13` — toutes vers
-`../engine/core/clock-time.ts` ou `../engine/core/tool-subject.ts`, et aucune
-autre. C'est la liste blanche du § 2.3 relue depuis le graphe d'import plutôt
-qu'affirmée ; le contrôle négatif 2b prouve qu'un import d'un **troisième**
-fichier du moteur, lui, resterait visible après le même filtre.
+- sa liste blanche est recopiée dans son filtre : chaque primitive ajoutée à
+  `ROUTES` doit y être ajoutée à la main, et aucun test ne signale l'oubli ;
+- il ne voit pas un import écrit sur plusieurs lignes, une forme courante dans
+  `src/web/`, que `grep -rnE "^import (type )?\{[[:space:]]*$" src/web/` montre :
+  `import {`, `getPrice,`, `} from '../server/pricing.ts'` le laissent muet,
+  alors que le test rougit ;
+- il ne distingue pas `import type { X } from`, effacé au service, de
+  `import { type X } from`, qui fait demander le fichier.
 
-Les trois lignes « a » rendent vide (`exit 1`), les trois contrôles négatifs
-rendent chacun leur ligne (`exit 0`). **Un zéro n'a de valeur que flanqué du un
-qui prouve que la commande sait le quitter.**
+Le test lit l'arbre syntaxique, suit le graphe de fichier en fichier et lit la
+liste blanche dans `ROUTES` au lieu de la recopier. Il compare aussi, fichier
+par fichier, son classement type / valeur au vrai retrait des types.
 
-**Ce que ces trois règles NE regardent PAS.** Elles portent sur des
-**instructions d'import statiques**, et c'est délibéré (le paragraphe suivant
-dit pourquoi un contrôle textuel se trompe dans les deux sens). Mais une
-commande dont on ignore la portée finit par servir de preuve de ce qu'elle ne
+| Forme écrite dans `src/web/` | Ce que le serveur envoie | Nature du lien |
+|---|---|---|
+| `import type { X } from './m.ts';` | une ligne blanche | type : permis vers le moteur et le serveur |
+| `import { type X } from './m.ts';` | `import { } from './m.ts';` | valeur : le fichier est demandé |
+| `import { v, type X } from './m.ts';` | `import { v, } from './m.ts';` | valeur |
+
+**Ce que ces règles NE regardent PAS.** Les commandes des règles n° 1 et n° 3
+portent sur des **instructions d'import statiques**, et c'est délibéré (le
+paragraphe suivant dit pourquoi un contrôle textuel se trompe dans les deux
+sens). Le test de la règle n° 2 lit aussi les `import()`. Mais une commande
+dont on ignore la portée finit par servir de preuve de ce qu'elle ne
 regarde pas, donc :
 
-- **la règle n° 2 laisse échapper l'`import()` dynamique — sauf le seul cas
-  qui existe aujourd'hui, et qui ne compte pas.** `observatory/advisor-view.ts`
-  et `observatory/store.ts` écrivent `type ApiClient = typeof import('./api.ts')` :
-  une requête de **type**, effacée en entier au retrait des types (vérifié :
-  la sortie de `stripTypeScriptTypes` sur ces deux fichiers ne contient plus
-  aucun `import(`). Un **vrai** `import()` dynamique —
-  `const m = await import('../server/usage.js')` — resterait invisible à la
-  règle, lui, parce qu'il ne porte pas de `from` ;
+- **la règle n° 2 suit un `import()` dont le chemin est une chaîne écrite en
+  toutes lettres. Un `import()` dont le chemin est calculé arrête la marche, et
+  le test le signale (R0).** `typeof import('./api.ts')`, que `advisor-view.ts`
+  et `store.ts` écrivent (`grep -rn "typeof import(" src/web/`), est une requête
+  de type, effacée au service, et le test la met de côté ;
 - **la règle n° 3 ne voit que `import X from 'node:…'`** — `import 'node:fs'`,
   `require('node:fs')` et `await import('node:fs')` lui échappent tous les trois.
 
@@ -289,15 +280,16 @@ printf "import 'node:fs'\nrequire('node:path')\nawait import('node:os')\n" \
                                                                          # → 3 lignes
 ```
 
-**Zéro victime n'est pas zéro risque.** Ces deux formes sont exactement ce
-qu'une règle de lint typée attrapera à l'étape 7, et c'est une des raisons pour
-lesquelles elle est prévue (§ 10). **Une troisième forme s'y ajoute depuis
-l'étape 5** : `tsc`, sous un projet unique où `src/web/` reçoit les types de
-Node (`"types": ["node"]`), n'interdit plus un `import fs from 'node:fs'`
-**direct** dans le navigateur — mesuré, la phrase qui suivait ici (« le
-compilateur refusera ») est devenue fausse le jour où les deux arbres ont
-rejoint un seul `tsconfig.json`. C'est la règle de lint de l'étape 7 qui devra
-tenir ce cas-là, pas seulement le cas transitif qu'elle devait déjà couvrir.
+**Zéro victime n'est pas zéro risque.** Ces deux formes échappent au grep, et le
+compilateur ne les refuse pas non plus : `src/web/` partage le seul
+`tsconfig.json` du projet et reçoit `"types": ["node"]` avec le reste, donc un
+`import fs from 'node:fs'` direct dans le navigateur compile. Ce qui les tient
+est un test de graphe, `tests/repo/served-web-graph.test.mjs` : sa règle R1
+refuse tout spécificateur non relatif — `node:` ou paquet nu — atteint depuis
+`src/web/`, directement ou par transitivité, en nommant le fichier et le
+spécificateur. Aucun outil de lint ne le remplace : ESLint ne franchit pas un
+import, le cas transitif lui échappe (mesuré sur trois configurations), et le
+dépôt n'a aucune configuration ESLint.
 
 Le déplacement a d'ailleurs **changé la forme** de la deuxième : avant, le moteur
 s'atteignait par `../netgain/dist/`, un segment que `(\.\./)*(lib|netgain)/`
@@ -329,10 +321,11 @@ contrôle juste porte sur les **instructions d'import**, pas sur le texte des
 fichiers — et le passage à TypeScript en est un argument de plus, pas
 seulement une note d'histoire.
 
-**Aujourd'hui, rien ne tient cette règle mécaniquement.** Elle est vraie parce
-qu'elle a été mesurée, pas parce qu'un outil la refuserait. Il n'existe aucune
-configuration de lint dans ce dépôt. C'est un manque connu, et le § 10 dit ce
-qui le comblera.
+**La règle n° 2 est tenue par un test de dépôt, `tests/repo/served-web-graph.test.mjs`.**
+Les règles n° 1 et n° 3 gardent leurs commandes, rejouées à la main. La règle
+n° 3 est aussi tenue par la règle R1 du même test, qui refuse tout import
+`node:` atteint depuis `src/web/`, directement ou par transitivité. R1 ne voit
+pas une API Node atteinte sans import (`process.env`, `globalThis.require`).
 
 ---
 
@@ -400,7 +393,7 @@ la table `ROUTES` de `src/server/routes.ts` au lieu d'en recopier une :
 
 | Filet | Ce qu'il tient |
 |---|---|
-| `tests/repo/served-web-graph.test.mjs` | le graphe d'imports atteignable depuis `src/web/` : uniquement des chemins relatifs en `.ts` qui existent, et chaque module atteint hors de `src/web/` servi par `ROUTES` |
+| `tests/repo/served-web-graph.test.mjs` | le graphe d'imports en valeur atteignable depuis `src/web/` : uniquement des chemins relatifs en `.ts` qui existent ; chaque module atteint hors de `src/web/` est servi par `ROUTES` (R4) et se trouve dans `src/engine/`, jamais dans `src/server/` (R5) ; les lignes `import type` sont mises de côté parce que le serveur les efface. |
 | `tests/repo/served-ts-strip-check.test.mjs` | chaque fichier servi, types retirés par le même chemin que la requête HTTP, passe `node --check` ; aucun préfixe de route ne recouvre `/src/engine/` |
 | `tests/repo/package-entrypoints.test.mjs` | chaque route `/src/engine/…` figure dans le champ `files` de `package.json`, donc dans le paquet publié |
 
@@ -500,6 +493,10 @@ configuration écrite avant la fusion et jamais réparée entre-temps reste
 orpheline, sans outil pour la retirer — mesuré sans exposition connue au jour
 du retrait (doc/36 § 1.4).
 
+Ce que ce dépôt n'établit pas : **sous quelle forme Claude Code ou Copilot CLI
+remontent à l'utilisateur l'échec d'un hook** dont la commande ne trouve plus son
+fichier. Rien ici ne le teste.
+
 ### Le produit écrit chez son utilisateur — en deux endroits de natures différentes
 
 C'est le point le plus rigide du produit, et l'inventaire en est plus large qu'il
@@ -556,38 +553,23 @@ silence, `exit=0`** (mesuré). Le `build` efface donc `dist/engine` et
 **C'est la seule section dont un déplacement de fichiers change le SENS** — le
 reste est écrit en termes de responsabilités, qui ne bougent pas.
 
-**Ce n'est pas la seule qu'un déplacement RÉÉCRIT, et la première rédaction le
-prétendait.** Mesuré à l'étape 2 :
-
-```
-git diff --numstat <avant> <après> -- ARCHITECTURE.md   →  146 ajoutées, 95 retirées
-                                                            48 fragments, dans les
-                                                            ONZE sections numérotées
-```
-
-Aucune section n'a été épargnée, § 0 compris. La raison est que dix d'entre elles
+**Ce n'est pas la seule qu'un déplacement RÉÉCRIT.** Les autres sections
 **citent** des chemins sans porter sur eux : commandes de contrôle, tables de
 fichiers, ancrages `fichier:ligne`. Une responsabilité ne bouge pas ; l'adresse
-par laquelle on la montre, si. **Rouvrir le seul § 8 à l'étape 3 laisserait le
-reste mentir** — et le mensonge serait invisible, puisque chaque phrase resterait
-grammaticalement vraie.
+par laquelle on la montre, si. **Rouvrir le seul § 8 après un déplacement
+laisserait le reste mentir** — et le mensonge serait invisible, puisque chaque
+phrase resterait grammaticalement vraie.
 
-| Unité | Répertoires, au 2026-08-13 (v0.15.0) | Fichiers |
-|---|---|---|
-| serveur | `src/server/` + `bin/` | 54 + 1 |
-| moteur | `src/engine/` → `dist/engine/` | 43 |
-| navigateur | `src/web/` | 27 |
+| Unité | Répertoires |
+|---|---|
+| serveur | `src/server/` → `dist/server/`, et `bin/` |
+| moteur | `src/engine/` → `dist/engine/` |
+| navigateur | `src/web/` |
 
-**Un seul arbre `src/`, depuis l'étape 2 de la migration.** `lib/`, `public/` et
-`netgain/` n'existent plus. Un test permanent le tient —
-`tests/repo/stale-path-citations.test.mjs` : les trois racines étant mortes, leur
-simple apparition dans un commentaire ou dans la documentation est un rouge,
-sauf entrée nommée dans sa liste blanche. Le moteur gagne un fichier
-(`install/rupture.ts`, l'étape 2), puis quatre de plus à l'étape 5
-(`detector.ts`, `invocation-patterns.ts`, `tool-subject.ts`, `clock-time.ts`) —
-trois renommés depuis `src/web/`, un neuf. Le navigateur passe de `20 .js + 6 .mjs`
-à **27 `.ts`** à l'étape 5 (§ 2.3) — un fichier de plus qu'au 2026-08-13, sans
-rapport avec le changement de langage. Le serveur, lui, est inchangé.
+`tests/repo/stale-path-citations.test.mjs` rougit quand ce document cite un
+fichier `.ts`, `.js`, `.mjs` ou `.cjs` de `src/server/`, `src/engine/` ou
+`src/web/` qui n'existe pas. Il ne vérifie ni un dossier ni un numéro de
+ligne : un ancrage `fichier:ligne` qui a glissé reste vert.
 
 ---
 
@@ -770,51 +752,3 @@ modules qui, sous une garde qui lâche, écriraient dans le
 `~/.claude/settings.json` **réel** de la machine et rouvriraient la base de
 l'observatoire. Le mettre au harnais plutôt que dans chaque test **empêche** la
 fuite au lieu de la **constater** — et n'a demandé la réécriture d'aucun test.
-
----
-
-## 10. Ce qui va changer
-
-Les deux régimes de modules d'un même paquet étaient un héritage : le produit et
-le moteur ont d'abord vécu dans deux dépôts. Leur fusion en un seul paquet est
-faite ; **la fusion en un seul arbre l'est aussi depuis l'étape 2** — `src/server/`,
-`src/engine/`, `src/web/` — et **la fusion en un seul régime de modules l'est
-depuis l'étape 3** : ES modules partout, une seule ligne à la racine. **La fusion
-en un seul langage l'est depuis les étapes 4 et 5** — TypeScript dans tout le code
-de `src/` —, et **le retrait des ponts entre serveur et moteur depuis l'étape 6**.
-Reste la règle de frontière typée, prévue à l'étape 7.
-
-Trois choses en découlent, et ce document en est la référence :
-
-1. **Les responsabilités du § 1 ne changent pas.** Seule la table du § 8 change.
-   C'est la raison pour laquelle ce document est écrit ainsi.
-2. **Les six traversées de frontière serveur → moteur — cinq ponts et un
-   `import()` dynamique — ont perdu leur objet à l'étape 6, et pas avant.** L'étape 3 avait fait tomber la moitié CommonJS de leur raison d'être
-   sans les faire tomber elles : elles franchissaient alors la frontière *source →
-   build*. L'écart était annoncé à l'envers ici même — *« l'interrupteur du régime
-   de modules fait disparaître les cinq ponts »*. L'étape 6 les a retirées :
-   l'appel est direct — `import { addUsage, … } from '../engine/core/usage.ts'` —,
-   les noms importés sont l'affaire du compilateur (§ 4), et `CLAUDE_DIR_ENV`, la
-   chaîne qu'aucune liste de fonctions ne savait vérifier, n'est plus ré-exporté
-   par le serveur.
-3. **La règle du § 3 ne sera tenue mécaniquement qu'à l'étape 7, et par un seul
-   mécanisme.** Ce document prévoyait ici que le compilateur refuserait un
-   `import` d'API Node **direct** dans le navigateur en ne lui donnant pas les
-   types de Node : faux depuis l'étape 5, où `src/web/` partage le seul
-   `tsconfig.json` du projet et reçoit `"types": ["node"]` avec le reste (§ 3).
-   La règle de lint de l'étape 7 devra donc tenir **les deux cas**, direct et
-   **transitif** — un module partagé, pur aujourd'hui, qui gagnerait un
-   `node:` demain — puisque le compilateur n'en tient plus aucun.
-
-**Deux points exposent cette fusion à l'extérieur**, tous deux décrits au § 6 :
-
-- ce que rend `main` à un appelant CommonJS depuis l'étape 3 : un espace de noms
-  figé au lieu de `module.exports` ;
-- un chemin absolu écrit chez l'utilisateur. Le hook **agent-viz** posé en mode
-  `absolute` nomme `bin/agent-viz.js`, qui n'a pas bougé ; en mode `npx`, sa ligne
-  ne nomme aucun chemin. Une configuration du hook du **moteur** écrite avant la
-  fusion reste orpheline : l'outil qui la réparait a disparu avec l'étape 6 bis.
-
-Ce que ce dépôt n'établit pas : **sous quelle forme Claude Code ou Copilot CLI
-remontent à l'utilisateur l'échec d'un hook** dont la commande ne trouve plus son
-fichier. Rien ici ne le teste.

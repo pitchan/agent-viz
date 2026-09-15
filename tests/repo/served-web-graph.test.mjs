@@ -8,6 +8,7 @@
 //   R2  tout specificateur relatif finit en `.ts` : le serveur ne sert que la source `.ts` ;
 //   R3  la cible existe : une cible introuvable sautee rendrait un faux vert ;
 //   R4  tout module atteint hors `src/web/` est servi par `ROUTES`, lue dans `src/server/routes.ts`.
+//   R5  hors de src/web/, le graphe de valeur n'atteint que src/engine/ : jamais src/server/, meme par une route exacte.
 //
 // Type ou valeur, mesure sur `stripTypeScriptTypes` en mode `strip`, celui du serveur :
 //   import type { X } from './m.ts';     ->  ligne blanchie, le fichier n'est pas demande
@@ -202,4 +203,39 @@ test('la classification type/valeur est celle que le retrait de types applique v
     }
   }
   assert.deepEqual(ecarts, [], `classification dementie par le corps servi :\n  ${ecarts.join('\n  ')}`);
+});
+
+// R5 : hors de src/web/, le navigateur n'atteint en valeur que des modules du moteur.
+// R4 ne suffit pas : une route exacte vers un fichier de src/server/ le rendrait vert.
+const horsMoteur = (relatifs) => relatifs.filter((r) => !r.startsWith('src/engine/'));
+
+test('R5 : hors src/web, le graphe de valeur n\'atteint que src/engine, jamais src/server', () => {
+  // Arrange : la marche du module (`horsWeb`, `vus`).
+
+  // Act
+  const fautifs = horsWeb.filter((a) => horsMoteur([rel(a)]).length > 0).map((a) => `${rel(a)} <- ${vus.get(a)}`);
+
+  // Assert
+  // Controle negatif : le predicat signale un module du serveur.
+  assert.deepEqual(horsMoteur(['src/engine/core/usage.ts', 'src/server/pricing.ts']), ['src/server/pricing.ts']);
+  assert.deepEqual(fautifs, [],
+    `atteints en valeur depuis src/web hors du moteur :\n  ${fautifs.join('\n  ')}`);
+});
+
+test('frontiere de type : seul `import type` est mis de cote, toute autre forme est une arete de valeur', () => {
+  // Arrange
+  // Controle negatif de R4 et R5 : un import de valeur ecrit sur plusieurs lignes est vu.
+  const texte = [
+    "import type { Drift } from '../server/pricing.ts';",
+    "import { type DriftReport } from '../server/pricing.ts';",
+    'import {',
+    '  getPrice,',
+    "} from '../server/pricing.ts';",
+  ].join('\n');
+
+  // Act
+  const vues = aretes('sonde.ts', texte, ts.ScriptKind.TS).map((a) => [a.ligne, a.valeur]);
+
+  // Assert
+  assert.deepEqual(vues, [[1, false], [2, true], [3, true]]);
 });

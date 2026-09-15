@@ -57,10 +57,9 @@ donnée n'aurait de toute façon pas été rejouable en publiant le document.
 ## Deux limites, nommées plutôt que tues
 
 - **Le paquet npm ne contient de `docs/` que `docs/netgain.md`.** `package.json` (`files`)
-  n'embarque que `bin/`, `dist/server/`, `src/web/`, les deux primitives du moteur servies au
-  navigateur (`src/engine/core/tool-subject.ts`, `src/engine/core/clock-time.ts`),
-  `dist/engine/`, `docs/netgain.md` et trois fichiers racine — choix antérieur à ce fichier,
-  révisé à l'étape 2 pour suivre le déplacement, puis à l'étape 5 pour les deux primitives.
+  n'embarque que `bin/`, `dist/server/`, `src/web/`, les primitives du moteur servies au
+  navigateur (celles que nomme la table `ROUTES` de `src/server/routes.ts`), `dist/engine/`,
+  `docs/netgain.md` et trois fichiers racine.
   Un lecteur qui n'a que le paquet installé a le commentaire, qui porte la
   substance ; l'adresse, elle, vit dans le dépôt. Le filet de `tests/repo/` mesure les
   citations **contre le dépôt**, et c'est ce qu'il annonce.
