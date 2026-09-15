@@ -138,7 +138,7 @@ function createObservatoryRoutes(getService: () => Service): Route[] {
           sendJson(res, 400, { error: 'identifiant ou statut invalide' });
           return;
         }
-        // La raison n'a de sens que pour un arbitrage (doc/42) : exigée non
+        // La raison n'a de sens que pour un arbitrage : exigée non
         // blanche là, ignorée partout ailleurs — un retour à 'new' l'efface.
         const rawReason = url.searchParams.get('reason');
         if (status === 'arbitrated' && (rawReason === null || rawReason.trim() === '')) {

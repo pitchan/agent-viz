@@ -39,10 +39,10 @@ export function findProjectRoot(
 //     → { scope, file, projectRoot }
 // Defaults: explicit scope respected; no scope → 'user' (global), for every
 // agent. A user-scope hook fires from any directory, so an agent session
-// launched outside the install directory is still captured. The previous
-// default ('local' when a project was detected) only registered the hook for
-// that one project — sessions run from anywhere else silently produced no
-// events. This mirrors how agent-viz itself is installed: globally.
+// launched outside the install directory is still captured; a project default
+// would register the hook for that one project only, and sessions run anywhere
+// else would silently produce no events. This mirrors how agent-viz itself is
+// installed: globally.
 export function resolveScope({ scope, cwd, agent = 'claude', packageRoot }: AgentOpts = {}): ResolvedTarget {
   const cfg = AGENT_CONFIG[agent];
   cwd = cwd || process.cwd();
@@ -66,7 +66,7 @@ export function resolveScope({ scope, cwd, agent = 'claude', packageRoot }: Agen
 // currently-running version (~300-800ms cold start).
 export function resolveHookCommand({ packageRoot, agent = 'claude' }: AgentOpts = {}): ResolvedCommand {
   // Émis en dist/server/install-hooks/scopes.js : la racine du paquet est
-  // TROIS crans au-dessus (l'original, un cran moins profond, en comptait deux).
+  // TROIS crans au-dessus.
   packageRoot = packageRoot || path.resolve(import.meta.dirname, '..', '..', '..');
   const binPath = path.join(packageRoot, 'bin', 'agent-viz.js');
   // npx caches always live under "/_npx/" on every platform.

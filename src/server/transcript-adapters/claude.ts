@@ -19,8 +19,8 @@ import { ensureTokens, accumulateUsage, newBucket } from '../tokens.ts';
 import { decodeJsonlLine } from '../../engine/core/jsonl.ts';
 import type { JsonlLine } from '../../engine/core/jsonl.ts';
 
-// Frontière avec `tokens.ts` (hors lot : sa forme complète y vit encore en
-// implicite). Ceci n'engage que ce que CE fichier lit et écrit — le seau
+// Frontière avec `tokens.ts`, dont la forme complète n'est pas exportée. Ceci
+// n'engage que ce que CE fichier lit et écrit — le seau
 // lui-même (`main`, chaque valeur de `perAgent`) reste `unknown` : ni
 // `parseUsageLine` ni `getOrCreateBucket` ne regardent ses champs, ils le
 // font seulement transiter vers `accumulateUsage`.
@@ -118,15 +118,9 @@ function getOrCreateBucket(tokens: TokenState, key: string): unknown {
 
 function parseUsageLine(line: string, rec: UsageRecord): boolean {
   if (!line || line.indexOf('"usage"') === -1) return false;
-  // C2 : le verdict sur une ligne vient de la primitive commune du moteur, il
-  // n'est plus réimplémenté ici. Ce que la migration change pour l'appelant :
-  // une ligne d'usage préfixée d'un BOM est désormais comptabilisée au lieu
-  // d'être perdue en silence, alors que ce site lit la queue du transcript en
-  // direct — une ligne perdue ici est une ligne qu'aucune relecture ne
-  // rattrape. La pré-garde ci-dessus, elle, reste : elle ne décode rien, elle
-  // écarte sans analyser les lignes sans usage sur un chemin parcouru à chaque
-  // ligne écrite.
-  //
+  // Le verdict sur une ligne vient de la primitive commune : une ligne d'usage préfixée d'un BOM est
+  // comptée, sur un site qui lit la queue du transcript en direct — une ligne perdue ici, aucune
+  // relecture ne la rattrape. La pré-garde ci-dessus écarte sans analyse les lignes sans usage.
   const verdict: JsonlLine | null = decodeJsonlLine(line);
   if (!verdict || !verdict.ok) return false;
   const evt = verdict.value;

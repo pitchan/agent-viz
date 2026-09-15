@@ -1,9 +1,8 @@
 'use strict';
 // R1 — the cache prefix was rebuilt mid-session.
 //
-// Grounded in the netgain v0.8.0 / v0.9.0 verdict: when prefix-change churn
-// outweighs both compaction and expiration churn, the cache prefix is being
-// re-created for a reason worth surfacing.
+// When prefix-change churn outweighs both compaction and expiration churn, the
+// cache prefix is being re-created for a reason worth surfacing.
 //
 // What the rule measures is the COST; what the engine journals is the MARKER.
 // The two are separate and the action follows the marker, never the rule name:
@@ -49,15 +48,10 @@ const ACTION_BY_MARKER = Object.freeze({
   // ambiguïté (doc officielle : connecter/déconnecter un serveur MCP en cours
   // de session réécrit le bloc d'outils ; le chargement différé, lui, préserve).
   toolsChanged: 'Connecter (ou déconnecter) les serveurs MCP avant la session, pas en cours de route — chaque bascule réécrit le bloc d’outils.',
-  // toolsAppeared: corrected 2026-08-05. The former action ("load deferred
-  // tools up front — each mid-session load rewrites the tools block") named a
-  // mechanism the official docs refute: tool search APPENDS the discovered
-  // definition to the conversation history, the prefix is untouched, the
-  // cache is preserved ("adding tools dynamically through tool search does
-  // not break your cache"). Our own controlled test agreed (+265 tk, full
-  // cache re-read — doc/10, condition C). The marker remains a true temporal
-  // observation (a ToolSearch call happened, then a break), but with no
-  // established mechanism there is no honest gesture to prescribe.
+  // toolsAppeared: tool search APPENDS the discovered definition to the conversation history, the
+  // prefix is untouched and the cache preserved (official docs; our controlled test agrees, +265 tk
+  // fully re-read — docs/sources-externes.md). A ToolSearch call before a break is a true temporal
+  // observation, but with no established mechanism there is no honest gesture to prescribe.
   toolsAppeared: null,
   // noMarker: the engine found nothing that explains the break, and inventing
   // a remedy is what this rule once got wrong. A null action = informative
@@ -70,10 +64,8 @@ const prefixTokensOf = (report: Session['report']): number => report.context.chu
 type Breakdown = Session['report']['context']['prefixBreakdown'];
 
 /** Somme d'une découpe du prefixBreakdown sur les sessions retenues.
- * Une case absente vaut zéro : la base conserve des rapports calculés par le
- * moteur qui les a scannés, et un rapport d'avant l'ajout d'un marqueur n'a
- * légitimement pas sa case (vécu 2026-08-19 : base pré-0.24 → R1 levait et la
- * carte disparaissait entière jusqu'au re-scan). */
+ * Une case absente vaut zéro : un rapport scanné avant l'ajout d'un marqueur n'a pas sa case ;
+ * lever ici faisait disparaître la carte R1 entière jusqu'au re-scan. */
 function sumBreakdown<K extends string>(
   sessions: Session[], part: keyof Breakdown, keys: readonly K[],
 ): Record<K, number> {

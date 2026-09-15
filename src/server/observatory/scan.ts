@@ -13,8 +13,8 @@ import { toSessionRow } from './session-mapper.ts';
 
 // SSE broadcast shape of the incremental scan — 'done' is added by the
 // service (see service.ts), never emitted here (see the comment at the
-// bottom of runIncrementalScan). Shared with service.ts: the second real
-// consumer of this exact shape within the lot.
+// bottom of runIncrementalScan). Shared with service.ts, the second real
+// consumer of this exact shape.
 export interface AnalysisScanMessage {
   type: 'analysisScan';
   phase: 'start' | 'progress' | 'done';

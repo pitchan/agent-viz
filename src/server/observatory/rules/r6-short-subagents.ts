@@ -1,11 +1,11 @@
 'use strict';
 // R6 — subagents on tasks too short to need them.
 //
-// The only correlation-grade rule of M1: a short session with heavy subagent
+// The only correlation-grade rule: a short session with heavy subagent
 // spend may be misuse, or may be parallelism that worked. The ranking weights
 // it at 0.6 instead of pretending it is a fact.
 //
-// Needs the session duration, which is why netgain v0.11.0 exposes endedAt. A
+// Needs the session duration, which is why the engine exposes endedAt. A
 // session without timestamps cannot be judged and is left out entirely — it is
 // never counted as a zero-length session.
 

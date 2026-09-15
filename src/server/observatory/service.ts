@@ -53,7 +53,7 @@ interface WindowPeriod {
   days: number;
 }
 
-// project/report can be null on a genuinely sparse (pre-M1.1) row — see
+// project/report can be null on a genuinely sparse row — see
 // store.ts's SessionRow comment; honest here too, never a guessed fallback.
 type SessionListRow = Omit<SessionRow, 'reportJson'> & { projectPath: string | null };
 type SessionDetail = Omit<SessionRow, 'reportJson'> & { report: SessionReport | null };
@@ -71,7 +71,7 @@ function createObservatoryService(deps: ServiceDeps) {
   const KINDS_HUMAN: SessionKind[] = ['interactive'];
   // toAnalysedSessions (session-mapper.ts) expects the always-complete row a
   // fresh upsertSession writes. Every call below always passes `since`, and a
-  // sparse pre-M1.1 row (store.ts's SessionRow comment) never carries a
+  // sparse row (store.ts's SessionRow comment) never carries a
   // started_at — `started_at >= ?` structurally excludes it, so a row that
   // reaches this point is never one of those; the cast documents that
   // boundary instead of widening session-mapper.ts's own row type.

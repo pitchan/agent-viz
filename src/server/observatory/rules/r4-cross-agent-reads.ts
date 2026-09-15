@@ -1,7 +1,7 @@
 'use strict';
 // R4 — the same file is read by several agents.
 //
-// The J8 investigation closed every other re-read hypothesis (identical
+// The re-read investigation closed every other hypothesis (identical
 // intra-agent re-reads: 0.08 %) and left exactly one real seam: cross-agent
 // duplicates, ~7 % of read volume. The share threshold sits just under that
 // known-real case; the absolute floor only matters on tiny histories, where a

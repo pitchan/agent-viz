@@ -46,9 +46,9 @@ function isNodeErrnoException(err: unknown): err is NodeJS.ErrnoException {
 // impossible, et ce fichier continue de ne connaitre que le service et le
 // dossier.
 //
-// Sans elle — appelant qui l'oublie, ou fichier sans watcher — on lit tout,
-// comme avant. C'est le comportement le plus sur : relire de trop ne perd
-// jamais un fait, et le journal dedoublonne l'alerte.
+// Sans elle — appelant qui l'oublie, ou fichier sans watcher — on lit tout.
+// C'est le comportement le plus sur : relire de trop ne perd jamais un fait,
+// et le journal dedoublonne l'alerte.
 async function catchUpFromDisk(
   service: EventSink,
   dir: string,
@@ -115,18 +115,13 @@ async function catchUpFromDisk(
       // parlerait donc d'une coupure que le contrat autorise et qui n'est pas une
       // corruption. A quelle FREQUENCE elle survient n'est pas etabli : cela
       // depend de l'atomicite de l'ajout d'une ligne par l'ecrivain, qui n'a pas
-      // ete prouvee. C'est un silence, pas un oubli : il n'y avait aucune trace
-      // avant cette migration, aucune n'est perdue.
+      // ete prouvee.
       const verdict: { ok: true; value: unknown } | { ok: false; rawLength: number } | null = decodeJsonlLine(line);
       if (!verdict || !verdict.ok) continue;
       const evt = verdict.value;
-      // Ce qui n'est pas un objet n'est pas un evenement. `null` est du JSON
-      // VALIDE — la primitive rend { ok:true, value:null } — et `processEvent`
-      // levait dessus (verifie en executant le vrai service : « Cannot read
-      // properties of null (reading '_ts') »). L'exception etait rattrapee au
-      // demarrage, donc le serveur tenait ; mais la boucle s'arretait, et TOUT
-      // ce qui suivait — le reste du fichier ET les fichiers d'apres — n'etait
-      // jamais relu. Une ligne de bruit faisait perdre le passe entier.
+      // Ce qui n'est pas un objet n'est pas un evenement. `null` est du JSON VALIDE, et
+      // `processEvent` levait dessus : la boucle s'arretait, et le reste du fichier ET les
+      // fichiers d'apres n'etaient jamais relus. Une ligne de bruit faisait perdre le passe.
       if (!isRecord(evt)) continue;
       service.onEvent(evt);
       fed++;

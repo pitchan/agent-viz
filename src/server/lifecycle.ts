@@ -29,8 +29,8 @@ function readPidFile(): PidRecord | null {
     const raw = fs.readFileSync(PID_FILE, 'utf8');
     const [pidStr, portStr, startedAt] = raw.split('\n');
     // `noUncheckedIndexedAccess` : un `split('\n')` ne garantit pas trois
-    // éléments — `?? ''` rend `parseInt('', 10)` (NaN), même issue qu'un
-    // `parseInt(undefined, 10)` non typé, donc même comportement qu'avant.
+    // éléments — `?? ''` rend `parseInt('', 10)`, soit NaN, que la garde
+    // `!pid || !port` ci-dessous refuse.
     const pid = parseInt(pidStr ?? '', 10);
     const port = parseInt(portStr ?? '', 10);
     if (!pid || !port) return null;

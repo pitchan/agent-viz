@@ -21,7 +21,7 @@ import {
 } from './install-hooks/registry.ts';
 import { cliMain } from './install-hooks/cli.ts';
 
-// Couture de test — mêmes 9 clés, mêmes fonctions qu'avant le découpage.
+// Couture de test : les fonctions internes que les tests appellent directement.
 const _internals = {
   readSettings, writeSettings, auditSettings, addHook, removeHook,
   hasHookForEvent, inspectEvent, refreshStaleCommand, eventsFor,

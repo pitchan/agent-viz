@@ -100,8 +100,8 @@ function enHorodatage(v: unknown): number | null {
 
 // La clef d'une alerte est une chaine non vide. Ici la garde est
 // DELIBEREMENT plus stricte que celle du journal, qui ne teste que
-// `id != null` : mesure de la revue de la tache 5, `''`, `'   '`, un tableau
-// (ce que Node fait de `?id=a&id=b`), un objet, `0` et `false` y ecrivent tous
+// `id != null` : `''`, `'   '`, un tableau (ce que Node fait de `?id=a&id=b`),
+// un objet, `0` et `false` y ecrivent tous
 // une ligne d'acquittement, sans plainte et sans deduplication, que le
 // rechargement relit a chaque demarrage pendant 90 jours.
 //
@@ -199,8 +199,7 @@ function createWatchdogRoutes(getService: () => ServiceLike | null) {
         }
         // `ack` rend un booleen parce que le journal peut REFUSER — c'est la
         // seule chose qui sache si l'acquittement a ete retenu. Le jeter ferait
-        // dire 200 sur un acquittement qui n'a pas eu lieu : exactement la
-        // panne muette que ce chantier repare.
+        // dire 200 sur un acquittement qui n'a pas eu lieu : une panne muette.
         //
         // 500 et non 400 : la route vient de verifier tout ce que le journal
         // verifie, donc un refus ici est un desaccord entre les deux, pas une

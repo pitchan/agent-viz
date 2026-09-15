@@ -68,7 +68,7 @@ async function startServer(): Promise<void> {
 }
 
 async function boot(): Promise<void> {
-  // LiteLLM is a watchdog now: drift reports surface on the SSE stream and in
+  // LiteLLM is a watchdog: drift reports surface on the SSE stream and in
   // the alerts popup; it never writes prices.
   onPricingDrift(report => broadcastSSE({ type: 'pricingDrift', drifts: report.drifts }));
   startPricingRefresh();

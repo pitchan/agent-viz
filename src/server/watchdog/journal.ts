@@ -8,28 +8,22 @@
 // relire apres un arret brutal.
 //
 // L'alerte est ecrite telle qu'elle vient et relue telle quelle : de sa forme,
-// ce fichier ne connait que `id` et `createdAt`, qui font sa cle. Tout le
-// reste — cwd, standing, occurrences — traverse sans etre regarde. Un seul
-// champ merite d'etre signale a ceux qui liront ces lignes : `acknowledged`,
-// que le detecteur pose a false, est FIGE sur le disque et devient donc
-// menteur des le premier acquittement. C'est `readAll` qui le recalcule depuis
-// les lignes `ack`, et lui seul fait autorite.
+// ce fichier ne connait que `id` et `createdAt`, qui font sa cle. Un seul champ
+// merite d'etre signale : `acknowledged`, que le detecteur pose a false, est
+// FIGE sur le disque ; `readAll` le recalcule depuis les lignes `ack`, et lui
+// seul fait autorite.
 //
-// Idempotence par la cle (id, createdAt). `createdAt` est l'heure de
-// l'EVENEMENT declencheur, jamais celle de l'ecriture : elle est donc stable
-// au rejeu, et relire dix fois le meme fichier n'ecrit rien de plus.
+// Idempotence par la cle (id, createdAt) : `createdAt` est l'heure de
+// l'EVENEMENT, stable au rejeu (test « rejouer le meme fait n ecrit rien de plus »).
 //
-// CONTRAT DES HORODATAGES — `createdAt` et `at` sont des MILLISECONDES EPOCH :
-// un nombre, ou la chaine de chiffres qui le represente, et rien d'autre. Ni
-// ISO 8601, ni objet `Date`, ni format local. Ce n'est pas une paresse : lire
-// du texte de date obligerait a accepter les formats locaux, dont
-// l'interpretation depend du moteur — '14/11/2023' est novembre ici et avril
-// ailleurs — et on echangerait une perte visible contre une donnee fausse
-// silencieuse. Hors contrat, un `createdAt` est REFUSE (il fait la cle, le
-// serveur ne peut pas l'inventer) et un `at` est REMPLACE par l'horloge du
-// serveur — auquel cas la ligne le dit, par `atFrom: 'server'`, pour que le
-// disque ne conflate jamais ce que le serveur a mesure avec ce qu'on lui a
-// rapporte.
+// CONTRAT DES HORODATAGES — `createdAt` et `at` sont des MILLISECONDES EPOCH,
+// nombre ou chaine de chiffres, rien d'autre : lire du texte de date obligerait
+// a accepter les formats locaux, dont l'interpretation depend du moteur
+// ('14/11/2023' est novembre ici et avril ailleurs). Hors contrat, `createdAt`
+// est REFUSE (il fait la cle) et `at` REMPLACE par l'horloge du serveur, ce que
+// la ligne dit par `atFrom: 'server'` (tests « le contrat des horodatages :
+// millisecondes epoch, rien d autre » et « la ligne dit quand c est l horloge du
+// serveur qui a parle »).
 //
 // Pourquoi pas `os.tmpdir()`, ou vivent les evenements : c'est le seul dossier
 // que le systeme s'autorise a vider, et le menage y purge deja les sessions.
@@ -66,8 +60,8 @@ const RETENTION_DAYS = 90;
 // fichier, disque plein cinq minutes) doit pouvoir se resorber toute seule.
 const RETRY_EVERY = 20;
 
-// Une alerte n'a AUCUNE liste blanche de champs — mesure de la tache 5, fixee
-// par test ('un champ ajoute par un nouveau detecteur survit au disque').
+// Une alerte n'a AUCUNE liste blanche de champs — fixee par le test « un champ
+// ajoute par un nouveau detecteur survit au disque et au redemarrage ».
 // Le journal ecrit l'objet entier et le relit entier ; seuls `id` et
 // `createdAt` sont engages ici, parce que c'est tout ce que CE fichier lit —
 // le reste traverse via l'index `unknown`. Les proprietes nommees restent
@@ -186,31 +180,20 @@ function createJournal({ filePath = DEFAULT_PATH, now = Date.now }: { filePath?:
       // declenche pas a elle seule une reecriture — on ne reecrit que pour la
       // peremption — mais elle disparaitra a la prochaine compaction.
       //
-      // C2 : ce verdict vient de la primitive commune du moteur, il n'est plus
-      // reimplemente ici. La garde de ligne blanche qui precedait ETAIT cette
-      // reimplementation — la primitive rend deja null sur une ligne vide — et
-      // le verdict unique couvre desormais les deux cas. Ce que la migration
-      // change pour ce site : une ligne prefixee d'un BOM est decodee au lieu
-      // d'etre perdue. Comme `gardees` retient la ligne BRUTE et non
-      // l'enregistrement re-serialise, ce BOM est recopie tel quel dans le
-      // fichier compacte ; la primitive le retolere au chargement suivant, si
-      // bien que la ligne reste lisible d'une compaction a l'autre.
+      // Le verdict vient de la primitive commune, qui rend deja null sur une ligne
+      // vide. Une ligne prefixee d'un BOM est decodee ; `gardees` retient la ligne
+      // BRUTE, donc la compaction recopie ce BOM, que la primitive retolere au
+      // chargement suivant.
       const verdict: { ok: true; value: unknown } | { ok: false; rawLength: number } | null = decodeJsonlLine(line);
       if (!verdict || !verdict.ok) continue;
       const rec = verdict.value;
-      // `null` est du JSON VALIDE : la primitive rend { ok:true, value:null } et
-      // `rec.kind` ci-dessous levait, hors du `try`. La promesse du bloc
-      // ci-dessus — « une ligne illisible est sautee, jamais fatale » — ne
-      // tenait donc pas pour la seule ligne qui n'est pas illisible. Verifie en
-      // executant `initWatchdog` : le serveur ne tombait pas, mais le CHIEN DE
-      // GARDE ENTIER disparaissait pour tout le processus en accusant une
-      // « detection indisponible » — c'est-a-dire en designant une installation
-      // abimee au lieu d'une ligne de journal. Le mauvais diagnostic coutait
-      // plus cher que la panne.
+      // `null` est du JSON VALIDE, et `rec.kind` levait dessus hors du `try` : le CHIEN DE
+      // GARDE ENTIER disparaissait pour le processus en accusant une « detection
+      // indisponible », donc une installation abimee au lieu d'une ligne de journal.
       //
-      // Ce qui n'est pas un objet n'est pas un enregistrement : `42` et
-      // `"texte"` ne levaient pas mais passaient avec un `ts` indefini, donc
-      // etaient comptes PERIMES — du bruit devenait un motif de reecriture.
+      // Ce qui n'est pas un objet n'est pas un enregistrement : `42` et `"texte"`
+      // passaient avec un `ts` indefini et etaient comptes PERIMES — du bruit
+      // devenait un motif de reecriture.
       if (!isRecord(rec)) continue;
       const ts = rec.kind === 'alert' && isRecord(rec.alert) ? rec.alert.createdAt : rec.createdAt;
       if (!(isFiniteNumber(ts) && ts >= plancher)) { perimees += 1; continue; }

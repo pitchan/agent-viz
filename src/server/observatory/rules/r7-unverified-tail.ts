@@ -1,5 +1,5 @@
 'use strict';
-// R7 — modifications laissées sans vérification (doc/41, famille « dette de trajectoire »).
+// R7 — modifications laissées sans vérification (famille « dette de trajectoire »).
 //
 // Fait : des fichiers ont été modifiés dans la session APRÈS sa dernière
 // commande de vérification (test/build/lint/typecheck), ou sans qu'aucune
@@ -70,7 +70,7 @@ function evaluate(ctx: EvaluationContext): R7Recommendation[] {
     recs.push({
       ruleId: ID,
       subject: project,
-      // Pas « terminées » (revue doc/41) : rien ici ne filtre sur la fin de
+      // Pas « terminées » : rien ici ne filtre sur la fin de
       // session, une session encore vivante entre dans la reco.
       title: 'Sessions laissant des modifications non vérifiées',
       category: CATEGORY,

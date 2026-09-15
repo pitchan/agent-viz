@@ -35,16 +35,14 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
-// Bridge vers la signature publique de `tokens.ts` (hors lot, scellé) : sa
-// forme privée (`TokensCarrier`) n'est pas exportée, `Parameters<...>`
-// l'emprunte sans la nommer — même geste qu'en lot 8 dans transcript.ts et
-// event-reader.ts. `rec` (Map alimentée par `tokens.ts` lui-même via
+// Bridge vers la signature publique de `tokens.ts` : sa forme privée
+// (`TokensCarrier`) n'est pas exportée, `Parameters<...>` l'emprunte sans la
+// nommer — même geste que transcript.ts et event-reader.ts. `rec` (Map alimentée par `tokens.ts` lui-même via
 // `ensureTokens`) porte réellement cette forme à l'exécution.
 type TokensCarrierLike = Parameters<typeof tokensMessage>[1];
 
 // La table de routage telle que ce fichier la déclare : chaque entrée locale
-// mêle handlers synchrones et asynchrones (fidèle à l'origine — pas de
-// passage en tout-async), donc `void | Promise<void>`. Les deux tables
+// mêle handlers synchrones et asynchrones, donc `void | Promise<void>`. Les deux tables
 // importées (`createWatchdogRoutes`, `createObservatoryRoutes`) déclarent
 // leurs propres types de requête/réponse localement (interfaces minimales,
 // zéro dépendance) — `IncomingMessage`/`ServerResponse` les satisfont
@@ -150,7 +148,7 @@ async function readStaticFile(absPath: string): Promise<{ mime: string; body: Bu
 
 // Sert un fichier deja resolu en chemin absolu de confiance : les deux
 // appelants (prefixe confine, liste blanche exacte) ont chacun leur propre
-// facon de decider CE chemin ; celui-ci ne fait plus que repondre.
+// facon de decider CE chemin ; celui-ci ne fait que repondre.
 async function respondStaticFile(res: ServerResponse, absPath: string): Promise<void> {
   try {
     const { mime, body } = await readStaticFile(absPath);

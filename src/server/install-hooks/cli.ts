@@ -96,22 +96,19 @@ export function cliMain(argv: string[]): void {
         if (r.backup) console.log(`[${agent}]   backup: ${r.backup}`);
       }
     }
-    // Une erreur ne doit jamais se lire comme « rien à retirer » (décision D3) :
-    // le total peut rester à 0 alors qu'un agent n'a pas pu être traité du tout.
+    // Une erreur ne doit jamais se lire comme « rien à retirer » : le total reste
+    // à 0 quand un agent n'a pas pu être traité du tout.
     if (total === 0 && !failed) console.log('Aucun hook agent-viz trouvé.');
-    // …et elle ne doit pas non plus se lire comme un succès dans un script
-    // (D3, le code de sortie) : avant la traduction du refus en valeur, la
-    // levée remontait au gestionnaire global et sortait 1. Un `uninstall-hooks`
-    // qui sort 0 en disant « hooks NON retirés » fait lire un succès à une
-    // étape de CI alors que les hooks sont posés et se déclenchent toujours.
+    // …et elle ne doit pas non plus se lire comme un succès dans un script : un
+    // `uninstall-hooks` qui sort 0 en disant « hooks NON retirés » fait lire un succès
+    // à une étape de CI alors que les hooks sont posés et se déclenchent toujours.
     if (failed) process.exit(1);
     return;
   }
 
   // install — une seule boucle : le registre garantit la même forme pour tout
-  // agent enregistré, y compris un 3e. La branche `error` valait jusqu'ici pour
-  // copilot seulement, et rien ne la produisait ; le registre la produit
-  // désormais pour n'importe quel agent (cf. registry.ts).
+  // agent enregistré, y compris un 3e, et produit la branche `error` pour
+  // n'importe lequel (cf. registry.ts).
   const result = install({ scope, cwd }) as Record<string, CliInstallResult>;
   let refused = false;
   for (const [agent, r] of Object.entries(result)) {
@@ -130,6 +127,6 @@ export function cliMain(argv: string[]): void {
     if (r.missing.length > 0) console.log(`[${agent}] ✓ Ajouté sur : ${r.missing.join(', ')}`);
     if (r.updated.length > 0) console.log(`[${agent}] ✓ Rafraîchi sur : ${r.updated.join(', ')}`);
   }
-  // Une erreur-valeur ne doit pas perdre le signal d'échec (décision D3).
+  // Une erreur-valeur ne doit pas perdre le signal d'échec : le code de sortie le porte.
   if (refused) process.exit(1);
 }

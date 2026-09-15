@@ -4,17 +4,15 @@
 // dropping the database would lose recommendation statuses — the only data a
 // re-scan cannot rebuild. One entry per evolution: a table, not branches.
 
-// node:sqlite ships no type declarations yet (TS2307) — store.ts (lot 6) owns
-// that boundary. This file only needs the two calls it actually makes, kept
-// minimal so it does not assume more of `db` than that.
+// store.ts owns the node:sqlite boundary. This file only needs the two calls it
+// actually makes, kept minimal so it does not assume more of `db` than that.
 interface SqliteDb {
   prepare(sql: string): { all(): unknown[] };
   exec(sql: string): void;
 }
 
-// PRAGMA table_info rows are `unknown` at the type level (the query result of
-// an untyped driver) — narrowed here rather than assumed, per the plan's rule
-// for anything SQLite hands back.
+// PRAGMA table_info rows are `unknown` through the minimal SqliteDb above:
+// checked here, never trusted as-is.
 function isColumnInfo(row: unknown): row is { name: string } {
   return typeof row === 'object' && row !== null && typeof (row as Record<string, unknown>).name === 'string';
 }

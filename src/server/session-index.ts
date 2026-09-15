@@ -61,7 +61,7 @@ function sessionFilePath(sid: string): string {
 
 function idFromPath(fp: string): string { return path.basename(fp, '.jsonl'); }
 
-// Session IDs come from Claude Code (UUID) or fall back to "unknown" in hook.ts.
+// Session IDs come from Claude Code (UUID); hook.ts refuses and logs an event without one.
 // We restrict to safe filename chars to prevent path traversal via crafted ?session=
 // or ?clear= values being concatenated into path.join(DIR, sid + '.jsonl').
 function validSessionId(sid: unknown): sid is string {
@@ -98,10 +98,9 @@ async function indexSessionInitial(fp: string): Promise<void> {
   try {
     const stat = await fsp.stat(fp);
     const eventCount = await countNewlinesStreaming(fp);
-    // Backfill agentSource from the first event's _source field (read first 4 KB).
-    // Stays undefined when the field is missing — every hook installed by
-    // agent-viz >= 0.2.0 stamps _source, so absence means a stale file or a
-    // foreign producer. Don't silently coerce to 'claude'.
+    // Backfill agentSource from the first event's _source (first 4 KB). Undefined when the field
+    // is missing: hook.ts stamps _source on every event, so absence means a file written without
+    // that stamp or by a foreign producer. Don't silently coerce to 'claude'.
     let agentSource: string | undefined;
     try {
       const fh = await fsp.open(fp, 'r');
@@ -111,15 +110,13 @@ async function indexSessionInitial(fp: string): Promise<void> {
       // `split('\n')` rend toujours au moins un élément — l'index 0 existe en
       // pratique ; le repli sur '' ne sert que `noUncheckedIndexedAccess`.
       const firstLine = buf.toString('utf8').split('\n')[0] ?? '';
-      // C2 : verdict rendu par la primitive commune, plus par un JSON.parse
-      // local. Elle ne lève pas — un échec se lit, il ne s'attrape pas. Effet
-      // voulu : une première ligne préfixée d'un BOM est désormais décodée, là
-      // où la sonde perdait `_source` sans que rien ne soit réparable.
+      // Verdict rendu par la primitive commune, qui ne lève pas : un échec se lit, il ne
+      // s'attrape pas. Une première ligne préfixée d'un BOM est décodée ; un JSON.parse local
+      // y perdait `_source` sans rien de réparable.
       const verdict: JsonlLine | null = decodeJsonlLine(firstLine);
       if (verdict && !verdict.ok) {
-        // On garde la trace, comme avant — mais en nommant la cause la plus
-        // probable, que la sonde ne peut pas distinguer d'un fichier corrompu :
-        // au-delà de 4 Ko la première ligne arrive coupée en plein milieu.
+        // La trace nomme la cause la plus probable, que la sonde ne distingue pas d'un fichier
+        // corrompu : au-delà de 4 Ko, la première ligne arrive coupée en plein milieu.
         console.error(
           `[session-index] ${id.slice(0, 8)}: sonde agentSource — première ligne illisible ` +
           `(${verdict.rawLength} caractères ; au-delà de ${buf.length} octets lus, elle arrive tronquée)`,
@@ -128,7 +125,7 @@ async function indexSessionInitial(fp: string): Promise<void> {
       const evt: unknown = verdict && verdict.ok ? verdict.value : null;
       if (isRecord(evt) && typeof evt._source === 'string') agentSource = evt._source;
     } catch (err: unknown) {
-      // Ne couvre plus que l'accès disque : le décodage, lui, ne lève pas.
+      // Ne couvre que l'accès disque : le décodage, lui, ne lève pas.
       const message = err instanceof Error ? err.message : String(err);
       console.error(`[session-index] ${id.slice(0, 8)}: sonde agentSource — lecture impossible : ${message}`);
     }

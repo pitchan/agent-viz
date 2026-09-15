@@ -5,21 +5,17 @@
 // running agent-viz server (default 127.0.0.1:3333).
 //
 // Source agent (claude | copilot) is taken from --source=<agent> on argv.
-// Defaults to 'claude' for back-compat with old hook commands installed by
-// agent-viz < 0.2.0 that didn't carry the flag.
+// Sans --source, la source est 'claude' : des settings.json portent encore une
+// commande de hook installée sans ce drapeau, et elle doit rester lue.
 
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 
-// node:http charge par process.getBuiltinModule et non par `import` : la
-// materialisation de l'espace de noms ESM de node:http coute ~25 ms par
-// processus (mesure, doc/39, depot prive — cf. docs/sources-externes.md),
-// soit l'essentiel de la regression du chemin chaud constatee au step 9 de
-// la tache 5. getBuiltinModule rend le meme objet que l ancien chargement
-// CommonJS, sans cette materialisation, et reste synchrone (API stable,
-// presente depuis Node 22.3 ; engines dit >= 24).
+// node:http par process.getBuiltinModule, pas par `import` : materialiser l'espace de noms ESM
+// de node:http se paie a chaque processus de hook, donc a chaque evenement. getBuiltinModule rend
+// le meme objet sans ce cout, et reste synchrone (API stable depuis Node 22.3, sous `engines`).
 const http = process.getBuiltinModule('node:http');
 
 const DIR = path.join(os.tmpdir(), 'agent-events');
@@ -51,10 +47,9 @@ function runHook(): void {
 
   const source = parseSource(process.argv.slice(2));
 
-  // Safety net: if stdin never closes (Windows-common), exit after 3 s. Stays
-  // well under the hook's `timeout` setting on every install we've shipped
-  // (historic 5 s, current 10 s) so the safety fires *before* the agent kills
-  // us — otherwise we race and the event gets lost.
+  // Safety net: if stdin never closes (Windows-common), exit after 3 s — under every hook
+  // `timeout` a settings file can carry (10 s, or 5 s from an older install), so the safety
+  // fires *before* the agent kills us; otherwise we race and the event gets lost.
   const safety = setTimeout(() => process.exit(0), 3000);
 
   let input = '';
@@ -63,13 +58,9 @@ function runHook(): void {
   process.stdin.on('end', () => {
     clearTimeout(safety);
     try {
-      // BOM U+FEFF toléré : un writer Windows (.NET UTF8Encoding) préfixe la
-      // charge, JSON.parse le rejette. Sans ce retrait, l'événement était perdu
-      // en silence total — même leçon apprise par le retrait moteur de carte,
-      // qui portait le même correctif de son côté (constat C1
-      // de docs/audit-qualite-code.md). Le BOM est compare par CODE de
-      // caractere, jamais par un motif contenant le caractere lui-meme : un
-      // BOM litteral dans le source serait invisible a la relecture.
+      // BOM U+FEFF toléré : un writer Windows (.NET UTF8Encoding) préfixe la charge, que JSON.parse
+      // rejette ; sans ce retrait, l'événement était perdu en silence. Le BOM est comparé par CODE
+      // de caractère : un BOM littéral dans le source serait invisible à la relecture.
       const evt: Record<string, unknown> = JSON.parse(input.charCodeAt(0) === 0xFEFF ? input.slice(1) : input);
       evt._ts = new Date().toISOString();
       evt._source = source;
@@ -91,11 +82,9 @@ function runHook(): void {
       req.on('timeout', () => req.destroy());
       req.end(body);
     } catch (err: unknown) {
-      // Ce catch etait VIDE, et le journal d'erreur vivait lui-meme dans le
-      // try, apres l'analyse : un echec de JSON.parse ne laissait donc AUCUNE
-      // trace, nulle part. Perte de capture totale et silencieuse dans un
-      // produit dont la capture est la raison d'etre (constat C1). On sort
-      // toujours en 0 — on ne bloque jamais l'agent — mais plus jamais muet.
+      // Ce catch etait VIDE, et le journal d'erreur vivait dans le try, apres l'analyse : un
+      // JSON.parse en echec ne laissait AUCUNE trace. On sort toujours en 0 — on ne bloque
+      // jamais l'agent — mais jamais sans trace.
       const message = err instanceof Error ? err.message : String(err);
       logHookError(`payload rejected: ${message} source=${source}`);
     }

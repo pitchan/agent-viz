@@ -12,16 +12,16 @@
 //   deliberately no sum function in this module.
 // * A recommendation the latest scan did not re-emit leaves the ranking and is
 //   reported as "no longer occurring" — a fact, not a claim that anything the
-//   user did caused it (effect measurement is M3).
+//   user did caused it.
 // * A DECIDED recommendation (accepted, ignored, arbitrated) lives in the
-//   journal, not in the groups (doc/44): the decision wins over freshness,
+//   journal, not in the groups: the decision wins over freshness,
 //   and only the +50 % return rule can surface it again — never arbitrated.
 
 import { COST_BASIS } from './cost.ts';
 
 // The persisted shape: a draft Recommendation (rules/types.ts) once the
 // service layer has given it an id and a lifecycle. Local to this file —
-// nothing else in the lot needs the persisted fields (id, status,
+// nothing else under rules/ needs the persisted fields (id, status,
 // costAtStatusUsd, the timestamps), so it stays out of the shared types.ts.
 interface RankedRecommendation {
   id: number;
@@ -53,10 +53,10 @@ function scoreOf(rec: RankedRecommendation): number {
 }
 
 // 'new' is always proposed; 'accepted' and 'ignored' come back only once the
-// recomputed cost has grown by at least 50 % since the user decided (doc/44 —
-// an adoption is a watched commitment, not a pledge taken on faith). A missing
+// recomputed cost has grown by at least 50 % since the user decided (an
+// adoption is a watched commitment, not a pledge taken on faith). A missing
 // baseline is not a reason to guess — the card stays in the journal.
-// 'arbitrated' never comes back on its own (doc/42): the user already weighed
+// 'arbitrated' never comes back on its own: the user already weighed
 // this exact choice, only lifting the arbitration re-proposes it — its frozen
 // costAtStatusUsd is kept for a FUTURE resurfacing rule, none exists yet.
 function isEligible(rec: RankedRecommendation): boolean {

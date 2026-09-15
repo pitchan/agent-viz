@@ -39,9 +39,8 @@ interface Bucket extends UsageBucket {
 
 /** La tranche `rec.tokens` telle que CE fichier la construit et la lit.
  *  `unsupported` et `transcriptMissing` ne sont jamais posés ICI — ils le
- *  sont par `transcript.ts` (hors lot) sur le même objet ; optionnels côté
- *  lecture, comme avant la migration (`!rec.tokens.unsupported` tolérait déjà
- *  leur absence). */
+ *  sont par `transcript.ts` sur le même objet ; optionnels côté lecture
+ *  (`!rec.tokens.unsupported` tolère leur absence). */
 interface TokenState {
   main: Bucket;
   perAgent: Map<string, Bucket>;
@@ -59,10 +58,9 @@ interface TokensCarrier {
 
 function newBucket(): Bucket {
   return {
-    // C3 : les six champs bruts viennent de la primitive du moteur. Le seau en
-    // gagne DEUX au passage — `cacheCreate1h` et `cacheCreate5m`, la ventilation
-    // par fenêtre de cache que seul le moteur suivait. L'enveloppe SSE est
-    // additive : un navigateur qui ne les connaît pas les ignore.
+    // Les six champs bruts viennent de la primitive du moteur, dont `cacheCreate1h` et
+    // `cacheCreate5m` (la ventilation par fenêtre de cache). L'enveloppe SSE est additive :
+    // un navigateur qui ne les connaît pas les ignore.
     ...emptyUsageBucket(),
     lastIn: 0, lastCacheCreate: 0, lastCacheRead: 0,
     lastModel: null, contextMax: 0, costUsd: 0,
@@ -81,14 +79,9 @@ function newBucket(): Bucket {
   };
 }
 
-// Frontière avec `transcript-adapters/claude.ts` (lot 4, déjà typé et clos) :
-// il y déclare sa PROPRE forme locale et minimale de `rec` — `{ tokens?: {
-// main: unknown; perAgent: Map<string, unknown> } }` — parce qu'au moment de
-// ce lot, `tokens.ts` n'exposait rien de plus précis. `ensureTokens` doit
-// rester appelable avec CETTE forme, donc son paramètre ne peut pas exiger le
-// `TokenState` réel : `unknown` est le seul type dont TOUT est assignable,
-// c'est la frontière la plus large qui reste correcte. La forme réelle n'est
-// connue qu'à l'INTÉRIEUR de cette fonction, qui seule sait ce qu'elle y pose.
+// `transcript-adapters/claude.ts` appelle `ensureTokens` avec sa propre forme minimale de `rec`
+// (`tokens?: { main: unknown; perAgent: Map<string, unknown> }`) : le paramètre ne peut pas exiger
+// le `TokenState` réel, et `unknown` est la frontière la plus large qui reste correcte.
 function ensureTokens(rec: { tokens?: unknown }): void {
   if (!rec.tokens) {
     rec.tokens = {
@@ -133,11 +126,8 @@ function accumulateUsage(
   // Idempotence by Anthropic message id — see _seenMsgIds note in newBucket.
   // Opt-in: callers without a stable id (e.g. legacy hooks) keep cumulating
   // as before.
-  // C3 : la règle de déduplication vient de la primitive commune — un
-  // identifiant vide n'est pas un identifiant. `msgId !== null` en tête donne
-  // à TypeScript la même certitude que `isDedupableMsgId` vérifie déjà par
-  // `typeof msgId === 'string'` (elle ne rétrécit pas son paramètre `unknown` —
-  // c'est la signature du moteur, hors lot).
+  // Un identifiant vide ne déduplique pas (`isDedupableMsgId`) ; `msgId !== null` en tête donne
+  // à TypeScript la certitude que ce prédicat vérifie sans rétrécir son paramètre `unknown`.
   if (msgId !== null && isDedupableMsgId(msgId)) {
     if (bucket._seenMsgIds.has(msgId)) return;
     bucket._seenMsgIds.add(msgId);
@@ -148,7 +138,7 @@ function accumulateUsage(
     bucket.malformedUsageMessages += 1;
     bucket.costComplete = false;
   }
-  // C3 : l'accumulation des six champs bruts, une seule définition.
+  // L'accumulation des six champs bruts : une seule définition, celle du moteur.
   addUsage(bucket, raw);
   // Les champs « dernier message » font la taille de contexte courante, le dernier lu l'emporte.
   // Un usage inexploitable n'en mesure aucune : la jauge garde la dernière mesure saine

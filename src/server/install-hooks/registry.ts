@@ -21,7 +21,7 @@ export const INSTALLERS: Record<AgentName, AgentInstaller> = {
 
 // Une clef réelle du registre — vit ici, à côté de la constante qu'elle
 // protège, plutôt qu'un cast : `Object.hasOwn` seul ne rétrécit pas `target`
-// vers `AgentName` (même geste que transcript-adapters/index.ts, scellé).
+// vers `AgentName` (même geste que transcript-adapters/index.ts).
 export function isAgentName(v: string): v is AgentName {
   return Object.hasOwn(INSTALLERS, v);
 }
@@ -47,16 +47,9 @@ export function pickAgents({ target }: { target?: string }): AgentName[] {
   throw new Error(`unknown target '${target}' (expected ${TARGETS.join('|')})`);
 }
 
-// Un adaptateur a le droit de REFUSER : copilot.ts refuse d'écraser un fichier
-// qui porte notre nom sans être à nous (sécurité voulue, cf. config.ts). Ce
-// refus est une DONNÉE du résultat, pas une exception qui traverse — sinon la
-// table `out`, donc le travail déjà fait par les agents précédents, est perdue
-// et l'appelant annonce « skipped » alors que des hooks SONT posés.
-//
-// Convention restaurée, pas inventée : b0b0e8e l'avait introduite et
-// bin/agent-viz.js la consommait ; 677771e l'a retirée en annonçant « no more
-// wrapped errors » — faux le jour même, le throw de f7bc172 étant antérieur et
-// jamais retiré. Le consommateur orphelin `if (r.error)` a survécu dans cli.ts.
+// Un adaptateur a le droit de REFUSER (copilot.ts refuse d'écraser un fichier qui porte notre nom
+// sans être à nous) : ce refus est une DONNÉE du résultat. Levé, il perdrait la table `out` et le
+// travail des agents précédents, et l'appelant annoncerait « skipped » alors que des hooks SONT posés.
 function failure(err: unknown): { error: string } {
   return { error: err instanceof Error ? err.message : String(err) };
 }
@@ -99,7 +92,7 @@ export function detectAgents(_opts: AgentOpts = {}): Record<string, boolean> {
 // scope where the hook already exists elsewhere, and to surface where hooks
 // live in `agent-viz status`.
 //
-// Generique : le registre fournit sweepTargets et installedIn — plus aucun
+// Generique : le registre fournit sweepTargets et installedIn, sans aucun
 // branchement par nom d'agent ici.
 export function findInstalledScopes(
   { cwd, packageRoot, agent = 'claude' }: AgentOpts = {},

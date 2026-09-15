@@ -70,17 +70,9 @@ function mergeCopilotHooks(existing: CopilotHooksFile, command: string): Copilot
   return { ...existing, version: 1, hooks };
 }
 
-// Retour `unknown`, PAS `CopilotHooksFile | null` : `JSON.parse` d'un fichier
-// disque ne garantit RIEN sur sa forme — un `agent-viz.json` JSON-valide sans
-// clé `hooks` est un contenu réel possible, pas une impossibilité que le type
-// pourrait légitimement écarter. Prétendre `CopilotHooksFile` ici (revue du
-// 2026-08-14, constat 1) avait fait disparaître la garde `content.hooks &&`
-// dans `auditCopilot` sur la foi d'un type qui mentait : `.hooks` non
-// optionnel semblait rendre le test redondant, alors que rien sur le disque
-// ne le garantissait. Chaque appelant doit donc valider lui-même — via
-// `isAgentVizCopilotFile` (qui vérifie `isRecord(content.hooks)` avant de
-// rendre `true`) ou, pour une lecture simplement défensive comme
-// `auditCopilot`, via le même garde explicite.
+// Retour `unknown`, PAS `CopilotHooksFile | null` : `JSON.parse` d'un fichier disque ne
+// garantit rien de sa forme (un `agent-viz.json` valide sans clé `hooks` existe). Un type qui la
+// promettrait ferait passer pour redondant le garde de chaque appelant, `auditCopilot` compris.
 function readCopilotFile(file: string): unknown {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); }
   catch (e: unknown) {
@@ -90,11 +82,9 @@ function readCopilotFile(file: string): unknown {
   }
 }
 
-// « Ce fichier est un fichier de hooks Copilot » — la FORME seule, sans rien
-// exiger de son contenu. C'est la question que pose le refus d'écrasement
-// (D2 bis) : un fichier de forme étrangère est refusé, un fichier de hooks
-// valide est fusionné, qu'il porte ou non l'une de nos entrées — exactement ce
-// que fait déjà `installClaude` avec n'importe quel `settings.json`.
+// « Ce fichier est un fichier de hooks Copilot » — la FORME seule, sans rien exiger du contenu.
+// C'est la question du refus d'écrasement : une forme étrangère est refusée, un fichier de hooks
+// valide est fusionné, qu'il porte ou non notre entrée, comme `installClaude` avec un settings.json.
 function isCopilotHooksFile(content: unknown): content is CopilotHooksFile {
   return isRecord(content) && content.version === 1 && isRecord(content.hooks);
 }
@@ -133,10 +123,8 @@ export function auditCopilot({ scope, cwd, packageRoot }: AgentOpts = {}) {
   const target = resolveScope({ scope, cwd, agent: 'copilot', packageRoot });
   const cmd = resolveHookCommand({ packageRoot, agent: 'copilot' });
   const content = readCopilotFile(target.file);
-  // Restaure le garde à trois niveaux de l'original (`content && content.hooks
-  // && content.hooks[ev]`) — `content` est `unknown` (voir `readCopilotFile`) :
-  // un fichier JSON-valide sans `hooks` rend `hooksMap` `undefined` ici, comme
-  // avant, plutôt qu'un `TypeError` à l'indexation.
+  // `content` est `unknown` (voir `readCopilotFile`) : un fichier JSON valide sans `hooks`
+  // rend `hooksMap` `undefined` ici, jamais un `TypeError` à l'indexation.
   const hooksMap = isRecord(content) && isRecord(content.hooks)
     ? content.hooks as Record<string, CopilotHookEntry[]>
     : undefined;
@@ -177,12 +165,9 @@ export function installCopilot({ scope, cwd, packageRoot }: AgentOpts = {}) {
     action = 'installed';
     missing = [...eventsFor('copilot')];
   } else if (!isCopilotHooksFile(existing)) {
-    // Le fichier porte notre nom mais n'a pas la FORME d'un fichier de hooks
-    // Copilot — on refuse de l'écraser. Le refus interroge la forme, PAS la
-    // présence de notre entrée (D2 bis) : exiger notre entrée rendait
-    // l'aller-retour install → uninstall → install définitivement bloqué dès
-    // qu'une entrée tierce faisait survivre le fichier vidé du nôtre — donc un
-    // seul cycle `agent-viz stop` / `start`.
+    // Le fichier porte notre nom sans la FORME d'un fichier de hooks Copilot : refus d'écraser.
+    // Le refus interroge la forme, PAS notre entrée : l'exiger bloquait pour de bon la réinstallation
+    // dès qu'une entrée tierce gardait le fichier vidé du nôtre, soit dès un cycle stop / start.
     throw new Error(`refusing to overwrite ${target.file}: not an agent-viz hooks file`);
   } else {
     for (const ev of eventsFor('copilot')) {
@@ -277,10 +262,8 @@ export function uninstallCopilot({ scope, cwd, packageRoot }: AgentOpts = {}) {
         // pas le fichier qui les porte.
         writeJsonAtomic(t.file, { ...content, hooks: kept });
       } else {
-        // Le fichier ne portait que nous : il s'en va. Plus de `catch {}` muet —
-        // un retrait qui échoue ne doit pas s'annoncer « removed » (règle maison
-        // « pas de fallback silencieux »). La levée devient une valeur au
-        // registre, cf. tâche 1.
+        // Le fichier ne portait que nous : il s'en va. Pas de `catch {}` muet : un retrait qui
+        // échoue lève, et le registre en fait un `{ error }` au lieu d'annoncer « removed ».
         fs.unlinkSync(t.file);
       }
       results.push({ ...t, removed, exists: true, backup });
@@ -295,7 +278,6 @@ export const copilotInstaller: AgentInstaller = {
   install: installCopilot,
   uninstall: uninstallCopilot,
   audit: auditCopilot,
-  // Extrait de l'ancien agentDetected('copilot').
   detect: () => inPath('copilot') || dirHasFiles(path.join(os.homedir(), '.copilot')),
   sweepTargets: copilotSweepTargets,
   installedIn: copilotHookIn,

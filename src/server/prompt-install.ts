@@ -7,8 +7,8 @@ import readline from 'node:readline';
 import { styleText } from 'node:util';
 import type { Target } from './install-hooks/types.ts';
 
-// Forme rendue par `detectAgents()` (install-hooks.ts, hors lot ce fichier-ci
-// mais même lot 8) : un booléen par agent connu, jamais plus.
+// Forme rendue par `detectAgents()` (install-hooks.ts) : un booléen par agent
+// connu, jamais plus.
 interface DetectedAgents {
   claude: boolean;
   copilot: boolean;
@@ -121,12 +121,9 @@ function ask<T extends string>({ question, options, initial, io }: {
       else if (key.name === 'down' && idx < options.length - 1) { idx++; render(); }
       else if (key.name === 'return') {
         input.removeListener('keypress', onKey);
-        // `idx` reste dans [0, options.length) par construction (gardes
-        // up/down ci-dessus) : la même garantie que `forEach` ci-dessus,
-        // mais ici l'accès EST indexé — un seul `!`, à la frontière exacte
-        // où l'invariant est vrai, plutôt qu'un repli silencieux qui
-        // changerait le comportement (l'original levait ici si `idx` avait
-        // pu sortir de la plage).
+        // `idx` reste dans [0, options.length) par construction (gardes up/down ci-dessus) : un seul
+        // `!`, à la frontière exacte où l'invariant est vrai, plutôt qu'un repli silencieux qui
+        // masquerait un index hors plage.
         resolve(options[idx]!.value);
       }
     };

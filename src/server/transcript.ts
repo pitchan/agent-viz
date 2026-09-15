@@ -43,7 +43,7 @@ interface TranscriptSlice {
   _closed: boolean;
 }
 
-// Frontière avec `tokens.ts` (hors lot, scellé) : sa forme précise (`Bucket`,
+// Frontière avec `tokens.ts` : sa forme précise (`Bucket`,
 // `TokenState`) reste privée à ce module, comme documenté dans son propre
 // commentaire pour `transcript-adapters/claude.ts` — ce fichier-ci reprend le
 // même geste, avec les deux champs supplémentaires que LUI seul pose sur
@@ -55,8 +55,8 @@ interface TokenState {
   transcriptMissing?: boolean;
 }
 
-// `rec` tel que CE fichier le voit : le disque canonique de session-index.ts
-// (scellé), plus les deux tranches nommées que transcript.ts pose lui-même
+// `rec` tel que CE fichier le voit : le disque canonique de session-index.ts,
+// plus les deux tranches nommées que transcript.ts pose lui-même
 // sur le même enregistrement (voir l'en-tête de session-index.ts). Un cast
 // est nécessaire au point d'entrée (`sessionIndex.get` ne connaît que
 // `SessionRecord`) — jamais un `any`, une vue plus précise du même objet.
@@ -67,7 +67,7 @@ type SessionWithSlices = SessionRecord & {
 
 // Bridge vers la signature publique de `tokens.ts` : sa forme privée
 // (`TokensCarrier`) n'est pas exportée, `Parameters<...>` l'emprunte sans la
-// nommer — même geste qu'en lot 8 dans event-reader.ts pour
+// nommer — même geste que event-reader.ts pour
 // `clearTokensTimer`. `rec` porte réellement cette forme à l'exécution
 // (`ensureTokens` l'y pose) ; le cast documente la frontière.
 type TokensCarrierLike = Parameters<typeof scheduleTokensBroadcast>[1];
@@ -83,8 +83,7 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 // and stops at the first '\n' — bounded by the line's length, not the file
 // size. `cap` guards against a file with no newline at all (a single hook
 // event past this size is pathological; return what was read so the caller
-// reports an unreadable line loudly rather than hanging — since C2 that report
-// is an explicit console.error on the verdict, no longer a thrown JSON.parse).
+// reports an unreadable line loudly rather than hanging).
 function readFirstLine(filePath: string, cap: number = 8 * 1024 * 1024): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     const stream = fs.createReadStream(filePath, { encoding: 'utf8' });
@@ -112,13 +111,9 @@ function readFirstLine(filePath: string, cap: number = 8 * 1024 * 1024): Promise
 async function getTranscriptPath(sessionFile: string): Promise<string | null> {
   try {
     const firstLine = await readFirstLine(sessionFile);
-    // C2 : le verdict sur la ligne vient de la primitive commune du moteur.
-    // Elle ne lève pas — un échec se LIT, il ne s'attrape pas — et le `catch`
-    // ci-dessous ne peut donc plus servir de filet au décodage. La trace qu'il
-    // écrivait pour une première ligne illisible est reprise ici, explicitement :
-    // la faire disparaître au passage aurait été exactement la perte silencieuse
-    // que C1 a coûté. Effet voulu par ailleurs : une première ligne préfixée
-    // d'un BOM est désormais décodée au lieu de coûter le transcript entier.
+    // Le verdict vient de la primitive commune, qui ne lève pas : le `catch` ci-dessous n'est pas
+    // le filet du décodage, donc la trace d'une première ligne illisible s'écrit ici. Une première
+    // ligne préfixée d'un BOM est décodée au lieu de coûter le transcript entier.
     const verdict = decodeJsonlLine(firstLine);
     if (verdict === null) {
       console.error(`[transcript] ${idFromPath(sessionFile).slice(0, 8)}: empty session file — cannot extract transcript_path`);
@@ -135,7 +130,7 @@ async function getTranscriptPath(sessionFile: string): Promise<string | null> {
     const adapter = getAdapter(isRecord(evt) ? evt._source : undefined);
     return adapter.discoverPath(evt);
   } catch (err: unknown) {
-    // Ne couvre plus que la lecture disque et l'adaptateur : le décodage, lui,
+    // Ne couvre que la lecture disque et l'adaptateur : le décodage, lui,
     // ne lève pas.
     const message = err instanceof Error ? err.message : String(err);
     console.error(`[transcript] ${idFromPath(sessionFile).slice(0, 8)}: getTranscriptPath failed — ${message}`);
@@ -159,24 +154,14 @@ function isNoise(text: string): boolean {
 function extractPromptFromText(content: string): string | null {
   const lines = content.split('\n');
   for (const line of lines) {
-    // C2 : le verdict sur une ligne vient de la primitive commune du moteur.
-    // Ici le silence RESTE le bon comportement, et pour une raison vérifiée en
-    // exécutant plutôt que supposée : la fenêtre est bornée (256 Ko puis 1 Mo)
-    // et coupe en plein milieu de ligne — une fenêtre décalée d'une frontière
-    // rend bien `{"type":"user","message":{`. Une trace sur cet échec-là se
-    // déclencherait à chaque lecture : du bruit de routine, pas un signal.
-    // `isRecord(o)` remplace le filet qu'offrait `o.type` en levant sur une
-    // ligne `null` — même issue pour `o` seul (cette ligne est ignorée), gardée
-    // explicite. Aucun frère en jeu à ce niveau : une ligne ne porte qu'un `o`.
+    // Le verdict vient de la primitive commune. Un échec reste muet ici : la fenêtre lue est
+    // bornée (256 Ko puis 1 Mo) et coupe en plein milieu de ligne, donc une trace se
+    // déclencherait à chaque lecture — du bruit de routine, pas un signal.
     //
-    // Le `try` qui suit reste un vrai filet pour deux choses, TOUTES DEUX
-    // reproduites par CAST plutôt que par garde ci-dessous, jamais filtrées :
-    // `block.type` lève si un bloc du tableau `c` est `null`/`undefined`, et
-    // `cleanUserText(block.text)` lève si un bloc `text` n'a pas de champ
-    // `text`. Un garde (`isRecord(block)`) SAUTERAIT le bloc cassé au lieu de
-    // laisser l'exception remonter — ce qui changerait qui gagne : l'original
-    // abandonne la ligne ENTIÈRE dès le premier bloc cassé, frères valides
-    // compris, revue du 2026-08-14 (constat 2).
+    // Le `try` qui suit rattrape deux levées, reproduites par CAST et jamais filtrées :
+    // `block.type` sur un bloc `null`/`undefined`, `cleanUserText(block.text)` sur un bloc
+    // `text` sans champ `text`. La ligne ENTIÈRE est alors abandonnée, frères valides compris ;
+    // un garde (`isRecord(block)`) sauterait le seul bloc cassé et changerait qui gagne.
     const verdict = decodeJsonlLine(line);
     if (!verdict || !verdict.ok) continue;
     const o = verdict.value;
@@ -193,8 +178,7 @@ function extractPromptFromText(content: string): string | null {
           const blocks: unknown[] = c;
           for (const block of blocks) {
             // Cast, jamais `isRecord` : un bloc `null`/`undefined` doit lever
-            // ICI, comme `block.type` de l'original — voir le commentaire
-            // au-dessus du `try`.
+            // ICI — voir le commentaire au-dessus du `try`.
             const b = block as { type?: unknown; text?: unknown };
             if (b.type === 'text') {
               const text = cleanUserText(b.text as string);
@@ -405,7 +389,7 @@ async function ensureSubagentTails(tr: TranscriptSlice, rec: SessionWithSlices):
 // every call so newly-spawned agents are picked up.
 async function ensureTranscriptWatcher(sessionFile: string): Promise<void> {
   const id = idFromPath(sessionFile);
-  // `SessionRecord` (session-index.ts, scellé) n'expose `transcript`/`tokens`
+  // `SessionRecord` (session-index.ts) n'expose `transcript`/`tokens`
   // que via son index signature ouverte ; ce cast pose la vue plus précise
   // que CE fichier construit et lit lui-même sur le même enregistrement (voir
   // `SessionWithSlices`).
@@ -480,7 +464,7 @@ function flagTranscriptMissing(rec: SessionWithSlices, id: string): void {
 function closeTranscriptResources(rec: SessionRecord | null | undefined): void {
   if (!rec) return;
   // Voir `ensureTranscriptWatcher` : même cast vers la vue plus précise que ce
-  // fichier construit et lit lui-même sur `SessionRecord` (scellé).
+  // fichier construit et lit lui-même sur `SessionRecord`.
   const tr = (rec as SessionWithSlices).transcript;
   if (!tr) return;
   tr._closed = true;

@@ -1,5 +1,5 @@
 'use strict';
-// P3 (spec M1.1 §4): when the silent prefix breaks of an R1 card concentrate
+// When the silent prefix breaks of an R1 card concentrate
 // at the start of MCP sessions AND an R2 card is active for the same project,
 // the cautious no-gesture text gives way to a pointer at that R2 card.
 // Cross-RULE logic lives here, not inside a rule: each rule stays blind to
@@ -9,7 +9,7 @@
 
 import type { Recommendation } from './types.ts';
 
-const EARLY_MCP_DOMINANCE = 0.5; // spec M1.1 §4 P3: strictly more than 50 % of noMarker tokens
+const EARLY_MCP_DOMINANCE = 0.5; // strictly more than 50 % of noMarker tokens
 
 const SEE_ALSO_ACTION =
   'Voir aussi : « MCP chargé mais rarement utilisé » — les cassures sans marqueur de ce projet se concentrent '

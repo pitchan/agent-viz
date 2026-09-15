@@ -85,7 +85,7 @@ function toAnalysedSession(row: SessionRow): Session {
     netTokens: row.netTokens, costUsd: row.costUsd, costComplete: row.costComplete,
     // Round-trip of our OWN JSON.stringify(report) above, not external input —
     // the cast documents that trust boundary instead of leaving it as an
-    // implicit `any` (the flow this lot is asked to dry up).
+    // implicit `any`.
     report: JSON.parse(row.reportJson) as SessionReport,
   };
 }

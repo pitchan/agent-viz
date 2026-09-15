@@ -119,10 +119,8 @@ async function housekeep(): Promise<void> {
 
   let deleted = 0, unwatched = 0, compacted = 0;
 
-  // `entries()` plutôt qu'un accès indexé : `noUncheckedIndexedAccess`
-  // rendrait `entries[i]` possiblement `undefined`, alors que la borne de la
-  // boucle le garantit toujours défini — même geste qu'en lot 8 ailleurs
-  // (prompt-install.ts) pour la même raison.
+  // `entries()` plutôt qu'un accès indexé : `noUncheckedIndexedAccess` rendrait
+  // `entries[i]` possiblement `undefined` alors que la borne de la boucle le garantit.
   for (const [i, entry] of entries.entries()) {
     const { fp, size, mtime } = entry;
     const age = now - mtime;

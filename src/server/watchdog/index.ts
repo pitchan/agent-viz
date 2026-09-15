@@ -150,8 +150,8 @@ interface StartWatchdogOpts {
 // et le passe ne serait jamais relu.
 //
 // Pourquoi cette sequence vit ici et pas dans `src/server/server.ts` : `server.ts` est
-// un point d'entree, il se charge en ouvrant un port et en tuant le serveur
-// d'avant. Aucun test ne peut l'appeler, donc rien de ce qu'on y ecrirait ne
+// un point d'entree, son chargement demarre le serveur entier et ouvre un
+// port. Aucun test ne peut l'appeler, donc rien de ce qu'on y ecrirait ne
 // serait essayable — or les trois pieges de cette sequence (l'ordre, le dossier
 // nomme, l'exception qui remonte) sont precisement ceux qu'on ne voit pas a la
 // lecture. `server.ts` garde ce qui est a lui : le vrai dossier et le vrai flux.
@@ -163,9 +163,9 @@ interface StartWatchdogOpts {
 // rien d'autre — l'enveloppe du message est un detail du protocole du serveur,
 // et ce module n'a pas a la connaitre pour se dire ignorant du flux.
 //
-// `cadenceMs` est injecte aussi, avec la valeur du client d'aujourd'hui
-// (viz-watchdog-client.ts) : on demenage `stuck`, on ne change pas son
-// comportement en meme temps. Et `init` passe a `initWatchdog` ce qu'on lui
+// `cadenceMs` est injecte aussi, 5 s par defaut : c'est le battement qui fait
+// juger `stuck`, et un test doit pouvoir le regler sans attendre cinq secondes.
+// Et `init` passe a `initWatchdog` ce qu'on lui
 // aurait passe directement — meme raison que `journalPath` : sans cela, la
 // seule branche que la production emprunte serait la seule qu'aucun test ne
 // peut emprunter sans ecrire dans le vrai `~` de l'utilisateur.
@@ -179,7 +179,7 @@ async function startWatchdog(
   // Meme patron que `runCatchUp` devant un dossier absent, et pour la meme
   // raison : ce que l'appelant oublie ici, RIEN d'autre ne peut le dire.
   // `src/server/server.ts` est le seul appelant de production et c'est le seul fichier
-  // qu'aucun test ne peut charger — il ouvre un port et tue le serveur d'avant.
+  // qu'aucun test ne peut charger — son chargement demarre le serveur et ouvre un port.
   // Un `liveFrom` oublie ne casse rien de visible : il remet simplement les deux
   // chemins a lire les memes octets, et le produit se met a annoncer des
   // boucles que l'utilisateur n'a pas faites. Une plainte au demarrage est la

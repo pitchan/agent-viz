@@ -29,9 +29,8 @@ interface Options {
   claudeJsonPath: string;
 }
 
-// The parsed JSON of a config file is `unknown` — narrowed here rather than
-// assumed, the same discipline the plan asks of anything an external file
-// hands back.
+// The parsed JSON of a config file is `unknown` — checked here, never trusted
+// as-is: an external file promises nothing about its shape.
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }

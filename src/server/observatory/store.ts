@@ -56,11 +56,11 @@ CREATE TABLE IF NOT EXISTS scan_state (
 
 // ─── Row shapes (camelCase, the store's public vocabulary) ─────────────────
 
-// Exported: service.ts (lot 6, second real occurrence) builds its session-list
+// Exported: service.ts builds its session-list
 // and single-session public shapes on top of this exact row.
 //
 // Nullable beyond `id`: the SCHEMA above declares none of these columns
-// NOT NULL (SQLite honours that literally), and a real M1 (pre-M1.1) database
+// NOT NULL (SQLite honours that literally), and a database without session_kind
 // proves it — observatory-migrations.test.cjs inserts a row with only
 // (id, project, scan_version) set, exactly the shape applyMigrations exists
 // to tolerate. A stricter, non-null type here would make toSessionRow throw
@@ -84,7 +84,7 @@ export interface SessionRow {
 
 // 'arbitrated' : le choix est déjà pesé par l'utilisateur — jamais re-proposé
 // tant qu'il n'est pas levé, à la différence d'un 'ignored' qui revient à
-// +50 % de coût (doc/42).
+// +50 % de coût.
 type RecommendationStatus = 'new' | 'accepted' | 'ignored' | 'arbitrated';
 
 interface RecommendationRow {
@@ -355,8 +355,8 @@ function openStore(dbPath: string): Store {
       return row ? toSessionRow(row) : null;
     },
 
-    // Basis announcement (M1.1): every count the summary displays. NULL kind
-    // (rows scanned before the migration) counts as unknown — never as human.
+    // Basis announcement: every count the summary displays. A NULL kind (a row
+    // stored before the session_kind column) counts as unknown — never as human.
     countByKind(opts: { since?: string } = {}): KindCounts {
       const { since } = opts;
       const args: string[] = [];
@@ -388,8 +388,8 @@ function openStore(dbPath: string): Store {
     },
 
     // Identity is (ruleId, subject) so a rescan refreshes the numbers without
-    // ever resurrecting a decision the user already made. Assumed limit
-    // (doc/42): for project-scoped rules the subject IS the project path — a
+    // ever resurrecting a decision the user already made. Assumed limit:
+    // for project-scoped rules the subject IS the project path — a
     // moved or renamed project is a new subject, its card is reborn active and
     // the old path keeps its own decision. A choice, not an oversight.
     // last_seen_at only

@@ -41,10 +41,8 @@ export interface AgentOpts {
   target?: Target;
 }
 
-// L'interface du registre INSTALLERS. Les quatre premières méthodes existaient
-// déjà ; sweepTargets et installedIn comblent les deux endroits où le code
-// branchait encore sur le nom d'agent (findInstalledScopes, agentDetected) au
-// lieu de passer par le registre.
+// L'interface du registre INSTALLERS. sweepTargets et installedIn laissent
+// findInstalledScopes générique : aucun branchement sur le nom d'agent.
 // Les six méthodes valent pour tout agent enregistré. Un adaptateur a le droit
 // de REFUSER une opération (installCopilot refuse d'écraser un fichier qui
 // porte notre nom sans avoir la forme d'un fichier de hooks Copilot).
@@ -59,10 +57,8 @@ export interface AgentOpts {
 // garde : `pickAgents` appelle `detect`, `findInstalledScopes` appelle
 // `sweepTargets` et `installedIn`. Elles PEUVENT LEVER et la levée traverse
 // jusqu'à l'appelant — `installedIn` lève sur un fichier de hooks illisible,
-// donc `agent-viz status` casse (noté « hors périmètre » dans la spec du
-// 2026-09-02, à traiter séparément). Ne pas écrire ici que le registre traduit
-// tout : c'est exactement le sur-engagement de commentaire qui a fondé ce
-// chantier.
+// donc `agent-viz status` casse. Ne pas écrire ici que le registre traduit
+// tout.
 //
 // Ajouter un 3e agent = un fichier d'adaptateur + une entrée AGENT_CONFIG +
 // une entrée INSTALLERS.
@@ -76,8 +72,7 @@ export interface AgentInstaller {
 }
 
 // Per-event timeout written into agent settings. Must stay > 1 s (Windows node
-// + AV cold start) and > the in-process safety net in src/server/hook.js so the safety
-// fires *before* the agent kills us. Bumped from 5 s → 10 s when the safety
-// dropped to 3 s; install() now also refreshes existing standard-shape hooks
-// whose timeout drifted away from this value.
+// + AV cold start) and > the in-process safety net in src/server/hook.ts so the safety
+// fires *before* the agent kills us. install() also refreshes an existing
+// standard-shape hook whose timeout differs from this value.
 export const HOOK_TIMEOUT_SEC = 10;

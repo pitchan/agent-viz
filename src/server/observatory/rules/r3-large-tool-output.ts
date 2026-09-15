@@ -7,14 +7,12 @@
 // tool output: an absolute byte floor would fire constantly on a heavy user
 // and never on a light one.
 //
-// Population restriction (user decision of 2026-07-27, from the calibration
-// relevé): only families that come from a SHELL COMMAND are considered. Of the
-// 17 families that cleared the thresholds on 90 days of real history, 15 were
-// agent tools — Read at 70 % of one project's tool output, Grep at 45 % of
-// another. R3's action is "target the command: filter, pagination, narrower
-// test", and an agent tool has no filter to add: "your Read calls are large"
-// is an observation, not an action. Narrow scope is assumed — two pieces of
-// advice that hold beat seventeen of which fifteen are inapplicable.
+// Population restriction: only families that come from a SHELL COMMAND are
+// considered. On the real 90-day history, most families that cleared the
+// thresholds were agent tools (Read, Grep). R3's action is "target the command:
+// filter, pagination, narrower test", and an agent tool has no filter to add:
+// "your Read calls are large" is an observation, not an action. Narrow scope is
+// chosen — a few pieces of advice that hold beat many that cannot be applied.
 
 import { COST_BASIS, usdForBytes } from './cost.ts';
 import { THRESHOLDS } from './thresholds.ts';

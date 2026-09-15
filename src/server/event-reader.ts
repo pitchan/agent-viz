@@ -39,8 +39,8 @@ const readPending = new Set<string>();
 // Has the watchdog already failed once on this path? A pure detector that
 // throws means a broken build, not a passing condition, so one line is enough
 // to say it — and it must be said. The enclosing `catch {}` (there for the
-// broadcast path since C2 took the decoding out of it — the shared primitive
-// never throws) would otherwise swallow it forever: the watchdog would stop
+// broadcast path; the shared decoding primitive never throws) would otherwise
+// swallow it forever: the watchdog would stop
 // producing alerts for the whole life of the process and nothing would tell
 // anyone. Detection failing is not a reason to stop serving the canvas, so we
 // complain and carry on.
@@ -144,12 +144,9 @@ async function readAndBroadcast(filePath: string): Promise<void> {
     const wd = getWatchdogService();
     if (wd && !fedFrom.has(filePath)) fedFrom.set(filePath, offset);
     for (const line of lines) {
-      // C2 : le verdict sur une ligne vient de la primitive commune du moteur,
-      // il n'est plus réimplémenté ici. C'est le chemin de CAPTURE VIVE, et
-      // c'est là que la tolérance au BOM change le plus de choses : une ligne
-      // préfixée d'un BOM était perdue en silence — ni diffusée au canevas, ni
-      // donnée au chien de garde, donc invisible ET indétectable. Elle passe
-      // désormais, comme partout ailleurs.
+      // Le verdict sur une ligne vient de la primitive commune du moteur. C'est le chemin de
+      // CAPTURE VIVE : une ligne préfixée d'un BOM y était perdue en silence, ni diffusée au
+      // canevas ni donnée au chien de garde, donc invisible ET indétectable.
       const verdict = decodeJsonlLine(line);
       if (!verdict || !verdict.ok) continue;
       const evt = verdict.value;
@@ -246,9 +243,9 @@ async function deleteSession(fp: string): Promise<void> {
   const rec = sessionIndex.get(id);
   if (rec) {
     closeTranscriptResources(rec);
-    // `SessionRecord` (session-index.ts, scellé) n'expose `tokens` que via son
+    // `SessionRecord` (session-index.ts) n'expose `tokens` que via son
     // index signature ouverte ; `clearTokensTimer` attend sa forme précise
-    // (`tokens.ts`, scellé aussi). `Parameters<...>` emprunte ce type sans
+    // (`tokens.ts`). `Parameters<...>` emprunte ce type sans
     // devoir le nommer — il n'est pas exporté, c'est la même frontière que
     // celle documentée dans tokens.ts pour `ensureTokens`.
     clearTokensTimer(rec as Parameters<typeof clearTokensTimer>[0]);

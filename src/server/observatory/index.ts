@@ -22,9 +22,9 @@ let _service: ReturnType<typeof createObservatoryService> | null = null;
 
 function getObservatoryService(): ReturnType<typeof createObservatoryService> {
   if (_service) return _service;
-  // C5 : la MÊME résolution que celle du moteur, pas une expression jumelle.
-  // Les deux s'étaient déjà écartées une fois — sur la variable posée mais vide —
-  // sans que rien ne le signale.
+  // La MÊME résolution que celle du moteur, pas une expression jumelle : les deux
+  // s'étaient déjà écartées une fois, sur la variable posée mais vide, sans que
+  // rien ne le signale.
   const claudeDir: string = resolveClaudeDir();
   _service = createObservatoryService({
     store: openStore(DB_PATH),

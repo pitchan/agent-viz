@@ -5,10 +5,8 @@
 // adds id/status/timestamps — see ranking.ts, which types that later shape
 // locally: only one file needs it, so it stays out of here).
 //
-// Promoted to its own file because the need crosses more than two files of
-// this lot: all seven rules, the registry, and cross-links all share it
-// (precedent: doc/40-plan-etape4-langage task brief, "un fichier types.ts ne
-// naît que si le besoin dépasse deux consommateurs").
+// Promoted to its own file because the need crosses more than two files: all
+// seven rules, the registry, and cross-links share it.
 
 export type ChurnStat = { events: number; tokens: number };
 
@@ -18,13 +16,12 @@ export type PrefixMarker =
 export type PrefixDepth = 'facade' | 'd10to50' | 'd50to90' | 'tail';
 
 // Forme de session posée par l'agrégateur du moteur (session-kind.ts) —
-// interactive/headless/unknown. Stockée : une ligne écrite avant la migration
-// M1.1 n'a pas la colonne et rend null, jamais une valeur devinée.
+// interactive/headless/unknown. Stockée : une ligne écrite avant la colonne
+// `session_kind` rend null, jamais une valeur devinée.
 export type SessionKind = 'interactive' | 'headless' | 'unknown';
 
 // Les six champs bruts d'usage (core/usage.ts côté moteur) — promu ici parce
-// que la lot 5 des feuilles de l'observatoire en a besoin à plus de deux
-// endroits (perAgent, perModel, total).
+// que plus de deux endroits en ont besoin (perAgent, perModel, total).
 export interface TokenBucket {
   in: number;
   out: number;
@@ -39,11 +36,9 @@ export interface SessionReport {
   // meta.cwd (src/engine/doctor/report/types.ts:14, scan-session.ts l.32,
   // 47, 125) — cas réel, pas une garde de confort.
   cwd: string | null;
-  // Ajout consommé par le lot 6 (summary.ts) : le compte d'erreurs de parsing
-  // de LA session, toujours présent sur un rapport frais du moteur
-  // (src/engine/doctor/report/types.ts, champ top-level, jamais sous context) —
-  // la surface « anomalies » du panneau résumé en a besoin par session, pas
-  // seulement agrégé.
+  // Le compte d'erreurs de parsing de LA session, toujours présent sur un rapport frais du moteur
+  // (src/engine/doctor/report/types.ts, champ de premier niveau, jamais sous context) : summary.ts
+  // le somme sur les sessions de la fenêtre.
   parseErrors: number;
   context: {
     churnCauses: {
@@ -69,28 +64,22 @@ export interface SessionReport {
     totalBytes: number;
     candidateFilters: Array<{ family: string; count: number; bytes: number }>;
   };
-  // byType : mineur différé signalé au plan — la vraie forme rendue par
-  // l'agrégateur de sous-agents est un compte, jamais une valeur opaque.
+  // byType : l'agrégateur de sous-agents rend un compte par type, jamais une
+  // valeur opaque.
   subagents: { sidecarCount: number; spawnToolUses: number; byType: Record<string, number> };
   tokens: {
     perAgent: Record<string, TokenBucket>;
-    // Ajouts consommés par le lot 5 (model-costs.ts, session-mapper.ts) :
-    // perModel/total/unknownModels sortent de la MÊME accumulation que
-    // perAgent et sont donc toujours présents. costByModel est l'exception —
-    // champ de SCAN_VERSION 6 (scan-version.ts) : un rapport stocké avant
-    // cette version ne l'a pas, et model-costs.ts exclut ces sessions des
-    // lignes ET des totaux plutôt que de leur prêter une forme qu'elles n'ont
-    // pas (compté dans excludedPendingRescan).
+    // perModel/total/unknownModels sortent de la MÊME accumulation que perAgent : toujours présents.
+    // costByModel est le champ de SCAN_VERSION 6 : un rapport stocké avant ne l'a pas, et
+    // model-costs.ts exclut ces sessions des lignes ET des totaux, comptées (excludedPendingRescan).
     perModel: Record<string, TokenBucket>;
     total: TokenBucket;
     unknownModels: string[];
     costByModel?: Record<string, { usd: number | null; pricing: string }>;
   };
-  // Fait de SCAN_VERSION 8 (doc/41) : un rapport stocké avant ce bump ne le
-  // porte pas — R7 écarte alors la session plutôt que de lui prêter une forme
-  // (précédent : costByModel, v6). Vue restreinte de VerificationStats
-  // (moteur) : les champs que les règles lisent ou liront (volets 2-3, doc/41)
-  // sont déclarés ici.
+  // Fait de SCAN_VERSION 8 : un rapport stocké avant ne le porte pas, et R7 écarte la session
+  // plutôt que de lui prêter une forme (comme costByModel). Vue restreinte de VerificationStats
+  // (moteur) ; aucune règle ne lit `verificationsFailed` ni `lastVerification`.
   verification?: {
     verifications: number;
     verificationsFailed: number;
@@ -107,7 +96,7 @@ export interface Session {
   project: string;
   startedAt: string | null;
   endedAt: string | null;
-  // null : ligne stockée avant la migration M1.1 (store.ts), jamais devinée.
+  // null : ligne stockée avant la colonne `session_kind` (migrations.ts), jamais devinée.
   sessionKind: SessionKind | null;
   netTokens: number;
   costUsd: number;

@@ -133,7 +133,6 @@ export const claudeInstaller: AgentInstaller = {
   install: installClaude,
   uninstall: uninstallClaude,
   audit: auditClaude,
-  // Extrait de l'ancien agentDetected('claude').
   detect: () => inPath('claude') || fs.existsSync(path.join(os.homedir(), '.claude', 'settings.json')),
   sweepTargets: claudeSweepTargets,
   installedIn: claudeHookIn,

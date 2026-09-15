@@ -35,14 +35,8 @@ interface PriceEntry extends ModelPrices {
   readonly history: readonly PricePeriod[];
 }
 
-// C4 (2026-08-11): the deliberate zero-cost list (`<synthetic>`, local Ollama
-// models) used to be mirrored here too. It was DEAD CODE — measured, not
-// guessed: it was only ever consulted inside this module's own computeCost,
-// whose unknown-model branch no production path ever reached (proved by
-// mutation: a `throw` in that branch failed 2 of 788 tests, both direct unit
-// calls, no server or integration test). The single list now lives in
-// src/engine/core/pricing.ts, and `known: true` on a $0 result is how a
-// WANTED zero is told apart from a tariff we do not know.
+// La liste des zéros voulus (`<synthetic>`, modèles locaux) vit dans `src/engine/core/pricing.ts`
+// seulement ; `known: true` sur un résultat à 0 $ distingue un zéro VOULU d'un tarif inconnu.
 
 // Built once from the engine's table. A Map, not an object: a model id read
 // from a third-party transcript never matches an inherited property such as
@@ -93,7 +87,7 @@ interface FamilyVersion {
 // Parses a canonical id into its family and [major, minor] version tuple
 // (minor absent = 0). Pure — no dependency on the live price map. Returns
 // null for anything that doesn't match the strict "claude-<family>-N[-M]"
-// shape (kept out of the new-model decision below rather than guessed at).
+// shape (kept out of the new-model rule below rather than guessed at).
 function familyVersionOf(canonical: string): FamilyVersion | null {
   const m = /^claude-(opus|sonnet|haiku|fable|mythos)-(\d+)(?:-(\d+))?$/.exec(canonical);
   if (!m) return null;
@@ -133,18 +127,16 @@ interface Drift {
 // comparison is against the rate in effect at that instant, which is exactly
 // why sonnet-5's intro-rate representation in LiteLLM is not a false alarm.
 //
-// "New model" decision (Vincent, 2026-08-05): a canonical id ABSENT from the
-// table is reported ONLY when its version is ABOVE the family's known max.
-// Taken literally, "absent from the table" drowned the real signal under 109
-// false alerts against the live feed — historical ids (claude-opus-4-1,
+// "New model" rule: a canonical id ABSENT from the table is reported ONLY when
+// its version is ABOVE the family's known max. Taken literally, "absent from
+// the table" would drown the real signal — historical ids (claude-opus-4-1,
 // claude-opus-4) and un-normalized regional routing variants are also
 // "absent" but are not news. Known models keep the exact tariff comparison
-// below unchanged.
+// below.
 //
-// "Base tariff only" decision (Vincent, 2026-08-05, round 2): the embedded
-// table represents the BASE (direct-API) tariff. Measured on the real feed
-// the same day, the us./eu./au.anthropic.* regional endpoints carry a
-// uniform +10% premium on all four fields over that base — a different SKU,
+// "Base tariff only" rule: the embedded table represents the BASE (direct-API)
+// tariff. On the live feed, the us./eu./au.anthropic.* regional endpoints carry
+// a uniform premium on all four fields over that base — a different SKU,
 // not a drift of the canonical model. So tariff comparison is restricted to
 // feed keys that are ALREADY canonical (normalizeModel(k) === k, i.e. the bare
 // id LiteLLM also carries for every model) — every prefixed transport or

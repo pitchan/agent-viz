@@ -15,15 +15,14 @@ function isAdapterKey(key: string): key is keyof typeof TRANSCRIPT_ADAPTERS {
   return Object.hasOwn(TRANSCRIPT_ADAPTERS, key);
 }
 
-// Pre-0.2.0 hooks did not stamp _source; null/undefined defaults to claude
-// (the historical producer). An unknown string means a new agent source
-// landed in the hook layer without a matching adapter — that's a bug we want
-// surfaced, not silently absorbed, but not severe enough to crash the whole
-// transcript pipeline (which would take down all sessions).
+// An event without _source (null/undefined: its hook did not stamp one)
+// defaults to claude, the historical producer. An unknown string means a new
+// agent source landed in the hook layer without a matching adapter — that's a
+// bug we want surfaced, not silently absorbed, but not severe enough to crash
+// the whole transcript pipeline (which would take down all sessions).
 //
 // `agentSource` arrive d'un JSONL non typé (`evt._source` / `rec.agentSource`
-// dans transcript.ts, hors lot) : `unknown`, pas `string`, jusqu'à preuve du
-// contraire.
+// dans transcript.ts) : `unknown`, pas `string`, jusqu'à preuve du contraire.
 function getAdapter(agentSource: unknown) {
   if (agentSource == null) return TRANSCRIPT_ADAPTERS.claude;
   if (typeof agentSource === 'string' && isAdapterKey(agentSource)) {
