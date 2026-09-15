@@ -170,9 +170,9 @@ describe('conseil « préfixe modifié » dans le rendu terminal', () => {
 describe('CLI bout-en-bout', () => {
   test('netgain doctor --json écrit un rapport JSON valide sur stdout, exit 0', () => {
     const netgainRoot = path.resolve(import.meta.dirname, '..', '..');
-    // Résolu par NOM et non par chemin figé : un espace de travail npm hisse les
-    // dépendances vers la racine du dépôt, où ce test doit les retrouver aussi.
-    // `tsx` n'exporte pas dist/cli.mjs, d'où le détour par son package.json.
+    // Résolu par NOM et non par chemin figé : `tsx` est trouvé là où npm l'a
+    // installé. Le sous-chemin `tsx/dist/cli.mjs` n'est pas exporté, d'où le
+    // détour par le `package.json` de `tsx`, qui l'est.
     const requireFromHere = createRequire(import.meta.url);
     const tsxCli = path.join(path.dirname(requireFromHere.resolve('tsx/package.json')), 'dist', 'cli.mjs');
     const out = execFileSync(
