@@ -5,10 +5,9 @@ import { afterAll, afterEach, beforeEach, describe, expect, test, vi } from 'vit
 import { runDoctorCli } from '../../src/engine/doctor/index.ts';
 import { promptLine, writeSessionTree } from '../helpers/build-transcript.ts';
 
-// C5 : le point de resolution REEL du moteur, celui que l'audit designe
-// (src/engine/doctor/index.ts:112). Le test de `resolveClaudeDir` prouve la
-// primitive ; celui-ci prouve que le moteur la BRANCHE — sans lui, une primitive
-// parfaite pourrait coexister avec une ligne 112 restee sur l'ancienne variable.
+// Le test de `resolveClaudeDir` prouve la primitive ; celui-ci prouve que `runDoctorCli`
+// (src/engine/doctor/index.ts) la BRANCHE : sans lui, une primitive parfaite pourrait
+// coexister avec un point d'appel qui lit encore une autre variable.
 //
 // On passe par `runDoctorCli` et non par la primitive : c'est la seule facon de
 // voir la variable produire un effet observable de bout en bout.
@@ -56,11 +55,9 @@ describe('runDoctorCli — la racine scannee', () => {
     expect(sorties.join('')).toContain(`1 session(s) découverte(s) sous ${racine}`);
   });
 
-  // Temoin negatif. Avant C5 ce test etait VERT a l'envers : c'etait
-  // NETGAIN_CLAUDE_DIR qui deplacait le moteur, et CLAUDE_CONFIG_DIR qui ne
-  // faisait rien — verifie en executant les deux croisements sur le binaire
-  // construit avant d'ecrire une ligne.
-  test('NETGAIN_CLAUDE_DIR ne deplace plus rien — l\'ancienne variable est morte', async () => {
+  // Temoin negatif : si le moteur lisait encore NETGAIN_CLAUDE_DIR, la session posee sous
+  // `racine` serait decouverte ici.
+  test('NETGAIN_CLAUDE_DIR ne deplace pas le dossier lu', async () => {
     process.env['NETGAIN_CLAUDE_DIR'] = racine;
     expect(await runDoctorCli({ json: false, list: true })).toBe(0);
     expect(sorties.join('')).toContain(`0 session(s) découverte(s) sous ${path.join(home, '.claude')}`);
@@ -72,9 +69,8 @@ describe('runDoctorCli — la racine scannee', () => {
     expect(sorties.join('')).toContain(`1 session(s) découverte(s) sous ${racine}`);
   });
 
-  // La cecite silencieuse trouvee en executant : avec `??`, une variable posee
-  // mais vide faisait scanner la chaine vide et annoncer « 0 session(s)
-  // découverte(s) sous  » — un utilisateur y lit « je n'ai pas de sessions ».
+  // Lue avec `??`, une variable posee mais vide faisait scanner la chaine vide et annoncer
+  // « 0 session(s) découverte(s) sous  » : un utilisateur y lit « je n'ai pas de sessions ».
   test('une variable VIDE retombe sur le home, jamais sur la chaine vide', async () => {
     process.env['CLAUDE_CONFIG_DIR'] = '';
     expect(await runDoctorCli({ json: false, list: true })).toBe(0);

@@ -150,7 +150,7 @@ test('PowerShell est un porteur de commande au meme titre que Bash', () => {
 
 test('un lancement en arriere-plan accuse le depart, il ne rend aucun verdict', () => {
   // Arrange — le tool_result est vert, mais c'est l'accusé de lancement : le
-  // compter fabriquerait un `ok: true` sans preuve (doc/41, D4).
+  // compter fabriquerait un `ok: true` sans preuve.
   const agg = new VerificationAggregator();
   agg.addAssistant(assistant({ timestamp: T(1),
     toolUses: [{ id: 'v1', name: 'Bash', input: { command: 'npm test', run_in_background: true } }] }) as never, 'main');
@@ -188,9 +188,8 @@ test('une affectation a valeur vide est retiree comme les autres', () => {
   assert.equal(stats.lastVerification?.command, 'npm test');
 });
 
-// Revue finale de branche (ruling 20) : le nettoyage etait ancre en TETE de
-// chaine. Les deux formes ci-dessous echappaient donc a la redaction et
-// entraient verbatim dans le rapport PERSISTE.
+// Un nettoyage ancre en TETE de chaine laissait echapper les deux formes ci-dessous :
+// elles entraient verbatim dans le rapport PERSISTE.
 test('une affectation au MILIEU d un compose est retiree elle aussi', () => {
   // Arrange
   const agg = new VerificationAggregator();

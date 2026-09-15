@@ -1,7 +1,5 @@
-// Le classement déclaratif des commandes de vérification (doc/41) : la table
-// est la spec, ces cas sont les frontières mesurées avant la sonde. La règle
-// qui les gouverne toutes : nommer un outil n'est pas l'exécuter — une fausse
-// preuve se paie (doc/41, D4).
+// Les frontières du classement déclaratif des commandes de vérification. La règle qui les
+// gouverne toutes : nommer un outil n'est pas l'exécuter, car une fausse preuve se paie.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { classifyVerification } from '../../src/engine/doctor/verification-commands.ts';
@@ -118,7 +116,7 @@ test('le tout-venant du shell rend null', () => {
 });
 
 test('une entree qui n est pas une chaine rend null', () => {
-  // Arrange — la sonde (doc/41) lit du JSON de transcript non type.
+  // Arrange — la commande vient d'un JSON de transcript non typé.
   const notCommands = [undefined, null, 42, { command: 'npm test' }];
   // Act
   const kinds = notCommands.map(classifyVerification);

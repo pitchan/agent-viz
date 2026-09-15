@@ -242,16 +242,10 @@ describe('priceTable — le barème réellement appliqué, exposé', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// C4 (2026-08-11) — la normalisation du serveur devient celle du moteur.
-// Trouvé par sonde différentielle : `normalizeId` de src/server/pricing.js est
-// un SUR-ENSEMBLE strict de `normalizeModel`. Sur un identifiant régional, le
-// moteur disait « inconnu / coût partiel » pendant que le serveur tarifait
-// correctement — exactement le symptôme que C4 doit fermer, déclenché par une
-// autre entrée. 0 occurrence sur les 833 transcripts de la machine de mesure :
-// latent ici, réel pour un déploiement Bedrock/Vertex.
-// ---------------------------------------------------------------------------
-describe('normalizeModel — routage régional et transport (C4)', () => {
+// Le serveur et le moteur tarifent avec CETTE normalisation (src/server/pricing.ts
+// l'importe) : un identifiant de routage régional ou de transport (Bedrock, Vertex) doit
+// s'y réduire à sa forme canonique, sinon son coût est dit inconnu.
+describe('normalizeModel — routage régional et transport', () => {
   test('retire le préfixe de routeur régional', () => {
     expect(normalizeModel('us.anthropic.claude-opus-4-7')).toBe('claude-opus-4-7');
     expect(normalizeModel('eu.anthropic.claude-haiku-4-5')).toBe('claude-haiku-4-5');
@@ -260,8 +254,8 @@ describe('normalizeModel — routage régional et transport (C4)', () => {
   });
 
   test('retire DEUX préfixes empilés, pas seulement le premier', () => {
-    // Le motif d'origine était une alternance appliquée une seule fois :
-    // `bedrock/` partait, `anthropic.` restait, et l'identifiant restait inconnu.
+    // Une alternance appliquée une seule fois retirerait `bedrock/` et laisserait
+    // `anthropic.` : l'identifiant resterait inconnu.
     expect(normalizeModel('bedrock/anthropic.claude-opus-4-7-v1:0')).toBe('claude-opus-4-7');
     expect(normalizeModel('vertex_ai/anthropic.claude-opus-5')).toBe('claude-opus-5');
   });
@@ -292,15 +286,10 @@ describe('normalizeModel — routage régional et transport (C4)', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// C4 (2026-08-11) — durcissement de `cache_creation`. Le serveur délègue
-// désormais SA formule à celle-ci ; sans ces gardes, l'unification ferait
-// APPARAÎTRE côté serveur une panne qu'il n'avait pas. `cache_creation: null`
-// est du JSON parfaitement valide : 0 occurrence sur 833 transcripts, donc
-// latent, mais rien dans la chaîne ne l'arrête (`asRec` ne normalise que
-// `usage` lui-même, pas ses champs).
-// ---------------------------------------------------------------------------
-describe('computeCost — cache_creation non exploitable (C4)', () => {
+// Le serveur calcule son coût par `computeCost` lui aussi (src/server/tokens.ts).
+// `cache_creation: null` est du JSON valide que rien n'arrête en amont : `normalizeEvent`
+// écarte un `usage` non-objet, pas ses champs. Sans ces gardes, la fonction lèverait.
+describe('computeCost — cache_creation non exploitable', () => {
   const attendu5m = (cc: number) => 100 * 5e-6 + cc * 6.25e-6; // opus-4-8
 
   test('cache_creation null : pas de levée, tout le total au tarif 5m', () => {

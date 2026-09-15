@@ -2,25 +2,13 @@ import path from 'node:path';
 import { describe, expect, test } from 'vitest';
 import { CLAUDE_DIR_ENV, resolveClaudeDir, resolveClaudeJsonPath } from '../../src/engine/core/claude-dir.ts';
 
-// C5 (docs/audit-qualite-code.md) : DEUX variables d'environnement designaient le
-// meme dossier dans un SEUL paquet npm — CLAUDE_CONFIG_DIR cote produit
-// (src/server/observatory/index.js), NETGAIN_CLAUDE_DIR cote moteur (ici). Poser
-// l'une ne changeait que la moitie correspondante : deux vues du meme produit sur
-// deux jeux de sessions, sans qu'aucun message n'avertisse de l'ecart.
+// Une seule resolution du dossier de configuration, importee par le serveur et par le
+// moteur : un nom de variable par moitie du produit ne deplacerait que cette moitie, et
+// deux vues liraient deux jeux de sessions sans avertir.
 //
-// Prouve par execution avant d'ecrire une ligne, les quatre croisements :
-//   NETGAIN_CLAUDE_DIR pose -> moteur 1 session / serveur ~/.claude
-//   CLAUDE_CONFIG_DIR  pose -> moteur 0 session / serveur dossier pose
-//
-// C'est CLAUDE_CONFIG_DIR qui survit, et pas par gout : c'est le nom que Claude
-// Code definit LUI-MEME (31 occurrences dans le binaire 2.1.226 installe, 0 pour
-// NETGAIN_CLAUDE_DIR — temoin negatif). Le moteur observe ce produit ; il adopte
-// donc son vocabulaire au lieu d'en inventer un second.
-//
-// L'ancienne variable est SUPPRIMEE, pas repliee (arbitrage de Vincent) : le
-// produit n'est installe que chez lui et la variable n'etait annoncee qu'au
-// `netgain --help`. Le dernier test de ce fichier est le filet qui empeche
-// qu'elle revienne par megarde.
+// Le nom retenu est CLAUDE_CONFIG_DIR, celui que Claude Code definit lui-meme.
+// NETGAIN_CLAUDE_DIR n'est pas lue, meme en repli : le test « NETGAIN_CLAUDE_DIR est
+// ignorée » empeche qu'elle revienne.
 
 const HOME = path.join('C:', 'faux-home');
 const AILLEURS = path.join('D:', 'ailleurs', '.claude');
@@ -40,13 +28,8 @@ describe('resolveClaudeDir', () => {
       .toBe(explicite);
   });
 
-  // La SECONDE divergence, invisible dans le rapport d'audit et trouvee en
-  // executant : le moteur employait `??` (nullish) la ou le serveur employait
-  // `||` (falsy). Avec la variable posee mais VIDE, le moteur scannait la chaine
-  // vide et annoncait « 0 session(s) decouverte(s) sous  » — une cecite totale,
-  // en silence, alors que le serveur retombait correctement sur ~/.claude.
-  // Une variable vide EST une variable non posee : c'est le sens du serveur qui
-  // est retenu, sur les deux moities.
+  // Une variable VIDE est une variable non posee : lue avec `??`, elle faisait scanner la
+  // chaine vide et annoncer « 0 session(s) decouverte(s) sous  », une cecite silencieuse.
   test('une variable VIDE vaut une variable non posee — jamais scanner la chaine vide', () => {
     expect(resolveClaudeDir({ env: { [CLAUDE_DIR_ENV]: '' }, home: HOME })).toBe(path.join(HOME, '.claude'));
   });
@@ -57,7 +40,7 @@ describe('resolveClaudeDir', () => {
 
   // Temoin negatif : sans lui, une resolution qui lirait ENCORE l'ancienne
   // variable passerait tous les tests ci-dessus.
-  test('NETGAIN_CLAUDE_DIR n\'est plus lue — l\'ancienne variable est morte', () => {
+  test('NETGAIN_CLAUDE_DIR est ignorée', () => {
     expect(resolveClaudeDir({ env: { NETGAIN_CLAUDE_DIR: AILLEURS }, home: HOME }))
       .toBe(path.join(HOME, '.claude'));
   });
@@ -67,19 +50,9 @@ describe('resolveClaudeDir', () => {
   });
 });
 
-// `~/.claude.json` porte l'inventaire MCP que lit la carte R2 de l'Observatoire.
-// La MEME variable le deplace — etabli PAR EXECUTION sur Claude Code 2.1.226,
-// les deux branches, dans un home entierement jetable :
-//   CLAUDE_CONFIG_DIR posee     -> ecrit $CLAUDE_CONFIG_DIR/.claude.json
-//   CLAUDE_CONFIG_DIR non posee -> ecrit ~/.claude.json
-// Recoupe sur une machine reelle : <home>/.claude.json existe,
-// <home>/.claude/.claude.json n'existe pas.
-//
-// Le produit, lui, cherchait ce fichier au home DANS TOUS LES CAS
-// (src/server/observatory/index.js:34). Ce n'est pas une hypothese : c'est ce
-// qui fait disparaitre la carte R2 sous le protocole de controle du depot, ou
-// USERPROFILE est jetable et CLAUDE_CONFIG_DIR reel — cout accepte d'avance dans
-// cette recette, alors que c'etait ce defaut-ci.
+// `.claude.json` (l'inventaire MCP de la carte R2) suit la MEME variable, autrement que le
+// dossier : posee, Claude Code 2.1.226 l'ecrit dedans ; absente, a cote du home. Le serveur
+// le lit par cette fonction, dans `getObservatoryService` (src/server/observatory/index.ts).
 describe('resolveClaudeJsonPath', () => {
   test('sans variable, le fichier est A COTE du dossier, pas dedans', () => {
     // Le piege exact : `path.join(resolveClaudeDir(), '.claude.json')` donnerait

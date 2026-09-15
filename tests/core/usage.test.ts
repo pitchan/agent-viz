@@ -3,23 +3,9 @@ import {
   addUsage, countOrZero, emptyUsageBucket, isDedupableMsgId, isTokenCount, sumUsageInto, usageVerdict,
 } from '../../src/engine/core/usage.ts';
 
-// C3 (docs/audit-qualite-code.md) : l'accumulation des jetons d'usage etait
-// reimplementee cote serveur (src/server/tokens.js, `accumulateUsage`) et cote
-// moteur (src/engine/doctor/aggregators/tokens.ts, `addUsage`).
-//
-// LA FICHE SE TROMPAIT SUR UN POINT, et la sonde differentielle l'a montre en
-// EXECUTANT les deux fonctions reelles sur la meme matrice : elle affirmait
-// « les memes gardes a zero » et « pas de divergence de comportement sur ce
-// perimetre commun ». Il y en avait deux — la meme famille qu'en C5, une
-// question de garde :
-//
-//   input_tokens: NaN      -> serveur 0 (`|| 0`)  · moteur NaN (`?? 0`)
-//   meme id "" deux fois   -> serveur accumule 2x · moteur deduplique
-//
-// AUCUNE DES DEUX N'ETAIT ATTEIGNABLE, verifie aussi : `JSON.parse` REFUSE le
-// litteral NaN, et `"id":""` apparait 0 fois sur les 833 transcripts de la
-// machine. Ce sont des pieges latents — gratuits a supprimer en unifiant, pas
-// des defauts vivants. Ne pas les raconter comme des pannes.
+// Les gardes de l'usage vivent a un seul endroit : le serveur (src/server/tokens.ts,
+// `accumulateUsage`) et les agregateurs du moteur importent ces fonctions, donc une garde
+// changee ici change les deux cotes a la fois.
 
 describe('addUsage — un seul jeu de gardes', () => {
   test('accumule les six champs', () => {
@@ -46,9 +32,8 @@ describe('addUsage — un seul jeu de gardes', () => {
     expect(b).toEqual(emptyUsageBucket());
   });
 
-  // LA GARDE RETENUE : un champ qui n'est pas un compte (entier >= 0) vaut zero. Ni le
-  // `|| 0` du serveur ni le `?? 0` du moteur ne couvraient tout, et il fallait
-  // en choisir une seule — c'est ce que la cible de la fiche demande.
+  // Un champ qui n'est pas un compte (entier >= 0) vaut zero : ni `|| 0`, qui laisse passer
+  // une chaine, ni `?? 0`, qui laisse passer NaN, ne couvrent tous les poisons.
   test('NaN vaut zero, il n\'empoisonne pas le seau', () => {
     const b = emptyUsageBucket();
     addUsage(b, { input_tokens: NaN, output_tokens: 5 });
@@ -57,9 +42,8 @@ describe('addUsage — un seul jeu de gardes', () => {
     expect(Number.isNaN(b.in)).toBe(false);
   });
 
-  // Le SEUL des poisons qui soit atteignable depuis du JSON valide : `1e999`
-  // s'analyse en Infinity (verifie en executant, la ou le litteral `NaN` est
-  // refuse). Les deux implementations d'avant le laissaient passer.
+  // `1e999` est du JSON valide et s'analyse en Infinity, la ou le litteral `NaN` est
+  // refuse : c'est le poison numerique qu'un transcript peut vraiment porter.
   test('Infinity vaut zero — c\'est le poison qu\'un JSON valide peut porter', () => {
     const b = emptyUsageBucket();
     expect(JSON.parse('{"input_tokens":1e999}').input_tokens).toBe(Infinity);
@@ -68,12 +52,8 @@ describe('addUsage — un seul jeu de gardes', () => {
     expect(b.out).toBe(5);
   });
 
-  // CHANGEMENT DE COMPORTEMENT VOULU. Avant, les DEUX
-  // cotes rendaient la chaine "0100" — verifie en executant : `0 + "100"`
-  // concatene, et le seau partait en chaine pour toute la suite de la session,
-  // jusque dans l'enveloppe SSE. Un nombre en chaine est une ligne malformee ;
-  // la compter zero est une perte, la laisser casser l'arithmetique en est une
-  // autre, plus large. Aucun transcript reel n'en porte.
+  // `0 + "100"` concatene : sans cette garde, le seau passerait en texte pour toute la
+  // session, jusque dans l'enveloppe SSE. Un nombre en chaine est un champ malforme.
   test('un nombre en chaine vaut zero, il ne transforme pas le seau en texte', () => {
     const b = emptyUsageBucket();
     addUsage(b, { input_tokens: '100' as unknown as number, output_tokens: 5 });
@@ -133,14 +113,8 @@ describe('isDedupableMsgId — la regle de deduplication, une seule fois', () =>
     expect(isDedupableMsgId(undefined)).toBe(false);
   });
 
-  // L'ARBITRAGE, et c'est le seul point ou les deux cotes se contredisaient
-  // vraiment : le serveur testait la verite (`if (msgId)`), le moteur la
-  // non-nullite (`if (msgId !== null)`). C'est le SENS DU SERVEUR qui est
-  // retenu — un identifiant vide n'est pas un identifiant.
-  //
-  // Ce n'est pas un choix de style : dedupliquer sur "" fusionnerait des
-  // messages DISTINCTS qui n'ont pas d'identifiant en un seul, donc
-  // SOUS-COMPTERAIT. Meme doctrine que la variable d'environnement vide de C5.
+  // Un identifiant vide n'est pas un identifiant : dedupliquer sur "" fusionnerait des
+  // messages DISTINCTS sans identifiant en un seul, donc SOUS-COMPTERAIT.
   test('une chaine VIDE n\'est pas un identifiant — sinon on sous-compte', () => {
     expect(isDedupableMsgId('')).toBe(false);
   });

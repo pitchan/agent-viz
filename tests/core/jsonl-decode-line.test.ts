@@ -1,20 +1,12 @@
 import { describe, expect, test } from 'vitest';
 import { decodeJsonlLine, iterJsonlLines, type JsonlLine } from '../../src/engine/core/jsonl.ts';
 
-// C2 (docs/audit-qualite-code.md) : le decodage JSONL est reimplemente sur 7
-// fichiers cote serveur, avec une tolerance au BOM incidente et inegale.
+// `decodeJsonlLine` porte la decision prise sur UNE ligne, a un seul endroit : ignorer une
+// ligne vide, analyser, SIGNALER un echec au lieu de l'avaler. Les modes de lecture (flux,
+// contenu en memoire, sonde bornee, tail incremental) restent aux appelants.
 //
-// Ce qui est commun aux sept n'est PAS la lecture — ils lisent de quatre
-// manieres legitimement differentes (flux complet, contenu deja en memoire,
-// sonde bornee a 4 Ko, tail incremental) — mais la decision prise sur UNE
-// ligne : retirer le BOM, ignorer une ligne vide, analyser, et SIGNALER un
-// echec au lieu de l'avaler. C'est cette decision qu'on extrait ici, pour
-// qu'elle ait une seule definition.
-//
-// `iterJsonlLines` devient un simple mode de lecture par-dessus. Son
-// comportement ne doit pas bouger d'un iota : son test d'origine
-// (jsonl.test.ts) reste la preuve de non-regression, et le dernier test de ce
-// fichier verifie explicitement que les deux passent par le meme chemin.
+// `iterJsonlLines` est l'un de ces modes : jsonl.test.ts tient son comportement, et le test
+// « les deux rendent le meme verdict sur les memes lignes » verifie qu'il passe par ici.
 
 describe('decodeJsonlLine', () => {
   test('une ligne valide rend sa valeur', () => {
@@ -36,11 +28,9 @@ describe('decodeJsonlLine', () => {
     expect(decodeJsonlLine('{"a":1}\r')).toEqual({ ok: true, value: { a: 1 } });
   });
 
-  // Ce test a d'abord ete ecrit FAUX : il attendait qu'un BOM hors premiere
-  // ligne soit signale en erreur. Il ne peut pas l'etre — trim() retire deja
-  // U+FEFF, qui appartient a la production WhiteSpace d'ECMAScript. C'est le
-  // test rouge qui a revele que le retrait conditionnel « seulement sur la
-  // premiere ligne » de la version precedente etait du CODE MORT.
+  // Un BOM hors premiere ligne ne peut pas etre signale : trim() retire U+FEFF, qui
+  // appartient a la production WhiteSpace d'ECMAScript. Un retrait explicite « premiere
+  // ligne seulement » serait du code mort.
   test('un BOM est tolere sur N’IMPORTE QUELLE ligne, et c’est trim() qui le fait', () => {
     const BOM = String.fromCharCode(0xfeff);
     expect(decodeJsonlLine(BOM + '{"a":1}')).toEqual({ ok: true, value: { a: 1 } });
