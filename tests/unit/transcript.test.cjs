@@ -158,6 +158,53 @@ test('lines without usage payload return false and do not touch buckets', () => 
   assert.equal(rec.tokens.perAgent.size, 0);
 });
 
+// Seule l'absence de `usage` écarte une ligne. Un `usage` qui n'est pas un objet
+// arrive jusqu'au seau, qui le compte zéro, au lieu de disparaître ici sans trace.
+// Un test de vérité (`!usage`) écarterait aussi `0`, `false` et `""`.
+const USAGE_NON_OBJET = [
+  ['fil principal', 'x',
+    (usage) => ({ type: 'assistant', isSidechain: false, message: { model: 'claude-sonnet-4-5', usage } }),
+    (rec) => rec.tokens.main],
+  ['fil principal', 0,
+    (usage) => ({ type: 'assistant', isSidechain: false, message: { model: 'claude-sonnet-4-5', usage } }),
+    (rec) => rec.tokens.main],
+  ['sous-agent à fichier propre', 0,
+    (usage) => ({ type: 'assistant', isSidechain: true, agentId: 'agent-nonobjet', message: { model: 'claude-haiku-4-5', usage } }),
+    (rec) => rec.tokens.perAgent.get('agent-nonobjet')],
+  ['sous-agent en agent_progress', 0,
+    (usage) => ({ type: 'progress', data: { type: 'agent_progress', agentId: 'agent-nonobjet', message: { message: { model: 'claude-haiku-4-5', usage } } } }),
+    (rec) => rec.tokens.perAgent.get('agent-nonobjet')],
+];
+
+for (const [forme, valeur, ligne, seau] of USAGE_NON_OBJET) {
+  test(`${forme} : un usage ${JSON.stringify(valeur)} n'est pas écarté, la ligne compte zéro jeton`, () => {
+    // Arrange
+    const rec = freshRec();
+    const line = JSON.stringify(ligne(valeur));
+
+    // Act
+    const changed = parseTranscriptEvent(line, rec);
+
+    // Assert
+    assert.equal(changed, true);
+    assert.equal(seau(rec).in, 0);
+  });
+}
+
+test('un usage null est écarté comme un usage absent : aucun seau ne bouge', () => {
+  // Arrange
+  const rec = freshRec();
+  const line = JSON.stringify({ type: 'assistant', isSidechain: false, message: { model: 'claude-sonnet-4-5', usage: null } });
+
+  // Act
+  const changed = parseTranscriptEvent(line, rec);
+
+  // Assert
+  assert.equal(changed, false);
+  assert.equal(rec.tokens.main.lastModel, null);
+  assert.equal(rec.tokens.perAgent.size, 0);
+});
+
 test('main-thread line without model still records tokens but no cost', () => {
   // Defensive: older transcript schemas may omit `model`. Tokens should still
   // accumulate (the user wants to see them) but cost stays at 0.

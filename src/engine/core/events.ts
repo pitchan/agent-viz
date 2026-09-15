@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto';
+import { usageVerdict } from './usage.ts';
+import type { UsageVerdict } from './usage.ts';
 
 export interface RawUsage {
   input_tokens?: number;
@@ -23,6 +25,8 @@ export type NormalizedEvent =
       msgId: string | null;
       model: string | null;
       usage: RawUsage | null;
+      /** `usage` à `null` ne dit plus si le champ manquait ou n'était pas un objet : le verdict, lui, le dit. */
+      usageVerdict: UsageVerdict;
       toolUses: ToolUseRef[];
       textChars: number;
       timestamp?: string;
@@ -103,6 +107,7 @@ function normalizeAssistant(line: Rec): NormalizedEvent {
     msgId: asStr(message['id']),
     model: asStr(message['model']),
     usage: asRec(message['usage']) as RawUsage | null,
+    usageVerdict: usageVerdict(message['usage']),
     toolUses,
     textChars,
     ...(timestamp !== null ? { timestamp } : {}),

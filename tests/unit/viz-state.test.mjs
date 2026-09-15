@@ -40,7 +40,7 @@ test('state.tokens.transcriptMissing defaults to false', () => {
   assert.equal(state.tokens.transcriptMissing, false);
 });
 
-test('tokenContext: Infinity on one field does not poison the sum (finiteCount guard)', () => {
+test('tokenContext: Infinity on one field does not poison the sum (countOrZero guard)', () => {
   // Arrange — Infinity passes an `|| 0` guard untouched.
   const t = { lastIn: Infinity, lastCacheCreate: 1, lastCacheRead: 1 };
 

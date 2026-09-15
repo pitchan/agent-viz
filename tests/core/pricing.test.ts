@@ -338,10 +338,10 @@ describe('computeCost — cache_creation non exploitable (C4)', () => {
   });
 });
 
-// computeCost garde chaque champ brut par `finiteCount` : un champ non fini
-// (NaN, Infinity, une chaîne) coûte zéro, comme il compte zéro jeton dans
-// usage.ts — jamais une conversion implicite qui facture un texte.
-describe('computeCost — champ brut non fini : coûte zéro comme il compte zéro', () => {
+// computeCost garde chaque champ brut par `countOrZero` : un champ qui n'est
+// pas un compte (NaN, Infinity, une chaîne, un négatif, un décimal) coûte zéro,
+// comme il compte zéro jeton dans usage.ts — jamais une conversion implicite qui facture un texte.
+describe('computeCost — champ brut qui n’est pas un compte : coûte zéro comme il compte zéro', () => {
   const model = 'claude-opus-4-8';
   const resteValide = {
     output_tokens: 2000,
@@ -350,7 +350,7 @@ describe('computeCost — champ brut non fini : coûte zéro comme il compte zé
     cache_creation: { ephemeral_5m_input_tokens: 4000, ephemeral_1h_input_tokens: 6000 },
   };
   // Référence : mêmes champs valides, input_tokens à zéro — ce que doit rendre
-  // chaque cas malformé ci-dessous, puisque finiteCount les compte à zéro.
+  // chaque cas malformé ci-dessous, puisque countOrZero les compte à zéro.
   const coutSansInput = computeCost({ ...resteValide, input_tokens: 0 }, model).usd as number;
 
   test.each([
@@ -358,6 +358,8 @@ describe('computeCost — champ brut non fini : coûte zéro comme il compte zé
     ['NaN', NaN],
     ['chaîne non numérique', 'abc'],
     ['chaîne numérique convertible', '1000'],
+    ['négatif', -10],
+    ['décimal', 1.5],
   ])('input_tokens = %s : usd fini, champs valides facturés normalement', (_label, valeur) => {
     const r = computeCost({ ...resteValide, input_tokens: valeur } as never, model);
     expect(Number.isFinite(r.usd)).toBe(true);
@@ -385,7 +387,7 @@ describe('computeCost — champ brut non fini : coûte zéro comme il compte zé
 // cache_creation_input_tokens n'est lu que quand l'objet cache_creation est
 // absent (tout part alors au tarif 5m) : cette voie a sa propre garde à
 // prouver, le describe ci-dessus ne l'atteint jamais.
-describe('computeCost — cache_creation_input_tokens non fini SANS objet cache_creation', () => {
+describe('computeCost — cache_creation_input_tokens qui n’est pas un compte SANS objet cache_creation', () => {
   const model = 'claude-opus-4-8';
   const reference = computeCost({ input_tokens: 10, output_tokens: 20 }, model).usd as number;
 
@@ -394,6 +396,8 @@ describe('computeCost — cache_creation_input_tokens non fini SANS objet cache_
     ['NaN', NaN],
     ['chaîne non numérique', 'x'],
     ['chaîne numérique convertible', '1000'],
+    ['négatif', -10],
+    ['décimal', 1.5],
   ])('cache_creation_input_tokens = %s : usd fini, égal au coût des champs valides', (_label, valeur) => {
     const r = computeCost(
       { input_tokens: 10, output_tokens: 20, cache_creation_input_tokens: valeur } as never,

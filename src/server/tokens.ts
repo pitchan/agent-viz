@@ -18,7 +18,7 @@
 import { broadcastSSE } from './sse.ts';
 import { getPrice } from './pricing.ts';
 import { computeCost, normalizeModel, pricingKindOf } from '../engine/core/pricing.ts';
-import { addUsage, emptyUsageBucket, finiteCount, isDedupableMsgId } from '../engine/core/usage.ts';
+import { addUsage, countOrZero, emptyUsageBucket, isDedupableMsgId } from '../engine/core/usage.ts';
 import type { UsageBucket } from '../engine/core/usage.ts';
 import type { RawUsage } from '../engine/core/events.ts';
 
@@ -98,7 +98,7 @@ function ensureTokens(rec: { tokens?: unknown }): void {
 
 function tokenSum(b: UsageBucket | null | undefined): number {
   if (!b) return 0;
-  return finiteCount(b.in) + finiteCount(b.out) + finiteCount(b.cacheCreate) + finiteCount(b.cacheRead);
+  return countOrZero(b.in) + countOrZero(b.out) + countOrZero(b.cacheCreate) + countOrZero(b.cacheRead);
 }
 
 /** Un seau réel, reconnu à ses champs propres — jamais un cast : la même
@@ -142,9 +142,9 @@ function accumulateUsage(
   // in chronological order, so "last wins" gives the current context size.
   // Même garde que la primitive : sans elle, un message malformé donnerait
   // `in: 0` mais `lastIn: "100"` — une incohérence à l'intérieur d'un seul seau.
-  bucket.lastIn = finiteCount(raw.input_tokens);
-  bucket.lastCacheCreate = finiteCount(raw.cache_creation_input_tokens);
-  bucket.lastCacheRead = finiteCount(raw.cache_read_input_tokens);
+  bucket.lastIn = countOrZero(raw.input_tokens);
+  bucket.lastCacheCreate = countOrZero(raw.cache_creation_input_tokens);
+  bucket.lastCacheRead = countOrZero(raw.cache_read_input_tokens);
   // Le coût s'accumule message par message, au barème en vigueur à la date `at` du message.
   // La nature du tarif vient de `pricingKindOf` : ni un montant nul (un modèle tarifé sans
   // jeton coûte 0 $) ni `getPrice`, réservé aux métadonnées d'affichage, ne la disent.
@@ -160,7 +160,7 @@ function accumulateUsage(
       bucket.costComplete = false;
     } else {
       // Tarifé ou zéro voulu (`<synthetic>`, Ollama local) : le montant compte, le total reste complet.
-      // `usd` est fini (chaque champ passe par `finiteCount`) et `null` seulement pour un tarif
+      // `usd` est fini (chaque champ passe par `countOrZero`) et `null` seulement pour un tarif
       // inconnu, écarté ci-dessus : `?? 0` ne traite que ce cas.
       const cost = computeCost(raw, model, at ?? undefined).usd;
       bucket.costUsd += cost ?? 0;

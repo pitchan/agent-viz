@@ -345,7 +345,7 @@ Extrait de la sortie :
 
 ```
 git grep -nE "from '(\.\./)+engine/" -- src/server
-  src/server/tokens.ts:21:import { addUsage, emptyUsageBucket, finiteCount, isDedupableMsgId } from '../engine/core/usage.ts';
+  src/server/tokens.ts:21:import { addUsage, countOrZero, emptyUsageBucket, isDedupableMsgId } from '../engine/core/usage.ts';
   src/server/observatory/engine.ts:12:import { discoverSessions, parseSince, priceTable } from '../../engine/core/index.ts';
   src/server/transcript.ts:13:import { decodeJsonlLine } from '../engine/core/jsonl.ts';
 ```

@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'vitest';
-import { addUsage, emptyUsageBucket, isDedupableMsgId, sumUsageInto } from '../../src/engine/core/usage.ts';
+import {
+  addUsage, countOrZero, emptyUsageBucket, isDedupableMsgId, isTokenCount, sumUsageInto, usageVerdict,
+} from '../../src/engine/core/usage.ts';
 
 // C3 (docs/audit-qualite-code.md) : l'accumulation des jetons d'usage etait
 // reimplementee cote serveur (src/server/tokens.js, `accumulateUsage`) et cote
@@ -44,7 +46,7 @@ describe('addUsage — un seul jeu de gardes', () => {
     expect(b).toEqual(emptyUsageBucket());
   });
 
-  // LA GARDE RETENUE : un champ qui n'est pas un nombre FINI vaut zero. Ni le
+  // LA GARDE RETENUE : un champ qui n'est pas un compte (entier >= 0) vaut zero. Ni le
   // `|| 0` du serveur ni le `?? 0` du moteur ne couvraient tout, et il fallait
   // en choisir une seule — c'est ce que la cible de la fiche demande.
   test('NaN vaut zero, il n\'empoisonne pas le seau', () => {
@@ -79,10 +81,18 @@ describe('addUsage — un seul jeu de gardes', () => {
     expect(typeof b.in).toBe('number');
   });
 
-  test('un nombre negatif est accumule tel quel — ce n\'est pas a la primitive d\'en juger', () => {
+  // Additionner un negatif retrancherait des jetons comptes sur d'autres
+  // messages : le total ne serait plus une borne inferieure.
+  test('un nombre negatif n\'est pas un compte : il vaut zero', () => {
+    // Arrange
     const b = emptyUsageBucket();
-    addUsage(b, { input_tokens: -10 });
-    expect(b.in).toBe(-10);
+
+    // Act
+    addUsage(b, { input_tokens: -10, output_tokens: 5 });
+
+    // Assert
+    expect(b.in).toBe(0);
+    expect(b.out).toBe(5);
   });
 
   test('la ventilation de cache est independante du total de creation', () => {
@@ -138,5 +148,145 @@ describe('isDedupableMsgId — la regle de deduplication, une seule fois', () =>
   test('ce qui n\'est pas une chaine n\'est pas un identifiant', () => {
     expect(isDedupableMsgId(42)).toBe(false);
     expect(isDedupableMsgId({})).toBe(false);
+  });
+});
+
+// Une seule regle decide ce qui est additionne (countOrZero) et ce qui est juge
+// malforme (usageVerdict) : un compte de jetons est un entier >= 0.
+const COMPTES: Array<[string, number]> = [
+  ['100', 100],
+  ['0', 0],
+];
+const PAS_DES_COMPTES: Array<[string, unknown]> = [
+  ['un negatif', -10],
+  ['un decimal', 1.5],
+  ['un nombre en chaine', '100'],
+  ['Infinity (1e999 lu par JSON.parse)', JSON.parse('1e999')],
+  ['NaN', NaN],
+  ['un booleen', true],
+  ['un objet', {}],
+  ['un tableau', []],
+  ['2^53, hors des entiers surs', 2 ** 53],
+];
+
+describe('isTokenCount — un compte de jetons est un entier >= 0', () => {
+  test.each(COMPTES)('%s est un compte', (_label, valeur) => {
+    expect(isTokenCount(valeur)).toBe(true);
+  });
+
+  test.each(PAS_DES_COMPTES)('%s n\'est pas un compte', (_label, valeur) => {
+    expect(isTokenCount(valeur)).toBe(false);
+  });
+});
+
+describe('countOrZero — la valeur si c\'est un compte, sinon zero', () => {
+  test.each(COMPTES)('%s vaut sa valeur', (_label, valeur) => {
+    expect(countOrZero(valeur)).toBe(valeur);
+  });
+
+  test.each(PAS_DES_COMPTES)('%s vaut zero', (_label, valeur) => {
+    expect(countOrZero(valeur)).toBe(0);
+  });
+});
+
+// La forme que Claude Code ecrit : les deux comptes que le type `Usage` du SDK
+// rend obligatoires, et les champs de cache qu'il declare facultatifs.
+const USAGE_SAIN = {
+  input_tokens: 100,
+  output_tokens: 5,
+  cache_creation_input_tokens: 40,
+  cache_read_input_tokens: 2000,
+  cache_creation: { ephemeral_5m_input_tokens: 30, ephemeral_1h_input_tokens: 10 },
+};
+
+function sansChamp(champ: string): Record<string, unknown> {
+  const u: Record<string, unknown> = { ...USAGE_SAIN };
+  delete u[champ];
+  return u;
+}
+
+describe('usageVerdict — la forme de l\'objet usage', () => {
+  test.each([['absent', undefined], ['null', null]])('usage %s : absent, il n\'y a pas de mesure', (_label, raw) => {
+    expect(usageVerdict(raw)).toBe('absent');
+  });
+
+  test.each([['une chaine', 'x'], ['un tableau', []], ['un nombre', 42], ['un booleen', true]])(
+    'usage qui est %s : malforme',
+    (_label, raw) => {
+      expect(usageVerdict(raw)).toBe('malforme');
+    },
+  );
+
+  test('usage objet vide : malforme, les deux comptes obligatoires manquent', () => {
+    expect(usageVerdict({})).toBe('malforme');
+  });
+
+  test.each([['une chaine', 'x'], ['un tableau', []]])('cache_creation qui est %s : malforme', (_label, detail) => {
+    expect(usageVerdict({ ...USAGE_SAIN, cache_creation: detail })).toBe('malforme');
+  });
+
+  test('usage aux comptes entiers : sain', () => {
+    expect(usageVerdict(USAGE_SAIN)).toBe('sain');
+  });
+
+  test('les cles en plus sont ignorees : l\'usage reel d\'un message <synthetic> est sain', () => {
+    // Arrange — releve tel quel dans un transcript : des zeros, et des cles que le type ne connait pas.
+    const synthetic = {
+      input_tokens: 0, output_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0,
+      server_tool_use: { web_search_requests: 0, web_fetch_requests: 0 }, service_tier: null,
+      cache_creation: { ephemeral_1h_input_tokens: 0, ephemeral_5m_input_tokens: 0 },
+      inference_geo: null, iterations: null, speed: null,
+    };
+
+    // Act
+    const verdict = usageVerdict(synthetic);
+
+    // Assert
+    expect(verdict).toBe('sain');
+  });
+});
+
+describe('usageVerdict — un champ de compte present', () => {
+  test.each(PAS_DES_COMPTES)('input_tokens qui est %s : malforme', (_label, valeur) => {
+    expect(usageVerdict({ ...USAGE_SAIN, input_tokens: valeur })).toBe('malforme');
+  });
+
+  test.each([
+    ['output_tokens', { ...USAGE_SAIN, output_tokens: -10 }],
+    ['cache_creation_input_tokens', { ...USAGE_SAIN, cache_creation_input_tokens: -10 }],
+    ['cache_read_input_tokens', { ...USAGE_SAIN, cache_read_input_tokens: -10 }],
+    ['cache_creation.ephemeral_5m_input_tokens', { ...USAGE_SAIN, cache_creation: { ephemeral_5m_input_tokens: -10 } }],
+    ['cache_creation.ephemeral_1h_input_tokens', { ...USAGE_SAIN, cache_creation: { ephemeral_1h_input_tokens: -10 } }],
+  ])('%s negatif : malforme, chaque champ de compte est lu', (_champ, usage) => {
+    expect(usageVerdict(usage)).toBe('malforme');
+  });
+
+  test('cache_creation.ephemeral_5m_input_tokens en chaine : malforme', () => {
+    expect(usageVerdict({ ...USAGE_SAIN, cache_creation: { ephemeral_5m_input_tokens: '1' } })).toBe('malforme');
+  });
+});
+
+describe('usageVerdict — un champ absent ou null', () => {
+  test.each([
+    ['input_tokens absent', sansChamp('input_tokens')],
+    ['input_tokens null', { ...USAGE_SAIN, input_tokens: null }],
+    ['output_tokens absent', sansChamp('output_tokens')],
+    ['output_tokens null', { ...USAGE_SAIN, output_tokens: null }],
+  ])('%s : malforme, le type du SDK rend ce compte obligatoire', (_label, usage) => {
+    expect(usageVerdict(usage)).toBe('malforme');
+  });
+
+  test.each([
+    ['cache_creation_input_tokens absent', sansChamp('cache_creation_input_tokens')],
+    ['cache_creation_input_tokens null', { ...USAGE_SAIN, cache_creation_input_tokens: null }],
+    ['cache_read_input_tokens absent', sansChamp('cache_read_input_tokens')],
+    ['cache_read_input_tokens null', { ...USAGE_SAIN, cache_read_input_tokens: null }],
+    ['cache_creation absent', sansChamp('cache_creation')],
+    ['cache_creation null', { ...USAGE_SAIN, cache_creation: null }],
+    ['cache_creation vide', { ...USAGE_SAIN, cache_creation: {} }],
+    ['cache_creation.ephemeral_5m_input_tokens null', { ...USAGE_SAIN, cache_creation: { ephemeral_5m_input_tokens: null } }],
+    ['cache_creation.ephemeral_1h_input_tokens null', { ...USAGE_SAIN, cache_creation: { ephemeral_1h_input_tokens: null } }],
+  ])('%s : sain, un champ de cache facultatif vaut zero', (_label, usage) => {
+    expect(usageVerdict(usage)).toBe('sain');
   });
 });

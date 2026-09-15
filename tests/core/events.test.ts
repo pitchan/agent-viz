@@ -37,6 +37,7 @@ describe('normalizeEvent', () => {
           cache_read_input_tokens: 2000,
           cache_creation: { ephemeral_5m_input_tokens: 100, ephemeral_1h_input_tokens: 0 },
         },
+        usageVerdict: 'sain',
         toolUses: [{ id: 'toolu_1', name: 'Bash', input: { command: 'npx vitest run' } }],
         textChars: 5,
         timestamp: '2026-07-09T10:00:00.000Z',
@@ -53,11 +54,35 @@ describe('normalizeEvent', () => {
         msgId: null,
         model: null,
         usage: null,
+        usageVerdict: 'absent',
         toolUses: [],
         textChars: 0,
         isSidechain: false,
       },
     ]);
+  });
+
+  test('ligne assistant à usage non objet → usage null, verdict malformé : il ne se confond pas avec l’absence', () => {
+    // Arrange
+    const raw = { type: 'assistant', message: { id: 'msg_04', role: 'assistant', content: [], usage: 'x' } };
+
+    // Act
+    const [evt] = normalizeEvent(raw);
+
+    // Assert
+    expect(evt).toMatchObject({ kind: 'assistant', usage: null, usageVerdict: 'malforme' });
+  });
+
+  test('ligne assistant à compte en chaîne → usage conservé tel quel, verdict malformé', () => {
+    // Arrange
+    const usage = { input_tokens: '100', output_tokens: 5 };
+    const raw = { type: 'assistant', message: { id: 'msg_05', role: 'assistant', content: [], usage } };
+
+    // Act
+    const [evt] = normalizeEvent(raw);
+
+    // Assert
+    expect(evt).toMatchObject({ kind: 'assistant', usage, usageVerdict: 'malforme' });
   });
 
   test('ligne assistant sidechain porte agentId', () => {

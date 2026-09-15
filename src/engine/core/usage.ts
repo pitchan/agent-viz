@@ -16,29 +16,53 @@ export function emptyUsageBucket(): UsageBucket {
 }
 
 /**
- * LA garde, à un seul endroit : un champ qui n'est pas un nombre **fini** vaut
- * zéro.
- *
- * Elle tranche entre les deux gardes qui coexistaient, et qui n'étaient pas
- * équivalentes malgré ce qu'en disait la fiche C3 — écart trouvé en exécutant
- * les deux fonctions sur la même matrice, jamais visible à la lecture :
- *
- *   - serveur `|| 0` : ramenait `NaN` à zéro, laissait passer `Infinity` ;
- *   - moteur `?? 0` : laissait passer les deux, et **un seul `NaN` empoisonnait
- *     le seau pour toute la session** (tout `+=` suivant reste `NaN`).
- *
- * `Infinity` est le seul des deux poisons qu'un JSON **valide** puisse porter :
- * `JSON.parse('{"input_tokens":1e999}')` rend `Infinity`, là où le littéral
- * `NaN` est refusé par l'analyseur. Aucune des deux implémentations d'avant ne
- * l'arrêtait.
- *
- * Un nombre en chaîne vaut zéro lui aussi. Avant, les deux côtés faisaient
- * `0 + "100"` — donc **le seau entier partait en chaîne**, jusque dans
- * l'enveloppe SSE envoyée au navigateur. Une ligne malformée ne doit pas
- * pouvoir casser l'arithmétique de tout ce qui suit.
+ * Un compte de jetons est un entier sûr ≥ 0. Une chaîne, un booléen, `NaN`,
+ * `Infinity` (ce que `JSON.parse` tire de `1e999`), un négatif, un décimal ou un
+ * entier à partir de 2^53 n'en sont pas.
  */
-export function finiteCount(v: unknown): number {
-  return typeof v === 'number' && Number.isFinite(v) ? v : 0;
+export function isTokenCount(v: unknown): v is number {
+  return Number.isSafeInteger(v) && (v as number) >= 0;
+}
+
+/**
+ * LA garde des compteurs et du coût : la valeur si c'est un compte, sinon zéro.
+ * Additionner un négatif retrancherait des jetons comptés sur d'autres messages,
+ * et `0 + "100"` changerait le seau en texte jusque dans l'enveloppe SSE.
+ */
+export function countOrZero(v: unknown): number {
+  return isTokenCount(v) ? v : 0;
+}
+
+/** Ce que porte un champ `usage` brut : aucune mesure, une mesure exploitable, ou une mesure inexploitable. */
+export type UsageVerdict = 'absent' | 'sain' | 'malforme';
+
+/**
+ * Le verdict sur un `usage` tel que le JSONL le porte. Il se rend avant toute
+ * normalisation, qui ramène un non-objet à `null` et le confond alors avec l'absence.
+ *
+ * Le contrat est le type `Usage` du SDK Anthropic : `input_tokens` et
+ * `output_tokens` obligatoires, les champs de cache facultatifs ou `null`.
+ * Les clés que ce type ne connaît pas sont ignorées.
+ */
+export function usageVerdict(raw: unknown): UsageVerdict {
+  if (raw === undefined || raw === null) return 'absent';
+  if (!isPlainObject(raw)) return 'malforme';
+  if (!isTokenCount(raw.input_tokens) || !isTokenCount(raw.output_tokens)) return 'malforme';
+  if (!isOptionalCount(raw.cache_creation_input_tokens) || !isOptionalCount(raw.cache_read_input_tokens)) return 'malforme';
+  const detail = raw.cache_creation;
+  if (detail === undefined || detail === null) return 'sain';
+  if (!isPlainObject(detail)) return 'malforme';
+  return isOptionalCount(detail.ephemeral_5m_input_tokens) && isOptionalCount(detail.ephemeral_1h_input_tokens)
+    ? 'sain'
+    : 'malforme';
+}
+
+function isOptionalCount(v: unknown): boolean {
+  return v === undefined || v === null || isTokenCount(v);
+}
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
 /**
@@ -56,15 +80,15 @@ export function finiteCount(v: unknown): number {
  * fusion** (arbitrage de la fiche, respecté).
  */
 export function addUsage(b: UsageBucket, u: RawUsage): void {
-  b.in += finiteCount(u.input_tokens);
-  b.out += finiteCount(u.output_tokens);
-  b.cacheCreate += finiteCount(u.cache_creation_input_tokens);
-  b.cacheRead += finiteCount(u.cache_read_input_tokens);
+  b.in += countOrZero(u.input_tokens);
+  b.out += countOrZero(u.output_tokens);
+  b.cacheCreate += countOrZero(u.cache_creation_input_tokens);
+  b.cacheRead += countOrZero(u.cache_read_input_tokens);
   // Les deux fenêtres de cache sont des champs BRUTS distincts : leur somme n'a
   // aucune raison de valoir `cache_creation_input_tokens`, et la primitive ne
   // réconcilie rien.
-  b.cacheCreate1h += finiteCount(u.cache_creation?.ephemeral_1h_input_tokens);
-  b.cacheCreate5m += finiteCount(u.cache_creation?.ephemeral_5m_input_tokens);
+  b.cacheCreate1h += countOrZero(u.cache_creation?.ephemeral_1h_input_tokens);
+  b.cacheCreate5m += countOrZero(u.cache_creation?.ephemeral_5m_input_tokens);
 }
 
 /** Fusionne `src` dans `target`, champ pour champ. `src` n'est pas touché. */

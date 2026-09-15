@@ -16,6 +16,7 @@ function assistant(
     msgId,
     model: opts?.model !== undefined ? opts.model : 'claude-opus-4-8',
     usage,
+    usageVerdict: 'sain',
     toolUses: opts?.toolUses ?? [],
     textChars: 0,
     ...(timestamp !== undefined ? { timestamp } : {}),

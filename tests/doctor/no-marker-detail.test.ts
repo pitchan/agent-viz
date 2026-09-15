@@ -22,6 +22,7 @@ function asst(o: {
       cache_creation_input_tokens: o.cacheCreate,
       cache_read_input_tokens: o.cacheRead,
     },
+    usageVerdict: 'sain',
     toolUses: o.toolUses ?? [],
     textChars: 0,
     timestamp: o.ts,

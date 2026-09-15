@@ -40,6 +40,12 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
+// Seule l'absence écarte une ligne : un `usage` qui n'est pas un objet (`0`, `"x"`)
+// va jusqu'à `accumulateUsage`, qui le compte zéro, au lieu de disparaître ici sans trace.
+function isAbsent(v: unknown): v is undefined | null {
+  return v === undefined || v === null;
+}
+
 function asString(v: unknown): string | null {
   return typeof v === 'string' ? v : null;
 }
@@ -59,7 +65,7 @@ interface ExtractedUsage {
 // main thread: `isSidechain:false`, usage at `evt.message.usage`.
 function extractMainUsage(evt: Record<string, unknown>): ExtractedUsage | null {
   if (evt.isSidechain !== false || evt.type !== 'assistant') return null;
-  if (!isRecord(evt.message) || !evt.message.usage) return null;
+  if (!isRecord(evt.message) || isAbsent(evt.message.usage)) return null;
   return {
     usage: evt.message.usage,
     model: asString(evt.message.model),
@@ -73,7 +79,7 @@ function extractMainUsage(evt: Record<string, unknown>): ExtractedUsage | null {
 function extractSubagentUsage(evt: Record<string, unknown>): ExtractedUsage | null {
   if (evt.isSidechain !== true || evt.type !== 'assistant') return null;
   const agentId = asString(evt.agentId);
-  if (!agentId || !isRecord(evt.message) || !evt.message.usage) return null;
+  if (!agentId || !isRecord(evt.message) || isAbsent(evt.message.usage)) return null;
   return {
     usage: evt.message.usage,
     model: asString(evt.message.model),
@@ -90,7 +96,7 @@ function extractLegacyProgressUsage(evt: Record<string, unknown>): ExtractedUsag
   if (!agentId) return null;
   const outer = isRecord(evt.data.message) ? evt.data.message : null;
   const inner = outer && isRecord(outer.message) ? outer.message : null;
-  if (!inner || !inner.usage) return null;
+  if (!inner || isAbsent(inner.usage)) return null;
   return {
     usage: inner.usage,
     model: asString(inner.model),
