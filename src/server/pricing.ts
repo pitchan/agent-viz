@@ -274,3 +274,7 @@ export {
   onPricingDrift,
   _internals,
 };
+
+// L'onglet fabrique l'alerte de la vigie sur cette forme
+// (src/web/viz-pricing-drift-alert.ts), par un import de type que le service efface.
+export type { Drift };

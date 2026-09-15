@@ -8,7 +8,8 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { alertActor, alertDetailLines, notificationPayload } from '../../src/web/viz-alert-format.ts';
+import { alertActor, alertActorLine, alertDetailLines, notificationPayload } from '../../src/web/viz-alert-format.ts';
+import { pricingDriftAlert } from '../../src/web/viz-pricing-drift-alert.ts';
 import { clockTime } from '../../src/engine/core/clock-time.ts';
 
 // Built from local-time components so the expectation holds in any timezone.
@@ -53,6 +54,17 @@ test('alertActor names the subagent by type and short id', () => {
 
 test('alertActor says main thread when no agent ran it', () => {
   assert.equal(alertActor(loopAlert()), 'main thread');
+});
+
+test('alertActorLine nomme l\'acteur d\'une alerte de session et se tait pour un stuck', () => {
+  // Arrange
+  const alertes = [loopAlert(), loopAlert({ agentId: 'ag-9c2f11a0', agentType: 'Explore' }), stuckAlert()];
+
+  // Act
+  const lignes = alertes.map(alertActorLine);
+
+  // Assert
+  assert.deepEqual(lignes, ['main thread', 'Explore ag-9c2f1', '']);
 });
 
 // ─── Detail lines ──────────────────────────────────────────────────────────
@@ -162,6 +174,17 @@ test('notification body of a stuck alert says what is in flight', () => {
     + '14:05:00 · Bash · npm run build\n'
     + '14:06:00 · Read · hook.js · Explore ag-9c2f1',
   );
+});
+
+test('la notification d\'une alerte hors session ne nomme aucun acteur', () => {
+  // Arrange
+  const derive = pricingDriftAlert({ model: 'claude-opus-6', kind: 'modele-nouveau' }, at(14, 3, 24));
+
+  // Act
+  const { body } = notificationPayload(derive);
+
+  // Assert
+  assert.equal(body, derive.message);
 });
 
 test('an oversized command is cut, so one alert cannot flood the panel', () => {

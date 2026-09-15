@@ -14,6 +14,7 @@ import {
   pauseTick, resumeTick, markNarratorDirty,
 } from './viz-narrator.ts';
 import { raiseExternalAlert, applyServerAlert, refreshAlerts } from './viz-watchdog-client.ts';
+import { pricingDriftAlert } from './viz-pricing-drift-alert.ts';
 import { connectionPresentation } from './viz-topbar-status.ts';
 import { resetErrors } from './viz-errors.ts';
 
@@ -122,23 +123,6 @@ export function connectSSE() {
   sseSource.onmessage = (msg) => {
     try {
       const data = JSON.parse(msg.data);
-      // One alert per drifted model, stable id — the client-side dedup contract
-      // (same id active → no refire) matches the watchdog's.
-      function pricingDriftAlert(d: { model: string; kind: string }) {
-        return {
-          id: `pricingDrift:${d.model}`,
-          type: 'pricingDrift', sessionId: '', toolName: d.model, count: 1,
-          createdAt: Date.now(),
-          // Une dérive tarifaire est un état, pas un moment : elle reste vraie
-          // tant que la table embarquée n'a pas bougé. Les deux tableaux vides
-          // complètent la forme uniforme, pour qu'un consommateur puisse lire
-          // n'importe quel champ sans savoir d'où l'alerte vient.
-          standing: true, occurrences: [], tools: [],
-          message: d.kind === 'modele-nouveau'
-            ? `Vigie tarifaire : ${d.model} existe chez LiteLLM mais pas dans la table embarquée`
-            : `Vigie tarifaire : le tarif de ${d.model} diffère entre LiteLLM et la table embarquée`,
-        };
-      }
       // Observatory scan progress: re-broadcast as a DOM event so the advisor
       // panel can follow it without this module importing the observatory.
       if (data.type === 'analysisScan') {
@@ -153,7 +137,7 @@ export function connectSSE() {
         return;
       }
       if (data.type === 'pricingDrift') {
-        for (const d of data.drifts) raiseExternalAlert(pricingDriftAlert(d));
+        for (const d of data.drifts) raiseExternalAlert(pricingDriftAlert(d, Date.now()));
         return;
       }
       if (data.type === 'sessionsChanged') {

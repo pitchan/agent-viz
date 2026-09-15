@@ -10,16 +10,17 @@
 //     whether it still holds. Served from the journal alone, a session stuck
 //     yesterday would shout for ever.
 //
-// These tests pin that split, and the traps in it: an alert with no createdAt
-// (the pricing vigil) is current by construction and must never be filtered
-// away; an acknowledgement that the server refused must not leave the badge
-// quiet about an alert that is coming back.
+// These tests pin that split, and the traps in it: an external alert (the
+// pricing vigil) is current by construction, whatever its age, and must never
+// be filtered away; an acknowledgement that the server refused must not leave
+// the badge quiet about an alert that is coming back.
 //
 // Nothing here touches the real journal, the real home directory or the real
 // event folder: the module is a pure reader over an injected fetch.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { pricingDriftAlert } from '../../src/web/viz-pricing-drift-alert.ts';
 
 const T = 1_700_000_000_000;
 const HOUR = 3_600_000;
@@ -35,6 +36,8 @@ const evt = (createdAt, id, extra = {}) => ({
 const stuck = (createdAt, id) => evt(createdAt, id, {
   type: 'stuck', toolName: '', standing: true, message: 'No event since 16:22',
 });
+// The pricing vigil's alert, built by the same factory as the tab's.
+const drift = model => pricingDriftAlert({ model, kind: 'tarif-different' }, 1);
 
 // One module instance per test: the reader's state is a module singleton.
 // The journal object stays mutable so a test can change what the next
@@ -86,12 +89,13 @@ test('une alerte poussee par le flux apparait sans attendre le prochain chargeme
   assert.deepEqual(ids(seen), ['live'], 'et elle est annoncee, pas seulement affichee');
 });
 
-test('une alerte externe sans createdAt n est jamais filtree', async () => {
+test('une alerte externe vieille de dix minutes reste affichée : ni l\'âge ni activeIds ne la filtrent', async () => {
+  // Arrange — l'horloge du lecteur est à T, bien au-delà de la fraîcheur, et
+  // le serveur ne compte aucune alerte vive
   const { mod } = await freshClient({});
-  mod.raiseExternalAlert({
-    id: 'pricingDrift:x', type: 'pricingDrift', sessionId: '', toolName: 'x',
-    count: 1, message: 'derive', occurrences: [], tools: [],
-  });
+  // Act
+  mod.raiseExternalAlert(pricingDriftAlert({ model: 'x', kind: 'modele-nouveau' }, T - 10 * 60_000));
+  // Assert
   assert.deepEqual(ids(mod.getActiveAlerts()), ['pricingDrift:x']);
 });
 
@@ -192,10 +196,7 @@ test('un rechargement ne re-annonce pas ce qui est deja affiche', async () => {
 
 test('une alerte externe n est pas re-annoncee a chaque rechargement', async () => {
   const { mod, seen } = await freshClient({});
-  mod.raiseExternalAlert({
-    id: 'pricingDrift:x', type: 'pricingDrift', sessionId: '', toolName: 'x',
-    count: 1, message: 'derive', occurrences: [], tools: [],
-  });
+  mod.raiseExternalAlert(drift('x'));
   seen.length = 0;                       // la levee elle-meme a le droit de sonner
   await mod.refreshAlerts();
   await mod.refreshAlerts();
@@ -359,10 +360,7 @@ test('acquitter une alerte externe ne poste rien au journal', async () => {
   // La vigie tarifaire ne vient pas du journal du serveur : il n a rien a y
   // acquitter, et la clef n y existe pas.
   const { mod, posts } = await freshClient({});
-  mod.raiseExternalAlert({
-    id: 'pricingDrift:x', type: 'pricingDrift', sessionId: '', toolName: 'x',
-    count: 1, message: 'derive', occurrences: [], tools: [],
-  });
+  mod.raiseExternalAlert(drift('x'));
   await mod.acknowledgeAlert('pricingDrift:x');
   assert.deepEqual(posts, []);
   assert.deepEqual(mod.getActiveAlerts(), []);

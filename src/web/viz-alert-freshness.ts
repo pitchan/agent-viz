@@ -10,16 +10,11 @@
 // Nor is it in viz-alert-format.ts: that module answers "how is an alert
 // worded", this one answers "is it still current". Two questions, two files.
 
+import type { Alert } from '../engine/watchdog/detector.ts';
+
 export const FRESHNESS_MS = 2 * 60_000;
 
-// Ce que le lecteur du watchdog fait circuler : une alerte de STATE (`standing`)
-// ou une alerte datee (`createdAt`), jamais les deux a la fois par contrat.
-export interface FreshnessAlert {
-  standing?: boolean;
-  createdAt: number;
-}
-
-export function isFresh(alert: FreshnessAlert, now: number, freshnessMs = FRESHNESS_MS): boolean {
+export function isFresh(alert: Pick<Alert, 'standing' | 'createdAt'>, now: number, freshnessMs = FRESHNESS_MS): boolean {
   // A standing alert describes a STATE, not a moment. `stuck` says "nothing
   // has happened since 16:22" — that stays true, and stays worth showing,
   // however long ago it started; ageing it out would hide a session that is

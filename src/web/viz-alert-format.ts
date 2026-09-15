@@ -9,33 +9,12 @@
 // looked up by alert type instead of sniffing which fields happen to be present.
 
 import { clockTime } from '../engine/core/clock-time.ts';
+import type { Alert } from '../engine/watchdog/detector.ts';
 
-// Une occurrence repetee (motif `loop`) : juste l'horodatage, affiche brut.
-interface AlertOccurrence {
-  ts: number;
-}
-
-// Un appel d'outil porte par une alerte `stuck`. `agentId` distingue le fil
-// principal (absent) d'un sous-agent, `subject` vient deja tronque a la source.
-interface AlertToolCall {
-  startedAt: number;
-  toolName: string;
-  subject?: string;
-  agentId?: string;
-}
-
-// La forme uniforme que le detecteur du moteur garantit : `occurrences` et
-// `tools` sont toujours des tableaux (vides si non pertinents pour ce type
-// d'alerte), jamais absents — voir le commentaire de tete du fichier.
-export interface AlertContent {
-  type: string;
-  message: string;
-  subject?: string;
-  agentId?: string;
-  agentType?: string;
-  occurrences: AlertOccurrence[];
-  tools: AlertToolCall[];
-}
+// Ce que la mise en mots lit d'une alerte, chaque champ typé par le détecteur.
+// `type` reste une chaîne : la pastille met aussi en mots l'alerte de la vigie
+// tarifaire, qu'aucun détecteur ne lève.
+export type AlertContent = Pick<Alert, 'message' | 'subject' | 'sessionId' | 'agentId' | 'agentType' | 'occurrences' | 'tools'> & { type: string };
 
 // A command has no natural length limit and an alert has to fit in a panel.
 // Cut visibly — a silently truncated command reads as a different command.
@@ -55,9 +34,17 @@ export function truncate(text: unknown, max = SUBJECT_MAX): string {
 
 // '' is what the watchdog stores for the main thread, and that is a real
 // answer, not a missing one.
-export function alertActor({ agentId, agentType }: { agentId?: string; agentType?: string }): string {
+export function alertActor({ agentId, agentType }: Pick<Alert, 'agentId' | 'agentType'>): string {
   if (!agentId) return 'main thread';
   return `${agentType || 'Agent'} ${agentId.slice(0, 8)}`;
+}
+
+// La ligne « qui » d'une alerte, décidée une fois pour le popup et la notification :
+// vide pour un `stuck` (l'acteur est sur chaque ligne d'outil) et pour une alerte
+// sans session (personne à nommer).
+export function alertActorLine(alert: Pick<Alert, 'sessionId' | 'agentId' | 'agentType'> & { type: string }): string {
+  if (alert.type === 'stuck' || !alert.sessionId) return '';
+  return alertActor(alert);
 }
 
 // Cle dynamique (`alert.type`) : seuls `loop` et `stuck` detaillent, les
@@ -104,6 +91,7 @@ export function notificationPayload(alert: AlertContent): { title: string; body:
   const lines = [alert.message];
   if (alert.subject) lines.push(truncate(alert.subject));
   lines.push(...alertDetailLines(alert));
-  if (alert.type !== 'stuck') lines.push(alertActor(alert));
+  const who = alertActorLine(alert);
+  if (who) lines.push(who);
   return { title: `agent-viz: ${alert.type}`, body: lines.join('\n') };
 }

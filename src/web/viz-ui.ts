@@ -26,11 +26,10 @@ import {
 } from './viz-narrator.ts';
 import {
   getActiveAlerts, acknowledgeAlert, onAlertsChanged, initAlertReader, refreshAlerts,
-  type TrackedAlert,
+  type LiveAlert,
 } from './viz-watchdog-client.ts';
 import {
-  alertActor, alertDetailLines, notificationPayload, truncate,
-  type AlertContent,
+  alertActorLine, alertDetailLines, notificationPayload, truncate,
 } from './viz-alert-format.ts';
 import { watchdogPresentation, errorsPresentation } from './viz-topbar-status.ts';
 import { errorRow, errorsPanelTitle } from './viz-error-format.ts';
@@ -551,11 +550,6 @@ function updateLiveDurations() {
 // Ack button. New alerts also trigger a desktop Notification (permission is
 // requested lazily on the first incoming alert; silent fallback if denied).
 
-// Une alerte telle que la LIGNE l'affiche. Trois declarations decrivent le
-// meme objet — `TrackedAlert`, `AlertContent`, et ce que `pricingDriftAlert`
-// ajoute ; l'objet qui circule les porte toutes, ce recoupement le dit.
-type DisplayedAlert = TrackedAlert & AlertContent & { sessionId?: string; toolName?: string };
-
 interface WatchdogEls {
   pill: HTMLElement | null;
   count: HTMLElement | null;
@@ -575,14 +569,14 @@ function _watchdogDOM() {
 
 // The wording comes from viz-alert-format (shared with the OS notification);
 // this function only decides which element each line lands in.
-function alertItemHTML(a: DisplayedAlert) {
+function alertItemHTML(a: LiveAlert) {
   const subject = a.subject
     ? `<div class="alert-subject">${esc(truncate(a.subject))}</div>` : '';
   const details = alertDetailLines(a)
     .map(line => `<div class="alert-detail">${esc(line)}</div>`).join('');
   const meta = [
     a.sessionId ? `session ${a.sessionId.slice(0, 8)}` : a.toolName || '',
-    a.type === 'stuck' ? '' : alertActor(a),
+    alertActorLine(a),
   ].filter(Boolean).join(' · ');
   return `<div class="alert-item">
     <div class="alert-info">
@@ -598,7 +592,7 @@ function alertItemHTML(a: DisplayedAlert) {
 
 function renderAlertsPopup() {
   const els = _watchdogDOM();
-  const active = getActiveAlerts() as DisplayedAlert[];
+  const active = getActiveAlerts();
   els.list!.innerHTML = active.length
     ? active.map(alertItemHTML).join('')
     : '<div class="alerts-empty">No active alerts.</div>';
@@ -768,7 +762,7 @@ renderErrorsPill();
 // Browsers dedupe by `tag`, so re-emitting a notification with the same id
 // is harmless (the OS toast updates in place).
 let _notifPermAsked = false;
-function notifyDesktop(alert: DisplayedAlert) {
+function notifyDesktop(alert: LiveAlert) {
   if (typeof Notification === 'undefined') return;
   if (Notification.permission === 'default' && !_notifPermAsked) {
     _notifPermAsked = true;
@@ -782,7 +776,7 @@ function notifyDesktop(alert: DisplayedAlert) {
 
 onAlertsChanged((alerts) => {
   renderWatchdogPill();
-  for (const a of alerts as DisplayedAlert[]) notifyDesktop(a);
+  for (const a of alerts) notifyDesktop(a);
 });
 
 // Initial render so the pill is green from the first paint.

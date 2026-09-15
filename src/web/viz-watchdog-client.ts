@@ -25,9 +25,10 @@
 // loop that ended an hour ago, which is the exact thing the freshness rule
 // exists to prevent.
 //
-// External alerts (the pricing vigil) do not come from the hook stream and
-// carry no triggering event, hence no createdAt. They are current by
-// construction and are kept in their own registry, out of both sieves.
+// External alerts (the pricing vigil) do not come from the hook stream. They
+// carry the full Alert shape — `createdAt` is the moment the tab received the
+// report, `standing` is true — but neither sieve reads them: they are current
+// by construction, live in their own registry, and leave it on acknowledgement alone.
 
 import { isFresh } from './viz-alert-freshness.ts';
 // Les deux routes du journal des pannes sont décrites une seule fois, dans le
@@ -43,20 +44,18 @@ import { isFresh } from './viz-alert-freshness.ts';
 // l'écran d'abord, puis consigne ; celui de l'API ne fait que poster.
 import { fetchAlerts, acknowledgeAlert as postAcknowledgement } from './observatory/api.ts';
 
-// Une alerte telle que ce lecteur la fait circuler : le journal du serveur en
-// porte davantage (message, sujet, occurrences...), mais ce fichier ne
-// regarde jamais que ces quatre champs pour decider ce qui reste a l'ecran.
-export interface TrackedAlert {
-  id: string;
-  createdAt: number;
-  standing?: boolean;
-  acknowledged?: boolean;
-}
+// Clause entière en `import type` : le serveur efface la ligne au service, et
+// le navigateur ne demande jamais le détecteur.
+import type { Alert } from '../engine/watchdog/detector.ts';
 
-type AlertListener = (alerts: TrackedAlert[]) => void;
+// Ce que la pastille montre : l'alerte d'un détecteur, ou une alerte externe
+// (vigie tarifaire) de même forme, sous un type qu'aucun détecteur ne lève.
+export type LiveAlert = Omit<Alert, 'type'> & { type: string };
+
+type AlertListener = (alerts: LiveAlert[]) => void;
 
 const listeners = new Set<AlertListener>();
-const externalAlerts = new Map<string, TrackedAlert>();
+const externalAlerts = new Map<string, LiveAlert>();
 
 // id → the most recent journal entry carrying that id. The journal's key is
 // the PAIR (id, createdAt) and it legitimately holds several incidents under
@@ -64,7 +63,7 @@ const externalAlerts = new Map<string, TrackedAlert>();
 // speaks about the present, so of those it keeps the latest; indexing by id
 // and letting the last one written win would silence a live loop behind a
 // finished one, because the journal answers newest-first.
-let serverAlerts = new Map<string, TrackedAlert>();
+let serverAlerts = new Map<string, Alert>();
 // What the server still judges live. Kept as a set of ids, never as alerts:
 // the alert itself comes from the journal, with its `acknowledged` recomputed
 // there, and a second copy would be a second truth for one fact.
@@ -82,7 +81,7 @@ let firstRead = true;
 // A separator is indispensable, and it is the journal's own: glued together,
 // ('a1', 2) and ('a', 12) both give 'a12'. NUL can appear neither in an id nor
 // in a number, and ids already carry punctuation (loop:s1:Bash).
-const keyOf = (a: TrackedAlert) => `${a.id}\u0000${a.createdAt}`;
+const keyOf = (a: LiveAlert) => `${a.id}\u0000${a.createdAt}`;
 
 // Les cles serveur vivantes au moment de la DERNIERE notification — donc ce
 // que l'interface montre en ce moment. C'est a CET etat-la qu'un rechargement
@@ -93,14 +92,14 @@ const keyOf = (a: TrackedAlert) => `${a.id}\u0000${a.createdAt}`;
 // (vecu sur capture : cloche a « 1 », « No active alerts »).
 let shownKeys = new Set<string>();
 
-function notify(newAlerts: TrackedAlert[]) {
+function notify(newAlerts: LiveAlert[]) {
   shownKeys = new Set(liveServerAlerts().map(keyOf));
   for (const fn of listeners) fn(newAlerts);
 }
 
 // Is this journal entry something the badge should be lit about right now?
 // The alert declares which kind it is; nothing here sniffs its type.
-function isLive(alert: TrackedAlert, now: number): boolean {
+function isLive(alert: Alert, now: number): boolean {
   if (alert.standing) return activeIds.has(alert.id);
   return isFresh(alert, now);
 }
@@ -110,7 +109,7 @@ function liveServerAlerts() {
   return [...serverAlerts.values()].filter(a => isLive(a, now));
 }
 
-export function getActiveAlerts() {
+export function getActiveAlerts(): LiveAlert[] {
   const external = [...externalAlerts.values()].filter(a => !a.acknowledged);
   return [...liveServerAlerts(), ...external];
 }
@@ -168,7 +167,7 @@ export async function refreshAlerts() {
 
 // Pushed by the SSE stream the moment the server records something, so the
 // badge does not wait for the next poll.
-export function applyServerAlert(alert: TrackedAlert | null | undefined): void {
+export function applyServerAlert(alert: Alert | null | undefined): void {
   if (!alert || !alert.id) return;
   const held = serverAlerts.get(alert.id);
   // Same rule as the refresh: of two incidents sharing an id, the latest one
@@ -185,7 +184,7 @@ export function applyServerAlert(alert: TrackedAlert | null | undefined): void {
   notify(isLive(alert, _now()) ? [alert] : []);
 }
 
-export function raiseExternalAlert(alert: TrackedAlert): void {
+export function raiseExternalAlert(alert: LiveAlert): void {
   const existing = externalAlerts.get(alert.id);
   if (existing && !existing.acknowledged) return;
   const fresh = { ...alert, acknowledged: false };

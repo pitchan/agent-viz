@@ -5,8 +5,9 @@
 // (`onAckGroup`), advisor-view l'orchestre. Le regroupement et les phrases
 // viennent de failures-format.js, les remedes de remedies.js.
 
-import { groupAlerts, causeLabel, episodeLabel, failuresSummary, projectLabel, panelAlerts, type JournalAlert, type AlertGroup } from './failures-format.ts';
+import { groupAlerts, causeLabel, episodeLabel, failuresSummary, projectLabel, panelAlerts, type AlertGroup } from './failures-format.ts';
 import { remedyFor, type Remedy } from './remedies.ts';
+import type { Alert } from '../../engine/watchdog/detector.ts';
 
 function el(tag: string, className?: string | null, text?: string): HTMLElement {
   const node = document.createElement(tag);
@@ -28,7 +29,7 @@ const SANS_COMMANDE = 'commande non consignée (alerte ancienne)';
 // La commande d'un episode. Vide chez badInvocation = anterieure a la
 // consigne du subject (doc/32) : le dire vaut mieux qu'un trou, qui se lirait
 // comme un bug du bloc.
-function commandes(alert: JournalAlert): string[] {
+function commandes(alert: Alert): string[] {
   if (alert.type === 'stuck') {
     return (Array.isArray(alert.tools) ? alert.tools : [])
       .map(t => (t.subject ? `${t.toolName} · ${t.subject}` : t.toolName));
@@ -62,7 +63,7 @@ function commandNode(cmd: string) {
   return ligne;
 }
 
-function episodeNode(alert: JournalAlert) {
+function episodeNode(alert: Alert) {
   const ep = el('div', alert.acknowledged ? 'failure-episode is-acked' : 'failure-episode');
   const faits = episodeLabel(alert);
   ep.appendChild(el('div', 'failure-head',
@@ -94,7 +95,7 @@ function remedeNode(remede: NonNullable<Remedy>) {
   return bloc;
 }
 
-function groupNode(group: AlertGroup, onAckGroup: ((episodes: JournalAlert[]) => void) | undefined) {
+function groupNode(group: AlertGroup, onAckGroup: ((episodes: Alert[]) => void) | undefined) {
   const det = el('details', group.unacked ? 'failure-group' : 'failure-group is-acked');
   const resume = el('summary', 'failure-group-head');
   resume.appendChild(el('span', 'failure-cause', causeLabel(group)));
@@ -123,10 +124,10 @@ function groupNode(group: AlertGroup, onAckGroup: ((episodes: JournalAlert[]) =>
 }
 
 export interface RenderFailuresOptions {
-  onAckGroup?: (episodes: JournalAlert[]) => void;
+  onAckGroup?: (episodes: Alert[]) => void;
 }
 
-export function renderFailures(node: HTMLElement, alerts: JournalAlert[] | null | undefined, { onAckGroup }: RenderFailuresOptions = {}) {
+export function renderFailures(node: HTMLElement, alerts: Alert[] | null | undefined, { onAckGroup }: RenderFailuresOptions = {}) {
   node.textContent = '';
   // Le filtre se pose ICI, a l'affichage, et nulle part en amont : le journal
   // continue de consigner les stuck (la pastille vivante les lit par la meme

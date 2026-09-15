@@ -17,7 +17,7 @@ import { initPeriodSelector } from './period-selector.ts';
 import { initConfirmButton } from './confirm-button.ts';
 import { renderFailures } from './failures-view.ts';
 import { renderDecisions, refusalControls } from './decisions-view.ts';
-import type { JournalAlert } from './failures-format.ts';
+import type { Alert } from '../../engine/watchdog/detector.ts';
 
 // Le client HTTP tel qu'importe ici (`import * as api`) — meme motif que
 // store.ts (non exporte de la, un alias local par consommateur).
@@ -161,7 +161,7 @@ function render() {
 // Sequentiel a dessein — un journal en ajout seul n'a rien a gagner a la
 // concurrence, et l'ordre rend l'interruption lisible : tout ce qui precede
 // l'erreur est acquitte, rien apres.
-export async function ackEpisodes(apiClient: ApiClient, episodes: JournalAlert[]) {
+export async function ackEpisodes(apiClient: ApiClient, episodes: Alert[]) {
   for (const a of episodes.filter(e => !e.acknowledged)) {
     await apiClient.acknowledgeAlert({ id: a.id, createdAt: a.createdAt });
   }
@@ -177,7 +177,7 @@ async function loadFailures() {
   try {
     // Le type non verifie de fetchAlerts (getJson, api.ts) est repris ici :
     // c'est le point de lecture qui doit dire la vraie forme du payload.
-    const { alerts } = await api.fetchAlerts({ days: getState().periodDays }) as { alerts: JournalAlert[] };
+    const { alerts } = await api.fetchAlerts({ days: getState().periodDays }) as { alerts: Alert[] };
     erreur.textContent = '';
     renderFailures(node, alerts, {
       onAckGroup: episodes => ackEpisodes(api, episodes).then(

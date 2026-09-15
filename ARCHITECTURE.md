@@ -593,10 +593,10 @@ rapport avec le changement de langage. Le serveur, lui, est inchangé.
 
 ## 9. La plomberie de test
 
-**Un seul exécuteur, un seul arbre de tests dans 128 fichiers.**
+**Un seul exécuteur, un seul arbre de tests dans 129 fichiers.**
 
 ```
-npx vitest run     → tous passés, 128 fichiers
+npx vitest run     → tous passés, 129 fichiers
 ```
 
 Les deux arbres ont fusionné à plat à l'étape 2 : `netgain/tests/` a rejoint
@@ -605,7 +605,7 @@ même dossier, et c'est ce qui explique le pont ci-dessous.
 
 | Dialecte | Fichiers | Écrits en |
 |---|---|---|
-| CommonJS + ESM | 41 `.test.cjs` + 62 `.test.mjs` | `node:test` |
+| CommonJS + ESM | 41 `.test.cjs` + 63 `.test.mjs` | `node:test` |
 | TypeScript | 25 `.test.ts` | l'API de vitest |
 
 **L'extension dit désormais le régime, et c'est l'étape 3 qui l'a rendue
@@ -618,7 +618,7 @@ par un `git mv` pur ; les **3** derniers manipulaient `require.cache`, un
 mécanisme que le régime ESM rend inerte, et ont été réécrits en même temps que
 renommés — deux en `.test.mjs`, un en `.test.ts`.
 
-**Les 103 fichiers en `node:test` passent par un pont** (`test-support/bridge/`),
+**Les 104 fichiers en `node:test` passent par un pont** (`test-support/bridge/`),
 qui rend la surface `node:test` au-dessus des primitives de vitest. **L'addition,
 écrite pour qu'on puisse la refaire — et re-dérivée à l'étape 3, où l'ancienne
 version se contredisait elle-même** (elle totalisait 74 trois lignes sous un
@@ -692,10 +692,13 @@ manquante est ci-dessous, relevée après coup et non réécrite) :
 +1  15/09  readme-mirrors.test.mjs   les événements capturés et le nombre de copies gardées, identiques dans le README et le code
 ――
 103
++1  15/09  pricing-drift-alert.test.mjs   l'alerte de la vigie tarifaire : forme complète, hors session, une phrase par nature de dérive
+――
+104
 ```
 
 ```
-grep -rlE "(require\(|from )['\"]node:test['\"]" tests | wc -l   → 103
+grep -rlE "(require\(|from )['\"]node:test['\"]" tests | wc -l   → 104
 ```
 
 Le test du pont a la propriété amusante de passer par ce qu'il teste dès qu'on

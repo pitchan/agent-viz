@@ -7,7 +7,9 @@
 // cause n'etant pas caracterisee (doc/30). Un motif absent de la table est un
 // oubli, et le test le dit. Jamais de conseil invente.
 //
-// Module pur : ni DOM, ni reseau, ni import — une table et une fonction.
+// Module pur : ni DOM, ni reseau, ni import a l'execution — une table et une fonction.
+
+import type { Alert } from '../../engine/watchdog/detector.ts';
 
 const CLAUDE_MD = (titre: string) => `## ${titre}\n`;
 
@@ -71,7 +73,7 @@ export const REMEDES: Record<string, Remedy> = {
   'inv-ps-argument-exception': null,
 };
 
-export function remedyFor(alert: { type: string; patternId?: string }): Remedy {
+export function remedyFor(alert: Pick<Alert, 'type' | 'patternId'>): Remedy {
   if (alert.type !== 'badInvocation') return null;
   return REMEDES[alert.patternId ?? ''] ?? null;
 }

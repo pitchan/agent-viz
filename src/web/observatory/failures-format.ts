@@ -11,37 +11,14 @@
 // src/web/observatory/analysis-view.js, dont la part testable est exportee nue
 // et la part DOM ne l'est pas.
 
-export interface JournalOccurrence {
-  ts?: number;
-  failed?: boolean;
-}
-
-export interface JournalTool {
-  toolName: string;
-  subject?: string;
-}
-
-// Une alerte telle que le journal la rend (GET /alerts) — pas TrackedAlert
-// (viz-watchdog-client.ts) ni AlertContent (viz-alert-format.ts) : un
-// troisieme jeu de champs, avec ses propres extras (cwd, count, patternId).
-export interface JournalAlert {
-  id: string;
-  type: string;
-  createdAt: number;
-  acknowledged?: boolean;
-  cwd?: string | null;
-  toolName?: string;
-  count?: number;
-  occurrences?: JournalOccurrence[];
-  patternId?: string;
-  subject?: string;
-  tools?: JournalTool[];
-}
+// Le journal (GET /alerts) rend l'alerte telle que le détecteur l'a écrite :
+// ce fichier en lit le type à la source.
+import type { Alert, AlertType } from '../../engine/watchdog/detector.ts';
 
 // Une cause (groupKey) et ses episodes, du plus recent au plus ancien.
 export interface AlertGroup {
   key: string;
-  episodes: JournalAlert[];
+  episodes: Alert[];
   lastAt: number;
   unacked: number;
 }
@@ -74,7 +51,7 @@ function listeDe<T>(v: T[] | null | undefined): T[] { return Array.isArray(v) ? 
 // jamais. « Toutes en echec » affirmerait donc sur un appel qu'on n'a pas vu.
 // Le denominateur est affiche : le lecteur voit sur quoi porte le compte.
 // Meme regle que `failureSuffix` cote module pur, dans l'autre langue.
-function failureNote(occurrences: JournalOccurrence[]) {
+function failureNote(occurrences: Alert['occurrences']) {
   const failed = occurrences.filter(o => o.failed === true);
   if (failed.length === 0) return '';
   return `, ${failed.length} sur ${occurrences.length} en échec`;
@@ -132,7 +109,7 @@ const REGLAGE_INCONNU = 'un réglage du poste de travail';
 // dit qu'a partir du moment ou il distingue quelque chose.
 const repetitionNote = (count: number | undefined) => ((count ?? 0) > 1 ? `, ${count} fois dans la session` : '');
 
-const HEADLINES: Record<string, (a: JournalAlert) => string> = {
+const HEADLINES: Record<AlertType, (a: Alert) => string> = {
   loop: a => `${a.toolName} · même commande ${a.count}×${failureNote(listeDe(a.occurrences))}`,
   retryStorm: a => `${a.toolName} · ${a.count} échecs consécutifs`,
   stuck: a => `Aucun événement · ${a.count} outil${(a.count ?? 0) > 1 ? 's' : ''} encore en vol`,
@@ -141,7 +118,7 @@ const HEADLINES: Record<string, (a: JournalAlert) => string> = {
     + repetitionNote(a.count),
 };
 
-function subjectOf(alert: JournalAlert) {
+function subjectOf(alert: Alert) {
   if (alert.type === 'stuck') {
     const first = listeDe(alert.tools)[0];
     return first ? `${first.toolName} · ${first.subject}` : '';
@@ -149,7 +126,7 @@ function subjectOf(alert: JournalAlert) {
   return alert.subject || '';
 }
 
-export function failureLine(alert: JournalAlert) {
+export function failureLine(alert: Alert) {
   const build = HEADLINES[alert.type];
   return {
     time: alert.createdAt,
@@ -172,7 +149,7 @@ export function failureLine(alert: JournalAlert) {
 // rejouerait la confusion que la tache 9 a paye pour trancher.
 //
 // Donc un compte, et le mot exact de ce qui est compte.
-export function failuresSummary(alerts: JournalAlert[] | null | undefined) {
+export function failuresSummary(alerts: Alert[] | null | undefined) {
   const n = listeDe(alerts).filter(a => !a.acknowledged).length;
   if (n === 0) return 'aucune';
   return `${n} non acquittée${n > 1 ? 's' : ''}`;
@@ -193,7 +170,7 @@ export function failuresSummary(alerts: JournalAlert[] | null | undefined) {
 // protege que ce qui s'affiche. Et les formulations stuck restent dans les
 // tables ci-dessus : le contrat se verifie des deux cotes du detecteur, et le
 // jour ou cette decision se rejoue, tout est encore la.
-export function panelAlerts(alerts: JournalAlert[] | null | undefined) {
+export function panelAlerts(alerts: Alert[] | null | undefined) {
   return listeDe(alerts).filter(a => a.type !== 'stuck');
 }
 
@@ -205,14 +182,14 @@ export function panelAlerts(alerts: JournalAlert[] | null | undefined) {
 // (une boucle sur Bash et une sur Grep sont deux histoires), le type seul pour
 // les silences.
 
-export function groupKey(alert: JournalAlert): string {
+export function groupKey(alert: Alert): string {
   if (alert.type === 'badInvocation') return `badInvocation:${alert.patternId || ''}`;
   if (alert.type === 'stuck') return 'stuck';
   return `${alert.type}:${alert.toolName || ''}`;
 }
 
-export function groupAlerts(alerts: JournalAlert[] | null | undefined): AlertGroup[] {
-  const parClef = new Map<string, JournalAlert[]>();
+export function groupAlerts(alerts: Alert[] | null | undefined): AlertGroup[] {
+  const parClef = new Map<string, Alert[]>();
   for (const a of listeDe(alerts)) {
     const key = groupKey(a);
     if (!parClef.has(key)) parClef.set(key, []);
@@ -240,12 +217,12 @@ export function groupAlerts(alerts: JournalAlert[] | null | undefined): AlertGro
 // La cause se nomme SANS les chiffres d'un episode : « meme commande 4× » est
 // un fait d'episode, pas un nom de cause (revue doc/32). L'outil ne se dit que
 // s'il est uniforme — jamais celui d'un episode arbitraire.
-function outilUniforme(episodes: JournalAlert[]) {
+function outilUniforme(episodes: Alert[]) {
   const outils = new Set(episodes.map(e => e.toolName || ''));
   return outils.size === 1 ? [...outils][0] : '';
 }
 
-const CAUSES: Record<string, (first: JournalAlert, prefix: string) => string> = {
+const CAUSES: Record<AlertType, (first: Alert, prefix: string) => string> = {
   badInvocation: (first, prefix) =>
     `${prefix}appel mal formé : ${MOTIFS[first.patternId ?? ''] || REGLAGE_INCONNU}`,
   loop: (_first, prefix) => `${prefix}même commande répétée`,
@@ -264,14 +241,14 @@ export function causeLabel(group: AlertGroup) {
 }
 
 // Les faits d'UN episode, l'outil en moins (il est dit par la cause).
-const EPISODES: Record<string, (a: JournalAlert) => string> = {
+const EPISODES: Record<AlertType, (a: Alert) => string> = {
   loop: a => `même commande ${a.count}×${failureNote(listeDe(a.occurrences))}`,
   retryStorm: a => `${a.count} échecs consécutifs`,
   stuck: a => `${a.count} outil${(a.count ?? 0) > 1 ? 's' : ''} encore en vol`,
   badInvocation: a => ((a.count ?? 0) > 1 ? `${a.count} fois dans la session` : ''),
 };
 
-export function episodeLabel(alert: JournalAlert) {
+export function episodeLabel(alert: Alert) {
   const build = EPISODES[alert.type];
   return build ? build(alert) : '';
 }

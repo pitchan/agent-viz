@@ -6,35 +6,33 @@ import assert from 'node:assert/strict';
 import {
   raiseExternalAlert, getActiveAlerts, acknowledgeAlert, onAlertsChanged,
 } from '../../src/web/viz-watchdog-client.ts';
+import { pricingDriftAlert } from '../../src/web/viz-pricing-drift-alert.ts';
 
-const drift = id => ({
-  id, type: 'pricingDrift', sessionId: '', toolName: 'claude-test-x',
-  count: 1, createdAt: 1, message: 'Vigie tarifaire : test',
-});
+const drift = model => pricingDriftAlert({ model, kind: 'tarif-different' }, 1);
 
 test('a raised external alert becomes active and notifies listeners', () => {
   const seen = [];
   const off = onAlertsChanged(a => seen.push(...a));
-  raiseExternalAlert(drift('pricingDrift:a'));
+  raiseExternalAlert(drift('a'));
   off();
   assert.equal(seen.length, 1);
   assert.ok(getActiveAlerts().some(a => a.id === 'pricingDrift:a'));
 });
 
 test('the same id does not fire twice while active', () => {
-  raiseExternalAlert(drift('pricingDrift:b'));
+  raiseExternalAlert(drift('b'));
   const seen = [];
   const off = onAlertsChanged(a => seen.push(...a));
-  raiseExternalAlert(drift('pricingDrift:b'));
+  raiseExternalAlert(drift('b'));
   off();
   assert.equal(seen.length, 0);
   assert.equal(getActiveAlerts().filter(a => a.id === 'pricingDrift:b').length, 1);
 });
 
 test('acknowledged disappears; a fresh raise after ack fires again', () => {
-  raiseExternalAlert(drift('pricingDrift:c'));
+  raiseExternalAlert(drift('c'));
   acknowledgeAlert('pricingDrift:c');
   assert.ok(!getActiveAlerts().some(a => a.id === 'pricingDrift:c'));
-  raiseExternalAlert(drift('pricingDrift:c'));
+  raiseExternalAlert(drift('c'));
   assert.ok(getActiveAlerts().some(a => a.id === 'pricingDrift:c'));
 });
