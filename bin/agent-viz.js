@@ -174,8 +174,8 @@ async function cmdStart(flags) {
         if (!r) continue;
         const label = agent === 'claude' ? 'Claude Code' : 'Copilot CLI';
         if (r.error) {
-          // Ne plus dire « skipped » pour TOUS quand un SEUL refuse : les hooks
-          // de l'autre agent sont posés, et le disaient déjà avant ce message.
+          // Un refus ne vaut que pour son agent : les hooks de l'autre sont posés
+          // et l'annoncent sur leur propre ligne, sans « skipped » pour tous.
           console.error(`${c.warn('!')} ${label} hooks not installed: ${r.error}`);
           continue;
         }
@@ -243,20 +243,9 @@ async function cmdStop(flags) {
       for (const [agent, x] of Object.entries(result)) {
         const label = agent === 'claude' ? 'Claude Code' : 'Copilot CLI';
         if (x.error) {
-          // Le signal d'echec ne doit jamais se perdre ici (décision D3) : stop
-          // retire des hooks de maniere routiniere, donc un refus tu = des
-          // hooks qui restent poses et continuent de se declencher sans que
-          // l'utilisateur le sache.
-          //
-          // Le refus est IMPRIME, mais ne fixe PAS le code de sortie — et c'est
-          // deliberé, meme regle que `cmdStart` : le code de sortie de `start` /
-          // `stop` rend compte du CYCLE DE VIE DU SERVEUR, leur unique objet.
-          // Le retrait des hooks y est un service annexe, explicitement
-          // desactivable (`--keep-hooks` / `--no-install-hooks`) : laisser des
-          // hooks en place est un mode supporte de la commande, donc pas un
-          // echec de la commande. Les codes de sortie QUI PARLENT DES HOOKS
-          // sont ceux des commandes dediees, `install-hooks` et
-          // `uninstall-hooks` — elles, sortent 1 (D3).
+          // Un refus s'imprime toujours : tu, il laisserait des hooks posés qui tirent
+          // à l'insu de l'utilisateur. Il ne touche pas le code de sortie, qui dit le cycle
+          // de vie du serveur ; install-hooks et uninstall-hooks, eux, sortent 1 sur un refus.
           console.log(`${c.err('✗')} ${label} hooks NOT removed: ${x.error}`);
           continue;
         }
@@ -451,13 +440,11 @@ async function cmdUninstallHooks(flags) {
       if (r.backup) console.log(c.dim(`${label}:   backup: ${r.backup}`));
     }
   }
-  // Une erreur ne doit jamais se lire comme « rien à retirer » (décision D3) :
-  // le total peut rester a 0 alors qu un agent n a pas pu etre traite du tout.
+  // Une erreur ne doit jamais se lire comme « rien à retirer » : le total reste
+  // à 0 quand un agent n'a pas pu être traité du tout.
   if (total === 0 && !failed) console.log(c.dim('No agent-viz hooks found.'));
-  // …ni comme un succes pour le script qui appelle (D3, le code de sortie).
-  // Avant que le registre ne traduise le refus en valeur, la levee sortait 1 ;
-  // sortir 0 en annoncant « hooks NOT removed » ferait lire un succes a une
-  // etape de CI alors que les hooks restent poses et continuent de tirer.
+  // …ni comme un succès pour le script appelant : sortir 0 en annonçant « hooks NOT
+  // removed » ferait lire un succès à une étape de CI alors que les hooks restent posés.
   if (failed) process.exitCode = 1;
 }
 

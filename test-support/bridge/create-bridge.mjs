@@ -3,23 +3,20 @@
 // c'est ce qui la rend testable sans monkey-patching (regle D du CLAUDE.md
 // racine), et ce qui permet a ses tests de tourner sous les DEUX executeurs.
 //
-// Trois points etablis par la mesure du 2026-08-11, qu'aucune lecture ne
-// montre :
+// Trois comportements qu'aucune lecture ne montre, tenus par
+// `tests/unit/node-test-bridge.test.mjs` :
 //   - `after` de node:test s'execute apres TOUS les tests du fichier : c'est
 //     `afterAll` de vitest, pas `afterEach` ;
-//   - `t.mock.method` RESTAURE automatiquement en fin de test, la ou
-//     `vi.spyOn` ne le fait pas — d'ou le remplacement ecrit ici plutot que
-//     delegue ;
-//   - une API non implementee doit JETER en se nommant. Un no-op retirerait
-//     des tests du filet en silence : la maladie du constat C1.
+//   - `t.mock.method` RESTAURE en fin de test, `vi.spyOn` non : d'ou le
+//     remplacement ecrit ici plutot que delegue ;
+//   - une API non implementee JETTE en se nommant : un no-op retirerait des
+//     tests du filet en silence.
 
 const FICHIER = 'test-support/bridge/create-bridge.mjs';
 
-// `node:test` echoue sur TOUTE valeur jetee, y compris `0`, `''`, `null`,
-// `NaN` et `false`. Une sentinelle est donc obligatoire : tester la verite
-// d'une erreur au lieu de sa presence rapporterait ces tests-la VERTS —
-// un faux vert loge dans le composant meme qui existe pour les supprimer.
-// Mesure le 2026-08-11, les cinq valeurs verifiees une par une.
+// `node:test` fait echouer un test sur TOUTE valeur jetee, `0`, `''`, `null`, `NaN` et
+// `false` compris : tester la verite d'une erreur au lieu de sa presence rapporterait
+// ces tests VERTS. D'ou la sentinelle, comparee par identite.
 const AUCUNE = Symbol('aucune erreur');
 
 function refus(api) {
@@ -66,12 +63,9 @@ function creerContexte(vi) {
   const contexte = { mock: { method, timers }, after: fn => apresTest.push(fn) };
   for (const api of NON_IMPLEMENTE_CONTEXTE) contexte[api] = refus(`t.${api}`);
 
-  // Les trois phases sont isolees CHACUNE DANS SON PROPRE `try`. Une erreur
-  // dans l'une ne doit empecher aucune des deux autres : sinon l'etat fuit
-  // vers les tests suivants — mocks non restaures, faux temporisateurs
-  // toujours actifs — et la panne se manifeste ailleurs qu'a l'endroit ou
-  // elle est nee, le mode de panne le plus couteux du chantier.
-  // La premiere erreur rencontree est conservee et rendue, jamais avalee.
+  // Chaque phase a son propre `try` : une erreur dans l'une n'empeche pas les autres,
+  // sinon mocks et faux temporisateurs fuient vers les tests suivants et la panne
+  // apparait loin de sa cause. La premiere erreur est gardee et rendue, jamais avalee.
   let premiereErreur = AUCUNE;
   const garder = (e) => { if (premiereErreur === AUCUNE) premiereErreur = e; };
 

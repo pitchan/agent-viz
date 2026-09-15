@@ -1,44 +1,18 @@
-// Garde d'environnement du harnais. Elle tourne AVANT tout module de test :
-// - vitest : premiere entree de `setupFiles`, executee dans chaque worker
-//   avant que le fichier de test (et ses require/import de portee de module)
-//   ne charge ;
-// - node --test : via `--import`, executee dans le processus principal puis
-//   heritee (env) par chaque processus fils de test.
+// Garde d'environnement du harnais, executee avant chaque fichier de test : premiere entree
+// de `setupFiles` sous vitest, `--import` de chaque processus fils sous node --test.
 //
-// Son role n'est PAS de remplacer les detournements que les tests posent
-// eux-memes (watchdog-*.test, claude-dir-cli.test, install-hooks-entrypoint) :
-// eux tournent APRES et gardent le dernier mot. Son role est d'etre le
-// PLANCHER : si un point d'entree de production perd un jour sa garde
-// (mutation, migration), l'ecriture part dans un bac jetable, jamais dans le
-// vrai ~/.claude ni ~/.agent-viz.
+// Elle est un PLANCHER : les detournements des tests gardent le dernier mot, mais un point
+// d'entree qui perd sa garde ecrit dans un bac jetable, jamais dans ~/.claude ni ~/.agent-viz.
 //
-// Mesure : sous Windows `os.homedir()` suit USERPROFILE seul ; HOME seule ne
-// detourne rien. `os.tmpdir()` et `os.homedir()` relisent l'environnement a
-// chaque appel.
-// AGENT_VIZ_PORT=59999 est un port ou aucun demon n'ecoute : un runHook()
-// accidentel parle dans le vide — reconduction d'un port deja employe ailleurs
-// dans le depot (`tests/unit/hook-runtime.test.mjs`,
-// `tests/unit/install-hooks-entrypoint.test.mjs`), pas une valeur inventee.
+// USERPROFILE est detourne avec HOME : sous Windows `os.homedir()` suit USERPROFILE seul,
+// relu a chaque appel, comme TEMP par `os.tmpdir()`. Aucun demon n'ecoute sur le port 59999.
 //
-// CE QUE CE FICHIER NE COUVRE PAS (cinq limites) :
-//   1. L'ecriture cote DEPOT : `install-hooks.ts` sait ajouter une ligne au
-//      `.gitignore` de `findProjectRoot(cwd)` — aucun detournement de home ne
-//      l'empeche. `git status --porcelain` reste le controle qui la voit.
-//   2. Les executions HORS harnais : un script lance directement
-//      (`node src/server/install-hooks.ts`), `npm start`, le bin, ou un
-//      fichier de test lance NU sans runner ne passent ni par `setupFiles`
-//      ni par `--import`.
-//   3. Un `node --test` tape a la main SANS `--import` : seuls les DEUX
-//      scripts npm (`test:node`, `test:ids:node`) portent le drapeau.
-//   4. La garde de harnais ELLE-MEME : retirer cette entree de `setupFiles`
-//      ou ce `--import` fait tomber la prevention sans bruit. Le filet qui
-//      reste alors est `tests/unit/install-hooks-entrypoint.test.mjs`, qui
-//      detecte sans empecher — doublure voulue, pas un repli suppose.
-//   5. `~/.agent-viz/observatory.db` : couverte par ricochet (vit sous
-//      `os.homedir()/.agent-viz`, suit donc le detournement) mais un demon
-//      REEL deja lance sur la machine continue d'y ecrire — cette garde
-//      empeche seulement LES TESTS de lui parler (port mort, AGENT_VIZ_PORT
-//      ci-dessus) ou d'ecrire chez lui, pas le demon deja vivant.
+// Ce qu'elle ne couvre pas :
+//   1. le `.gitignore` du depot, ou `install-hooks.ts` peut ecrire (`git status` le voit) ;
+//   2. une execution hors harnais : script lance directement, `npm start`, le bin, test nu ;
+//   3. un `node --test` sans `--import` : seuls `test:node` et `test:ids:node` le portent ;
+//   4. son retrait : reste `tests/unit/install-hooks-entrypoint.test.mjs`, qui detecte sans empecher ;
+//   5. un demon reel deja lance, qui continue d'ecrire dans `~/.agent-viz/observatory.db`.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -86,14 +60,9 @@ function purgeAnciensBacs(parent) {
   }
 }
 
-// Idempotente DANS UN MEME PROCESSUS : le marqueur evite qu'un processus qui
-// herite deja de l'environnement detourne (un fils issu d'UN SEUL fichier
-// passe a `node --test`, mesure) n'en recree un second. Ce N'EST PAS un
-// partage entre fichiers freres d'un meme run : mesure (2026-08-13) — deux
-// fichiers explicites passes au meme `node --test` produisent DEUX bacs, pas
-// un ; chaque fichier est son propre processus et ne voit pas le marqueur
-// pose par les autres. C'est precisement pourquoi la purge ci-dessus raisonne
-// en "plusieurs bacs par run", jamais en "un seul".
+// Le marqueur empeche un second bac dans un processus qui l'a deja, pose ou herite.
+// Il ne relie pas les fichiers d'un run : sous vitest comme sous node --test, chaque
+// fichier de test cree son bac, d'ou le seuil d'age de la purge ci-dessus.
 if (!process.env.AGENT_VIZ_BAC_HARNAIS) {
   const parent = os.tmpdir();
   purgeAnciensBacs(parent);
