@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { CLI_PAR_DEFAUT } from './cli-defaut-stub.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const BIN_REEL = path.join(ROOT, 'bin', 'agent-viz.js');
@@ -19,6 +20,7 @@ export const REQUIS = [
   'server/install-hooks.js',
   'server/prompt-install.js',
   'server/hook.js',
+  'server/cli.js',
   'engine/core/index.js',
   'engine/doctor/index.js',
 ];
@@ -37,15 +39,24 @@ export function nouvelleRacine(prefixe, { version = '0.0.0', bom = false, sansPa
   return racine;
 }
 
+// Contenu par défaut de chaque fichier de REQUIS, quand `contenus` ne le
+// précise pas. `server/cli.js` sort du lot : bin/agent-viz.js appelle
+// directement `mod.cmdXxx(...)` dessus pour toute commande connue — un module
+// vide y ferait échouer `hook`, `stop`, `status`, etc. avant même d'atteindre
+// le fichier qu'un test veut réellement observer.
+function contenuParDefaut(rel) {
+  return rel === 'server/cli.js' ? CLI_PAR_DEFAUT : 'export {};';
+}
+
 // Écrit sous dist/ les fichiers compilés requis, sauf ceux de `omettre`.
 // `contenus` remplace le corps d'un fichier (clé relative à dist/, par exemple
-// 'server/hook.js') ; les autres exportent un module vide.
+// 'server/hook.js') ; les autres reçoivent leur contenu par défaut.
 export function ecrireDist(racine, { omettre = [], contenus = {} } = {}) {
   for (const rel of REQUIS) {
     if (omettre.includes(rel)) continue;
     const p = path.join(racine, 'dist', ...rel.split('/'));
     fs.mkdirSync(path.dirname(p), { recursive: true });
-    fs.writeFileSync(p, contenus[rel] ?? 'export {};');
+    fs.writeFileSync(p, contenus[rel] ?? contenuParDefaut(rel));
   }
 }
 

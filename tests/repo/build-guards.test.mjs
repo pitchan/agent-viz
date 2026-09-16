@@ -132,7 +132,16 @@ test('commande `hook` sur un arbre perime : aucune ligne de garde', () => {
   const racine = nouvelleRacine(PREFIXE);
   try {
     ecrireDepotDev(racine);
-    ecrireDist(racine, { contenus: { 'server/hook.js': "export function runHook() { console.log('SONDE_HOOK_OK'); }\n" } });
+    ecrireDist(racine, {
+      contenus: {
+        'server/hook.js': "export function runHook() { console.log('SONDE_HOOK_OK'); }\n",
+        'server/cli.js': "import { pathToFileURL } from 'node:url';\nimport path from 'node:path';\n"
+          + "export async function cmdHook(packageRoot) {\n"
+          + "  const { runHook } = await import(pathToFileURL(path.join(packageRoot, 'dist', 'server', 'hook.js')).href);\n"
+          + "  runHook();\n"
+          + "}\n",
+      },
+    });
     ecrireTemoin(racine, T_VIEUX);
     ecrireSourceTs(racine, 'server', T_RECENT);
     const r = lance(racine, ['hook']);

@@ -12,8 +12,12 @@ const HOOK_SONDE = "export function runHook() { console.log('SONDE_HOOK_OK'); }\
 
 // Chaque module factice de dist/ dépose un témoin à la racine du bac s'il est
 // chargé : un refus doit arriver avant tout import, donc sans aucun témoin.
+// `server/cli.js` sort de la liste des témoins : bin/agent-viz.js appelle
+// directement ses `cmdXxx`, un module vide casserait l'appel avant même que
+// les fichiers témoins ci-dessous soient importés. Il garde donc le
+// contenu par défaut de bin-sandbox.mjs (le mirroir de src/server/cli.ts).
 function ecrireDistAvecTemoins(racine, contenus = {}) {
-  const temoins = Object.fromEntries(REQUIS.map(rel => {
+  const temoins = Object.fromEntries(REQUIS.filter(rel => rel !== 'server/cli.js').map(rel => {
     const versRacine = '../'.repeat(rel.split('/').length);
     const nom = `CHARGE-${rel.replaceAll('/', '-')}`;
     return [rel, `import fs from 'node:fs';\nfs.writeFileSync(new URL('${versRacine}${nom}', import.meta.url), '');\nexport {};\n`];

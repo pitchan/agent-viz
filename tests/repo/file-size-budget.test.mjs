@@ -36,11 +36,6 @@ const LISTE_BLANCHE = new Map([
     + "de la session, et suivre le transcript qui grossit (celui de la session et ceux de ses "
     + "sous-agents) pour en tirer les jetons consommés. Chaque métier a son propre consommateur dans "
     + "le serveur ; c'est une dette."],
-  ['bin/agent-viz.js',
-    "Le point d'entrée de la ligne de commande : il lit les options, vérifie que le code compilé est "
-    + "présent et à jour, charge le module de dist/ concerné et affiche le résultat. La logique vit "
-    + "dans dist/ ; ici, une fonction par sous-commande, et le fichier grossit avec le nombre de "
-    + "sous-commandes et de leurs options."],
 ]);
 
 // ── Vérificateur pur ──
