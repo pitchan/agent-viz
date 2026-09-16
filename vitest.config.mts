@@ -28,5 +28,6 @@ export default defineConfig({
     environment: 'node',
     include: ['tests/**/*.test.{cjs,mjs,ts}'],
     setupFiles: ['./test-support/env-guard.mjs', './test-support/bridge/install.mjs'],
+    restoreMocks: true,
   },
 });
