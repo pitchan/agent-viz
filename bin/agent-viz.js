@@ -297,12 +297,21 @@ async function cmdStatus(flags) {
 
   const scopes = installedScopes({ cwd: process.cwd(), packageRoot: PKG_ROOT });
   const lines = [];
-  for (const [agent, list] of Object.entries(scopes)) {
-    if (!list || list.length === 0) continue;
+  for (const [agent, scan] of Object.entries(scopes)) {
+    if (!scan) continue;
     const label = agent === 'claude' ? 'Claude Code' : 'Copilot CLI';
-    const names = list.map(x => x.scope).join(', ');
-    const dup = list.length > 1 ? c.warn(`  ! duplicate: each event fires ${list.length}x`) : '';
-    lines.push(`  ${label.padEnd(11)} : ${names}${dup}`);
+    const list = scan.installed;
+    if (list.length > 0) {
+      const names = list.map(x => x.scope).join(', ');
+      const dup = list.length > 1 ? c.warn(`  ! duplicate: each event fires ${list.length}x`) : '';
+      lines.push(`  ${label.padEnd(11)} : ${names}${dup}`);
+    }
+    // Un fichier illisible n'est pas une portée sans hook : sans cette ligne,
+    // `status` afficherait la même chose qu'un fichier sain et laisserait
+    // croire que la portée n'est pas installée.
+    for (const u of scan.unreadable) {
+      lines.push(`  ${label.padEnd(11)} : ${c.warn(`! ${u.scope} unreadable — ${u.error}`)}`);
+    }
   }
   if (lines.length > 0) {
     console.log('hooks   :');
@@ -477,6 +486,10 @@ function newestTsMtime(dir) {
 // d'un dist/server intact, doivent aussi faire echouer la garde.
 const REQUIRED_DIST_FILES = [
   ['server', 'lifecycle.js'],
+  // Le démon lui-même. `lifecycle` le lance par `spawn(process.execPath, …)` :
+  // Node existe toujours, donc l'absence de ce fichier ne se voit qu'en queue de
+  // journal, en « Cannot find module », le message que cette garde doit éviter.
+  ['server', 'server.js'],
   ['server', 'install-hooks.js'],
   ['server', 'prompt-install.js'],
   ['server', 'hook.js'],

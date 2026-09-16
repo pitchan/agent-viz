@@ -556,10 +556,10 @@ ligne : un ancrage `fichier:ligne` qui a glissé reste vert.
 
 ## 9. La plomberie de test
 
-**Un seul exécuteur, un seul arbre de tests dans 131 fichiers.**
+**Un seul exécuteur, un seul arbre de tests dans 132 fichiers.**
 
 ```
-npx vitest run     → tous passés, 131 fichiers
+npx vitest run     → tous passés, 132 fichiers
 ```
 
 Les deux exécuteurs ne lisent que `tests/` (`include` de `vitest.config.mts`,
@@ -568,7 +568,7 @@ qui explique le pont ci-dessous.
 
 | Dialecte | Fichiers | Écrits en |
 |---|---|---|
-| CommonJS + ESM | 41 `.test.cjs` + 65 `.test.mjs` | `node:test` |
+| CommonJS + ESM | 41 `.test.cjs` + 66 `.test.mjs` | `node:test` |
 | TypeScript | 25 `.test.ts` | l'API de vitest |
 
 **L'extension dit le régime.** Sous une racine `"type": "module"`, un `.js`
@@ -584,7 +584,7 @@ est écrit une seule fois, à côté de la commande qui le refait, et
 `tests/repo/architecture-test-counts.test.mjs` le compare au disque :
 
 ```
-grep -rlE "(require\(|from )['\"]node:test['\"]" tests | wc -l   → 106
+grep -rlE "(require\(|from )['\"]node:test['\"]" tests | wc -l   → 107
 ```
 
 Le test du pont, `tests/unit/node-test-bridge.test.mjs`, passe lui-même par le

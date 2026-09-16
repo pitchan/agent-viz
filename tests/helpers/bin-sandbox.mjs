@@ -10,10 +10,12 @@ const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const BIN_REEL = path.join(ROOT, 'bin', 'agent-viz.js');
 const PREFIXE_COMMUN = 'agent-viz-';
 
-// Les six fichiers que la garde exige réellement (miroir de
-// REQUIRED_DIST_FILES dans bin/agent-viz.js), relatifs à dist/.
+// Les fichiers que la garde exige réellement (miroir de REQUIRED_DIST_FILES
+// dans bin/agent-viz.js), relatifs à dist/. Le miroir est verrouillé par
+// tests/repo/build-guards.test.mjs : les deux listes doivent rester identiques.
 export const REQUIS = [
   'server/lifecycle.js',
+  'server/server.js',
   'server/install-hooks.js',
   'server/prompt-install.js',
   'server/hook.js',

@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import type { AgentOpts, ResolvedTarget, ResolvedCommand, Scope } from './types.ts';
+import type { AgentOpts, ResolvedTarget, ResolvedCommand, ScanResult, Scope } from './types.ts';
 import { AGENT_CONFIG } from './config.ts';
 import { PRODUCT_VERSION } from '../../engine/version.ts';
 
@@ -100,13 +100,26 @@ export function ensureGitignore(
 // La boucle « quelles cibles portent réellement notre hook », écrite une
 // fois : les adaptateurs s'en servent pour leur avertissement inter-portées
 // (crossScope) et le registre pour findInstalledScopes.
+//
+// `installedIn` lève sur un fichier présent mais illisible. Le laisser passer
+// tuait `agent-viz status` sur une trace brute ; le compter comme « pas de
+// hook » ferait passer un fichier cassé pour un fichier sain. Il sort donc à
+// part, à charge de l'appelant de le dire.
 export function scanInstalled(
   targets: ResolvedTarget[], installedIn: (file: string) => boolean,
-): Array<{ scope: Scope; file: string }> {
+): ScanResult {
   const installed: Array<{ scope: Scope; file: string }> = [];
+  const unreadable: ScanResult['unreadable'] = [];
   for (const t of targets) {
     if (!fs.existsSync(t.file)) continue;
-    if (installedIn(t.file)) installed.push({ scope: t.scope, file: t.file });
+    try {
+      if (installedIn(t.file)) installed.push({ scope: t.scope, file: t.file });
+    } catch (e: unknown) {
+      unreadable.push({
+        scope: t.scope, file: t.file,
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
   }
-  return installed;
+  return { installed, unreadable };
 }

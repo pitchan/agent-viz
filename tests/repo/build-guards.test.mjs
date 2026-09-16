@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { nouvelleRacine, ecrireDist, lance, nettoie } from '../helpers/bin-sandbox.mjs';
+import { nouvelleRacine, ecrireDist, lance, nettoie, REQUIS } from '../helpers/bin-sandbox.mjs';
 
 const PREFIXE = 'agent-viz-buildguard-';
 // Commande inconnue : `ensureBuildIsFresh` tourne avant le `switch`, et le `default:`
@@ -177,4 +177,45 @@ test('controle inverse : arbre construit et a jour, aucun message de garde', () 
   } finally {
     nettoie(racine);
   }
+});
+
+test('dist/server/server.js manquant : la garde arrete, sans laisser voir « Cannot find module »', () => {
+  // Arrange
+  const racine = nouvelleRacine(PREFIXE);
+  try {
+    ecrireDepotDev(racine);
+    ecrireDist(racine, { omettre: ['server/server.js'] });
+
+    // Act
+    const r = lance(racine, [SONDE]);
+
+    // Assert
+    const sortie = `${r.stdout}${r.stderr}`;
+    assert.ok(sortie.includes('npm run build'),
+      `demon absent : la garde devrait nommer le remede plutot que laisser le spawn echouer plus tard :\n${sortie}`);
+    assert.ok(!sortie.includes('Cannot find module'),
+      `sans server.js dans la liste, l'echec ne se voyait qu'en queue de journal :\n${sortie}`);
+    assert.equal(r.status, 1, `code de sortie attendu 1, obtenu ${r.status} :\n${sortie}`);
+  } finally {
+    nettoie(racine);
+  }
+});
+
+// Le bac a sable recopie la liste de la garde a la main. Sans ce verrou, un
+// fichier ajoute a REQUIRED_DIST_FILES reste absent de REQUIS et aucun test ne
+// couvre son absence — c'est ainsi que server.js est passe inapercu.
+test('la liste du bac a sable est le miroir exact de REQUIRED_DIST_FILES', () => {
+  // Arrange
+  const source = fs.readFileSync(
+    path.join(import.meta.dirname, '..', '..', 'bin', 'agent-viz.js'), 'utf8');
+  const bloc = source.split('const REQUIRED_DIST_FILES = [')[1]?.split('].map(')[0];
+  assert.ok(bloc, 'REQUIRED_DIST_FILES introuvable dans bin/agent-viz.js');
+
+  // Act
+  const declares = [...bloc.matchAll(/\[([^\]]*)\]/g)]
+    .map(m => [...m[1].matchAll(/'([^']+)'/g)].map(s => s[1]).join('/'));
+
+  // Assert
+  assert.deepEqual(declares, REQUIS,
+    'REQUIS (tests/helpers/bin-sandbox.mjs) doit lister exactement les memes fichiers que la garde');
 });

@@ -9,7 +9,7 @@
 // undefined → auto-detect; uninstall defaults to ALL agents (don't leave hooks
 // behind if an agent got removed from PATH after install).
 // Returns { <agent>: result, ... } where each side carries the per-agent result.
-import type { AgentName, AgentOpts, Scope, AgentInstaller, Target } from './types.ts';
+import type { AgentName, AgentOpts, ScanResult, AgentInstaller, Target } from './types.ts';
 import { scanInstalled } from './scopes.ts';
 import { claudeInstaller } from './claude.ts';
 import { copilotInstaller } from './copilot.ts';
@@ -96,7 +96,7 @@ export function detectAgents(_opts: AgentOpts = {}): Record<string, boolean> {
 // branchement par nom d'agent ici.
 export function findInstalledScopes(
   { cwd, packageRoot, agent = 'claude' }: AgentOpts = {},
-): Array<{ scope: Scope; file: string }> {
+): ScanResult {
   const inst = INSTALLERS[agent];
   return scanInstalled(inst.sweepTargets(cwd, { packageRoot }), inst.installedIn);
 }
@@ -106,8 +106,8 @@ export function findInstalledScopes(
 // cross-scope warning.
 export function installedScopes(
   { cwd, packageRoot }: { cwd?: string; packageRoot?: string } = {},
-): Record<string, Array<{ scope: Scope; file: string }>> {
-  const out: Record<string, Array<{ scope: Scope; file: string }>> = {};
+): Record<string, ScanResult> {
+  const out: Record<string, ScanResult> = {};
   for (const a of Object.keys(INSTALLERS) as AgentName[]) {
     out[a] = findInstalledScopes({ cwd, packageRoot, agent: a });
   }

@@ -41,8 +41,11 @@ function claudeHookIn(file: string): boolean {
 
 // Le balayage LOCAL des portées de cet agent (crossScope) : l'adaptateur se
 // connaît lui-même, seul le registre agrège plusieurs agents.
+// `.installed` seul : l'avertissement inter-portées ne parle que des portées qui
+// portent notre hook. Un fichier illisible rencontré ici remonte par `audit`,
+// dont c'est le métier.
 function claudeInstalledScopes(cwd?: string, packageRoot?: string) {
-  return scanInstalled(claudeSweepTargets(cwd, { packageRoot }), claudeHookIn);
+  return scanInstalled(claudeSweepTargets(cwd, { packageRoot }), claudeHookIn).installed;
 }
 
 // Install / refresh agent-viz hooks. Returns:

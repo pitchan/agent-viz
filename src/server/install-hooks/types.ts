@@ -22,6 +22,14 @@ export interface ResolvedTarget {
   projectRoot: string | null;
 }
 
+// Le résultat d'un balayage de portées. Un fichier présent mais illisible n'est
+// ni installé ni absent : il sort dans `unreadable` plutôt que d'être compté
+// comme « pas de hook », pour qu'un fichier cassé ne passe pas pour un sain.
+export interface ScanResult {
+  installed: Array<{ scope: Scope; file: string }>;
+  unreadable: Array<{ scope: Scope; file: string; error: string }>;
+}
+
 export interface ResolvedCommand {
   command: string;
   mode: 'absolute' | 'npx';
@@ -53,12 +61,10 @@ export interface AgentOpts {
 // dans la case de cet agent, les autres agents gardent leur résultat, et les
 // consommateurs n'ont jamais à connaître l'agent concret.
 //
-// `detect`, `sweepTargets` et `installedIn` sont appelées DIRECTEMENT, sans
-// garde : `pickAgents` appelle `detect`, `findInstalledScopes` appelle
-// `sweepTargets` et `installedIn`. Elles PEUVENT LEVER et la levée traverse
-// jusqu'à l'appelant — `installedIn` lève sur un fichier de hooks illisible,
-// donc `agent-viz status` casse. Ne pas écrire ici que le registre traduit
-// tout.
+// `detect` et `sweepTargets` sont appelées DIRECTEMENT, sans garde : leur levée
+// traverse jusqu'à l'appelant. `installedIn` lève aussi, sur un fichier de hooks
+// illisible, mais `scanInstalled` l'attrape et range la cible dans `unreadable`.
+// Ne pas écrire ici que le registre traduit tout.
 //
 // Ajouter un 3e agent = un fichier d'adaptateur + une entrée AGENT_CONFIG +
 // une entrée INSTALLERS.

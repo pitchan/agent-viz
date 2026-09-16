@@ -53,7 +53,7 @@ test('findInstalledScopes: detects agent-viz hooks pre-installed in project + lo
   writeClaudeSettingsWithHook(path.join(projectRoot, '.claude', 'settings.json'));
   writeClaudeSettingsWithHook(path.join(projectRoot, '.claude', 'settings.local.json'));
   const found = findInstalledScopes({ cwd: projectRoot, packageRoot: makeTempDir('avtest-pkg-'), agent: 'claude' });
-  const scopes = found.map(f => f.scope);
+  const scopes = found.installed.map(f => f.scope);
   assert.ok(scopes.includes('project'), `expected 'project' in ${scopes.join(',')}`);
   assert.ok(scopes.includes('local'), `expected 'local' in ${scopes.join(',')}`);
 });
