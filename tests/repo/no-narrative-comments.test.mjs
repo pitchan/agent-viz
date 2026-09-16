@@ -6,7 +6,7 @@
 // c'est une vérification d'hygiène du dépôt, d'où `tests/repo/` — même famille que
 // `stale-path-citations.test.mjs` et `documentation-citations.test.mjs`.
 //
-// Deux règles, lues sur ce que `tests/helpers/comment-lines.mjs` reconnaît comme commentaire :
+// Deux règles, lues sur ce que `tests/helpers/comment-lines.ts` reconnaît comme commentaire :
 //   1. aucune ligne de commentaire ne porte un des marqueurs de MOTIFS ;
 //   2. aucun bloc de commentaire ne dépasse LIMITE_BLOC lignes — au-delà, un bloc raconte.
 //
@@ -17,7 +17,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { commentPart, commentBlocks } from '../helpers/comment-lines.mjs';
+import { commentPart, commentBlocks } from '../helpers/comment-lines.ts';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 

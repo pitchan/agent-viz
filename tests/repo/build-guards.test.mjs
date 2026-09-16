@@ -5,8 +5,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { nouvelleRacine, ecrireDist, lance, nettoie, REQUIS } from '../helpers/bin-sandbox.mjs';
-import { CLI_PAR_DEFAUT } from '../helpers/cli-defaut-stub.mjs';
+import { nouvelleRacine, ecrireDist, lance, nettoie, REQUIS } from '../helpers/bin-sandbox.ts';
+import { CLI_PAR_DEFAUT } from '../helpers/cli-defaut-stub.ts';
 
 const PREFIXE = 'agent-viz-buildguard-';
 // Commande inconnue : `ensureBuildIsFresh` tourne avant le `switch`, et le `default:`
@@ -227,7 +227,7 @@ test('la liste du bac a sable est le miroir exact de REQUIRED_DIST_FILES', () =>
 
   // Assert
   assert.deepEqual(declares, REQUIS,
-    'REQUIS (tests/helpers/bin-sandbox.mjs) doit lister exactement les memes fichiers que la garde');
+    'REQUIS (tests/helpers/bin-sandbox.ts) doit lister exactement les memes fichiers que la garde');
 });
 
 // Meme famille de verrou que le precedent, pour le meme risque : cli-defaut-stub.mjs

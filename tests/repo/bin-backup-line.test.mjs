@@ -3,7 +3,7 @@
 // sont factices : ils rendent une copie sonde ou `null`, sans toucher au disque.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { nouvelleRacine, ecrireDist, lance, nettoie } from '../helpers/bin-sandbox.mjs';
+import { nouvelleRacine, ecrireDist, lance, nettoie } from '../helpers/bin-sandbox.ts';
 import { BACKUPS_KEPT } from '../../src/server/install-hooks/backup.ts';
 
 const PREFIXE = 'agent-viz-copie-';

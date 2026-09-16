@@ -1,0 +1,218 @@
+
+[1m[46m RUN [49m[22m [36mv3.2.7 [39m[90mF:/DEV/agent-viz[39m
+
+ [32m✓[39m tests/unit/hook-runtime.test.mjs [2m([22m[2m3 tests[22m[2m)[22m[33m 635[2mms[22m[39m
+ [32m✓[39m tests/unit/observatory-store.test.cjs [2m([22m[2m20 tests[22m[2m)[22m[33m 606[2mms[22m[39m
+ [32m✓[39m tests/e2e/status-unreadable-hooks.e2e.test.mjs [2m([22m[2m3 tests[22m[2m)[22m[33m 706[2mms[22m[39m
+ [32m✓[39m tests/repo/relative-specifiers-exist.test.mjs [2m([22m[2m2 tests[22m[2m)[22m[33m 641[2mms[22m[39m
+   [33m[2m✓[22m[39m assiette : au moins 120 fichiers .ts et 300 spécificateurs relatifs lus sous src et tests [33m 365[2mms[22m[39m
+ [32m✓[39m tests/unit/watchdog-service.test.mjs [2m([22m[2m27 tests[22m[2m)[22m[33m 756[2mms[22m[39m
+ [32m✓[39m tests/unit/watchdog-wiring.test.mjs [2m([22m[2m22 tests[22m[2m)[22m[33m 600[2mms[22m[39m
+ [32m✓[39m tests/repo/server-imports-load.test.mjs [2m([22m[2m2 tests[22m[2m)[22m[33m 398[2mms[22m[39m
+ [32m✓[39m tests/e2e/install-hooks-backup-registry.e2e.test.mjs [2m([22m[2m16 tests[22m[2m)[22m[33m 961[2mms[22m[39m
+   [33m[2m✓[22m[39m la CLI directe, sur un settings.json qui existe, imprime la ligne backup sous la commande du hook [33m 342[2mms[22m[39m
+ [32m✓[39m tests/unit/install-hooks-entrypoint.test.mjs [2m([22m[2m2 tests[22m[2m)[22m[33m 499[2mms[22m[39m
+(node:26948) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ [32m✓[39m tests/unit/watchdog-journal.test.cjs [2m([22m[2m36 tests[22m[2m)[22m[32m 260[2mms[22m[39m
+ [32m✓[39m tests/unit/static-ts-route.test.cjs [2m([22m[2m2 tests[22m[2m)[22m[32m 220[2mms[22m[39m
+ [32m✓[39m tests/unit/watchdog-client-reader.test.mjs [2m([22m[2m31 tests[22m[2m)[22m[33m 1551[2mms[22m[39m
+ [32m✓[39m tests/repo/build-guards.test.mjs [2m([22m[2m11 tests[22m[2m)[22m[33m 1607[2mms[22m[39m
+ [32m✓[39m tests/unit/observatory-scan.test.cjs [2m([22m[2m8 tests[22m[2m)[22m[33m 397[2mms[22m[39m
+(node:47556) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+[90mstdout[2m | tests/unit/housekeep-compact.test.cjs[2m > [22m[2mau-delà du seuil : la queue est conservée, le résumé compte TOUTE l’histoire
+[22m[39m[housekeep] compacted sess-1: 130 → 100 events, summary at sess-1.summary.json
+
+[90mstdout[2m | tests/unit/housekeep-compact.test.cjs[2m > [22m[2mCARACTÉRISATION — une ligne illisible est comptée dans totalEvents mais perdue pour les outils
+[22m[39m[housekeep] compacted sess-4: 121 → 100 events, summary at sess-4.summary.json
+
+[90mstdout[2m | tests/unit/housekeep-compact.test.cjs[2m > [22m[2mun BOM est toléré où qu’il soit dans le fichier
+[22m[39m[housekeep] compacted sess-5: 120 → 100 events, summary at sess-5.summary.json
+
+ [32m✓[39m tests/repo/bin-backup-line.test.mjs [2m([22m[2m9 tests[22m[2m)[22m[33m 1901[2mms[22m[39m
+ [32m✓[39m tests/e2e/doctor.e2e.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 1240[2mms[22m[39m
+   [33m[2m✓[22m[39m CLI bout-en-bout[2m > [22mnetgain doctor --json écrit un rapport JSON valide sur stdout, exit 0 [33m 1186[2mms[22m[39m
+[90mstdout[2m | tests/unit/housekeep-compact.test.cjs[2m > [22m[2mCARACTÉRISATION — une ligne vide au milieu est traitée comme une ligne illisible
+[22m[39m[housekeep] compacted sess-6: 121 → 100 events, summary at sess-6.summary.json
+
+[90mstdout[2m | tests/unit/housekeep-compact.test.cjs[2m > [22m[2mCARACTÉRISATION — le saut de ligne final ne fabrique PAS de ligne fantôme (trim avant découpe)
+[22m[39m[housekeep] compacted sess-7: 120 → 100 events, summary at sess-7.summary.json
+
+[90mstdout[2m | tests/unit/housekeep-compact.test.cjs[2m > [22m[2mCARACTÉRISATION — seuls les trois événements d’outil alimentent le résumé
+[22m[39m[housekeep] compacted sess-8: 113 → 100 events, summary at sess-8.summary.json
+
+ [32m✓[39m tests/unit/housekeep-compact.test.cjs [2m([22m[2m9 tests[22m[2m)[22m[32m 185[2mms[22m[39m
+ [32m✓[39m tests/repo/no-narrative-comments.test.mjs [2m([22m[2m6 tests[22m[2m)[22m[32m 209[2mms[22m[39m
+ [32m✓[39m tests/repo/documentation-citations.test.mjs [2m([22m[2m2 tests[22m[2m)[22m[32m 163[2mms[22m[39m
+ [32m✓[39m tests/repo/stale-path-citations.test.mjs [2m([22m[2m5 tests[22m[2m)[22m[32m 161[2mms[22m[39m
+[90mstderr[2m | tests/unit/transcript-discovery.test.cjs[2m > [22m[2mensureTranscriptWatcher retries discovery after a transient missing transcript
+[22m[39m[tokens] retry-se: transcript not on disk yet at C:\Users\Vincent\AppData\Local\Temp\agent-viz-harnais-uhAD6C\aviz-disc-A1mJrw\transcript.jsonl
+
+[90mstderr[2m | tests/unit/transcript-discovery.test.cjs[2m > [22m[2mensureTranscriptWatcher retries discovery after a transient missing transcript
+[22m[39m[tokens] retry-se: main=1244 perAgent=0
+
+ [32m✓[39m tests/e2e/install-hooks-backup.e2e.test.mjs [2m([22m[2m8 tests[22m[2m)[22m[32m 126[2mms[22m[39m
+[90mstderr[2m | tests/unit/transcript-discovery.test.cjs[2m > [22m[2mensureTranscriptWatcher flags transcriptMissing while absent and clears it on success
+[22m[39m[tokens] retry-se: transcript not on disk yet at C:\Users\Vincent\AppData\Local\Temp\agent-viz-harnais-uhAD6C\aviz-disc-9XIRjD\transcript.jsonl
+
+[90mstderr[2m | tests/unit/transcript-discovery.test.cjs[2m > [22m[2mensureTranscriptWatcher flags transcriptMissing while absent and clears it on success
+[22m[39m[tokens] retry-se: main=505 perAgent=0
+
+ [32m✓[39m tests/unit/transcript-discovery.test.cjs [2m([22m[2m8 tests[22m[2m)[22m[32m 153[2mms[22m[39m
+(node:9632) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ [32m✓[39m tests/repo/served-web-graph.test.mjs [2m([22m[2m6 tests[22m[2m)[22m[33m 368[2mms[22m[39m
+   [33m[2m✓[22m[39m la classification type/valeur est celle que le retrait de types applique vraiment [33m 352[2mms[22m[39m
+ [32m✓[39m tests/unit/transcript-subagents.test.cjs [2m([22m[2m4 tests[22m[2m)[22m[32m 77[2mms[22m[39m
+ [32m✓[39m tests/unit/observatory-migrations.test.cjs [2m([22m[2m3 tests[22m[2m)[22m[32m 97[2mms[22m[39m
+ [32m✓[39m tests/doctor/session-kind.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 109[2mms[22m[39m
+ [32m✓[39m tests/unit/install-hooks-registry.test.mjs [2m([22m[2m13 tests[22m[2m)[22m[32m 102[2mms[22m[39m
+ [32m✓[39m tests/repo/no-local-engine-primitives.test.mjs [2m([22m[2m2 tests[22m[2m)[22m[32m 136[2mms[22m[39m
+[90mstderr[2m | tests/unit/session-index-initial.test.cjs[2m > [22m[2mCARACTÉRISATION — une première ligne de plus de 4 Ko est tronquée, donc illisible
+[22m[39m[session-index] sess-7: sonde agentSource — première ligne illisible (4096 caractères ; au-delà de 4096 octets lus, elle arrive tronquée)
+
+ [32m✓[39m tests/unit/observatory-claude-dir.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 66[2mms[22m[39m
+ [32m✓[39m tests/unit/session-index-initial.test.cjs [2m([22m[2m12 tests[22m[2m)[22m[32m 59[2mms[22m[39m
+ [32m✓[39m tests/core/jsonl.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 30[2mms[22m[39m
+ [32m✓[39m tests/doctor/clock.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 107[2mms[22m[39m
+ [32m✓[39m tests/unit/observatory-engine-contract.test.cjs [2m([22m[2m6 tests[22m[2m)[22m[32m 36[2mms[22m[39m
+ [32m✓[39m tests/core/discovery.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 69[2mms[22m[39m
+ [32m✓[39m tests/unit/install-hooks.test.cjs [2m([22m[2m13 tests[22m[2m)[22m[32m 46[2mms[22m[39m
+ [32m✓[39m tests/doctor/claude-dir-cli.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 31[2mms[22m[39m
+ [32m✓[39m tests/unit/invocation-patterns.test.mjs [2m([22m[2m50 tests[22m[2m)[22m[32m 38[2mms[22m[39m
+ [32m✓[39m tests/e2e/bind-port.e2e.test.mjs [2m([22m[2m4 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32m✓[39m tests/doctor/terminal.test.ts [2m([22m[2m22 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+ [32m✓[39m tests/core/discovery-unreadable-dir.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m tests/e2e/package-exports.e2e.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 61[2mms[22m[39m
+ [32m✓[39m tests/e2e/install-hooks-atomic-write.e2e.test.mjs [2m([22m[2m5 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+ [32m✓[39m tests/repo/file-size-budget.test.mjs [2m([22m[2m5 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m tests/core/jsonl-decode-line.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 75[2mms[22m[39m
+ [32m✓[39m tests/doctor/context.test.ts [2m([22m[2m44 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m tests/unit/observatory-ranking.test.cjs [2m([22m[2m21 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+ [32m✓[39m tests/unit/watchdog-routes.test.cjs [2m([22m[2m19 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m tests/repo/test-file-extensions.test.mjs [2m([22m[2m3 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m tests/unit/watchdog-disjoint-detectors.test.mjs [2m([22m[2m18 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m tests/unit/tokens.test.cjs [2m([22m[2m34 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m tests/unit/watchdog-freshness.test.mjs [2m([22m[2m30 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m tests/core/pricing.test.ts [2m([22m[2m46 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m tests/unit/watchdog-bad-invocation.test.mjs [2m([22m[2m26 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m tests/unit/pricing.test.cjs [2m([22m[2m31 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m tests/unit/watchdog-loop-outcomes.test.mjs [2m([22m[2m11 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m tests/unit/watchdog.test.mjs [2m([22m[2m17 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m tests/doctor/tokens.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+[90mstderr[2m | tests/unit/observatory-routes.test.cjs[2m > [22m[2mune panne du service répond 500 avec son message exact
+[22m[39m[observatory] route failed: database is locked
+
+[90mstderr[2m | tests/unit/observatory-routes.test.cjs[2m > [22m[2mune purge qui échoue répond 500 et ne lance pas de scan
+[22m[39m[observatory] route failed: database is locked
+
+ [32m✓[39m tests/unit/prompt-install.test.cjs [2m([22m[2m11 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m tests/unit/observatory-routes.test.cjs [2m([22m[2m24 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m tests/doctor/verification.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m tests/core/usage.test.ts [2m([22m[2m74 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+[90mstderr[2m | tests/unit/observatory-rule-r1.test.cjs[2m > [22m[2mthe registry exposes R1 and evaluateAll routes through it
+[22m[39m[rules] R2 failed: Cannot read properties of undefined (reading 'byTool')
+[rules] R3 failed: Cannot read properties of undefined (reading 'totalBytes')
+[rules] R4 failed: Cannot read properties of undefined (reading 'cases')
+[rules] R5 failed: Cannot read properties of undefined (reading 'length')
+[rules] R6 failed: Cannot read properties of undefined (reading 'spawnToolUses')
+
+[90mstderr[2m | tests/unit/observatory-rule-r1.test.cjs[2m > [22m[2ma rule that throws never takes the whole evaluation down
+[22m[39m[rules] RX failed: bug
+
+ [32m✓[39m tests/unit/observatory-rule-r1.test.cjs [2m([22m[2m21 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m tests/unit/errors-register.test.mjs [2m([22m[2m25 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m tests/unit/observatory-format.test.mjs [2m([22m[2m34 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m tests/core/events.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m tests/doctor/prompts.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m tests/unit/viz-narrator.test.mjs [2m([22m[2m16 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m tests/unit/failures-view.test.mjs [2m([22m[2m11 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m tests/unit/install-hooks-scan.test.mjs [2m([22m[2m2 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m tests/unit/observatory-service-window.test.cjs [2m([22m[2m8 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m tests/unit/alert-shape.test.mjs [2m([22m[2m10 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m tests/unit/watchdog-alert-content.test.mjs [2m([22m[2m10 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m tests/unit/alert-format.test.mjs [2m([22m[2m17 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m tests/unit/transcript.test.cjs [2m([22m[2m20 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m tests/unit/failures-format.test.mjs [2m([22m[2m25 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m tests/doctor/tool-results.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m tests/unit/observatory-service-pricing.test.cjs [2m([22m[2m2 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m tests/unit/version-route.test.cjs [2m([22m[2m3 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m tests/unit/node-test-bridge.test.mjs [2m([22m[2m20 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m tests/unit/observatory-rule-r2.test.cjs [2m([22m[2m8 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m tests/doctor/no-marker-detail.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m tests/doctor/verification-commands.test.mjs [2m([22m[2m13 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m tests/unit/observatory-evidence.test.mjs [2m([22m[2m20 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m tests/unit/observatory-rules-session-facts.test.cjs [2m([22m[2m12 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m tests/unit/observatory-config-audit.test.cjs [2m([22m[2m8 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m tests/unit/observatory-rules-cost.test.cjs [2m([22m[2m9 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m tests/unit/observatory-rule-titles.test.cjs [2m([22m[2m4 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m tests/unit/advisor-card.test.mjs [2m([22m[2m5 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m tests/unit/decisions-view.test.mjs [2m([22m[2m8 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m tests/unit/transcript-adapters.test.cjs [2m([22m[2m5 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m tests/repo/bin-help.test.mjs [2m([22m[2m24 tests[22m[2m)[22m[33m 5586[2mms[22m[39m
+   [33m[2m✓[22m[39m agent-viz uninstall-hooks --help : affiche l'aide, sort 0, n'écrit rien [33m 304[2mms[22m[39m
+   [33m[2m✓[22m[39m agent-viz status --help : affiche l'aide, sort 0, n'écrit rien [33m 317[2mms[22m[39m
+   [33m[2m✓[22m[39m agent-viz install-hooks --user --target=both -h : affiche l'aide, sort 0, n'écrit rien [33m 416[2mms[22m[39m
+   [33m[2m✓[22m[39m agent-viz --version --help : affiche l'aide, sort 0, n'écrit rien [33m 391[2mms[22m[39m
+   [33m[2m✓[22m[39m agent-viz --version : affiche la version, sort 0, n'écrit rien [33m 324[2mms[22m[39m
+   [33m[2m✓[22m[39m contrôle inverse : sans --help, la même commande atteint la garde de build et s'arrête [33m 307[2mms[22m[39m
+ [32m✓[39m tests/unit/observatory-project-label.test.cjs [2m([22m[2m14 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m tests/cli-args.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m tests/unit/viz-state.test.mjs [2m([22m[2m19 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m tests/core/claude-dir.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m tests/unit/observatory-confirm-button.test.mjs [2m([22m[2m3 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m tests/repo/package-entrypoints.test.mjs [2m([22m[2m7 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m tests/unit/observatory-service-status.test.cjs [2m([22m[2m2 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m tests/unit/observatory-client-store.test.mjs [2m([22m[2m12 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m tests/unit/observatory-client-api.test.mjs [2m([22m[2m12 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m tests/repo/cli-flags.test.mjs [2m([22m[2m24 tests[22m[2m)[22m[33m 6039[2mms[22m[39m
+   [33m[2m✓[22m[39m agent-viz status --json : refusé, sortie 2, aucun module chargé [33m 317[2mms[22m[39m
+   [33m[2m✓[22m[39m agent-viz install-hooks --user --target=cloude : refusé, sortie 2, aucun module chargé [33m 334[2mms[22m[39m
+   [33m[2m✓[22m[39m agent-viz install-hooks --user --target= : refusé, sortie 2, aucun module chargé [33m 442[2mms[22m[39m
+   [33m[2m✓[22m[39m hook --source=copilot, la forme écrite par l'installeur : le hook tourne et sort 0 [33m 318[2mms[22m[39m
+   [33m[2m✓[22m[39m contrôle inverse : chaque cible du registre passe l'analyse et uninstall-hooks charge dist/ [33m 558[2mms[22m[39m
+   [33m[2m✓[22m[39m stop avec PORT=3334 : status et stop visent ce port [33m 311[2mms[22m[39m
+ [32m✓[39m tests/unit/observatory-scan-done-order.test.cjs [2m([22m[2m1 test[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m tests/doctor/report-json.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m tests/doctor/reads.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m tests/unit/topbar-status.test.mjs [2m([22m[2m22 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m tests/unit/observatory-summary.test.cjs [2m([22m[2m7 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m tests/unit/observatory-session-view.test.mjs [2m([22m[2m11 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m tests/unit/tool-subject.test.mjs [2m([22m[2m9 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m tests/unit/observatory-model-costs.test.cjs [2m([22m[2m6 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m tests/unit/observatory-rule-r6.test.cjs [2m([22m[2m7 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m tests/unit/observatory-rules-r7.test.cjs [2m([22m[2m6 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m tests/unit/error-format.test.mjs [2m([22m[2m15 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m tests/repo/readme-mirrors.test.mjs [2m([22m[2m3 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m tests/unit/observatory-mcp-usage.test.cjs [2m([22m[2m4 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m tests/unit/observatory-cross-links.test.cjs [2m([22m[2m7 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m tests/unit/viz-layout.test.mjs [2m([22m[2m6 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m tests/repo/engines-readme-mirror.test.mjs [2m([22m[2m2 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m tests/repo/architecture-test-counts.test.mjs [2m([22m[2m7 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m tests/unit/advisor-ack.test.mjs [2m([22m[2m2 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m tests/unit/observatory-session-mapper.test.cjs [2m([22m[2m6 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m tests/unit/viz-duration.test.mjs [2m([22m[2m4 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m tests/unit/pricing-drift-alert.test.mjs [2m([22m[2m2 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m tests/unit/remedies.test.mjs [2m([22m[2m4 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m tests/unit/observatory-provenance.test.cjs [2m([22m[2m3 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m tests/doctor/subagents.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m tests/repo/served-ts-strip-check.test.mjs [2m([22m[2m34 tests[22m[2m)[22m[33m 5816[2mms[22m[39m
+   [33m[2m✓[22m[39m src/web/observatory/period-selector.ts : stripTypeScriptTypes puis node --check [33m 358[2mms[22m[39m
+ [32m✓[39m tests/unit/observatory-service-purge.test.cjs [2m([22m[2m1 test[22m[2m)[22m[32m 2[2mms[22m[39m
+ [32m✓[39m tests/unit/tokens-route.test.cjs [2m([22m[2m3 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m tests/unit/watchdog-external-alerts.test.mjs [2m([22m[2m3 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+ [32m✓[39m tests/unit/alert-freshness.test.mjs [2m([22m[2m5 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+ [32m✓[39m tests/e2e/lifecycle.e2e.test.mjs [2m([22m[2m13 tests[22m[2m)[22m[33m 9549[2mms[22m[39m
+   [33m[2m✓[22m[39m start sonde le port demandé et non le port par défaut : un démon sur le port par défaut ne bloque pas le lancement [33m 461[2mms[22m[39m
+   [33m[2m✓[22m[39m stop sans argument vise le port du fichier de pid et le retire [33m 323[2mms[22m[39m
+   [33m[2m✓[22m[39m après start puis stop, le processus qui a lancé le démon ne tient plus le journal : son dossier se renomme du premier coup [33m 449[2mms[22m[39m
+   [33m[2m✓[22m[39m start dont le serveur vit sans écouter : rejette au bout de 3 s en disant qu'il n'a pas répondu [33m 3150[2mms[22m[39m
+   [33m[2m✓[22m[39m stop sans fichier de pid vise le port demandé et y envoie POST /shutdown : le serveur qui ne sort pas n'est pas dit arrêté [33m 2208[2mms[22m[39m
+   [33m[2m✓[22m[39m stop sur un port où un serveur étranger répond sans sortir : rien n'est tué, le fichier de pid reste [33m 2179[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m131 passed[39m[22m[90m (131)[39m
+[2m      Tests [22m [1m[32m1594 passed[39m[22m[90m (1594)[39m
+[2m   Start at [22m 22:43:19
+[2m   Duration [22m 10.09s[2m (transform 5.82s, setup 6.90s, collect 14.72s, tests 43.02s, environment 20ms, prepare 12.22s)[22m
+

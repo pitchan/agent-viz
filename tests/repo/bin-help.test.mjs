@@ -3,7 +3,7 @@
 // tournerait malgré l'option s'arrêterait sur la garde, et le test le verrait.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { nouvelleRacine, lance, fichiersDe, nettoie } from '../helpers/bin-sandbox.mjs';
+import { nouvelleRacine, lance, fichiersDe, nettoie } from '../helpers/bin-sandbox.ts';
 import { TARGETS } from '../../src/server/install-hooks/registry.ts';
 
 const PREFIXE = 'agent-viz-aide-';

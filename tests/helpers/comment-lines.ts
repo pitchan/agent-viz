@@ -3,7 +3,7 @@
 
 // La part commentée d'une ligne : ligne de bloc (`*`, `/*`, `<!--`, `#`) prise
 // entière, sinon ce qui suit un `//` qui n'est pas celui d'une URL (`://`).
-export function commentPart(line) {
+export function commentPart(line: string): string {
   const trimmed = line.trim();
   if (/^(\*|\/\*|<!--|#)/.test(trimmed)) return trimmed;
   const at = line.indexOf('//');
@@ -11,11 +11,16 @@ export function commentPart(line) {
   return at === -1 ? '' : line.slice(at + 2);
 }
 
+interface CommentBlock {
+  line: number;
+  length: number;
+}
+
 // Les blocs de commentaire : une suite de lignes qui commencent par `//`, ou un bloc
 // étoilé ouvert sur une ligne et refermé plus bas. Seuls l'espace et la tabulation
 // précèdent le marqueur. Chaque bloc rend sa première ligne (comptée depuis 1) et sa longueur.
-export function commentBlocks(lines) {
-  const blocks = [];
+export function commentBlocks(lines: string[]): CommentBlock[] {
+  const blocks: CommentBlock[] = [];
   let start = 0;
   let length = 0;
   let open = false;

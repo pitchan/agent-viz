@@ -17,7 +17,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { commentPart } from '../helpers/comment-lines.mjs';
+import { commentPart } from '../helpers/comment-lines.ts';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 
