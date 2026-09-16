@@ -32,4 +32,6 @@ Un test ne doit casser que si **le comportement** change. S'il casse sur un refa
 
 ## 4. Ce qui n'est pas un test unitaire ici
 
-Rendu DOM, serveur démarré, vrai système de fichiers, vrai réseau. Ça relève d'un test d'intégration, rangé dans `tests/e2e/` (suffixe `.e2e.test.*`), pas dans `tests/unit/`.
+Rendu DOM, serveur démarré, processus lancé, vrai réseau. Ça relève d'un test d'intégration, rangé dans `tests/e2e/` (suffixe `.e2e.test.*`), pas dans `tests/unit/`.
+
+Le disque fait exception : un dossier temporaire que le test **crée et supprime lui-même** reste dans `tests/unit/`. Il ne rend pas le test moins déterministe, et l'interdire vidait le dossier sans rien y gagner. Ce qui reste interdit, c'est d'écrire ailleurs que dans ce dossier — jamais dans `~/.claude`, `~/.copilot`, `~/.agent-viz`, ni dans le dépôt.
