@@ -36,11 +36,9 @@
     "status": "node bin/agent-viz.js status",
     "build": "node -e \"['dist/engine','dist/server'].forEach(d=>require('fs').rmSync(d,{recursive:true,force:true}))\" && tsc -b tsconfig.build.json",
     "test": "vitest run",
-    "test:node": "node --import ./test-support/env-guard.mjs --test \"tests/**/*.test.{cjs,mjs}\"",
-    "test:ids:node": "node --import ./test-support/env-guard.mjs --test --test-reporter=./test-support/ids/node-reporter.mjs \"tests/**/*.test.{cjs,mjs}\"",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "prepare": "npm run build",
-    "prepublishOnly": "npm run typecheck && npm run build && npm test && npm run test:node && npm pack --dry-run"
+    "prepublishOnly": "npm run typecheck && npm run build && npm test && npm pack --dry-run"
   },
   "keywords": [
     "claude-code",

@@ -162,7 +162,6 @@ const EXCLUS_TEST_JS = [
   // Litteraux fabriques ('a.test.js', 'b.test.js'...) : donnees de test pour
   // `formatId` et le reporter node:test, pas des citations d un fichier reel.
   // Rien a proteger fragment par fragment : le fichier entier est hors sujet.
-  'tests/unit/test-ids-format.test.mjs',
 ];
 
 // Ancre sur un identifiant (lettres/chiffres/tiret/underscore) immediatement
