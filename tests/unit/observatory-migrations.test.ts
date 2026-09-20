@@ -1,16 +1,14 @@
-'use strict';
 // An observatory.db without the session_kind column must gain it without losing
 // a single row — recommendation statuses are the only data a re-scan cannot
 // rebuild.
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
-const { DatabaseSync } = require('node:sqlite');
+import { expect, test } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 
-const { openStore } = require('../../src/server/observatory/store.ts');
+import { openStore } from '../../src/server/observatory/store.ts';
 
 // Copy of a sessions schema without session_kind — the point of the test is
 // opening a database written before that column existed.
@@ -31,8 +29,8 @@ test('opening a database without session_kind adds the column, rows intact', () 
   const store = openStore(dbPath);
   try {
     const row = store.getSession('old-1');
-    assert.equal(row.id, 'old-1');
-    assert.equal(row.sessionKind, null, 'pre-migration rows have no kind, never a guessed one');
+    expect(row!.id).toBe('old-1');
+    expect(row!.sessionKind, 'pre-migration rows have no kind, never a guessed one').toBe(null);
   } finally {
     store.close();
     fs.rmSync(dir, { recursive: true, force: true });
@@ -69,9 +67,9 @@ test('une base sans les colonnes du statut arbitré gagne status_reason et statu
   // Assert
   try {
     const [row] = store.listRecommendations({});
-    assert.equal(row.status, 'ignored', 'le statut posé avant migration survit');
-    assert.equal(row.statusReason, null, 'pas de raison inventée aux lignes anciennes');
-    assert.equal(row.statusAt, null, 'pas de date inventée non plus');
+    expect(row!.status, 'le statut posé avant migration survit').toBe('ignored');
+    expect(row!.statusReason, 'pas de raison inventée aux lignes anciennes').toBe(null);
+    expect(row!.statusAt, 'pas de date inventée non plus').toBe(null);
   } finally {
     store.close();
     fs.rmSync(dir, { recursive: true, force: true });
@@ -84,7 +82,7 @@ test('applyMigrations is idempotent — a second open changes nothing', () => {
   openStore(dbPath).close();
   const store = openStore(dbPath); // must not throw "duplicate column"
   try {
-    assert.deepEqual(store.listSessions({}), []);
+    expect(store.listSessions({})).toEqual([]);
   } finally {
     store.close();
     fs.rmSync(dir, { recursive: true, force: true });
