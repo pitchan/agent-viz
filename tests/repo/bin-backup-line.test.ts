@@ -1,14 +1,13 @@
 // Le binaire imprime le chemin de chaque copie sous la ligne qui nomme le
 // fichier changé, et rien quand aucune copie n'a été faite. Les modules de dist/
 // sont factices : ils rendent une copie sonde ou `null`, sans toucher au disque.
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { expect, test } from 'vitest';
 import { nouvelleRacine, ecrireDist, lance, nettoie } from '../helpers/bin-sandbox.ts';
 import { BACKUPS_KEPT } from '../../src/server/install-hooks/backup.ts';
 
 const PREFIXE = 'agent-viz-copie-';
 
-const installHooksFactice = backup => [
+const installHooksFactice = (backup: string | null) => [
   `const backup = ${JSON.stringify(backup)};`,
   "const target = { file: 'FICHIER-SONDE', scope: 'user', projectRoot: null };",
   'export function resolveScope() { return target; }',
@@ -32,7 +31,7 @@ const COMMANDES = [
   { argv: ['uninstall-hooks', '--target=claude'], ligneDuFichier: 'removed 1 from', ligneBackup: 'Claude Code:   backup: SONDE-COPIE' },
 ];
 
-function bacQuiRend(backup) {
+function bacQuiRend(backup: string | null) {
   const racine = nouvelleRacine(PREFIXE);
   ecrireDist(racine, { contenus: {
     'server/install-hooks.js': installHooksFactice(backup),
@@ -41,9 +40,9 @@ function bacQuiRend(backup) {
   return racine;
 }
 
-function ligneApres(sortie, fragment) {
+function ligneApres(sortie: string, fragment: string) {
   const lignes = sortie.split(/\r?\n/);
-  const i = lignes.findIndex(ligne => ligne.includes(fragment));
+  const i = lignes.findIndex((ligne: string) => ligne.includes(fragment));
   return i === -1 ? null : (lignes[i + 1] ?? null);
 }
 
@@ -55,9 +54,8 @@ for (const { argv, ligneDuFichier, ligneBackup } of COMMANDES) {
       // Act
       const r = lance(racine, argv);
       // Assert
-      assert.equal(r.status, 0, `${r.stdout}${r.stderr}`);
-      assert.ok((ligneApres(r.stdout, ligneDuFichier) ?? '').includes(ligneBackup),
-        `« ${ligneBackup} » attendu juste sous « ${ligneDuFichier} » :\n${r.stdout}`);
+      expect(r.status, `${r.stdout}${r.stderr}`).toBe(0);
+      expect((ligneApres(r.stdout, ligneDuFichier) ?? '').includes(ligneBackup), `« ${ligneBackup} » attendu juste sous « ${ligneDuFichier} » :\n${r.stdout}`).toBeTruthy();
     } finally {
       nettoie(racine);
     }
@@ -70,9 +68,9 @@ for (const { argv, ligneDuFichier, ligneBackup } of COMMANDES) {
       // Act
       const r = lance(racine, argv);
       // Assert
-      assert.equal(r.status, 0, `${r.stdout}${r.stderr}`);
-      assert.ok(r.stdout.includes(ligneDuFichier), `la ligne du fichier devait s'afficher :\n${r.stdout}`);
-      assert.equal(r.stdout.includes('backup'), false, r.stdout);
+      expect(r.status, `${r.stdout}${r.stderr}`).toBe(0);
+      expect(r.stdout.includes(ligneDuFichier), `la ligne du fichier devait s'afficher :\n${r.stdout}`).toBeTruthy();
+      expect(r.stdout.includes('backup'), r.stdout).toBe(false);
     } finally {
       nettoie(racine);
     }
@@ -89,7 +87,7 @@ test('miroir : l\'aide annonce la copie des fichiers de hooks avec le nombre de 
     const r = lance(racine, ['--help']);
     // Assert
     const attendu = `Before changing or deleting a hooks file, agent-viz copies it to ~/.agent-viz/backups/ (last ${BACKUPS_KEPT} copies per file).`;
-    assert.ok(r.stdout.includes(attendu), `l'aide devrait afficher « ${attendu} » :\n${r.stdout}`);
+    expect(r.stdout.includes(attendu), `l'aide devrait afficher « ${attendu} » :\n${r.stdout}`).toBeTruthy();
   } finally {
     nettoie(racine);
   }

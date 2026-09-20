@@ -13,8 +13,7 @@
 //   2. tokens contenant une barre oblique — `CLAUDE.md` nu ne désigne pas une
 //      adresse mais une famille de fichiers ;
 //   3. chemins absolus et URL exclus — ce ne sont pas des chemins de ce dépôt.
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { expect, test } from 'vitest';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { commentPart } from '../helpers/comment-lines.ts';
@@ -26,7 +25,7 @@ const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const IGNORED_DIRS = new Set(['node_modules', '.git', 'dist', 'fixtures', 'resultats']);
 const SOURCE_EXT = new Set(['.js', '.mjs', '.cjs', '.ts', '.mts', '.html', '.css']);
 
-function sourceFiles(dir = ROOT, acc = []) {
+function sourceFiles(dir = ROOT, acc: string[] = []) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (entry.isDirectory()) {
       if (!IGNORED_DIRS.has(entry.name)) sourceFiles(path.join(dir, entry.name), acc);
@@ -40,7 +39,7 @@ function sourceFiles(dir = ROOT, acc = []) {
 const MARKDOWN_PATH = /(?:[A-Za-z0-9_.-]+\/)+[A-Za-z0-9_.-]+\.md\b/g;
 
 function citations() {
-  const found = [];
+  const found: { file: string; line: number; cite: string }[] = [];
   for (const abs of sourceFiles()) {
     const rel = path.relative(ROOT, abs).replaceAll('\\', '/');
     readFileSync(abs, 'utf8').split(/\r?\n/).forEach((line, i) => {
@@ -63,9 +62,8 @@ test('aucune citation de document ne pointe vers un chemin absent du dépôt', (
   const dead = cites.filter(c => !existsSync(path.join(ROOT, c.cite)));
 
   // Assert
-  assert.deepEqual(dead.map(c => `${c.file}:${c.line} → ${c.cite}`), [],
-    'un document cité par un chemin relatif doit exister ici ; s\'il vit dans le dépôt privé, ' +
-    'le citer via docs/sources-externes.md');
+  expect(dead.map(c => `${c.file}:${c.line} → ${c.cite}`), 'un document cité par un chemin relatif doit exister ici ; s\'il vit dans le dépôt privé, ' +
+    'le citer via docs/sources-externes.md').toEqual([]);
 });
 
 test('le balayage retrouve la citation écrite dans ce fichier même', () => {
@@ -78,6 +76,5 @@ test('le balayage retrouve la citation écrite dans ce fichier même', () => {
   const vues = cites.filter(c => c.file === ici && c.cite === 'docs/sources-externes.md');
 
   // Assert
-  assert.ok(vues.length > 0,
-    `aucune citation de docs/sources-externes.md vue dans ${ici} : le balayage ne lit plus ce fichier ou n'y reconnaît plus une citation`);
+  expect(vues.length > 0, `aucune citation de docs/sources-externes.md vue dans ${ici} : le balayage ne lit plus ce fichier ou n'y reconnaît plus une citation`).toBeTruthy();
 });

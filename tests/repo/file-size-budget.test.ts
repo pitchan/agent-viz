@@ -4,8 +4,7 @@
 //   1. un fichier de src/ ou bin/ au-dessus du budget et absent de LISTE_BLANCHE → échec ;
 //   2. une entrée de LISTE_BLANCHE repassée sous le budget (ou disparue) → échec
 //      (« entrée périmée ») — la liste se resserre, elle ne s'accumule pas.
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { expect, test } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -41,7 +40,11 @@ const LISTE_BLANCHE = new Map([
 // ── Vérificateur pur ──
 // entries: Array<{ file: string, lines: number }> ; listeBlanche: Map<file, raison>
 // Rend la liste des violations (chaînes lisibles) ; [] = conforme.
-export function checkBudget(entries, budget, listeBlanche) {
+export function checkBudget(
+  entries: { file: string; lines: number }[],
+  budget: number,
+  listeBlanche: Map<string, string>,
+) {
   const violations = [];
   const seen = new Set();
   for (const { file, lines } of entries) {
@@ -64,7 +67,7 @@ export function checkBudget(entries, budget, listeBlanche) {
   return violations;
 }
 
-function countLines(content) {
+function countLines(content: string) {
   return (content.match(/\n/g) || []).length;
 }
 
@@ -88,20 +91,20 @@ function scanRepo() {
 // ── L'instrument prouve qu'il mord (cas rouges à demeure) ──
 test('le vérificateur signale un dépassement non listé', () => {
   const got = checkBudget([{ file: 'src/x.ts', lines: 451 }], 450, new Map());
-  assert.equal(got.length, 1);
-  assert.match(got[0], /451 lignes > 450/);
+  expect(got.length).toBe(1);
+  expect(got[0]).toMatch(/451 lignes > 450/);
 });
 
 test('le vérificateur signale une entrée périmée (repassée sous le budget)', () => {
   const got = checkBudget([{ file: 'src/x.ts', lines: 10 }], 450, new Map([['src/x.ts', 'raison']]));
-  assert.equal(got.length, 1);
-  assert.match(got[0], /entrée périmée/);
+  expect(got.length).toBe(1);
+  expect(got[0]).toMatch(/entrée périmée/);
 });
 
 test('le vérificateur signale une entrée périmée (fichier disparu)', () => {
   const got = checkBudget([], 450, new Map([['src/gone.ts', 'raison']]));
-  assert.equal(got.length, 1);
-  assert.match(got[0], /n'existe plus/);
+  expect(got.length).toBe(1);
+  expect(got[0]).toMatch(/n'existe plus/);
 });
 
 test('le vérificateur accepte un dépassement inscrit avec sa raison et un fichier sous budget', () => {
@@ -109,11 +112,11 @@ test('le vérificateur accepte un dépassement inscrit avec sa raison et un fich
     [{ file: 'src/big.ts', lines: 900 }, { file: 'src/ok.ts', lines: 100 }],
     450, new Map([['src/big.ts', 'raison écrite']]),
   );
-  assert.deepEqual(got, []);
+  expect(got).toEqual([]);
 });
 
 // ── Le balayage réel ──
 test('src/ et bin/ respectent le budget de taille de fichier (450 lignes, exceptions inscrites avec leur raison)', () => {
   const violations = checkBudget(scanRepo(), BUDGET, LISTE_BLANCHE);
-  assert.deepEqual(violations, [], `\n${violations.join('\n')}`);
+  expect(violations, `\n${violations.join('\n')}`).toEqual([]);
 });

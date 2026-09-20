@@ -1,8 +1,7 @@
 // Verifie ce que voit process.stdout/stderr quand bin/agent-viz.js tourne sur
 // un arbre synthetique hors depot : fichier compile manquant (depot dev ou
 // paquet installe), temoin de compilation absent ou perime, commande hook.
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { expect, test } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { nouvelleRacine, ecrireDist, lance, nettoie, REQUIS } from '../helpers/bin-sandbox.ts';
@@ -20,13 +19,13 @@ const T_RECENT = new Date('2030-01-01T00:00:00Z');
 
 // `src/server/` present suffit a se faire reconnaitre comme depot de
 // developpement par la garde (elle ne regarde que son existence).
-function ecrireDepotDev(racine) {
+function ecrireDepotDev(racine: string) {
   fs.mkdirSync(path.join(racine, 'src', 'server'), { recursive: true });
 }
 
 // Un `.ts` sonde sous src/<sousDir>/, date a `mtime` — sert a positionner la
 // source la plus recente vue par le balayage de peremption.
-function ecrireSourceTs(racine, sousDir, mtime) {
+function ecrireSourceTs(racine: string, sousDir: string, mtime: Date) {
   const dir = path.join(racine, 'src', sousDir);
   fs.mkdirSync(dir, { recursive: true });
   const fichier = path.join(dir, 'sonde.ts');
@@ -34,7 +33,7 @@ function ecrireSourceTs(racine, sousDir, mtime) {
   fs.utimesSync(fichier, mtime, mtime);
 }
 
-function ecrireTemoin(racine, mtime) {
+function ecrireTemoin(racine: string, mtime: Date) {
   const p = path.join(racine, 'dist', 'tsconfig.build.tsbuildinfo');
   fs.mkdirSync(path.dirname(p), { recursive: true });
   fs.writeFileSync(p, '{}');
@@ -48,12 +47,10 @@ test('fichier compile manquant, depot de dev : exit 1, message nommant `npm run 
     ecrireDist(racine, { omettre: ['server/lifecycle.js'] });
     const r = lance(racine, [SONDE]);
     const sortie = `${r.stdout}${r.stderr}`;
-    assert.ok(r.error === undefined, `le sous-processus n'a pas demarre : ${r.error}`);
-    assert.ok(sortie.includes('npm run build'),
-      `depot de dev, fichier compile manquant : devrait nommer le remede (npm run build) :\n${sortie}`);
-    assert.ok(!sortie.includes('Cannot find module'),
-      `la garde ne doit jamais laisser voir l'echec brut du import() sous-jacent :\n${sortie}`);
-    assert.equal(r.status, 1, `code de sortie attendu 1, obtenu ${r.status} :\n${sortie}`);
+    expect(r.error === undefined, `le sous-processus n'a pas demarre : ${r.error}`).toBeTruthy();
+    expect(sortie.includes('npm run build'), `depot de dev, fichier compile manquant : devrait nommer le remede (npm run build) :\n${sortie}`).toBeTruthy();
+    expect(!sortie.includes('Cannot find module'), `la garde ne doit jamais laisser voir l'echec brut du import() sous-jacent :\n${sortie}`).toBeTruthy();
+    expect(r.status, `code de sortie attendu 1, obtenu ${r.status} :\n${sortie}`).toBe(1);
   } finally {
     nettoie(racine);
   }
@@ -66,10 +63,9 @@ test('dist/server complet mais un fichier de dist/engine manquant : meme arret q
     ecrireDist(racine, { omettre: ['engine/doctor/index.js'] });
     const r = lance(racine, [SONDE]);
     const sortie = `${r.stdout}${r.stderr}`;
-    assert.ok(sortie.includes('npm run build'),
-      `dist/server complet mais dist/engine incomplet : devrait quand meme nommer le remede :\n${sortie}`);
-    assert.ok(!sortie.includes('Cannot find module'), `pas d'echec brut attendu ici :\n${sortie}`);
-    assert.equal(r.status, 1, `code de sortie attendu 1, obtenu ${r.status} :\n${sortie}`);
+    expect(sortie.includes('npm run build'), `dist/server complet mais dist/engine incomplet : devrait quand meme nommer le remede :\n${sortie}`).toBeTruthy();
+    expect(!sortie.includes('Cannot find module'), `pas d'echec brut attendu ici :\n${sortie}`).toBeTruthy();
+    expect(r.status, `code de sortie attendu 1, obtenu ${r.status} :\n${sortie}`).toBe(1);
   } finally {
     nettoie(racine);
   }
@@ -82,11 +78,9 @@ test('fichier compile manquant, paquet installe (pas de src/server) : exit 1, me
     ecrireDist(racine, { omettre: ['server/lifecycle.js'] });
     const r = lance(racine, [SONDE]);
     const sortie = `${r.stdout}${r.stderr}`;
-    assert.ok(/reinstall/i.test(sortie),
-      `paquet installe, fichier compile manquant : devrait orienter vers une reinstallation :\n${sortie}`);
-    assert.ok(!sortie.includes('npm run build'),
-      `un paquet installe n'a pas de source ni de script build a proposer :\n${sortie}`);
-    assert.equal(r.status, 1, `code de sortie attendu 1, obtenu ${r.status} :\n${sortie}`);
+    expect(/reinstall/i.test(sortie), `paquet installe, fichier compile manquant : devrait orienter vers une reinstallation :\n${sortie}`).toBeTruthy();
+    expect(!sortie.includes('npm run build'), `un paquet installe n'a pas de source ni de script build a proposer :\n${sortie}`).toBeTruthy();
+    expect(r.status, `code de sortie attendu 1, obtenu ${r.status} :\n${sortie}`).toBe(1);
   } finally {
     nettoie(racine);
   }
@@ -100,13 +94,10 @@ test('un .ts de src/server plus recent que le temoin : avertissement, et la comm
     ecrireTemoin(racine, T_VIEUX);
     ecrireSourceTs(racine, 'server', T_RECENT);
     const r = lance(racine, [SONDE]);
-    assert.ok(r.stderr.includes('changed after the last'),
-      `un .ts de src/server plus recent que le temoin devrait avertir :\n${r.stderr}`);
-    assert.ok(r.stderr.includes('Unknown command'),
-      `la commande sondee devrait quand meme s'executer apres l'avertissement :\n${r.stderr}`);
-    assert.ok(r.stderr.indexOf('changed after the last') < r.stderr.indexOf('Unknown command'),
-      `l'avertissement doit preceder la sortie propre de la commande :\n${r.stderr}`);
-    assert.equal(r.status, 2, `code de sortie attendu 2 (celui du dispatcher sur commande inconnue), obtenu ${r.status}`);
+    expect(r.stderr.includes('changed after the last'), `un .ts de src/server plus recent que le temoin devrait avertir :\n${r.stderr}`).toBeTruthy();
+    expect(r.stderr.includes('Unknown command'), `la commande sondee devrait quand meme s'executer apres l'avertissement :\n${r.stderr}`).toBeTruthy();
+    expect(r.stderr.indexOf('changed after the last') < r.stderr.indexOf('Unknown command'), `l'avertissement doit preceder la sortie propre de la commande :\n${r.stderr}`).toBeTruthy();
+    expect(r.status, `code de sortie attendu 2 (celui du dispatcher sur commande inconnue), obtenu ${r.status}`).toBe(2);
   } finally {
     nettoie(racine);
   }
@@ -121,9 +112,8 @@ test('seul un .ts de src/web plus recent que le temoin : aucun avertissement (sr
     ecrireSourceTs(racine, 'server', T_VIEUX);
     ecrireSourceTs(racine, 'web', T_RECENT);
     const r = lance(racine, [SONDE]);
-    assert.ok(!r.stderr.includes('changed after the last'),
-      `src/web n'est jamais compile : un .ts plus recent la-dedans ne doit rien declencher :\n${r.stderr}`);
-    assert.ok(r.stderr.includes('Unknown command'), `la commande sondee devrait s'executer normalement :\n${r.stderr}`);
+    expect(!r.stderr.includes('changed after the last'), `src/web n'est jamais compile : un .ts plus recent la-dedans ne doit rien declencher :\n${r.stderr}`).toBeTruthy();
+    expect(r.stderr.includes('Unknown command'), `la commande sondee devrait s'executer normalement :\n${r.stderr}`).toBeTruthy();
   } finally {
     nettoie(racine);
   }
@@ -147,11 +137,9 @@ test('commande `hook` sur un arbre perime : aucune ligne de garde', () => {
     ecrireSourceTs(racine, 'server', T_RECENT);
     const r = lance(racine, ['hook']);
     const sortie = `${r.stdout}${r.stderr}`;
-    assert.ok(sortie.includes('SONDE_HOOK_OK'),
-      `le hook stub devrait s'executer normalement, sans etre bloque par la garde :\n${sortie}`);
-    assert.ok(!sortie.includes('changed after the last'),
-      `la commande hook ne doit jamais imprimer l'avertissement de peremption :\n${sortie}`);
-    assert.equal(r.status, 0, `code de sortie attendu 0, obtenu ${r.status} :\n${sortie}`);
+    expect(sortie.includes('SONDE_HOOK_OK'), `le hook stub devrait s'executer normalement, sans etre bloque par la garde :\n${sortie}`).toBeTruthy();
+    expect(!sortie.includes('changed after the last'), `la commande hook ne doit jamais imprimer l'avertissement de peremption :\n${sortie}`).toBeTruthy();
+    expect(r.status, `code de sortie attendu 0, obtenu ${r.status} :\n${sortie}`).toBe(0);
   } finally {
     nettoie(racine);
   }
@@ -164,9 +152,8 @@ test('temoin de compilation absent, fichiers compiles presents, depot de dev : a
     ecrireDist(racine);
     // Pas d'appel a ecrireTemoin : dist/tsconfig.build.tsbuildinfo n'existe pas.
     const r = lance(racine, [SONDE]);
-    assert.ok(r.stderr.includes("can't tell"),
-      `temoin absent : devrait avertir qu'aucune mesure de fraicheur n'est possible :\n${r.stderr}`);
-    assert.ok(r.stderr.includes('Unknown command'), `la commande sondee devrait quand meme s'executer :\n${r.stderr}`);
+    expect(r.stderr.includes("can't tell"), `temoin absent : devrait avertir qu'aucune mesure de fraicheur n'est possible :\n${r.stderr}`).toBeTruthy();
+    expect(r.stderr.includes('Unknown command'), `la commande sondee devrait quand meme s'executer :\n${r.stderr}`).toBeTruthy();
   } finally {
     nettoie(racine);
   }
@@ -181,9 +168,9 @@ test('controle inverse : arbre construit et a jour, aucun message de garde', () 
     ecrireSourceTs(racine, 'server', T_VIEUX);
     const r = lance(racine, [SONDE]);
     const sortie = `${r.stdout}${r.stderr}`;
-    assert.ok(!sortie.includes('npm run build'), `arbre a jour : aucun message de build ne devrait apparaitre :\n${sortie}`);
-    assert.ok(!sortie.includes("can't tell"), `le temoin existe : pas d'avertissement « can't tell » attendu :\n${sortie}`);
-    assert.ok(sortie.includes('Unknown command'), `la commande sondee devrait s'executer normalement :\n${sortie}`);
+    expect(!sortie.includes('npm run build'), `arbre a jour : aucun message de build ne devrait apparaitre :\n${sortie}`).toBeTruthy();
+    expect(!sortie.includes("can't tell"), `le temoin existe : pas d'avertissement « can't tell » attendu :\n${sortie}`).toBeTruthy();
+    expect(sortie.includes('Unknown command'), `la commande sondee devrait s'executer normalement :\n${sortie}`).toBeTruthy();
   } finally {
     nettoie(racine);
   }
@@ -201,11 +188,9 @@ test('dist/server/server.js manquant : la garde arrete, sans laisser voir « Can
 
     // Assert
     const sortie = `${r.stdout}${r.stderr}`;
-    assert.ok(sortie.includes('npm run build'),
-      `demon absent : la garde devrait nommer le remede plutot que laisser le spawn echouer plus tard :\n${sortie}`);
-    assert.ok(!sortie.includes('Cannot find module'),
-      `sans server.js dans la liste, l'echec ne se voyait qu'en queue de journal :\n${sortie}`);
-    assert.equal(r.status, 1, `code de sortie attendu 1, obtenu ${r.status} :\n${sortie}`);
+    expect(sortie.includes('npm run build'), `demon absent : la garde devrait nommer le remede plutot que laisser le spawn echouer plus tard :\n${sortie}`).toBeTruthy();
+    expect(!sortie.includes('Cannot find module'), `sans server.js dans la liste, l'echec ne se voyait qu'en queue de journal :\n${sortie}`).toBeTruthy();
+    expect(r.status, `code de sortie attendu 1, obtenu ${r.status} :\n${sortie}`).toBe(1);
   } finally {
     nettoie(racine);
   }
@@ -219,15 +204,14 @@ test('la liste du bac a sable est le miroir exact de REQUIRED_DIST_FILES', () =>
   const source = fs.readFileSync(
     path.join(import.meta.dirname, '..', '..', 'bin', 'agent-viz.js'), 'utf8');
   const bloc = source.split('const REQUIRED_DIST_FILES = [')[1]?.split('].map(')[0];
-  assert.ok(bloc, 'REQUIRED_DIST_FILES introuvable dans bin/agent-viz.js');
+  expect(bloc, 'REQUIRED_DIST_FILES introuvable dans bin/agent-viz.js').toBeTruthy();
 
   // Act
-  const declares = [...bloc.matchAll(/\[([^\]]*)\]/g)]
-    .map(m => [...m[1].matchAll(/'([^']+)'/g)].map(s => s[1]).join('/'));
+  const declares = [...bloc!.matchAll(/\[([^\]]*)\]/g)]
+    .map(m => [...m[1]!.matchAll(/'([^']+)'/g)].map(s => s[1]).join('/'));
 
   // Assert
-  assert.deepEqual(declares, REQUIS,
-    'REQUIS (tests/helpers/bin-sandbox.ts) doit lister exactement les memes fichiers que la garde');
+  expect(declares, 'REQUIS (tests/helpers/bin-sandbox.ts) doit lister exactement les memes fichiers que la garde').toEqual(REQUIS);
 });
 
 // Meme famille de verrou que le precedent, pour le meme risque : cli-defaut-stub.ts
@@ -240,12 +224,11 @@ test('le stub par defaut de dist/server/cli.js exporte exactement les memes fonc
   const sourceReelle = fs.readFileSync(
     path.join(import.meta.dirname, '..', '..', 'src', 'server', 'cli.ts'), 'utf8');
   const exportsReels = [...sourceReelle.matchAll(/^export async function (\w+)/gm)].map(m => m[1]);
-  assert.ok(exportsReels.length > 0, 'aucun export trouve dans src/server/cli.ts : le motif de lecture a casse');
+  expect(exportsReels.length > 0, 'aucun export trouve dans src/server/cli.ts : le motif de lecture a casse').toBeTruthy();
 
   // Act
   const exportsStub = [...CLI_PAR_DEFAUT.matchAll(/^export async function (\w+)/gm)].map(m => m[1]);
 
   // Assert
-  assert.deepEqual(exportsStub, exportsReels,
-    'cli-defaut-stub.ts (tests/helpers/) doit exporter exactement les memes fonctions, dans le meme ordre, que src/server/cli.ts');
+  expect(exportsStub, 'cli-defaut-stub.ts (tests/helpers/) doit exporter exactement les memes fonctions, dans le meme ordre, que src/server/cli.ts').toEqual(exportsReels);
 });

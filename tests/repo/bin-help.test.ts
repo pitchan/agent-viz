@@ -1,8 +1,7 @@
 // Demander l'aide ou la version n'exécute rien : ni démon, ni hooks, ni témoin
 // de bienvenue, ni garde de build. Le bac n'a pas de dist/ : une commande qui
 // tournerait malgré l'option s'arrêterait sur la garde, et le test le verrait.
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { expect, test } from 'vitest';
 import { nouvelleRacine, lance, fichiersDe, nettoie } from '../helpers/bin-sandbox.ts';
 import { TARGETS } from '../../src/server/install-hooks/registry.ts';
 
@@ -45,12 +44,10 @@ for (const argv of DEMANDES_D_AIDE) {
 
       // Assert
       const sortie = `${r.stdout}${r.stderr}`;
-      assert.equal(r.status, 0, `code de sortie attendu 0, obtenu ${r.status} :\n${sortie}`);
-      assert.ok(r.stdout.includes('Usage:') && r.stdout.includes(VERSION),
-        `l'aide globale devrait s'afficher :\n${sortie}`);
-      assert.equal(r.stderr, '', `rien ne devrait sortir sur stderr :\n${r.stderr}`);
-      assert.deepEqual(fichiersDe(racine), ['bin/agent-viz.js', 'package.json'],
-        'demander l\'aide ne doit écrire aucun fichier');
+      expect(r.status, `code de sortie attendu 0, obtenu ${r.status} :\n${sortie}`).toBe(0);
+      expect(r.stdout.includes('Usage:') && r.stdout.includes(VERSION), `l'aide globale devrait s'afficher :\n${sortie}`).toBeTruthy();
+      expect(r.stderr, `rien ne devrait sortir sur stderr :\n${r.stderr}`).toBe('');
+      expect(fichiersDe(racine), 'demander l\'aide ne doit écrire aucun fichier').toEqual(['bin/agent-viz.js', 'package.json']);
     } finally {
       nettoie(racine);
     }
@@ -67,11 +64,10 @@ for (const argv of DEMANDES_DE_VERSION) {
 
       // Assert
       const sortie = `${r.stdout}${r.stderr}`;
-      assert.equal(r.status, 0, `code de sortie attendu 0, obtenu ${r.status} :\n${sortie}`);
-      assert.equal(r.stdout, `${VERSION}\n`, `seule la version devrait s'afficher :\n${sortie}`);
-      assert.equal(r.stderr, '', `rien ne devrait sortir sur stderr :\n${r.stderr}`);
-      assert.deepEqual(fichiersDe(racine), ['bin/agent-viz.js', 'package.json'],
-        'demander la version ne doit écrire aucun fichier');
+      expect(r.status, `code de sortie attendu 0, obtenu ${r.status} :\n${sortie}`).toBe(0);
+      expect(r.stdout, `seule la version devrait s'afficher :\n${sortie}`).toBe(`${VERSION}\n`);
+      expect(r.stderr, `rien ne devrait sortir sur stderr :\n${r.stderr}`).toBe('');
+      expect(fichiersDe(racine), 'demander la version ne doit écrire aucun fichier').toEqual(['bin/agent-viz.js', 'package.json']);
     } finally {
       nettoie(racine);
     }
@@ -87,9 +83,9 @@ test('package.json précédé d\'un BOM : --version affiche la version, sort 0, 
 
     // Assert
     const sortie = `${r.stdout}${r.stderr}`;
-    assert.equal(r.status, 0, `code de sortie attendu 0, obtenu ${r.status} :\n${sortie}`);
-    assert.equal(r.stdout, `${VERSION}\n`, `la version devrait se lire malgré le BOM :\n${sortie}`);
-    assert.equal(r.stderr, '', `rien ne devrait sortir sur stderr :\n${r.stderr}`);
+    expect(r.status, `code de sortie attendu 0, obtenu ${r.status} :\n${sortie}`).toBe(0);
+    expect(r.stdout, `la version devrait se lire malgré le BOM :\n${sortie}`).toBe(`${VERSION}\n`);
+    expect(r.stderr, `rien ne devrait sortir sur stderr :\n${r.stderr}`).toBe('');
   } finally {
     nettoie(racine);
   }
@@ -104,9 +100,9 @@ test('package.json absent : --version échoue au lieu d\'afficher une version in
 
     // Assert
     const sortie = `${r.stdout}${r.stderr}`;
-    assert.notEqual(r.status, 0, `un package.json absent ne doit pas passer pour un succès :\n${sortie}`);
-    assert.ok(!r.stdout.includes('0.0.0'), `aucune version de repli ne doit s'afficher :\n${sortie}`);
-    assert.match(r.stderr, /package\.json/, `l'échec doit nommer package.json :\n${sortie}`);
+    expect(r.status, `un package.json absent ne doit pas passer pour un succès :\n${sortie}`).not.toBe(0);
+    expect(!r.stdout.includes('0.0.0'), `aucune version de repli ne doit s'afficher :\n${sortie}`).toBeTruthy();
+    expect(r.stderr, `l'échec doit nommer package.json :\n${sortie}`).toMatch(/package\.json/);
   } finally {
     nettoie(racine);
   }
@@ -121,8 +117,8 @@ test('contrôle inverse : sans --help, la même commande atteint la garde de bui
 
     // Assert
     const sortie = `${r.stdout}${r.stderr}`;
-    assert.equal(r.status, 1, `la garde de build devrait arrêter la commande :\n${sortie}`);
-    assert.ok(/reinstall/i.test(r.stderr), `le message de la garde devrait sortir sur stderr :\n${sortie}`);
+    expect(r.status, `la garde de build devrait arrêter la commande :\n${sortie}`).toBe(1);
+    expect(/reinstall/i.test(r.stderr), `le message de la garde devrait sortir sur stderr :\n${sortie}`).toBeTruthy();
   } finally {
     nettoie(racine);
   }
@@ -138,9 +134,9 @@ test('miroir : l\'aide affiche les cibles de --target du registre', () => {
     const r = lance(racine, ['--help']);
 
     // Assert
-    assert.equal(r.status, 0, `code de sortie attendu 0, obtenu ${r.status} :\n${r.stdout}${r.stderr}`);
+    expect(r.status, `code de sortie attendu 0, obtenu ${r.status} :\n${r.stdout}${r.stderr}`).toBe(0);
     const attendu = `--target=${TARGETS.join('|')}`;
-    assert.ok(r.stdout.includes(attendu), `l'aide devrait afficher ${attendu} :\n${r.stdout}`);
+    expect(r.stdout.includes(attendu), `l'aide devrait afficher ${attendu} :\n${r.stdout}`).toBeTruthy();
   } finally {
     nettoie(racine);
   }

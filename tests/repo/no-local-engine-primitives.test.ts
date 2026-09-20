@@ -27,14 +27,13 @@
 //   - une métaprogrammation (`Object.defineProperty`, `Proxy`) ;
 //   - une primitive du moteur écrite autrement qu'en `export function` (`export const f = () => …`) :
 //     la liste ne lit que les `export function`, elle en sort sans que rien ne rougisse.
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { expect, test } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
-const ts = createRequire(path.join(ROOT, 'package.json'))('typescript');
+const ts: any = createRequire(path.join(ROOT, 'package.json'))('typescript');
 
 // Les primitives sont les fonctions exportées des quatre modules du moteur que le
 // serveur importe, formule de coût et normalisation comprises. La carte de prix
@@ -42,12 +41,12 @@ const ts = createRequire(path.join(ROOT, 'package.json'))('typescript');
 const MODULES_DU_MOTEUR = ['usage.ts', 'jsonl.ts', 'claude-dir.ts', 'pricing.ts']
   .map((nom) => path.join(ROOT, 'src', 'engine', 'core', nom));
 
-function fonctionsExportees(abs) {
+function fonctionsExportees(abs: string) {
   const sf = ts.createSourceFile(abs, readFileSync(abs, 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
   return sf.statements
-    .filter((s) => ts.isFunctionDeclaration(s) && s.name
-      && (s.modifiers ?? []).some((m) => m.kind === ts.SyntaxKind.ExportKeyword))
-    .map((s) => s.name.text);
+    .filter((s: any) => ts.isFunctionDeclaration(s) && s.name
+      && (s.modifiers ?? []).some((m: any) => m.kind === ts.SyntaxKind.ExportKeyword))
+    .map((s: any) => s.name.text);
 }
 
 const PRIMITIVES_PAR_MODULE = new Map(MODULES_DU_MOTEUR.map((abs) => [abs, fonctionsExportees(abs)]));
@@ -55,7 +54,7 @@ const PRIMITIVES = new Set([...PRIMITIVES_PAR_MODULE.values()].flat());
 
 function fichiersServeur() {
   const dir = path.join(ROOT, 'src', 'server');
-  const out = [];
+  const out: string[] = [];
   for (const nom of readdirSync(dir, { recursive: true })) {
     const p = path.join(dir, String(nom));
     if (p.endsWith('.ts') && statSync(p).isFile()) out.push(p);
@@ -63,25 +62,25 @@ function fichiersServeur() {
   return out.sort();
 }
 
-const estFonction = (n) => !!n && (ts.isArrowFunction(n) || ts.isFunctionExpression(n));
+const estFonction = (n: any) => !!n && (ts.isArrowFunction(n) || ts.isFunctionExpression(n));
 
 // Un nom PORTÉ statiquement : identifiant, chaîne, gabarit sans substitution, ou l'un
 // d'eux derrière un `ComputedPropertyName` (`[ 'nom' ]`) — tous se lisent par `.text`.
 // `null` pour le reste, que ce filet laisse passer (voir l'en-tête).
-function nomDe(n) {
+function nomDe(n: any): string | null {
   if (!n) return null;
   if (ts.isIdentifier(n) || ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n)) return n.text;
   if (ts.isComputedPropertyName(n)) return nomDe(n.expression);
   return null;
 }
 
-function definitionsLocales(abs) {
+function definitionsLocales(abs: string) {
   const texte = readFileSync(abs, 'utf8');
   const sf = ts.createSourceFile(abs, texte, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-  const ligneDe = (n) => sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1;
-  const trouvees = [];
-  const marquer = (n, nom, forme) => trouvees.push({ nom, forme, ligne: ligneDe(n) });
-  const visiter = (n) => {
+  const ligneDe = (n: any) => sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1;
+  const trouvees: { nom: string; forme: string; ligne: number }[] = [];
+  const marquer = (n: any, nom: string, forme: string) => trouvees.push({ nom, forme, ligne: ligneDe(n) });
+  const visiter = (n: any) => {
     const nomCible = nomDe(n.name);
     if (ts.isFunctionDeclaration(n) && nomCible && PRIMITIVES.has(nomCible)) {
       // Forme 1.
@@ -126,7 +125,7 @@ function definitionsLocales(abs) {
       && PRIMITIVES.has(nomDe(n.left)) && estFonction(n.right)
     ) {
       // Forme 8 — déclaration nue ailleurs, affectation différée ici.
-      marquer(n, nomDe(n.left), 'affectation différée (nom = fonction/fléchée)');
+      marquer(n, nomDe(n.left)!, 'affectation différée (nom = fonction/fléchée)');
     }
     ts.forEachChild(n, visiter);
   };
@@ -135,7 +134,7 @@ function definitionsLocales(abs) {
 }
 
 function toutesLesDefinitions() {
-  const out = [];
+  const out: string[] = [];
   for (const abs of fichiersServeur()) {
     const rel = path.relative(ROOT, abs).replaceAll('\\', '/');
     for (const d of definitionsLocales(abs)) out.push(`${rel}:${d.ligne} -> ${d.nom} (${d.forme})`);
@@ -148,15 +147,11 @@ test('assiette : chacun des quatre modules du moteur exporte au moins une foncti
   const vides = [...PRIMITIVES_PAR_MODULE]
     .filter(([, noms]) => noms.length === 0)
     .map(([abs]) => path.relative(ROOT, abs).replaceAll('\\', '/'));
-  assert.deepEqual(vides, [], `ASSIETTE : aucune fonction exportée lue dans ${vides.join(', ')}`);
+  expect(vides, `ASSIETTE : aucune fonction exportée lue dans ${vides.join(', ')}`).toEqual([]);
 });
 
 test('aucun fichier de src/server ne définit localement une primitive du moteur', () => {
-  assert.deepEqual(
-    toutesLesDefinitions(),
-    [],
-    `ces primitives n’ont qu’UNE définition, dans src/engine/core/ (${[...PRIMITIVES].sort().join(', ')}) — ` +
+  expect(toutesLesDefinitions(), `ces primitives n’ont qu’UNE définition, dans src/engine/core/ (${[...PRIMITIVES].sort().join(', ')}) — ` +
       'un fichier de src/server/ qui en (re)définit une localement, sous quelque forme que ' +
-      'ce soit, recrée une copie locale de la primitive du moteur. Importer, ne pas réécrire.',
-  );
+      'ce soit, recrée une copie locale de la primitive du moteur. Importer, ne pas réécrire.').toEqual([]);
 });
