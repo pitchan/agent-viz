@@ -263,6 +263,13 @@ async function main() {
     case 'install-hooks':    return mod.cmdInstallHooks(flags, PKG_ROOT);
     case 'uninstall-hooks':  return mod.cmdUninstallHooks(flags, PKG_ROOT);
     case 'hook':             return mod.cmdHook(PKG_ROOT);
+    // Inatteignable tant que COMMAND_OPTIONS, KNOWN_COMMANDS et ces `case` restent
+    // synchronisés — c'est justement le filet : un nom ajouté à KNOWN_COMMANDS sans
+    // `case` assorti tomberait ici plutôt que de rendre 0 en silence.
+    default:
+      console.error(`${c.err('Unknown command:')} ${cmd}\n`);
+      help();
+      process.exit(2);
   }
 }
 

@@ -26,12 +26,18 @@ function openBrowser(url: string) {
   const cmd = process.platform === 'darwin' ? 'open'
             : isWin ? 'cmd'
             : 'xdg-open';
+  // On Windows, `start` is a cmd.exe builtin (not an executable), and the
+  // empty "" arg is the title slot required when the URL itself is quoted.
   const args = isWin ? ['/c', 'start', '', url] : [url];
   const child = spawn(cmd, args, { stdio: 'ignore', detached: true });
+  // ENOENT and friends arrive asynchronously on the 'error' event, not as a
+  // sync throw — silence them so a missing browser launcher never kills the CLI.
   child.on('error', () => {});
   child.unref();
 }
 
+// Sans --port ni PORT, le port reste indéfini : la valeur par défaut appartient
+// à lifecycle, qui la connaît seul.
 function requestedPort(flags: Record<string, unknown>) {
   const valeur = (flags.port as string | undefined) || process.env.PORT;
   return valeur ? parseInt(valeur, 10) : undefined;
@@ -39,6 +45,7 @@ function requestedPort(flags: Record<string, unknown>) {
 
 export async function cmdStart(flags: Record<string, any>, packageRoot: string) {
   const port = requestedPort(flags);
+  // Default install-hooks=true unless --no-install-hooks given.
   const shouldInstall = flags['install-hooks'] !== false;
 
   if (shouldInstall) {
@@ -50,6 +57,8 @@ export async function cmdStart(flags: Record<string, any>, packageRoot: string) 
         if (!r) continue;
         const label = agent === 'claude' ? 'Claude Code' : 'Copilot CLI';
         if (r.error) {
+          // Un refus ne vaut que pour son agent : le message le nomme, plutôt qu'un
+          // « skipped » qui vaudrait pour tous.
           console.error(`${c.warn('!')} ${label} hooks not installed: ${r.error}`);
           continue;
         }
@@ -102,6 +111,11 @@ export async function cmdStop(flags: Record<string, any>, packageRoot: string) {
     console.log('agent-viz not running.');
   }
 
+  // Mirror of cmdStart's auto-install: stop also removes hooks unless opted out.
+  // We target the SAME scope `start` would have resolved from this cwd
+  // (`resolveScope` returns 'user' when no scope is given, project root or not),
+  // so unrelated installs in other scopes are preserved. Sweeps both agents —
+  // uninstalling an agent that was never installed is a no-op.
   const shouldUninstall = flags['keep-hooks'] !== true;
   if (shouldUninstall) {
     const { uninstall, resolveScope } = await import(pathToFileURL(path.join(packageRoot, 'dist', 'server', 'install-hooks.js')).href);
@@ -112,6 +126,9 @@ export async function cmdStop(flags: Record<string, any>, packageRoot: string) {
       for (const [agent, x] of Object.entries(result) as [string, any][]) {
         const label = agent === 'claude' ? 'Claude Code' : 'Copilot CLI';
         if (x.error) {
+          // Un refus s'imprime toujours : tu, il laisserait des hooks posés qui tirent
+          // à l'insu de l'utilisateur. Il ne touche pas le code de sortie, qui dit le cycle
+          // de vie du serveur ; install-hooks et uninstall-hooks, eux, sortent 1 sur un refus.
           console.log(`${c.err('✗')} ${label} hooks NOT removed: ${x.error}`);
           continue;
         }
@@ -172,6 +189,9 @@ export async function cmdStatus(flags: Record<string, any>, packageRoot: string)
       const dup = list.length > 1 ? c.warn(`  ! duplicate: each event fires ${list.length}x`) : '';
       lines.push(`  ${label.padEnd(11)} : ${names}${dup}`);
     }
+    // Un fichier illisible n'est pas une portée sans hook : sans cette ligne,
+    // `status` afficherait la même chose qu'un fichier sain et laisserait
+    // croire que la portée n'est pas installée.
     for (const u of scan.unreadable) {
       lines.push(`  ${label.padEnd(11)} : ${c.warn(`! ${u.scope} unreadable — ${u.error}`)}`);
     }
@@ -187,6 +207,9 @@ export async function cmdInstallHooks(flags: Record<string, any>, packageRoot: s
   let target = flags.target;
   const { install, audit, detectAgents, findProjectRoot } = await import(pathToFileURL(path.join(packageRoot, 'dist', 'server', 'install-hooks.js')).href);
 
+  // Zero-flag invocation (no scope, no target, not --check) opens an
+  // interactive prompt asking which agent + which scope. --check stays
+  // non-interactive (audit mode). Any flag bypasses the prompt entirely.
   const noFlags = !scope && !target && !flags.check;
   if (noFlags) {
     if (!process.stdin.isTTY) {
@@ -215,6 +238,10 @@ export async function cmdInstallHooks(flags: Record<string, any>, packageRoot: s
     let exitCode = 0;
     for (const [agent, a] of Object.entries(result) as [string, any][]) {
       const label = agent === 'claude' ? 'Claude Code' : 'Copilot CLI';
+      // `audit` passe par le registre, qui traduit tout refus en `{ error }` :
+      // un fichier de hooks illisible fait lever la lecture. Sans cette garde,
+      // `--check` imprimait « settings : undefined » puis mourait sur
+      // `a.audit is not iterable`, en ne nommant plus le fichier fautif.
       if (a.error) {
         console.log(`${label}:`);
         console.log(`  ${c.err('✗')} ${a.error}`);
@@ -305,7 +332,11 @@ export async function cmdUninstallHooks(flags: Record<string, any>, packageRoot:
       if (r.backup) console.log(c.dim(`${label}:   backup: ${r.backup}`));
     }
   }
+  // Une erreur ne doit jamais se lire comme « rien à retirer » : le total reste
+  // à 0 quand un agent n'a pas pu être traité du tout.
   if (total === 0 && !failed) console.log(c.dim('No agent-viz hooks found.'));
+  // …ni comme un succès pour le script appelant : sortir 0 en annonçant « hooks NOT
+  // removed » ferait lire un succès à une étape de CI alors que les hooks restent posés.
   if (failed) process.exitCode = 1;
 }
 
