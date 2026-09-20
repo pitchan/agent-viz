@@ -1,18 +1,21 @@
 // start, status et stop parlent à de vrais processus sur de vrais ports : chaque
 // test charge une copie de lifecycle.ts à côté d'un faux server.js, son port par
 // défaut remplacé par un port de test, pour ne jamais sonder ni arrêter un démon réel.
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { expect, test } from 'vitest';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
-import net from 'node:net';
+import net, { type AddressInfo } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const SOURCE = path.resolve(import.meta.dirname, '..', '..', 'src', 'server', 'lifecycle.ts');
 const TEMOIN = 'lance.pid';
+
+// `lifecycle` vient d'un `await import()` d'un chemin construit à l'exécution :
+// son type n'est pas résolu statiquement, d'où le `any`.
+type Montage = { lifecycle: any; dossier: string };
 
 // Chaque faux server.js dépose son pid dans TEMOIN dès son lancement : le test
 // sait ainsi s'il a été lancé, et le faux serveur sort seul quand son dossier disparaît.
@@ -53,27 +56,30 @@ const SERVEUR_MUET = [
 
 // Les serveurs restent ouverts jusqu'au dernier : deux ports demandés ensemble
 // sont forcément distincts.
-async function portsLibres(nombre) {
+// Toujours appelée avec 2 : le retour se type en tuple de deux ports plutôt
+// qu'un tableau, pour que la destructuration `[port, portParDefaut]` des tests
+// rende des `number`, pas des `number | undefined` (noUncheckedIndexedAccess).
+async function portsLibres(nombre: number): Promise<[number, number]> {
   const serveurs = [];
   for (let i = 0; i < nombre; i++) {
     const serveur = net.createServer();
-    await new Promise(resolve => serveur.listen(0, '127.0.0.1', resolve));
+    await new Promise<void>(resolve => serveur.listen(0, '127.0.0.1', resolve));
     serveurs.push(serveur);
   }
-  const ports = serveurs.map(s => s.address().port);
-  await Promise.all(serveurs.map(s => new Promise(resolve => s.close(resolve))));
-  return ports;
+  const ports = serveurs.map(s => (s.address() as AddressInfo).port);
+  await Promise.all(serveurs.map(s => new Promise<void>(resolve => s.close(() => resolve()))));
+  return ports as [number, number];
 }
 
-async function demonFactice(port) {
-  const requetes = [];
+async function demonFactice(port: number) {
+  const requetes: string[] = [];
   const serveur = http.createServer((req, res) => {
     requetes.push(`${req.method} ${req.url}`);
     res.end('ok');
   });
-  await new Promise(resolve => serveur.listen(port, '127.0.0.1', resolve));
-  const ferme = () => new Promise(resolve => {
-    serveur.close(resolve);
+  await new Promise<void>(resolve => serveur.listen(port, '127.0.0.1', resolve));
+  const ferme = () => new Promise<void>(resolve => {
+    serveur.close(() => resolve());
     serveur.closeAllConnections();
   });
   return { requetes, ferme };
@@ -82,7 +88,9 @@ async function demonFactice(port) {
 // PID_FILE et LOG_FILE se calculent au chargement depuis os.tmpdir() : le
 // dossier temporaire est redirigé le temps de l'import, pour que chaque copie
 // ait les siens.
-async function chargeLifecycle({ portParDefaut, serveur = SERVEUR_QUI_SORT }) {
+async function chargeLifecycle(
+  { portParDefaut, serveur = SERVEUR_QUI_SORT }: { portParDefaut: number; serveur?: string },
+) {
   const dossier = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-viz-lifecycle-'));
   const source = fs.readFileSync(SOURCE, 'utf8');
   const copie = source.replaceAll(/\b3333\b/g, String(portParDefaut));
@@ -107,11 +115,11 @@ async function chargeLifecycle({ portParDefaut, serveur = SERVEUR_QUI_SORT }) {
   return { lifecycle, dossier };
 }
 
-function pidLance({ dossier }) {
+function pidLance({ dossier }: Montage) {
   try { return Number(fs.readFileSync(path.join(dossier, TEMOIN), 'utf8')); } catch { return null; }
 }
 
-function nettoie(montage) {
+function nettoie(montage: Montage) {
   fs.rmSync(montage.dossier, { recursive: true, force: true });
 }
 
@@ -124,8 +132,8 @@ test('status : rien sur le port demandé et pas de fichier de pid, le démon est
     const etat = await montage.lifecycle.status({ port });
 
     // Assert
-    assert.equal(etat.running, false);
-    assert.equal(etat.stale, undefined);
+    expect(etat.running).toBe(false);
+    expect(etat.stale).toBe(undefined);
   } finally {
     nettoie(montage);
   }
@@ -142,7 +150,7 @@ test('status sonde le port demandé : un serveur qui y répond est dit en marche
 
     // Assert
     const { running, pid, viaPidFile } = etat;
-    assert.deepEqual({ running, pid, port: etat.port, viaPidFile }, { running: true, pid: null, port, viaPidFile: false });
+    expect({ running, pid, port: etat.port, viaPidFile }).toEqual({ running: true, pid: null, port, viaPidFile: false });
   } finally {
     await demon.ferme();
     nettoie(montage);
@@ -159,8 +167,8 @@ test('start sur un port demandé déjà occupé : rend alreadyRunning sans lance
     const resultat = await montage.lifecycle.start({ port });
 
     // Assert
-    assert.deepEqual(resultat, { alreadyRunning: true, pid: null, port });
-    assert.equal(pidLance(montage), null, 'le faux server.js ne devait pas être lancé');
+    expect(resultat).toEqual({ alreadyRunning: true, pid: null, port });
+    expect(pidLance(montage), 'le faux server.js ne devait pas être lancé').toBe(null);
   } finally {
     await demon.ferme();
     nettoie(montage);
@@ -174,11 +182,11 @@ test('start --foreground sur un port demandé déjà occupé : lève en nommant 
   const demon = await demonFactice(port);
   try {
     // Act
-    const erreur = await montage.lifecycle.start({ port, foreground: true }).then(() => null, e => e);
+    const erreur = await montage.lifecycle.start({ port, foreground: true }).then(() => null, (e: any) => e);
 
     // Assert
-    assert.ok(erreur, 'start aurait dû lever');
-    assert.ok(erreur.message.includes(`already running on port ${port} (`), erreur.message);
+    expect(erreur, 'start aurait dû lever').toBeTruthy();
+    expect(erreur.message.includes(`already running on port ${port} (`), erreur.message).toBeTruthy();
   } finally {
     await demon.ferme();
     nettoie(montage);
@@ -195,9 +203,9 @@ test('start sonde le port demandé et non le port par défaut : un démon sur le
     const resultat = await montage.lifecycle.start({ port });
 
     // Assert
-    assert.deepEqual(resultat, { alreadyRunning: false, pid: pidLance(montage), port });
+    expect(resultat).toEqual({ alreadyRunning: false, pid: pidLance(montage), port });
     const fichierPid = fs.readFileSync(montage.lifecycle.PID_FILE, 'utf8');
-    assert.ok(fichierPid.startsWith(`${resultat.pid}\n${port}\n`), JSON.stringify(fichierPid));
+    expect(fichierPid.startsWith(`${resultat.pid}\n${port}\n`), JSON.stringify(fichierPid)).toBeTruthy();
   } finally {
     await demonParDefaut.ferme();
     nettoie(montage);
@@ -215,9 +223,9 @@ test('stop sans argument vise le port du fichier de pid et le retire', async () 
     const resultat = await montage.lifecycle.stop();
 
     // Assert
-    assert.equal(resultat.stopped, true);
-    assert.equal(resultat.port, port);
-    assert.equal(fs.existsSync(montage.lifecycle.PID_FILE), false, 'le fichier de pid devait être retiré');
+    expect(resultat.stopped).toBe(true);
+    expect(resultat.port).toBe(port);
+    expect(fs.existsSync(montage.lifecycle.PID_FILE), 'le fichier de pid devait être retiré').toBe(false);
   } finally {
     nettoie(montage);
   }
@@ -236,12 +244,12 @@ test('après start puis stop, le processus qui a lancé le démon ne tient plus 
     await montage.lifecycle.stop();
 
     // Act
-    let erreur = null;
-    try { fs.renameSync(dossierJournal, renomme); } catch (e) { erreur = e; }
+    let erreur: NodeJS.ErrnoException | null = null;
+    try { fs.renameSync(dossierJournal, renomme); } catch (e) { erreur = e as NodeJS.ErrnoException; }
 
     // Assert
-    assert.equal(erreur, null, `renommage refusé : ${erreur?.code} sur ${erreur?.path}`);
-    assert.equal(fs.existsSync(path.join(renomme, path.basename(montage.lifecycle.LOG_FILE))), true, 'le journal devait suivre son dossier');
+    expect(erreur, `renommage refusé : ${erreur?.code} sur ${erreur?.path}`).toBe(null);
+    expect(fs.existsSync(path.join(renomme, path.basename(montage.lifecycle.LOG_FILE))), 'le journal devait suivre son dossier').toBe(true);
   } finally {
     nettoie(montage);
   }
@@ -255,16 +263,16 @@ test('start dont le serveur meurt au démarrage : rejette tout de suite en le di
     const debut = Date.now();
 
     // Act
-    const erreur = await montage.lifecycle.start({ port }).then(() => null, e => e);
+    const erreur = await montage.lifecycle.start({ port }).then(() => null, (e: any) => e);
 
     // Assert
     const duree = Date.now() - debut;
-    assert.ok(erreur, 'start aurait dû lever');
-    assert.ok(duree < 3000, `rejet attendu avant 3 000 ms, obtenu en ${duree} ms`);
-    assert.ok(erreur.message.includes('exited during startup'), erreur.message);
-    assert.ok(erreur.message.includes('SONDE_MORT'), erreur.message);
-    assert.ok(!erreur.message.includes('within 3s'), erreur.message);
-    assert.equal(fs.existsSync(montage.lifecycle.PID_FILE), false, 'aucun fichier de pid ne devait être écrit');
+    expect(erreur, 'start aurait dû lever').toBeTruthy();
+    expect(duree < 3000, `rejet attendu avant 3 000 ms, obtenu en ${duree} ms`).toBeTruthy();
+    expect(erreur.message.includes('exited during startup'), erreur.message).toBeTruthy();
+    expect(erreur.message.includes('SONDE_MORT'), erreur.message).toBeTruthy();
+    expect(!erreur.message.includes('within 3s'), erreur.message).toBeTruthy();
+    expect(fs.existsSync(montage.lifecycle.PID_FILE), 'aucun fichier de pid ne devait être écrit').toBe(false);
   } finally {
     nettoie(montage);
   }
@@ -276,11 +284,11 @@ test('start dont le serveur vit sans écouter : rejette au bout de 3 s en disant
   const montage = await chargeLifecycle({ portParDefaut, serveur: SERVEUR_MUET });
   try {
     // Act
-    const erreur = await montage.lifecycle.start({ port }).then(() => null, e => e);
+    const erreur = await montage.lifecycle.start({ port }).then(() => null, (e: any) => e);
 
     // Assert
-    assert.ok(erreur, 'start aurait dû lever');
-    assert.ok(erreur.message.includes('did not answer within 3s'), erreur.message);
+    expect(erreur, 'start aurait dû lever').toBeTruthy();
+    expect(erreur.message.includes('did not answer within 3s'), erreur.message).toBeTruthy();
   } finally {
     nettoie(montage);
   }
@@ -296,8 +304,8 @@ test('stop sans fichier de pid vise le port demandé et y envoie POST /shutdown 
     const resultat = await montage.lifecycle.stop({ port });
 
     // Assert
-    assert.deepEqual(resultat, { stopped: false, port, why: 'still-answering' });
-    assert.ok(demon.requetes.includes('POST /shutdown'), JSON.stringify(demon.requetes));
+    expect(resultat).toEqual({ stopped: false, port, why: 'still-answering' });
+    expect(demon.requetes.includes('POST /shutdown'), JSON.stringify(demon.requetes)).toBeTruthy();
   } finally {
     await demon.ferme();
     nettoie(montage);
@@ -313,7 +321,7 @@ test('stop sans fichier de pid ni serveur sur le port demandé : rien n\'est arr
     const resultat = await montage.lifecycle.stop({ port });
 
     // Assert
-    assert.deepEqual(resultat, { stopped: false, port, why: 'nothing-listening' });
+    expect(resultat).toEqual({ stopped: false, port, why: 'nothing-listening' });
   } finally {
     nettoie(montage);
   }
@@ -330,10 +338,9 @@ test('stop ne signale jamais le pid du fichier : pid vivant mais port muet, rien
     const resultat = await montage.lifecycle.stop();
 
     // Assert
-    assert.deepEqual(resultat, { stopped: false, port, why: 'nothing-listening' });
-    assert.deepEqual({ exitCode: intrus.exitCode, signalCode: intrus.signalCode }, { exitCode: null, signalCode: null },
-      'le processus dont le pid figure dans le fichier ne devait pas être tué');
-    assert.equal(fs.existsSync(montage.lifecycle.PID_FILE), false, 'le fichier de pid périmé devait être retiré');
+    expect(resultat).toEqual({ stopped: false, port, why: 'nothing-listening' });
+    expect({ exitCode: intrus.exitCode, signalCode: intrus.signalCode }, 'le processus dont le pid figure dans le fichier ne devait pas être tué').toEqual({ exitCode: null, signalCode: null });
+    expect(fs.existsSync(montage.lifecycle.PID_FILE), 'le fichier de pid périmé devait être retiré').toBe(false);
   } finally {
     intrus.kill();
     nettoie(montage);
@@ -352,10 +359,10 @@ test('stop sur un port où un serveur étranger répond sans sortir : rien n\'es
     const resultat = await montage.lifecycle.stop();
 
     // Assert
-    assert.deepEqual(resultat, { stopped: false, port, why: 'still-answering' });
-    assert.ok(demon.requetes.includes('POST /shutdown'), JSON.stringify(demon.requetes));
-    assert.deepEqual({ exitCode: intrus.exitCode, signalCode: intrus.signalCode }, { exitCode: null, signalCode: null });
-    assert.equal(fs.existsSync(montage.lifecycle.PID_FILE), true, 'rien n\'a été arrêté : le fichier de pid reste');
+    expect(resultat).toEqual({ stopped: false, port, why: 'still-answering' });
+    expect(demon.requetes.includes('POST /shutdown'), JSON.stringify(demon.requetes)).toBeTruthy();
+    expect({ exitCode: intrus.exitCode, signalCode: intrus.signalCode }).toEqual({ exitCode: null, signalCode: null });
+    expect(fs.existsSync(montage.lifecycle.PID_FILE), 'rien n\'a été arrêté : le fichier de pid reste').toBe(true);
   } finally {
     intrus.kill();
     await demon.ferme();

@@ -1,8 +1,7 @@
 // `agent-viz status` sur un projet dont le fichier de hooks est illisible. Le
 // vrai binaire tourne sur le vrai dist/, avec home, dossier temporaire et projet
 // jetables, et un port qu'aucun démon n'écoute pour que l'état soit constant.
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { expect, test } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -22,7 +21,7 @@ function bacJetable() {
   return { racine, projet };
 }
 
-function lanceStatus(projet, racine) {
+function lanceStatus(projet: string, racine: string) {
   return spawnSync(process.execPath, [BIN, 'status'], {
     cwd: projet,
     encoding: 'utf8',
@@ -37,12 +36,12 @@ function lanceStatus(projet, racine) {
 const CAS = [
   {
     nom: 'Claude Code',
-    fichier: projet => path.join(projet, '.claude', 'settings.json'),
+    fichier: (projet: string) => path.join(projet, '.claude', 'settings.json'),
     tronque: '{ "hooks": { "Stop": [ ',
   },
   {
     nom: 'Copilot CLI',
-    fichier: projet => path.join(projet, '.github', 'hooks', 'agent-viz.json'),
+    fichier: (projet: string) => path.join(projet, '.github', 'hooks', 'agent-viz.json'),
     tronque: '{ "version": 1, "hooks": { "Stop": [',
   },
 ];
@@ -60,13 +59,10 @@ for (const cas of CAS) {
 
     // Assert
     const sortie = `${r.stdout}${r.stderr}`;
-    assert.equal(r.status, 0, `status ne doit pas mourir sur un fichier illisible :\n${sortie}`);
-    assert.ok(!sortie.includes('    at '),
-      `aucune pile d'appels ne doit atteindre l'utilisateur :\n${sortie}`);
-    assert.ok(sortie.includes('unreadable'),
-      `le fichier illisible doit etre signale, pas passe sous silence :\n${sortie}`);
-    assert.ok(sortie.includes(cas.nom),
-      `l'agent concerne doit etre nomme :\n${sortie}`);
+    expect(r.status, `status ne doit pas mourir sur un fichier illisible :\n${sortie}`).toBe(0);
+    expect(!sortie.includes('    at '), `aucune pile d'appels ne doit atteindre l'utilisateur :\n${sortie}`).toBeTruthy();
+    expect(sortie.includes('unreadable'), `le fichier illisible doit etre signale, pas passe sous silence :\n${sortie}`).toBeTruthy();
+    expect(sortie.includes(cas.nom), `l'agent concerne doit etre nomme :\n${sortie}`).toBeTruthy();
     fs.rmSync(racine, { recursive: true, force: true });
   });
 }
@@ -80,7 +76,6 @@ test('status reste muet sur les hooks quand aucun fichier n\'existe', () => {
 
   // Assert
   const sortie = `${r.stdout}${r.stderr}`;
-  assert.ok(!sortie.includes('unreadable'),
-    `un projet sans fichier de hooks ne doit rien signaler :\n${sortie}`);
+  expect(!sortie.includes('unreadable'), `un projet sans fichier de hooks ne doit rien signaler :\n${sortie}`).toBeTruthy();
   fs.rmSync(racine, { recursive: true, force: true });
 });

@@ -1,7 +1,6 @@
 // Les frontières du classement déclaratif des commandes de vérification. La règle qui les
 // gouverne toutes : nommer un outil n'est pas l'exécuter, car une fausse preuve se paie.
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { expect, test } from 'vitest';
 import { classifyVerification } from '../../src/engine/doctor/verification-commands.ts';
 
 test('les lanceurs de test directs sont des vérifications « test »', () => {
@@ -11,7 +10,7 @@ test('les lanceurs de test directs sont des vérifications « test »', () => {
   // Act
   const kinds = commands.map(classifyVerification);
   // Assert
-  assert.deepEqual(kinds, ['test', 'test', 'test', 'test', 'test', 'test', 'test']);
+  expect(kinds).toEqual(['test', 'test', 'test', 'test', 'test', 'test', 'test']);
 });
 
 test('les scripts npm/pnpm/yarn/bun de test sont des vérifications « test »', () => {
@@ -20,7 +19,7 @@ test('les scripts npm/pnpm/yarn/bun de test sont des vérifications « test »',
   // Act
   const kinds = commands.map(classifyVerification);
   // Assert
-  assert.deepEqual(kinds, ['test', 'test', 'test', 'test', 'test']);
+  expect(kinds).toEqual(['test', 'test', 'test', 'test', 'test']);
 });
 
 test('typecheck, lint et build sont classés dans leur genre', () => {
@@ -30,7 +29,7 @@ test('typecheck, lint et build sont classés dans leur genre', () => {
   // Act
   const kinds = commands.map(classifyVerification);
   // Assert
-  assert.deepEqual(kinds, ['typecheck', 'lint', 'lint', 'build', 'build', 'build']);
+  expect(kinds).toEqual(['typecheck', 'lint', 'lint', 'build', 'build', 'build']);
 });
 
 test('chaque cible de make est classee dans son genre, pas en bloc', () => {
@@ -39,7 +38,7 @@ test('chaque cible de make est classee dans son genre, pas en bloc', () => {
   // Act
   const kinds = commands.map(classifyVerification);
   // Assert
-  assert.deepEqual(kinds, ['test', 'lint', 'build']);
+  expect(kinds).toEqual(['test', 'lint', 'build']);
 });
 
 test('les seuls prefixes toleres en tete de segment sont les variables d environnement et npx', () => {
@@ -48,7 +47,7 @@ test('les seuls prefixes toleres en tete de segment sont les variables d environ
   // Act
   const kinds = commands.map(classifyVerification);
   // Assert
-  assert.deepEqual(kinds, ['test', 'test', 'test']);
+  expect(kinds).toEqual(['test', 'test', 'test']);
 });
 
 test('une commande enchainee est classee au premier segment apparie', () => {
@@ -57,7 +56,7 @@ test('une commande enchainee est classee au premier segment apparie', () => {
   // Act
   const kind = classifyVerification(command);
   // Assert
-  assert.equal(kind, 'test');
+  expect(kind).toBe('test');
 });
 
 test('entre segments, c est l ordre de la commande qui arbitre, pas l ordre de la table', () => {
@@ -66,7 +65,7 @@ test('entre segments, c est l ordre de la commande qui arbitre, pas l ordre de l
   // Act
   const kinds = commands.map(classifyVerification);
   // Assert
-  assert.deepEqual(kinds, ['build', 'test']);
+  expect(kinds).toEqual(['build', 'test']);
 });
 
 test('nommer un outil n est pas l executer', () => {
@@ -76,7 +75,7 @@ test('nommer un outil n est pas l executer', () => {
   // Act
   const kinds = commands.map(classifyVerification);
   // Assert
-  assert.deepEqual(kinds, [null, null, null, null, null, null, null]);
+  expect(kinds).toEqual([null, null, null, null, null, null, null]);
 });
 
 test('interroger un outil sur sa version ou son aide n est pas une verification', () => {
@@ -85,7 +84,7 @@ test('interroger un outil sur sa version ou son aide n est pas une verification'
   // Act
   const kinds = commands.map(classifyVerification);
   // Assert
-  assert.deepEqual(kinds, [null, null]);
+  expect(kinds).toEqual([null, null]);
 });
 
 test('un nom cite entre guillemets n est pas une verification', () => {
@@ -94,7 +93,7 @@ test('un nom cite entre guillemets n est pas une verification', () => {
   // Act
   const kinds = commands.map(classifyVerification);
   // Assert
-  assert.deepEqual(kinds, [null, null]);
+  expect(kinds).toEqual([null, null]);
 });
 
 test('un nom d outil colle a un suffixe de fichier n est pas une verification', () => {
@@ -103,7 +102,7 @@ test('un nom d outil colle a un suffixe de fichier n est pas une verification', 
   // Act
   const kinds = commands.map(classifyVerification);
   // Assert
-  assert.deepEqual(kinds, [null, null, null]);
+  expect(kinds).toEqual([null, null, null]);
 });
 
 test('le tout-venant du shell rend null', () => {
@@ -112,14 +111,14 @@ test('le tout-venant du shell rend null', () => {
   // Act
   const kinds = commands.map(classifyVerification);
   // Assert
-  assert.deepEqual(kinds, [null, null, null, null, null]);
+  expect(kinds).toEqual([null, null, null, null, null]);
 });
 
 test('une entree qui n est pas une chaine rend null', () => {
   // Arrange — la commande vient d'un JSON de transcript non typé.
-  const notCommands = [undefined, null, 42, { command: 'npm test' }];
+  const notCommands: any[] = [undefined, null, 42, { command: 'npm test' }];
   // Act
   const kinds = notCommands.map(classifyVerification);
   // Assert
-  assert.deepEqual(kinds, [null, null, null, null]);
+  expect(kinds).toEqual([null, null, null, null]);
 });

@@ -1,8 +1,7 @@
 // L'écriture atomique sur un vrai dossier temporaire : l'ancien fichier de hooks
 // survit à une écriture ratée. Les pannes passent par un faux `io` bâti sur le
 // vrai `fs`, jamais par un `fs` modifié en place.
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { expect, test } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -21,7 +20,7 @@ function fichierExistant() {
   return { dossier, fichier };
 }
 
-function erreurFs(code, detail) {
+function erreurFs(code: string, detail: string) {
   return Object.assign(new Error(`${code}: ${detail}`), { code });
 }
 
@@ -31,7 +30,7 @@ test('le fichier écrit porte le JSON indenté de deux espaces suivi d\'un retou
   // Act
   writeJsonAtomic(fichier, { hooks: { Stop: [] } });
   // Assert
-  assert.equal(fs.readFileSync(fichier, 'utf8'), '{\n  "hooks": {\n    "Stop": []\n  }\n}\n');
+  expect(fs.readFileSync(fichier, 'utf8')).toBe('{\n  "hooks": {\n    "Stop": []\n  }\n}\n');
 });
 
 test('remplacer un fichier existant met le nouveau contenu en place et ne laisse aucun temporaire', () => {
@@ -40,8 +39,8 @@ test('remplacer un fichier existant met le nouveau contenu en place et ne laisse
   // Act
   writeJsonAtomic(fichier, { hooks: { nouveau: true } });
   // Assert
-  assert.deepEqual(fs.readdirSync(dossier), ['settings.json']);
-  assert.deepEqual(JSON.parse(fs.readFileSync(fichier, 'utf8')), { hooks: { nouveau: true } });
+  expect(fs.readdirSync(dossier)).toEqual(['settings.json']);
+  expect(JSON.parse(fs.readFileSync(fichier, 'utf8'))).toEqual({ hooks: { nouveau: true } });
 });
 
 test('un renommage refusé laisse l\'ancien fichier intact, retire le temporaire et relance l\'erreur telle quelle', () => {
@@ -52,9 +51,14 @@ test('un renommage refusé laisse l\'ancien fichier intact, retire le temporaire
   // Act
   const appel = () => writeJsonAtomic(fichier, { hooks: { nouveau: true } }, io);
   // Assert
-  assert.throws(appel, (e) => e === refus);
-  assert.equal(fs.readFileSync(fichier, 'utf8'), ANCIEN);
-  assert.deepEqual(fs.readdirSync(dossier), ['settings.json']);
+  try {
+    appel();
+    expect.fail('devrait avoir levé');
+  } catch (e) {
+    expect(e).toBe(refus);
+  }
+  expect(fs.readFileSync(fichier, 'utf8')).toBe(ANCIEN);
+  expect(fs.readdirSync(dossier)).toEqual(['settings.json']);
 });
 
 test('une écriture du temporaire refusée laisse l\'ancien fichier intact et relance l\'erreur telle quelle', () => {
@@ -65,8 +69,13 @@ test('une écriture du temporaire refusée laisse l\'ancien fichier intact et re
   // Act
   const appel = () => writeJsonAtomic(fichier, { hooks: { nouveau: true } }, io);
   // Assert
-  assert.throws(appel, (e) => e === refus);
-  assert.equal(fs.readFileSync(fichier, 'utf8'), ANCIEN);
+  try {
+    appel();
+    expect.fail('devrait avoir levé');
+  } catch (e) {
+    expect(e).toBe(refus);
+  }
+  expect(fs.readFileSync(fichier, 'utf8')).toBe(ANCIEN);
 });
 
 // Copilot charge tout `*.json` de ses dossiers de hooks : un temporaire nommé
@@ -74,14 +83,14 @@ test('une écriture du temporaire refusée laisse l\'ancien fichier intact et re
 test('le contenu part d\'abord dans un fichier dont le nom ne finit pas par .json', () => {
   // Arrange
   const fichier = path.join(dossierTemporaire(), 'agent-viz.json');
-  const cheminsEcrits = [];
+  const cheminsEcrits: string[] = [];
   const io = {
     ...fs,
-    writeFileSync: (chemin, donnees) => { cheminsEcrits.push(chemin); fs.writeFileSync(chemin, donnees); },
+    writeFileSync: (chemin: any, donnees: any) => { cheminsEcrits.push(chemin); fs.writeFileSync(chemin, donnees); },
   };
   // Act
   writeJsonAtomic(fichier, { version: 1, hooks: {} }, io);
   // Assert
-  assert.equal(cheminsEcrits.length, 1);
-  assert.doesNotMatch(cheminsEcrits[0], /\.json$/);
+  expect(cheminsEcrits.length).toBe(1);
+  expect(cheminsEcrits[0]).not.toMatch(/\.json$/);
 });

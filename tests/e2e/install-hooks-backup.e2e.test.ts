@@ -1,8 +1,7 @@
 // La copie d'un fichier de hooks sur un vrai dossier temporaire : les octets
 // d'avant, un dossier par fichier source, les 30 dernières copies. Les pannes
 // passent par un faux `io` bâti sur le vrai `fs`, jamais par un `fs` modifié en place.
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { expect, test } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -21,21 +20,21 @@ function fichierSource() {
   return { dossier, file, root: path.join(dossier, 'backups') };
 }
 
-function dossierDesCopies(root, file) {
+function dossierDesCopies(root: string, file: string) {
   return path.join(root, file.replace(/[^A-Za-z0-9._-]/g, '-'));
 }
 
-function nomDeCopie(ms) {
+function nomDeCopie(ms: number) {
   return new Date(ms).toISOString().replace(/:/g, '-') + '.json';
 }
 
 // Trente copies plus anciennes que T0, d'une milliseconde chacune.
-function poserTrenteCopies(dir) {
+function poserTrenteCopies(dir: string) {
   fs.mkdirSync(dir, { recursive: true });
   for (let k = 30; k >= 1; k--) fs.writeFileSync(path.join(dir, nomDeCopie(T0 - k)), 'ancienne');
 }
 
-function erreurFs(code, detail) {
+function erreurFs(code: string, detail: string) {
   return Object.assign(new Error(`${code}: ${detail}`), { code });
 }
 
@@ -45,8 +44,8 @@ test('la copie garde les octets tels quels, fins de ligne CRLF comprises, et ren
   // Act
   const copie = backupHookFile(file, { root, now: () => T0 });
   // Assert
-  assert.equal(copie, path.join(dossierDesCopies(root, file), '2026-09-14T10-05-07.123Z.json'));
-  assert.deepEqual(fs.readFileSync(copie), Buffer.from(CRLF));
+  expect(copie).toBe(path.join(dossierDesCopies(root, file), '2026-09-14T10-05-07.123Z.json'));
+  expect(fs.readFileSync(copie!)).toEqual(Buffer.from(CRLF));
 });
 
 test('un fichier absent ne se copie pas : rien n\'est rendu et la racine des copies n\'est pas créée', () => {
@@ -56,8 +55,8 @@ test('un fichier absent ne se copie pas : rien n\'est rendu et la racine des cop
   // Act
   const copie = backupHookFile(absent, { root, now: () => T0 });
   // Assert
-  assert.equal(copie, null);
-  assert.equal(fs.existsSync(root), false);
+  expect(copie).toBe(null);
+  expect(fs.existsSync(root)).toBe(false);
 });
 
 test('au-delà de 30 copies, la plus ancienne part et un fichier posé là par quelqu\'un d\'autre reste', () => {
@@ -70,10 +69,10 @@ test('au-delà de 30 copies, la plus ancienne part et un fichier posé là par q
   backupHookFile(file, { root, now: () => T0 });
   // Assert
   const noms = fs.readdirSync(dir);
-  assert.equal(noms.filter(nom => nom.endsWith('Z.json')).length, 30);
-  assert.equal(noms.includes(nomDeCopie(T0 - 30)), false, 'la plus ancienne copie devait partir');
-  assert.ok(noms.includes(nomDeCopie(T0)), 'la nouvelle copie devait rester');
-  assert.ok(noms.includes('notes.txt'), 'un fichier étranger ne devait être ni compté ni supprimé');
+  expect(noms.filter(nom => nom.endsWith('Z.json')).length).toBe(30);
+  expect(noms.includes(nomDeCopie(T0 - 30)), 'la plus ancienne copie devait partir').toBe(false);
+  expect(noms.includes(nomDeCopie(T0)), 'la nouvelle copie devait rester').toBeTruthy();
+  expect(noms.includes('notes.txt'), 'un fichier étranger ne devait être ni compté ni supprimé').toBeTruthy();
 });
 
 test('deux copies du même fichier dans la même milliseconde : la seconde prend la milliseconde suivante, se trie après la première, et la première garde les octets d\'origine', () => {
@@ -84,10 +83,10 @@ test('deux copies du même fichier dans la même milliseconde : la seconde prend
   // Act
   const seconde = backupHookFile(file, { root, now: () => T0 });
   // Assert
-  assert.equal(seconde, path.join(dossierDesCopies(root, file), nomDeCopie(T0 + 1)));
-  assert.equal(fs.readFileSync(seconde, 'utf8'), '{"reecrit":true}\n');
-  assert.equal(fs.readFileSync(premiere, 'utf8'), CRLF);
-  assert.deepEqual(fs.readdirSync(dossierDesCopies(root, file)).sort(), [nomDeCopie(T0), nomDeCopie(T0 + 1)]);
+  expect(seconde).toBe(path.join(dossierDesCopies(root, file), nomDeCopie(T0 + 1)));
+  expect(fs.readFileSync(seconde!, 'utf8')).toBe('{"reecrit":true}\n');
+  expect(fs.readFileSync(premiere!, 'utf8')).toBe(CRLF);
+  expect(fs.readdirSync(dossierDesCopies(root, file)).sort()).toEqual([nomDeCopie(T0), nomDeCopie(T0 + 1)]);
 });
 
 test('une horloge en retard sur les copies déjà là : la copie neuve se nomme après la dernière et la purge la garde', () => {
@@ -100,10 +99,10 @@ test('une horloge en retard sur les copies déjà là : la copie neuve se nomme 
   // Act
   const copie = backupHookFile(file, { root, now: () => T0 });
   // Assert
-  assert.equal(copie, path.join(dir, nomDeCopie(T1 + 1)));
-  assert.equal(fs.readFileSync(copie, 'utf8'), CRLF);
-  assert.equal(fs.readdirSync(dir).length, 30);
-  assert.equal(fs.existsSync(path.join(dir, nomDeCopie(T1 - 29))), false, 'la plus ancienne copie devait partir');
+  expect(copie).toBe(path.join(dir, nomDeCopie(T1 + 1)));
+  expect(fs.readFileSync(copie!, 'utf8')).toBe(CRLF);
+  expect(fs.readdirSync(dir).length).toBe(30);
+  expect(fs.existsSync(path.join(dir, nomDeCopie(T1 - 29))), 'la plus ancienne copie devait partir').toBe(false);
 });
 
 test('une copie ne s\'écrase jamais : un nom pris entre la lecture du dossier et la copie lève EEXIST et la copie déjà là garde ses octets', () => {
@@ -117,9 +116,14 @@ test('une copie ne s\'écrase jamais : un nom pris entre la lecture du dossier e
   // Act
   const appel = () => backupHookFile(file, { root, io, now: () => T0 });
   // Assert
-  assert.throws(appel, (e) =>
-    e.message.startsWith(`backup of ${file} failed, file left unchanged: EEXIST`) && e.cause.code === 'EEXIST');
-  assert.equal(fs.readFileSync(premiere, 'utf8'), CRLF);
+  try {
+    appel();
+    expect.fail('devrait avoir levé');
+  } catch (e: any) {
+    expect(e.message.startsWith(`backup of ${file} failed, file left unchanged: EEXIST`)).toBeTruthy();
+    expect(e.cause.code).toBe('EEXIST');
+  }
+  expect(fs.readFileSync(premiere!, 'utf8')).toBe(CRLF);
 });
 
 test('une copie qui échoue lève en nommant le fichier de hooks et garde l\'erreur fs en cause', () => {
@@ -130,8 +134,13 @@ test('une copie qui échoue lève en nommant le fichier de hooks et garde l\'err
   // Act
   const appel = () => backupHookFile(file, { root, io, now: () => T0 });
   // Assert
-  assert.throws(appel, (e) =>
-    e.message === `backup of ${file} failed, file left unchanged: EACCES: permission denied, copyfile` && e.cause === refus);
+  try {
+    appel();
+    expect.fail('devrait avoir levé');
+  } catch (e: any) {
+    expect(e.message).toBe(`backup of ${file} failed, file left unchanged: EACCES: permission denied, copyfile`);
+    expect(e.cause).toBe(refus);
+  }
 });
 
 test('une purge qui échoue lève aussi, en nommant le fichier de hooks', () => {
@@ -143,6 +152,11 @@ test('une purge qui échoue lève aussi, en nommant le fichier de hooks', () => 
   // Act
   const appel = () => backupHookFile(file, { root, io, now: () => T0 });
   // Assert
-  assert.throws(appel, (e) =>
-    e.message === `backup of ${file} failed, file left unchanged: EBUSY: resource busy or locked, unlink` && e.cause === refus);
+  try {
+    appel();
+    expect.fail('devrait avoir levé');
+  } catch (e: any) {
+    expect(e.message).toBe(`backup of ${file} failed, file left unchanged: EBUSY: resource busy or locked, unlink`);
+    expect(e.cause).toBe(refus);
+  }
 });
