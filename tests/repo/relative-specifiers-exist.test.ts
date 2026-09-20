@@ -5,8 +5,8 @@
 // `typescript`) : un commentaire ou une chaîne ne sont jamais lus comme un import.
 //
 // Ce que ce filet ne prouve pas :
-//   - les `.test.cjs`, les `.test.mjs` et `vitest.config.mts` : hors périmètre, parce que le vrai
-//     chargeur de Node et vitest les chargent déjà et échouent sur une cible absente ;
+//   - `vitest.config.mts` : hors périmètre, parce que vitest le charge déjà et échoue sur une
+//     cible absente ;
 //   - la casse : le disque de Windows ne la distingue pas, `./Usage.ts` y trouve `usage.ts` ;
 //     `forceConsistentCasingInFileNames` du `tsconfig.json` la couvre au typecheck, pas ce filet.
 import { expect, test } from 'vitest';

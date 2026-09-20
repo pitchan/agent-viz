@@ -249,19 +249,16 @@ npm run build                # the engine is TypeScript; dist/ is not committed
 npm start                    # dashboard on http://localhost:3333
 ```
 
-Tests: `npm test` (a single `vitest run` over one `tests/` tree,
-product and engine together; the `node:test`-based files run through a bridge,
-`test-support/bridge/`) and `npm run test:node` (the same `node:test` cases, run natively
-under `node --test`, kept as the reference the bridge is checked against). After changing
-engine source, rebuild it (`npm run build`) — the product loads the compiled `dist/engine/`.
-Publishing runs both test commands and the build first (`prepublishOnly`).
+Tests: `npm test` (a single `vitest run` over one `tests/` tree, product and
+engine together). After changing engine source, rebuild it (`npm run build`)
+— the product loads the compiled `dist/engine/`. Publishing runs typecheck,
+the build and the test suite first (`prepublishOnly`).
 
-Test files are named after the module system they use: `.test.cjs` (CommonJS),
-`.test.mjs` (ESM) and `.test.ts` (vitest API). Since the root package is ESM, a
-`.js` test file *is* an ES module — the extension is what tells the runtime, so it has to be
-right. Both runners load `test-support/env-guard.mjs` first: it redirects `HOME`,
-`USERPROFILE`, `TEMP` and `TMP` to a throwaway sandbox and forces a dead port, so a test can
-never write to your real `~/.claude/settings.json` or reopen your observatory database.
+Every test file is `.test.ts`, written against vitest's own API
+(`import { test, expect } from 'vitest'`). vitest loads `test-support/env-guard.mjs`
+first: it redirects `HOME`, `USERPROFILE`, `TEMP` and `TMP` to a throwaway
+sandbox and forces a dead port, so a test can never write to your real
+`~/.claude/settings.json` or reopen your observatory database.
 
 ## License
 

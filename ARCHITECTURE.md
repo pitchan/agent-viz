@@ -559,94 +559,34 @@ ligne : un ancrage `fichier:ligne` qui a glissé reste vert.
 **Un seul exécuteur, un seul arbre de tests dans 130 fichiers.**
 
 ```
-npx vitest run     → tous passés, 130 fichiers
+find tests -name "*.test.ts" | wc -l   → 130
+npx vitest run                          → tous passés, 130 fichiers
 ```
 
-Les deux exécuteurs ne lisent que `tests/` (`include` de `vitest.config.mts`,
-motif du script `test:node`), et ce dossier porte **deux dialectes** : c'est ce
-qui explique le pont ci-dessous.
+vitest est le seul exécuteur (`include: tests/**/*.test.ts` de
+`vitest.config.mts`), et 130 `.test.ts` en sont l'unique dialecte : tous
+écrivent l'API de vitest (`import { test, expect } from 'vitest'`). Aucun
+pont, aucun second exécuteur, aucun fichier n'importe `node:test`.
+`tests/repo/architecture-test-counts.test.ts` compare ces nombres au disque et
+nomme l'écart s'il diverge.
 
-| Dialecte | Fichiers | Écrits en |
-|---|---|---|
-| CommonJS + ESM | 0 `.test.cjs` + 0 `.test.mjs` | `node:test` |
-| TypeScript | 130 `.test.ts` | l'API de vitest |
+**Les sources du moteur se chargent en direct, sans étape de compilation.**
+`src/engine/**`, comme `src/server/**`, nomme ses voisins par leur chemin
+`.ts` réel : un test importe la source du moteur directement
+(`tests/unit/pricing.test.ts` importe `src/engine/core/pricing.ts`), et
+vitest retire les types à la volée. Aucun `dist/` n'est requis pour que la
+suite passe — `dist/` sert le produit publié (§ 7), pas les tests.
 
-**L'extension dit le régime.** Sous une racine `"type": "module"`, un `.js`
-**est** un module ES, où `require()` n'existe pas : un test CommonJS s'écrit en
-`.test.cjs`, un test ESM pour `node:test` en `.test.mjs`. Un fichier `.test.js`
-sous `tests/` ne serait lu par aucun des deux exécuteurs, qui ne lisent que
-`.test.cjs`, `.test.mjs` et, pour vitest, `.test.ts` ;
-`tests/repo/test-file-extensions.test.mjs` le refuse.
-
-**Les fichiers en `node:test` passent par un pont** (`test-support/bridge/`),
-qui rend la surface `node:test` au-dessus des primitives de vitest. Leur nombre
-est écrit une seule fois, à côté de la commande qui le refait, et
-`tests/repo/architecture-test-counts.test.mjs` le compare au disque :
-
-```
-grep -rlE "(require\(|from )['\"]node:test['\"]" tests | wc -l   → 0
-```
-
-Le test du pont, `tests/unit/node-test-bridge.test.mjs`, passe lui-même par le
-pont quand il tourne sous vitest. Le décompte du pont **grandit à chaque fichier
-`node:test` neuf, et baisse quand un fichier change de dialecte ou quitte
-l'arbre** : un total recopié ailleurs dans ce document vieillirait au fichier
-suivant sans que rien ne rougisse.
-
-Le pont est en trois fichiers, et sa forme n'est pas un choix esthétique — elle
-est imposée par le fait qu'**une seule couture ne suffit pas** :
-
-| Fichier | Rôle |
-|---|---|
-| `create-bridge.mjs` | la **fabrique pure** : reçoit ses primitives par injection, se teste seule, ne connaît ni vitest ni `node:module` |
-| `install.mjs` | couture n° 1 : détourne `Module._load` — atteint les `require('node:test')` des fichiers CommonJS |
-| `node-test-alias.mjs` | couture n° 2 : cible d'un `resolve.alias` de `vitest.config.mts` — atteint les `import … from 'node:test'` des fichiers ESM |
-
-La seconde ne remplace pas la première, elle s'y ajoute : la résolution ESM ne
-passe pas par le hook CommonJS. Un pont amputé de l'une des deux laisse non
-exécutés, **sans le dire**, les fichiers du régime qu'elle atteint — c'est mesuré,
-pas supposé.
-
-Le pont **refuse en se nommant** les **15 API** qu'il sait ne pas implémenter
-(`NON_IMPLEMENTE_MODULE` et `NON_IMPLEMENTE_CONTEXTE` dans `create-bridge.mjs`) :
-`describe`, `it`, `test.skip`, `t.test`… Jamais un no-op. C'est un **inventaire
-figé**, relevé sur ce que `tests/` utilisait réellement, et non une garde
-générale : il n'y a pas de `Proxy`, donc une API de `node:test` hors de cette
-liste vaudrait `undefined` sans se signaler. Étendre le filet, c'est allonger ces
-deux listes.
-
-`npm run test:node` exécute les mêmes tests `node:test` **nativement**,
-sous `node --test`. Ce n'est pas une redondance : c'est la **sémantique de référence**
-à laquelle le pont est comparé. Si plus rien ne l'exerçait, elle pourrait cesser
-de passer sans que rien ne l'annonce. La publication lance les deux.
-
-**Les sources du moteur se chargent sous les deux exécuteurs.** `src/engine/**`
-nomme ses voisins en `.ts`, comme `src/server/**`, et Node 24 retire les types à
-l'import : un test `node:test` peut charger une source du moteur et tourner sous
-vitest comme sous `node --test`. `tests/unit/pricing.test.cjs`
-charge `src/engine/core/pricing.ts` et passe dans les deux suites.
-
-```
-grep -rhoE "from ['\"]\.[^'\"]*\.js['\"]" src/engine | wc -l                      → 0
-echo "import x from './core/usage.js'" | grep -cE "from ['\"]\.[^'\"]*\.js['\"]"  → 1
-```
-
-Le dialecte d'un test ne dépend donc pas de ce qu'il importe, seulement de l'API
-qu'il emploie : `tests/doctor/verification.test.ts` est un `.test.ts` parce qu'il
-écrit `import { test } from 'vitest'`. Le filet `tests/repo/relative-specifiers-exist.test.mjs`
-le tient : dans un `.ts` de `src/` ou de `tests/`, un spécificateur relatif désigne un
-fichier qui existe, ce qui refuse le `./x.js` que vitest résout seul vers `./x.ts` et
-que Node ne résout pas. L'inverse — un `.test.ts` qui importe
-`node:test` — est un **hybride** : il se lit comme couvert par les deux et n'est
-lu que par un. Le dépôt n'en compte aucun
-(`grep -rlE "(require\(|from )['\"]node:test['\"]" tests --include="*.test.ts" | wc -l` → 0).
+Un spécificateur relatif d'un `.ts` de `src/` ou de `tests/` doit désigner un
+fichier qui existe tel qu'il est écrit : vitest résout seul `./x.js` vers
+`./x.ts`, ce que Node ne ferait pas — `tests/repo/relative-specifiers-exist.test.ts`
+le refuse.
 
 **Un garde d'environnement est posé au HARNAIS, pas dans les tests** —
-`test-support/env-guard.mjs`, première entrée des `setupFiles` de vitest et
-`--import` des deux scripts `node --test`. Il détourne `HOME`, `USERPROFILE`,
-`TEMP` et `TMP` vers un bac jetable et force un port mort avant qu'une seule
-ligne de test s'exécute. Sa raison est mesurée : plusieurs tests chargent des
-modules qui, sous une garde qui lâche, écriraient dans le
-`~/.claude/settings.json` **réel** de la machine et rouvriraient la base de
-l'observatoire. Le mettre au harnais plutôt que dans chaque test **empêche** la
-fuite au lieu de la **constater**.
+`test-support/env-guard.mjs`, seule entrée des `setupFiles` de vitest. Il
+détourne `HOME`, `USERPROFILE`, `TEMP` et `TMP` vers un bac jetable et force
+un port mort avant qu'une seule ligne de test s'exécute. Sa raison est
+mesurée : plusieurs tests chargent des modules qui, sous une garde qui lâche,
+écriraient dans le `~/.claude/settings.json` **réel** de la machine et
+rouvriraient la base de l'observatoire. Le mettre au harnais plutôt que dans
+chaque test **empêche** la fuite au lieu de la **constater**.

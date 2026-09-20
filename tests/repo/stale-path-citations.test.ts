@@ -253,3 +253,51 @@ test('chaque entree de LISTE_BLANCHE_SRC protege encore une citation absente', (
   // Assert
   expect(orphelines.map(e => `${e.fichier} → ${e.fragment}`), 'une entree de LISTE_BLANCHE_SRC qui ne couvre plus aucune citation absente : la retirer.').toEqual([]);
 });
+
+// ── Les citations de l'outillage de test retire (pont node:test, scripts npm) ──
+//
+// `test-support/bridge/`, `test-support/ids/`, `npm run test:node` et
+// `npm run test:ids:node` ont disparu du depot avec le second executeur :
+// une citation qui les nomme decrit un regime qui n existe plus. Meme famille
+// que RACINE_MORTE : la simple apparition est la preuve, pas une resolution
+// de chemin. Reutilise `fichiersBalayes()` : memes exclusions.
+const OUTIL_TEST_MORT = /test-support\/(?:bridge|ids)\/|npm run test:(?:ids:)?node\b/;
+
+const LISTE_BLANCHE_OUTIL_MORT: EntreeBlanche[] = [
+  // Ce document decrit encore le pont et le script npm retires ; sa mise a
+  // jour est une revue distincte de ce filet-ci.
+  { fichier: 'tests/CLAUDE.md', fragment: 'test-support/bridge/', raison: 'la reecriture de ce document est une revue distincte de ce filet-ci' },
+  { fichier: 'tests/CLAUDE.md', fragment: 'npm run test:node', raison: 'meme document que l entree precedente, meme revue distincte' },
+  // DONNEES DE TEST — chaine synthetique pour verifier qu un script npm
+  // quelconque en `test:*` est classe comme test, pas une citation de
+  // l outillage de ce depot.
+  { fichier: 'tests/doctor/verification-commands.test.ts', fragment: 'npm run test:node', raison: 'chaine synthetique testant la reconnaissance generique des scripts npm de test ; ne cite pas l outillage de ce depot' },
+];
+
+function occurrencesOutilMort() {
+  const trouvees: Occurrence[] = [];
+  for (const rel of fichiersBalayes()) {
+    readFileSync(path.join(ROOT, rel), 'utf8').split(/\r?\n/).forEach((ligne, i) => {
+      if (OUTIL_TEST_MORT.test(ligne)) trouvees.push({ fichier: rel, ligne: i + 1, texte: ligne });
+    });
+  }
+  return trouvees;
+}
+
+test('aucune citation de l outillage de test retire hors liste blanche, et chaque exemption protege encore quelque chose', () => {
+  // Arrange
+  const toutes = occurrencesOutilMort();
+
+  // Act — premiere garantie : aucune citation hors liste blanche.
+  const perimees = toutes.filter(o => !couvertePar(o, LISTE_BLANCHE_OUTIL_MORT));
+
+  // Assert
+  expect(perimees.map(o => `${o.fichier}:${o.ligne} → ${o.texte.trim()}`), 'citation de l outillage de test retire (pont node:test, scripts npm) hors liste blanche : ' +
+      'la reecrire pour le regime a un seul executeur, ou l inscrire dans LISTE_BLANCHE_OUTIL_MORT avec sa raison.').toEqual([]);
+
+  // Act — seconde garantie : aucune exemption n a survecu a ce qu elle protegeait.
+  const orphelines = orphelinesDe(LISTE_BLANCHE_OUTIL_MORT, toutes);
+
+  // Assert
+  expect(orphelines.map(e => `${e.fichier} → ${e.fragment}`), 'une entree de LISTE_BLANCHE_OUTIL_MORT sans occurrence a survecu a ce qu elle protegeait : la retirer.').toEqual([]);
+});
