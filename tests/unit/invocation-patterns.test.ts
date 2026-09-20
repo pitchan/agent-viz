@@ -22,8 +22,7 @@
 //     chargement — c'est cela, et non un test de sous-chaîne, qui interdit
 //     qu'un morceau du texte reçu ressorte.
 
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { expect, test } from 'vitest';
 import { classify, PATTERNS } from '../../src/engine/watchdog/invocation-patterns.ts';
 
 // ─── Échantillons, un par motif, dans l'ordre de la table ──────────────────
@@ -98,7 +97,7 @@ const PYTHON_TRACEBACK_WITH_PATH = [
 // [id attendu, texte]. L'ordre suit celui de la table : un échantillon placé
 // ici prouve à la fois que son motif matche ET qu'aucun motif plus haut ne le
 // lui prend.
-const SAMPLES = [
+const SAMPLES: [string, string][] = [
   // couche 1 — le harnais a refuse l appel
   ['harness-tool-disabled',
    'No such tool available: mcp__mdb-explorer__mdb_geocode. This tool is not enabled in this context.'],
@@ -218,51 +217,50 @@ const CLASSES = ['invocation', 'verdict', 'environment', 'harness'];
 
 test('classify rend { id, class } et rien d autre', () => {
   const got = classify('Exit code 1 /usr/bin/bash: line 1: cd: too many arguments');
-  assert.deepEqual(got, { id: 'inv-bash-cd-too-many-args', class: 'invocation' });
-  assert.deepEqual(Object.keys(got), ['id', 'class']);
+  expect(got).toEqual({ id: 'inv-bash-cd-too-many-args', class: 'invocation' });
+  expect(Object.keys(got!)).toEqual(['id', 'class']);
 });
 
 test('un texte qui ne ressemble a aucun motif rend null', () => {
-  assert.equal(classify('tout va bien, la commande a fait ce qu on lui demandait'), null);
+  expect(classify('tout va bien, la commande a fait ce qu on lui demandait')).toBe(null);
 });
 
 test('la classe appartient a un ensemble ferme de quatre valeurs', () => {
   for (const p of PATTERNS) {
-    assert.ok(CLASSES.includes(p.class), `${p.id} porte une classe hors ensemble : ${p.class}`);
+    expect(CLASSES.includes(p.class), `${p.id} porte une classe hors ensemble : ${p.class}`).toBeTruthy();
   }
 });
 
 test('la table a la forme attendue : id unique, expression reguliere, drapeau de reglage', () => {
   const seen = new Set();
   for (const p of PATTERNS) {
-    assert.equal(typeof p.id, 'string');
-    assert.ok(p.id.length > 0);
-    assert.ok(!seen.has(p.id), `identifiant en double : ${p.id}`);
+    expect(typeof p.id).toBe('string');
+    expect(p.id.length > 0).toBeTruthy();
+    expect(!seen.has(p.id), `identifiant en double : ${p.id}`).toBeTruthy();
     seen.add(p.id);
-    assert.ok(p.re instanceof RegExp, `${p.id} n a pas d expression reguliere`);
-    assert.equal(typeof p.workstationSetting, 'boolean',
-      `${p.id} ne dit pas s il releve du reglage du poste`);
+    expect(p.re instanceof RegExp, `${p.id} n a pas d expression reguliere`).toBeTruthy();
+    expect(typeof p.workstationSetting, `${p.id} ne dit pas s il releve du reglage du poste`).toBe('boolean');
   }
 });
 
 test('aucune expression reguliere n est globale — classify serait a etat', () => {
   for (const p of PATTERNS) {
-    assert.ok(!p.re.flags.includes('g'), `${p.id} porte le drapeau g`);
-    assert.ok(!p.re.flags.includes('y'), `${p.id} porte le drapeau y`);
+    expect(!p.re.flags.includes('g'), `${p.id} porte le drapeau g`).toBeTruthy();
+    expect(!p.re.flags.includes('y'), `${p.id} porte le drapeau y`).toBeTruthy();
   }
 });
 
 test('classify est idempotent : deux appels sur le meme texte donnent le meme verdict', () => {
   for (const [, text] of SAMPLES) {
-    assert.deepEqual(classify(text), classify(text));
+    expect(classify(text)).toEqual(classify(text));
   }
 });
 
 test('la table compte 39 motifs, dont 24 d invocation', () => {
-  const byClass = {};
+  const byClass: Record<string, number> = {};
   for (const p of PATTERNS) byClass[p.class] = (byClass[p.class] || 0) + 1;
-  assert.deepEqual(byClass, { harness: 4, invocation: 24, environment: 5, verdict: 6 });
-  assert.equal(PATTERNS.length, 39);
+  expect(byClass).toEqual({ harness: 4, invocation: 24, environment: 5, verdict: 6 });
+  expect(PATTERNS.length).toBe(39);
 });
 
 // ─── Couverture : un echantillon reel par motif ────────────────────────────
@@ -270,13 +268,13 @@ test('la table compte 39 motifs, dont 24 d invocation', () => {
 test('chaque motif du releve reconnait son echantillon, et aucun ne le lui prend', () => {
   for (const [expected, text] of SAMPLES) {
     const got = classify(text);
-    assert.notEqual(got, null, `${expected} : aucun motif ne matche son propre echantillon`);
-    assert.equal(got.id, expected, `echantillon de ${expected} classe ${got.id}`);
+    expect(got, `${expected} : aucun motif ne matche son propre echantillon`).not.toBe(null);
+    expect(got!.id, `echantillon de ${expected} classe ${got!.id}`).toBe(expected);
   }
 });
 
 test('chaque motif de la table a un echantillon dans ce fichier', () => {
-  assert.deepEqual(SAMPLES.map(([id]) => id), PATTERNS.map(p => p.id));
+  expect(SAMPLES.map(([id]) => id)).toEqual(PATTERNS.map(p => p.id));
 });
 
 // ─── 1. La langue : le piege central, mesure et non suppose ────────────────
@@ -285,10 +283,8 @@ test('un message PowerShell FRANCAIS aux accents corrompus est classe', () => {
   // 100 % des messages PowerShell de cette machine sont en francais et onze
   // ont leurs accents remplaces par U+FFFD. C'est le cas nominal, pas un cas
   // limite : un motif qui le rate rate tout.
-  assert.ok(PS_COMMAND_NOT_FOUND_FR.includes('\uFFFD'),
-    'l echantillon doit vraiment porter des accents corrompus');
-  assert.deepEqual(classify(PS_COMMAND_NOT_FOUND_FR),
-    { id: 'inv-ps-command-not-found', class: 'invocation' });
+  expect(PS_COMMAND_NOT_FOUND_FR.includes('\uFFFD'), 'l echantillon doit vraiment porter des accents corrompus').toBeTruthy();
+  expect(classify(PS_COMMAND_NOT_FOUND_FR)).toEqual({ id: 'inv-ps-command-not-found', class: 'invocation' });
 });
 
 test('le motif PowerShell ne depend pas de la langue : meme verdict en anglais', () => {
@@ -301,7 +297,7 @@ test('le motif PowerShell ne depend pas de la langue : meme verdict en anglais',
     '    + CategoryInfo          : ObjectNotFound: (head:String) [], CommandNotFoundException',
     '    + FullyQualifiedErrorId : CommandNotFoundException',
   ].join('\n');
-  assert.deepEqual(classify(en), { id: 'inv-ps-command-not-found', class: 'invocation' });
+  expect(classify(en)).toEqual({ id: 'inv-ps-command-not-found', class: 'invocation' });
 });
 
 test('la prose francaise seule ne classe pas : c est l identifiant .NET qui ancre', () => {
@@ -312,12 +308,12 @@ test('la prose francaise seule ne classe pas : c est l identifiant .NET qui ancr
     .split('\n')
     .filter(l => !l.includes('FullyQualifiedErrorId'))
     .join('\n');
-  assert.ok(sansAncre.includes("n'est pas reconnu"), 'la prose francaise est bien restee');
-  assert.equal(classify(sansAncre), null);
+  expect(sansAncre.includes("n'est pas reconnu"), 'la prose francaise est bien restee').toBeTruthy();
+  expect(classify(sansAncre)).toBe(null);
 });
 
 test('les cinq motifs PowerShell sont classes sur leurs echantillons francais', () => {
-  const attendus = [
+  const attendus: [string, string][] = [
     [PS_COMMAND_NOT_FOUND_FR, 'inv-ps-command-not-found'],
     [PS_PARAMETER_NOT_FOUND_FR, 'inv-ps-parameter-not-found'],
     [PS_ARGUMENT_TYPE_FR, 'inv-ps-argument-type'],
@@ -325,10 +321,10 @@ test('les cinq motifs PowerShell sont classes sur leurs echantillons francais', 
     [PS_ARGUMENT_EXCEPTION_FR, 'inv-ps-argument-exception'],
   ];
   for (const [text, id] of attendus) {
-    assert.ok(text.includes('\uFFFD'), `${id} : echantillon sans accent corrompu`);
+    expect(text.includes('\uFFFD'), `${id} : echantillon sans accent corrompu`).toBeTruthy();
     const got = classify(text);
-    assert.notEqual(got, null, `${id} : message francais non classe`);
-    assert.equal(got.id, id);
+    expect(got, `${id} : message francais non classe`).not.toBe(null);
+    expect(got!.id).toBe(id);
   }
 });
 
@@ -336,7 +332,7 @@ test('les cinq motifs PowerShell sont classes sur leurs echantillons francais', 
 
 // ─── 2. Le zero faux positif : la moitie de la valeur du module ────────────
 
-const NON_INVOCATION = [
+const NON_INVOCATION: [string, string][] = [
   ['test rouge vitest', VITEST_RED],
   ['test rouge node:test', 'ℹ tests 625\nℹ pass 624\nℹ fail 1'],
   ['assertion rouge', [
@@ -359,8 +355,8 @@ const NON_INVOCATION = [
 test('une sortie de verdict, d environnement ou de harnais n est JAMAIS une invocation', () => {
   for (const [quoi, text] of NON_INVOCATION) {
     const got = classify(text);
-    assert.notEqual(got, null, `${quoi} : non classe, donc non exclu explicitement`);
-    assert.notEqual(got.class, 'invocation', `${quoi} : classe a tort en invocation (${got.id})`);
+    expect(got, `${quoi} : non classe, donc non exclu explicitement`).not.toBe(null);
+    expect(got!.class, `${quoi} : classe a tort en invocation (${got!.id})`).not.toBe('invocation');
   }
 });
 
@@ -368,15 +364,15 @@ test('le motif generique de chemin absent reste derriere les verdicts', () => {
   // Le releve a mesure exactement quatre fuites de inv-path-not-found : deux
   // dans une pile node, deux dans un traceback python. Sa place en fin de
   // table est ce qui les neutralise — et ce test est ce qui le prouve.
-  assert.ok(NODE_STACK_WITH_PATH.includes('No such file or directory'));
-  assert.ok(PYTHON_TRACEBACK_WITH_PATH.includes('No such file or directory'));
-  assert.equal(classify(NODE_STACK_WITH_PATH).id, 'vrd-node-stacktrace');
-  assert.equal(classify(PYTHON_TRACEBACK_WITH_PATH).id, 'vrd-python-traceback');
+  expect(NODE_STACK_WITH_PATH.includes('No such file or directory')).toBeTruthy();
+  expect(PYTHON_TRACEBACK_WITH_PATH.includes('No such file or directory')).toBeTruthy();
+  expect(classify(NODE_STACK_WITH_PATH)!.id).toBe('vrd-node-stacktrace');
+  expect(classify(PYTHON_TRACEBACK_WITH_PATH)!.id).toBe('vrd-python-traceback');
 });
 
 test('inv-path-not-found est le dernier motif d invocation de la table', () => {
   const invocations = PATTERNS.filter(p => p.class === 'invocation');
-  assert.equal(invocations.at(-1).id, 'inv-path-not-found');
+  expect(invocations.at(-1)!.id).toBe('inv-path-not-found');
 });
 
 test('un verdict colorise ne peut pas atteindre le sous-ensemble qui alerte', () => {
@@ -402,21 +398,20 @@ test('un verdict colorise ne peut pas atteindre le sous-ensemble qui alerte', ()
     'Error: ENOENT: No such file or directory',
   ].join('\n');
   const got = classify(testRougeColorise);
-  assert.notEqual(got, null);
+  expect(got).not.toBe(null);
   // La question est posee A LA TABLE, via le drapeau dont le detecteur se
   // servira comme unique filtre — pas a une liste d identifiants recopiee ici.
   // Une liste recopiee survivrait a un motif marque « reglage du poste » par
   // erreur, ce qui est exactement le faux positif que ce test doit attraper.
-  const motif = PATTERNS.find(p => p.id === got.id);
-  assert.equal(motif.workstationSetting, false,
-    `un test rouge colorise a atteint le sous-ensemble qui alerte : ${got.id}`);
+  const motif = PATTERNS.find(p => p.id === got!.id);
+  expect(motif!.workstationSetting, `un test rouge colorise a atteint le sous-ensemble qui alerte : ${got!.id}`).toBe(false);
 });
 
 test('le chemin Windows non echappe passe avant le chemin absent generique', () => {
   // Les deux motifs matchent ce texte. Le specifique doit gagner : c est lui
   // qui nomme le reglage manquant, l autre ne nomme rien.
   const text = 'Exit code 1 /usr/bin/bash: line 1: cd: F:DEVagent-viz: No such file or directory';
-  assert.equal(classify(text).id, 'inv-bash-windows-path-unquoted');
+  expect(classify(text)!.id).toBe('inv-bash-windows-path-unquoted');
 });
 
 // ─── 3. La vie privee : un identifiant, jamais un extrait ──────────────────
@@ -430,9 +425,8 @@ test('la sortie ne contient aucun morceau du texte recu', () => {
   // section 11.
   for (const [id, text] of SAMPLES) {
     const got = classify(text);
-    for (const [champ, valeur] of Object.entries(got)) {
-      assert.ok(!text.includes(valeur),
-        `${id} : la valeur de ${champ} est un extrait du texte recu`);
+    for (const [champ, valeur] of Object.entries(got! as unknown as Record<string, string>)) {
+      expect(!text.includes(valeur), `${id} : la valeur de ${champ} est un extrait du texte recu`).toBeTruthy();
     }
   }
 });
@@ -444,19 +438,19 @@ test('rien de la machine ne ressort : ni chemin, ni identite, ni secret', () => 
     '</tool_use_error>',
   ].join('');
   const got = classify(text);
-  assert.deepEqual(got, { id: 'inv-edit-anchor-missing', class: 'invocation' });
+  expect(got).toEqual({ id: 'inv-edit-anchor-missing', class: 'invocation' });
   const serialise = JSON.stringify(got);
   for (const secret of ['alice', 'sk-ant-000', 'projet-confidentiel', '.env', 'C:\\Users']) {
-    assert.ok(!serialise.includes(secret), `${secret} a fuite dans la sortie`);
+    expect(!serialise.includes(secret), `${secret} a fuite dans la sortie`).toBeTruthy();
   }
 });
 
 test('muter le resultat ne corrompt pas la table', () => {
   const text = 'Exit code 1 /usr/bin/bash: line 1: cd: too many arguments';
-  const premier = classify(text);
+  const premier = classify(text)!;
   premier.id = 'MUTE';
   premier.class = 'harness';
-  assert.deepEqual(classify(text), { id: 'inv-bash-cd-too-many-args', class: 'invocation' });
+  expect(classify(text)).toEqual({ id: 'inv-bash-cd-too-many-args', class: 'invocation' });
 });
 
 // ─── 4. L entree hostile : le champ error du hook n est pas garanti ────────
@@ -464,7 +458,7 @@ test('muter le resultat ne corrompt pas la table', () => {
 test('classify rend null sans jamais lever sur une entree qui n est pas un texte', () => {
   for (const hostile of [undefined, null, '', 0, 1, NaN, true, false, {}, [], { error: 'x' },
     () => {}, Symbol('x'), 12n, new Date(0)]) {
-    assert.equal(classify(hostile), null, `entree hostile non neutralisee : ${String(hostile)}`);
+    expect(classify(hostile), `entree hostile non neutralisee : ${String(hostile)}`).toBe(null);
   }
 });
 
@@ -474,26 +468,26 @@ test('classify ne bloque pas sur un tres gros texte', () => {
   // present, parce que ce texte n a aucun debut de ligne. La forme qui le
   // revele est un long train de blancs — voir la section 6.
   const enorme = 'lorem ipsum dolor sit amet '.repeat(40_000); // ~1 Mo
-  assert.ok(enorme.length > 1_000_000);
-  assert.equal(classify(enorme), null);
+  expect(enorme.length > 1_000_000).toBeTruthy();
+  expect(classify(enorme)).toBe(null);
 });
 
 test('un tres gros texte qui contient un motif est quand meme classe', () => {
   const enorme = 'lorem ipsum dolor sit amet '.repeat(40_000)
     + '\n<tool_use_error>No changes to make: old_string and new_string are exactly the same.</tool_use_error>';
-  assert.equal(classify(enorme).id, 'inv-edit-noop');
+  expect(classify(enorme)!.id).toBe('inv-edit-noop');
 });
 
 // ─── Le reglage du poste : le seul sous-ensemble qui alertera ──────────────
 
 test('exactement onze motifs relevent du reglage du poste', () => {
   const flagges = PATTERNS.filter(p => p.workstationSetting).map(p => p.id);
-  assert.deepEqual([...flagges].sort(), [...WORKSTATION_IDS].sort());
+  expect([...flagges].sort()).toEqual([...WORKSTATION_IDS].sort());
 });
 
 test('un motif de reglage du poste est toujours de classe invocation', () => {
   for (const p of PATTERNS.filter(x => x.workstationSetting)) {
-    assert.equal(p.class, 'invocation', `${p.id} est marque reglage du poste hors invocation`);
+    expect(p.class, `${p.id} est marque reglage du poste hors invocation`).toBe('invocation');
   }
 });
 
@@ -503,14 +497,14 @@ test('les motifs de protocole d outil sont reconnus mais exclus du conseil', () 
   // donc classes — pour etre exclus — et jamais marques reglage du poste.
   for (const id of ['inv-write-before-read', 'inv-read-without-pagination', 'inv-search-bad-pattern']) {
     const p = PATTERNS.find(x => x.id === id);
-    assert.equal(p.class, 'invocation', `${id} doit rester classe invocation`);
-    assert.equal(p.workstationSetting, false, `${id} ne doit pas declencher de conseil`);
+    expect(p!.class, `${id} doit rester classe invocation`).toBe('invocation');
+    expect(p!.workstationSetting, `${id} ne doit pas declencher de conseil`).toBe(false);
   }
 });
 
 test('aucun motif hors invocation n est marque reglage du poste', () => {
   for (const p of PATTERNS.filter(x => x.class !== 'invocation')) {
-    assert.equal(p.workstationSetting, false, `${p.id} : classe ${p.class} et marque reglage du poste`);
+    expect(p.workstationSetting, `${p.id} : classe ${p.class} et marque reglage du poste`).toBe(false);
   }
 });
 
@@ -525,10 +519,9 @@ test('CHAQUE motif de shell POSIX exige l estampille line N: du shell', () => {
   // plus bas — un huitieme motif de shell fera echouer ce test, ce qui est le
   // seul moyen de forcer quelqu un a verifier qu il porte bien l estampille.
   const posix = PATTERNS.filter(p => /^inv-(?:bash|cross-shell)-/.test(p.id));
-  assert.equal(posix.length, 7, 'la table doit porter sept motifs de shell POSIX');
+  expect(posix.length, 'la table doit porter sept motifs de shell POSIX').toBe(7);
   for (const p of posix) {
-    assert.match(p.re.source, /line \\d\+:/,
-      `${p.id} : motif de shell POSIX sans l estampille line N:`);
+    expect(p.re.source, `${p.id} : motif de shell POSIX sans l estampille line N:`).toMatch(/line \\d\+:/);
   }
 });
 
@@ -542,7 +535,7 @@ test('LIMITE ECRITE : un journal de conteneur atteint le sous-ensemble qui alert
   // corrigee : le remplacer alors, jamais le supprimer.
   const journalDeConteneur =
     "svc_1  | bash: -c: line 1: unexpected EOF while looking for matching `''";
-  assert.equal(classify(journalDeConteneur).id, 'inv-bash-heredoc-too-large');
+  expect(classify(journalDeConteneur)!.id).toBe('inv-bash-heredoc-too-large');
 });
 
 test('le filet generique ALERTE, parce qu un motif muet ne compte pas non plus', () => {
@@ -550,15 +543,15 @@ test('le filet generique ALERTE, parce qu un motif muet ne compte pas non plus',
   // `badInvocation` (src/engine/watchdog/detector.ts) rend null AVANT le compteur. A false, le
   // filet rendrait muette toute forme unexpected EOF qu aucune des deux ancres ne reconnait.
   const p = PATTERNS.find(x => x.id === 'inv-bash-unbalanced-quote');
-  assert.equal(p.class, 'invocation');
-  assert.equal(p.workstationSetting, true, 'le filet doit alerter, sinon il se tait');
+  expect(p!.class).toBe('invocation');
+  expect(p!.workstationSetting, 'le filet doit alerter, sinon il se tait').toBe(true);
 });
 
 test('chaque ancre refuse l echantillon de l autre cause', () => {
   const antislash = 'Exit code 2 /usr/bin/bash: eval: line 1: unexpected EOF while looking for matching `"\'';
   const heredoc = "Exit code 2 /usr/bin/bash: -c: line 149: unexpected EOF while looking for matching `''";
-  assert.equal(classify(antislash).id, 'inv-bash-trailing-backslash-in-path');
-  assert.equal(classify(heredoc).id, 'inv-bash-heredoc-too-large');
+  expect(classify(antislash)!.id).toBe('inv-bash-trailing-backslash-in-path');
+  expect(classify(heredoc)!.id).toBe('inv-bash-heredoc-too-large');
 });
 
 // ═══ 5. CITER n est pas EMETTRE ════════════════════════════════════════════
@@ -578,9 +571,9 @@ test('chaque ancre refuse l echantillon de l autre cause', () => {
 // commence ainsi ; devant les motifs d invocation il volerait tout et le
 // detecteur deviendrait muet. Il doit rester le dernier filet.
 
-const idx = id => {
+const idx = (id: string) => {
   const i = PATTERNS.findIndex(p => p.id === id);
-  assert.notEqual(i, -1, `motif absent de la table : ${id}`);
+  expect(i, `motif absent de la table : ${id}`).not.toBe(-1);
   return i;
 };
 
@@ -620,7 +613,7 @@ const DOC_CITANT_BASH = [
 
 // [ce que c est, texte, ce qui doit en sortir]. `null` = « aucun motif », une
 // chaine = l identifiant attendu. Aucun de ces textes ne doit ALERTER.
-const CITATIONS = [
+const CITATIONS: [string, string, string | null][] = [
   ['node --test rouge citant la quote non fermee', NODE_TEST_CITANT_BASH, 'vrd-test-runner'],
   ['shell d un conteneur docker (dash)', 'worker-1  | /bin/sh: 1: syntax error near unexpected token `(', null],
   ['binaire absent, nom capitalise', 'Exit code 127\n/usr/bin/bash: line 1: Docker-Compose: command not found', 'inv-cross-shell-cmdlet-in-posix'],
@@ -657,10 +650,9 @@ test('un texte qui prouve qu un programme a tourne n atteint jamais le sous-ense
     const got = classify(text);
     if (got !== null) {
       const motif = PATTERNS.find(p => p.id === got.id);
-      assert.equal(motif.workstationSetting, false,
-        `${quoi} : a atteint le sous-ensemble qui alerte via ${got.id}`);
+      expect(motif!.workstationSetting, `${quoi} : a atteint le sous-ensemble qui alerte via ${got.id}`).toBe(false);
     }
-    assert.equal(got === null ? null : got.id, attendu, `${quoi} : classe autrement qu attendu`);
+    expect(got === null ? null : got.id, `${quoi} : classe autrement qu attendu`).toBe(attendu);
   }
 });
 
@@ -668,8 +660,7 @@ test('les motifs de verdict specifiques passent avant le sous-ensemble qui alert
   const alertants = PATTERNS.filter(p => p.workstationSetting).map(p => idx(p.id));
   const premier = Math.min(...alertants);
   for (const id of VERDICTS_SPECIFIQUES) {
-    assert.ok(idx(id) < premier,
-      `${id} est en ${idx(id)} et le premier motif alertant en ${premier} : le verdict ne protege rien`);
+    expect(idx(id) < premier, `${id} est en ${idx(id)} et le premier motif alertant en ${premier} : le verdict ne protege rien`).toBeTruthy();
   }
 });
 
@@ -678,16 +669,16 @@ test('vrd-exit-code-bare reste le dernier filet, derriere tout ce qui alerte', (
   // ouvre presque tout echec Bash — et le detecteur devient muet. C est la pire
   // panne possible pour cet outil.
   const dernierAlertant = Math.max(...PATTERNS.filter(p => p.workstationSetting).map(p => idx(p.id)));
-  assert.ok(idx('vrd-exit-code-bare') > dernierAlertant);
-  assert.equal(PATTERNS.at(-1).id, 'vrd-exit-code-bare');
+  expect(idx('vrd-exit-code-bare') > dernierAlertant).toBeTruthy();
+  expect(PATTERNS.at(-1)!.id).toBe('vrd-exit-code-bare');
 });
 
 test('les deux motifs a ancre precedent le filet qui les avalerait', () => {
   // Le filet matche `line \d+: unexpected EOF ...`, donc les deux formes
   // specifiques aussi. Place devant elles, il prendrait tout et le detecteur
   // redeviendrait muet sur les deux causes a la fois.
-  assert.ok(idx('inv-bash-trailing-backslash-in-path') < idx('inv-bash-unbalanced-quote'));
-  assert.ok(idx('inv-bash-heredoc-too-large') < idx('inv-bash-unbalanced-quote'));
+  expect(idx('inv-bash-trailing-backslash-in-path') < idx('inv-bash-unbalanced-quote')).toBeTruthy();
+  expect(idx('inv-bash-heredoc-too-large') < idx('inv-bash-unbalanced-quote')).toBeTruthy();
 });
 
 test('un binaire absent ne sonne pas, quelle que soit la casse de son nom', () => {
@@ -695,14 +686,13 @@ test('un binaire absent ne sonne pas, quelle que soit la casse de son nom', () =
   // il est classe POUR ETRE EXCLU, jamais compte. Un `command not found` en minuscules tombe
   // sous `vrd-exit-code-bare`, ou sous aucun motif sans « Exit code » ; aucun des deux ne sonne.
   const p = PATTERNS.find(x => x.id === 'inv-cross-shell-cmdlet-in-posix');
-  assert.equal(p.workstationSetting, false);
-  assert.ok(idx('env-binary-missing') < idx('inv-cross-shell-cmdlet-in-posix'),
-    'un binaire absent doit etre reconnu comme tel avant d etre pris pour un melange de shells');
+  expect(p!.workstationSetting).toBe(false);
+  expect(idx('env-binary-missing') < idx('inv-cross-shell-cmdlet-in-posix'), 'un binaire absent doit etre reconnu comme tel avant d etre pris pour un melange de shells').toBeTruthy();
   for (const nom of ['Docker-Compose', 'docker-compose', 'Get-Item', 'ImageMagick-Convert']) {
     const got = classify(`Exit code 127\n/usr/bin/bash: line 1: ${nom}: command not found`);
     if (got === null) continue;
     const motif = PATTERNS.find(x => x.id === got.id);
-    assert.equal(motif.workstationSetting, false, `${nom} sonne alors que l autre casse ne sonnerait pas`);
+    expect(motif!.workstationSetting, `${nom} sonne alors que l autre casse ne sonnerait pas`).toBe(false);
   }
 });
 
@@ -719,17 +709,17 @@ test('classify ne retro-explore pas sur un long train de blancs', () => {
   // debut de ligne, il ne peut pas reveler le defaut.
   const blancs = '\n'.repeat(60_000);
   const t0 = process.hrtime.bigint();
-  assert.equal(classify(blancs), null);
+  expect(classify(blancs)).toBe(null);
   const ms = Number(process.hrtime.bigint() - t0) / 1e6;
   // Motifs lineaires : 0,2 ms mesuree ; motifs qui retro-explorent : ~3 500 ms. Le seuil
   // est a mi-chemin en echelle logarithmique : ni sensible a la charge de la machine, ni
   // indulgent envers le defaut.
-  assert.ok(ms < 300, `classify a pris ${ms.toFixed(0)} ms sur 60 Ko de lignes vides`);
+  expect(ms < 300, `classify a pris ${ms.toFixed(0)} ms sur 60 Ko de lignes vides`).toBeTruthy();
 });
 
 test('un long train de blancs suivi d un motif reste classe', () => {
   const text = '\n'.repeat(60_000) + '<tool_use_error>File has not been read yet. Read it first before writing to it.</tool_use_error>';
-  assert.equal(classify(text).id, 'inv-write-before-read');
+  expect(classify(text)!.id).toBe('inv-write-before-read');
 });
 
 // ═══ 7. L ancrage .NET : verrouille sur CHAQUE alternative ══════════════════
@@ -737,7 +727,7 @@ test('un long train de blancs suivi d un motif reste classe', () => {
 // Les alternatives de premier niveau d une expression : celles que `|` separe hors de toute
 // parenthese et de toute classe de caracteres. Un garde qui cherche son ancre n importe ou
 // dans la source se laisse defaire par une simple alternation.
-function alternativesDePremierNiveau(source) {
+function alternativesDePremierNiveau(source: string) {
   const out = [];
   let courante = '', profondeur = 0, dansClasse = false;
   for (let i = 0; i < source.length; i++) {
@@ -760,11 +750,10 @@ test('CHAQUE alternative de CHAQUE motif PowerShell exige FullyQualifiedErrorId'
   // Seul l identifiant .NET traverse la langue. Un motif dont UNE alternative
   // s ancre ailleurs tombe des qu on traduit — en silence.
   const ps = PATTERNS.filter(p => p.id.startsWith('inv-ps-'));
-  assert.equal(ps.length, 5, 'la table doit porter cinq motifs PowerShell');
+  expect(ps.length, 'la table doit porter cinq motifs PowerShell').toBe(5);
   for (const p of ps) {
     for (const alt of alternativesDePremierNiveau(p.re.source)) {
-      assert.match(alt, /FullyQualifiedErrorId/,
-        `${p.id} : une alternative ne s ancre pas sur l identifiant .NET — ${alt}`);
+      expect(alt, `${p.id} : une alternative ne s ancre pas sur l identifiant .NET — ${alt}`).toMatch(/FullyQualifiedErrorId/);
     }
   }
 });
@@ -773,8 +762,7 @@ test('aucun motif PowerShell n admet CategoryInfo', () => {
   // `CategoryInfo` est exclu : aucun des 37 motifs du releve ne l utilise. Un garde qui
   // l admet laisse passer un mutant ancre sur `CategoryInfo : InvalidArgument:`.
   for (const p of PATTERNS) {
-    assert.ok(!/CategoryInfo/.test(p.re.source),
-      `${p.id} s ancre sur CategoryInfo, que la decision exclut`);
+    expect(!/CategoryInfo/.test(p.re.source), `${p.id} s ancre sur CategoryInfo, que la decision exclut`).toBeTruthy();
   }
 });
 
@@ -782,9 +770,8 @@ test('un message PowerShell prive de FullyQualifiedErrorId n est pas classe, Cat
   for (const complet of [PS_COMMAND_NOT_FOUND_FR, PS_PARAMETER_NOT_FOUND_FR,
     PS_ARGUMENT_TYPE_FR, PS_SYNTAX_FR, PS_ARGUMENT_EXCEPTION_FR]) {
     const sansAncre = complet.split('\n').filter(l => !l.includes('FullyQualifiedErrorId')).join('\n');
-    assert.ok(sansAncre.includes('CategoryInfo'), 'CategoryInfo doit etre reste dans l echantillon');
-    assert.equal(classify(sansAncre), null,
-      'un message PowerShell sans son identifiant .NET ne doit pas etre classe');
+    expect(sansAncre.includes('CategoryInfo'), 'CategoryInfo doit etre reste dans l echantillon').toBeTruthy();
+    expect(classify(sansAncre), 'un message PowerShell sans son identifiant .NET ne doit pas etre classe').toBe(null);
   }
 });
 
@@ -799,7 +786,7 @@ test('un message PowerShell prive de FullyQualifiedErrorId n est pas classe, Cat
 // extraites programmatiquement de son bloc `FAILURE_PATTERNS`, et ce fichier tient
 // le role de temoin.
 
-const RELEVE = new Map([
+const RELEVE = new Map(([
   ['harness-tool-disabled', String.raw`No such tool available: \S+\.[^]{0,40}not enabled in this context`, ''],
   ['harness-classifier-denied', String.raw`denied by the Claude Code auto mode classifier`, ''],
   ['harness-model-unavailable', String.raw`is temporarily unavailable, so auto mode cannot determine the safety`, ''],
@@ -837,7 +824,7 @@ const RELEVE = new Map([
   ['vrd-compiler-diagnostic', String.raw`error TS\d+|SyntaxError|ReferenceError|TypeError|AssertionError`, ''],
   ['inv-path-not-found', String.raw`(?:Path|File) does not exist|No such file or directory|introuvable dans`, ''],
   ['vrd-exit-code-bare', String.raw`^\s*Exit code \d+`, ''],
-].map(([id, source, flags]) => [id, { source, flags }]));
+] as [string, string, string][]).map(([id, source, flags]) => [id, { source, flags }] as [string, { source: string; flags: string }]));
 
 // Le SECOND releve : deux motifs de plus, qui separent les deux causes que
 // `inv-bash-unbalanced-quote` reunit. Ils ne vont PAS dans RELEVE — celui-ci est le
@@ -846,12 +833,12 @@ const RELEVE = new Map([
 // `String.raw` ne convient pas ici et c est la seule raison du changement de
 // style : un backtick ne peut pas figurer nu dans un litteral de gabarit, et
 // l echapper ajouterait un antislash a la source comparee.
-const RELEVE_30 = new Map([
+const RELEVE_30 = new Map(([
   ['inv-bash-trailing-backslash-in-path',
    'eval: line \\d+: unexpected EOF while looking for matching `"', ''],
   ['inv-bash-heredoc-too-large',
    "-c: line \\d+: unexpected EOF while looking for matching `'", ''],
-].map(([id, source, flags]) => [id, { source, flags }]));
+] as [string, string, string][]).map(([id, source, flags]) => [id, { source, flags }] as [string, { source: string; flags: string }]));
 
 // Ce que la table doit reproduire : l union des deux releves. Les ECARTS se
 // declarent contre cette union, jamais contre l un des deux seulement.
@@ -862,8 +849,7 @@ test('les deux temoins ne revendiquent jamais le meme motif', () => {
   // en silence. C est la seule facon dont cette structure peut pourrir : un
   // troisieme releve re-declarant un motif existant effacerait la provenance
   // que la scission existe pour proteger, suite au vert.
-  assert.equal(RELEVE.size + RELEVE_30.size, TEMOIN.size,
-    'deux releves revendiquent le meme identifiant de motif');
+  expect(RELEVE.size + RELEVE_30.size, 'deux releves revendiquent le meme identifiant de motif').toBe(TEMOIN.size);
 });
 
 // Les seuls ecarts admis au releve, chacun avec sa raison et sa nature.
@@ -913,16 +899,14 @@ const ECARTS = new Map([
 ]);
 
 test('les 39 expressions sont celles des deux releves, ecart par ecart declare', () => {
-  assert.deepEqual([...PATTERNS.map(p => p.id)].sort(), [...TEMOIN.keys()].sort(),
-    'la table et les releves ne portent pas les memes identifiants');
+  expect([...PATTERNS.map(p => p.id)].sort(), 'la table et les releves ne portent pas les memes identifiants').toEqual([...TEMOIN.keys()].sort());
   for (const p of PATTERNS) {
-    const attendu = ECARTS.get(p.id) || TEMOIN.get(p.id);
-    assert.equal(p.re.source, attendu.source, `${p.id} : expression non conforme`);
-    assert.equal(p.re.flags, attendu.flags, `${p.id} : drapeaux non conformes`);
+    const attendu = (ECARTS.get(p.id) || TEMOIN.get(p.id))!;
+    expect(p.re.source, `${p.id} : expression non conforme`).toBe(attendu.source);
+    expect(p.re.flags, `${p.id} : drapeaux non conformes`).toBe(attendu.flags);
     if (ECARTS.has(p.id)) {
-      assert.notEqual(p.re.source, TEMOIN.get(p.id).source,
-        `${p.id} est declare en ecart alors qu il est conforme au releve`);
-      assert.ok(ECARTS.get(p.id).pourquoi.length > 40, `${p.id} : ecart sans raison ecrite`);
+      expect(p.re.source, `${p.id} est declare en ecart alors qu il est conforme au releve`).not.toBe(TEMOIN.get(p.id)!.source);
+      expect(ECARTS.get(p.id)!.pourquoi.length > 40, `${p.id} : ecart sans raison ecrite`).toBeTruthy();
     }
   }
 });
@@ -952,16 +936,14 @@ const CORPUS = [
 
 test('un ecart declare ne fait que RESTREINDRE le motif du releve, jamais l elargir', () => {
   for (const [id, ecart] of ECARTS) {
-    const p = PATTERNS.find(x => x.id === id);
-    const duReleve = new RegExp(TEMOIN.get(id).source, TEMOIN.get(id).flags);
+    const p = PATTERNS.find(x => x.id === id)!;
+    const duReleve = new RegExp(TEMOIN.get(id)!.source, TEMOIN.get(id)!.flags);
     for (const text of CORPUS) {
       if (p.re.test(text)) {
-        assert.ok(duReleve.test(text),
-          `${id} matche un texte que le releve ne matchait pas : ${JSON.stringify(text.slice(0, 80))}`);
+        expect(duReleve.test(text), `${id} matche un texte que le releve ne matchait pas : ${JSON.stringify(text.slice(0, 80))}`).toBeTruthy();
       }
       if (ecart.equivalent) {
-        assert.equal(p.re.test(text), duReleve.test(text),
-          `${id} est declare equivalent mais diverge sur ${JSON.stringify(text.slice(0, 80))}`);
+        expect(p.re.test(text), `${id} est declare equivalent mais diverge sur ${JSON.stringify(text.slice(0, 80))}`).toBe(duReleve.test(text));
       }
     }
   }
@@ -971,7 +953,7 @@ test('un ecart declare ne fait que RESTREINDRE le motif du releve, jamais l elar
 
 // Les quatre identifiants .NET de `inv-ps-syntax`, chacun avec la prose
 // francaise que PowerShell met devant.
-const PS_SYNTAX_VARIANTES = [
+const PS_SYNTAX_VARIANTES: [string, string][] = [
   ['ExpectedValueExpression', [
     'Vous devez indiquer une expression de valeur apr\uFFFDs l\u2019op\uFFFDrateur \u00ab -match \u00bb.',
     '    + FullyQualifiedErrorId : ExpectedValueExpression',
@@ -993,8 +975,7 @@ const PS_SYNTAX_VARIANTES = [
 
 test('les quatre identifiants .NET de inv-ps-syntax sont exerces, un par un', () => {
   for (const [nom, text] of PS_SYNTAX_VARIANTES) {
-    assert.deepEqual(classify(text), { id: 'inv-ps-syntax', class: 'invocation' },
-      `${nom} : identifiant .NET non reconnu`);
+    expect(classify(text), `${nom} : identifiant .NET non reconnu`).toEqual({ id: 'inv-ps-syntax', class: 'invocation' });
   }
 });
 
@@ -1034,14 +1015,13 @@ test('chaque branche d alternative de CHAQUE motif a un echantillon', () => {
     const branches = [];
     for (const alt of alternativesDePremierNiveau(p.re.source)) {
       const groupe = alt.match(/^(.*)\(\?:([^()]*)\)$/);
-      if (groupe && groupe[2].includes('|')) {
-        for (const b of groupe[2].split('|')) branches.push(groupe[1] + b);
+      if (groupe && groupe[2]!.includes('|')) {
+        for (const b of groupe[2]!.split('|')) branches.push(groupe[1]! + b);
       } else branches.push(alt);
     }
     for (const branche of branches) {
       const re = new RegExp(branche, p.re.flags);
-      assert.ok(corpus.some(t => re.test(t)),
-        `${p.id} : branche jamais exercee — ${branche}`);
+      expect(corpus.some(t => re.test(t)), `${p.id} : branche jamais exercee — ${branche}`).toBeTruthy();
     }
   }
 });
@@ -1050,10 +1030,8 @@ test('les deux ancrages francais de la table sont exerces', () => {
   // « est introuvable » et « introuvable dans » sont les seuls ancrages
   // francais de la table, dans un module dont la these est le piege de la
   // langue.
-  assert.deepEqual(classify("Exit code 1\nLe programme \u00ab rtk \u00bb est introuvable sur ce poste."),
-    { id: 'env-binary-missing', class: 'environment' });
-  assert.deepEqual(classify('<tool_use_error>Cha\u00eene introuvable dans le fichier</tool_use_error>'),
-    { id: 'inv-path-not-found', class: 'invocation' });
+  expect(classify("Exit code 1\nLe programme \u00ab rtk \u00bb est introuvable sur ce poste.")).toEqual({ id: 'env-binary-missing', class: 'environment' });
+  expect(classify('<tool_use_error>Cha\u00eene introuvable dans le fichier</tool_use_error>')).toEqual({ id: 'inv-path-not-found', class: 'invocation' });
 });
 
 // ═══ 10. La table est un temoin, pas une variable globale ═══════════════════
@@ -1063,16 +1041,18 @@ test('PATTERNS est gele : un importateur ne peut pas detourner classify pour tou
   // au lieu de recopier la liste. Exporte non gele, il offrirait aussi
   // `PATTERNS.unshift(...)` a n importe quel importateur — et l ordre de cette
   // table est la moitie de ce que le module garantit.
-  assert.ok(Object.isFrozen(PATTERNS), 'la table n est pas gelee');
-  assert.throws(() => PATTERNS.unshift({ id: 'MUTANT', class: 'invocation', workstationSetting: true, re: /./ }), TypeError);
-  assert.throws(() => { PATTERNS[0] = null; }, TypeError);
-  assert.throws(() => { PATTERNS.length = 0; }, TypeError);
+  expect(Object.isFrozen(PATTERNS), 'la table n est pas gelee').toBeTruthy();
+  // Casts deliberes : PATTERNS est typee `readonly` (le compilateur refuse deja
+  // ces mutations), et ce test verifie que Object.freeze les refuse aussi A
+  // L EXECUTION — les deux garanties sont distinctes, celle-ci ne teste que la seconde.
+  expect(() => (PATTERNS as any).unshift({ id: 'MUTANT', class: 'invocation', workstationSetting: true, re: /./ })).toThrow(TypeError);
+  expect(() => { (PATTERNS as any)[0] = null; }).toThrow(TypeError);
+  expect(() => { (PATTERNS as any).length = 0; }).toThrow(TypeError);
   for (const p of PATTERNS) {
-    assert.ok(Object.isFrozen(p), `${p.id} : entree non gelee`);
-    assert.throws(() => { p.workstationSetting = !p.workstationSetting; }, TypeError);
+    expect(Object.isFrozen(p), `${p.id} : entree non gelee`).toBeTruthy();
+    expect(() => { (p as any).workstationSetting = !p.workstationSetting; }).toThrow(TypeError);
   }
-  assert.equal(classify('Exit code 1\n/usr/bin/bash: line 1: cd: too many arguments').id,
-    'inv-bash-cd-too-many-args', 'la table a bouge malgre tout');
+  expect(classify('Exit code 1\n/usr/bin/bash: line 1: cd: too many arguments')!.id, 'la table a bouge malgre tout').toBe('inv-bash-cd-too-many-args');
 });
 
 // ═══ 11. La vie privee : un vocabulaire ferme, pas un test de sous-chaine ═══
@@ -1092,10 +1072,9 @@ test('la sortie de classify est tiree d un vocabulaire ferme', () => {
   for (const text of textes) {
     const got = classify(text);
     if (got === null) continue;
-    assert.deepEqual(Object.keys(got), ['id', 'class'], 'la sortie porte un champ de plus');
+    expect(Object.keys(got), 'la sortie porte un champ de plus').toEqual(['id', 'class']);
     for (const [champ, valeur] of Object.entries(got)) {
-      assert.ok(vocabulaire.has(valeur),
-        `la valeur de ${champ} sort du vocabulaire de la table : ${valeur}`);
+      expect(vocabulaire.has(valeur), `la valeur de ${champ} sort du vocabulaire de la table : ${valeur}`).toBeTruthy();
     }
   }
 });

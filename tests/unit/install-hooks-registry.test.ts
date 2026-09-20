@@ -1,33 +1,44 @@
 // Le contrat qui rend l'ajout d'un 3e agent falsifiable : chaque entrée du
 // registre expose les 6 méthodes d'AgentInstaller. Sans sweepTargets et
 // installedIn, findInstalledScopes rebrancherait sur le nom d'agent.
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { expect, test } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { INSTALLERS, TARGETS, install, pickAgents, uninstall } from '../../src/server/install-hooks/registry.ts';
+import type { AgentInstaller, Target } from '../../src/server/install-hooks/types.ts';
 
 // Un bac à sable qui ressemble à un projet : `resolveScope({ scope: 'project' })`
 // exige un `.git` pour trouver la racine. La portée `user`, elle, vise le bac de
 // `test-support/env-guard.mjs`, commun à tous les tests de ce fichier.
-function sandboxProject(prefix) {
+function sandboxProject(prefix: string) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
   fs.mkdirSync(path.join(root, '.git'));
   return root;
 }
 
-const METHODS = ['install', 'uninstall', 'audit', 'detect', 'sweepTargets', 'installedIn'];
+const METHODS: (keyof AgentInstaller)[] = ['install', 'uninstall', 'audit', 'detect', 'sweepTargets', 'installedIn'];
+
+// `install`/`uninstall` du registre rendent `Record<string, unknown>` — chaque
+// adaptateur est libre de sa forme (voir AgentInstaller dans types.ts). Cette
+// interface locale ne couvre que les champs que CE fichier lit réellement.
+interface AgentResult {
+  error?: string;
+  action?: string;
+  coexisting?: Record<string, number>;
+  command?: { command: string };
+  results?: Array<{ removed: number }>;
+}
 
 test('chaque adaptateur du registre expose le contrat AgentInstaller complet', () => {
   // Arrange — le registre importé ci-dessus
   // Act
   const agents = Object.keys(INSTALLERS).sort();
   // Assert
-  assert.deepEqual(agents, ['claude', 'copilot']);
+  expect(agents).toEqual(['claude', 'copilot']);
   for (const [name, inst] of Object.entries(INSTALLERS)) {
     for (const m of METHODS) {
-      assert.equal(typeof inst[m], 'function', `${name}.${m} doit être une fonction`);
+      expect(typeof inst[m], `${name}.${m} doit être une fonction`).toBe('function');
     }
   }
 });
@@ -42,16 +53,15 @@ test('le refus d\'un adaptateur ne traverse pas le registre et ne jette pas le r
 
   // Act — les DEUX agents, Claude passe en premier dans le registre
   const result = install({ target: 'both', scope: 'project', cwd: root, packageRoot });
+  const copilot = result.copilot as AgentResult;
+  const claude = result.claude as AgentResult;
 
   // Assert — la case fautive porte une valeur, pas une exception
-  assert.equal(typeof result.copilot.error, 'string', 'copilot doit rendre { error }');
-  assert.match(result.copilot.error, /refusing to overwrite/);
+  expect(typeof copilot.error, 'copilot doit rendre { error }').toBe('string');
+  expect(copilot.error).toMatch(/refusing to overwrite/);
   // …et le travail de l'agent sain n'est pas jeté avec l'exception
-  assert.equal(result.claude.action, 'installed');
-  assert.ok(
-    fs.existsSync(path.join(root, '.claude', 'settings.json')),
-    'l\'install claude doit avoir eu lieu et être visible sur le disque',
-  );
+  expect(claude.action).toBe('installed');
+  expect(fs.existsSync(path.join(root, '.claude', 'settings.json')), 'l\'install claude doit avoir eu lieu et être visible sur le disque').toBeTruthy();
 });
 
 test('l\'install préserve les entrées tierces du fichier — la postcondition « untouched » est vraie', () => {
@@ -73,20 +83,18 @@ test('l\'install préserve les entrées tierces du fichier — la postcondition 
 
   // Act
   const result = install({ target: 'copilot', scope: 'project', cwd: root, packageRoot });
+  const copilot = result.copilot as AgentResult;
 
   // Assert — on relit le DISQUE, on ne croit pas la valeur de retour
   const apres = JSON.parse(fs.readFileSync(file, 'utf8'));
-  const commandes = apres.hooks.PreToolUse.map(e => e.bash);
-  assert.ok(
-    commandes.includes('echo hook-d-un-tiers'),
-    `entrée tierce détruite par l'install : ${JSON.stringify(commandes)}`,
-  );
+  const commandes = apres.hooks.PreToolUse.map((e: any) => e.bash);
+  expect(commandes.includes('echo hook-d-un-tiers'), `entrée tierce détruite par l'install : ${JSON.stringify(commandes)}`).toBeTruthy();
   // …et notre hook a bien été rafraîchi au passage : la commande annoncée a atteint
   // le disque et l'ancienne a disparu, deux faits faux quand `mergeCopilotHooks`
   // préservait l'entrée périmée au lieu de la remplacer.
-  assert.equal(result.copilot.coexisting.PreToolUse, 1);
-  assert.ok(commandes.includes(result.copilot.command.command));
-  assert.ok(!commandes.includes(notre));
+  expect(copilot.coexisting?.PreToolUse).toBe(1);
+  expect(commandes.includes(copilot.command?.command)).toBeTruthy();
+  expect(!commandes.includes(notre)).toBeTruthy();
 });
 
 test('uninstall rend le nombre réel de retraits, jamais un forfait', () => {
@@ -104,10 +112,11 @@ test('uninstall rend le nombre réel de retraits, jamais un forfait', () => {
 
   // Act — PORTÉE EXPLICITE : sans portée, uninstall balaye depuis le cwd
   const result = uninstall({ target: 'copilot', scope: 'project', cwd: root, packageRoot });
+  const copilot = result.copilot as AgentResult;
 
   // Assert
-  const total = result.copilot.results.reduce((n, r) => n + r.removed, 0);
-  assert.equal(total, 2, `attendu 2 retraits réels, reçu ${total} (forfait ?)`);
+  const total = (copilot.results ?? []).reduce((n, r) => n + r.removed, 0);
+  expect(total, `attendu 2 retraits réels, reçu ${total} (forfait ?)`).toBe(2);
 });
 
 test('uninstall ne supprime pas le fichier qui porte encore des entrées tierces', () => {
@@ -129,13 +138,14 @@ test('uninstall ne supprime pas le fichier qui porte encore des entrées tierces
 
   // Act
   const result = uninstall({ target: 'copilot', scope: 'project', cwd: root, packageRoot });
+  const copilot = result.copilot as AgentResult;
 
   // Assert — le fichier survit, l'entrée tierce aussi, et removed vaut 1
-  assert.ok(fs.existsSync(file), 'le fichier portant une entrée tierce ne doit pas être supprimé');
+  expect(fs.existsSync(file), 'le fichier portant une entrée tierce ne doit pas être supprimé').toBeTruthy();
   const apres = JSON.parse(fs.readFileSync(file, 'utf8'));
-  assert.deepEqual(apres.hooks.PreToolUse.map(e => e.bash), ['echo hook-d-un-tiers']);
-  const total = result.copilot.results.reduce((n, r) => n + r.removed, 0);
-  assert.equal(total, 1);
+  expect(apres.hooks.PreToolUse.map((e: any) => e.bash)).toEqual(['echo hook-d-un-tiers']);
+  const total = (copilot.results ?? []).reduce((n, r) => n + r.removed, 0);
+  expect(total).toBe(1);
 });
 
 test('aller-retour install → uninstall → install : le cycle stop/start reste réinstallable', () => {
@@ -158,38 +168,35 @@ test('aller-retour install → uninstall → install : le cycle stop/start reste
     },
   }, null, 2));
   const surLeDisque = () => JSON.parse(fs.readFileSync(file, 'utf8'));
-  const toutesCommandes = () => Object.values(surLeDisque().hooks)
+  const toutesCommandes = (): string[] => Object.values(surLeDisque().hooks)
     .flat()
-    .map(e => e.bash);
+    .map((e: any) => e.bash);
 
   // Act 1 — install
   const install1 = install({ target: 'copilot', scope: 'project', cwd: root, packageRoot });
+  const copilot1 = install1.copilot as AgentResult;
   // Assert 1 — l'entrée tierce survit
-  assert.equal(install1.copilot.error, undefined, `install #1 refusé : ${install1.copilot.error}`);
-  assert.ok(toutesCommandes().includes(tiers), 'entrée tierce perdue à l\'install #1');
+  expect(copilot1.error, `install #1 refusé : ${copilot1.error}`).toBe(undefined);
+  expect(toutesCommandes().includes(tiers), 'entrée tierce perdue à l\'install #1').toBeTruthy();
 
   // Act 2 — uninstall (PORTÉE EXPLICITE : sans portée, le balayage part du cwd)
   const desinstall = uninstall({ target: 'copilot', scope: 'project', cwd: root, packageRoot });
+  const copilotDesinstall = desinstall.copilot as AgentResult;
   // Assert 2 — le fichier est conservé pour l'entrée tierce, qui survit
-  assert.equal(desinstall.copilot.error, undefined, `uninstall refusé : ${desinstall.copilot.error}`);
-  assert.ok(fs.existsSync(file), 'le fichier portant une entrée tierce ne doit pas être supprimé');
-  assert.ok(toutesCommandes().includes(tiers), 'entrée tierce perdue à l\'uninstall');
+  expect(copilotDesinstall.error, `uninstall refusé : ${copilotDesinstall.error}`).toBe(undefined);
+  expect(fs.existsSync(file), 'le fichier portant une entrée tierce ne doit pas être supprimé').toBeTruthy();
+  expect(toutesCommandes().includes(tiers), 'entrée tierce perdue à l\'uninstall').toBeTruthy();
 
   // Act 3 — install de nouveau, sur le fichier qui ne porte PLUS aucune de nos
   // entrées : c'est ici que le refus se déclenchait, définitivement.
   const install2 = install({ target: 'copilot', scope: 'project', cwd: root, packageRoot });
+  const copilot2 = install2.copilot as AgentResult;
 
   // Assert 3 — aucun refus, l'entrée tierce est toujours là, la nôtre est revenue
-  assert.equal(
-    install2.copilot.error, undefined,
-    `install #2 refusé — l'aller-retour n'est pas réinstallable : ${install2.copilot.error}`,
-  );
+  expect(copilot2.error, `install #2 refusé — l'aller-retour n'est pas réinstallable : ${copilot2.error}`).toBe(undefined);
   const finales = toutesCommandes();
-  assert.ok(finales.includes(tiers), `entrée tierce perdue à l'install #2 : ${JSON.stringify(finales)}`);
-  assert.ok(
-    finales.includes(install2.copilot.command.command),
-    `notre entrée absente du disque après l'install #2 : ${JSON.stringify(finales)}`,
-  );
+  expect(finales.includes(tiers), `entrée tierce perdue à l'install #2 : ${JSON.stringify(finales)}`).toBeTruthy();
+  expect(finales.includes(copilot2.command?.command ?? ''), `notre entrée absente du disque après l'install #2 : ${JSON.stringify(finales)}`).toBeTruthy();
 });
 
 test('un 3e agent hypothétique serait affiché : le rendu ne nomme aucun agent en dur', () => {
@@ -204,10 +211,7 @@ test('un 3e agent hypothétique serait affiché : le rendu ne nomme aucun agent 
 
   // Assert — aucun accès en dur `result.claude` / `result.copilot`
   for (const nom of noms) {
-    assert.ok(
-      !source.includes(`result.${nom}`),
-      `cli.ts nomme encore result.${nom} en dur — un 3e agent ne serait pas affiché`,
-    );
+    expect(!source.includes(`result.${nom}`), `cli.ts nomme encore result.${nom} en dur — un 3e agent ne serait pas affiché`).toBeTruthy();
   }
 });
 
@@ -216,7 +220,7 @@ test('TARGETS liste les agents du registre puis both, dans cet ordre', () => {
   // Act
   const cibles = TARGETS;
   // Assert
-  assert.deepEqual(cibles, ['claude', 'copilot', 'both']);
+  expect(cibles).toEqual(['claude', 'copilot', 'both']);
 });
 
 // Une cible inconnue lève au lieu de retomber sur l'auto-détection : sinon une
@@ -225,9 +229,9 @@ for (const cible of ['cloude', 'all', '']) {
   test(`pickAgents lève sur la cible inconnue '${cible}'`, () => {
     // Arrange — la cible seule, aucun fichier
     // Act
-    const appel = () => pickAgents({ target: cible });
+    const appel = () => pickAgents({ target: cible as Target });
     // Assert
-    assert.throws(appel, new RegExp(`unknown target '${cible}'`));
+    expect(appel).toThrow(new RegExp(`unknown target '${cible}'`));
   });
 }
 
@@ -237,12 +241,12 @@ test('install avec une cible inconnue lève et n\'écrit aucun fichier de hooks'
   const packageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'avtest-pkg-'));
 
   // Act
-  const appel = () => install({ target: 'cloude', scope: 'project', cwd: root, packageRoot });
+  const appel = () => install({ target: 'cloude' as Target, scope: 'project', cwd: root, packageRoot });
 
   // Assert
-  assert.throws(appel, /unknown target 'cloude'/);
-  assert.ok(!fs.existsSync(path.join(root, '.claude', 'settings.json')), 'aucun fichier Claude ne doit être écrit');
-  assert.ok(!fs.existsSync(path.join(root, '.github', 'hooks', 'agent-viz.json')), 'aucun fichier Copilot ne doit être écrit');
+  expect(appel).toThrow(/unknown target 'cloude'/);
+  expect(!fs.existsSync(path.join(root, '.claude', 'settings.json')), 'aucun fichier Claude ne doit être écrit').toBeTruthy();
+  expect(!fs.existsSync(path.join(root, '.github', 'hooks', 'agent-viz.json')), 'aucun fichier Copilot ne doit être écrit').toBeTruthy();
 });
 
 test('uninstall avec une cible inconnue lève et laisse en place le hook posé', () => {
@@ -251,12 +255,12 @@ test('uninstall avec une cible inconnue lève et laisse en place le hook posé',
   const packageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'avtest-pkg-'));
   const settings = path.join(root, '.claude', 'settings.json');
   install({ target: 'claude', scope: 'project', cwd: root, packageRoot });
-  assert.ok(INSTALLERS.claude.installedIn(settings), 'le hook Claude doit être posé avant l\'essai');
+  expect(INSTALLERS.claude.installedIn(settings), 'le hook Claude doit être posé avant l\'essai').toBeTruthy();
 
   // Act
-  const appel = () => uninstall({ target: 'cloude', scope: 'project', cwd: root, packageRoot });
+  const appel = () => uninstall({ target: 'cloude' as Target, scope: 'project', cwd: root, packageRoot });
 
   // Assert
-  assert.throws(appel, /unknown target 'cloude'/);
-  assert.ok(INSTALLERS.claude.installedIn(settings), 'le hook Claude doit rester posé après le refus');
+  expect(appel).toThrow(/unknown target 'cloude'/);
+  expect(INSTALLERS.claude.installedIn(settings), 'le hook Claude doit rester posé après le refus').toBeTruthy();
 });

@@ -1,12 +1,22 @@
-'use strict';
-const test = require('node:test');
-const assert = require('node:assert/strict');
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
-const { findProjectRoot, findInstalledScopes, install, resolveScope, EVENTS, _internals } = require('../../src/server/install-hooks.ts');
+import { expect, test } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { findProjectRoot, findInstalledScopes, install, resolveScope, EVENTS, _internals } from '../../src/server/install-hooks.ts';
+import pkg from '../../package.json' with { type: 'json' };
 
-function makeTempDir(prefix) {
+// `install()` rend `Record<string, unknown>` (chaque adaptateur du registre est
+// libre de sa forme) — cette interface locale ne couvre que les champs que CE
+// fichier lit réellement.
+interface AgentInstallResult {
+  action?: string;
+  updated?: string[];
+  missing?: string[];
+  crossScope?: Array<{ scope: string }>;
+  target?: { file: string };
+}
+
+function makeTempDir(prefix: string) {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
 }
 
@@ -14,7 +24,7 @@ test('findProjectRoot: home dir with .git is NOT recognized as a project', () =>
   const fakeHome = makeTempDir('avtest-home-');
   fs.mkdirSync(path.join(fakeHome, '.git'));
   const result = findProjectRoot(fakeHome, { homedir: fakeHome });
-  assert.equal(result, null, 'home dir must not be returned as projectRoot');
+  expect(result, 'home dir must not be returned as projectRoot').toBe(null);
 });
 
 test('findProjectRoot: packageRoot with .git is NOT recognized as a project', () => {
@@ -22,7 +32,7 @@ test('findProjectRoot: packageRoot with .git is NOT recognized as a project', ()
   fs.mkdirSync(path.join(pkgRoot, '.git'));
   const elsewhereHome = makeTempDir('avtest-otherhome-');
   const result = findProjectRoot(pkgRoot, { packageRoot: pkgRoot, homedir: elsewhereHome });
-  assert.equal(result, null, 'packageRoot must not be returned as projectRoot');
+  expect(result, 'packageRoot must not be returned as projectRoot').toBe(null);
 });
 
 test('findProjectRoot: nested cwd inside a real project still finds the project root', () => {
@@ -32,13 +42,13 @@ test('findProjectRoot: nested cwd inside a real project still finds the project 
   fs.mkdirSync(child);
   const elsewhereHome = makeTempDir('avtest-otherhome2-');
   const result = findProjectRoot(child, { homedir: elsewhereHome });
-  assert.equal(result, projectRoot);
+  expect(result).toBe(projectRoot);
 });
 
 // Helpers for the cross-scope tests below. os.homedir() is the disposable dir that
 // test-support/env-guard.mjs creates for each test file, so the user scope holds no
 // hook; these tests assert the scopes they populate themselves.
-function writeClaudeSettingsWithHook(file, command = 'node /tmp/agent-viz/lib/hook.js --source=claude') {
+function writeClaudeSettingsWithHook(file: string, command = 'node /tmp/agent-viz/lib/hook.js --source=claude') {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, JSON.stringify({
     hooks: {
@@ -54,8 +64,8 @@ test('findInstalledScopes: detects agent-viz hooks pre-installed in project + lo
   writeClaudeSettingsWithHook(path.join(projectRoot, '.claude', 'settings.local.json'));
   const found = findInstalledScopes({ cwd: projectRoot, packageRoot: makeTempDir('avtest-pkg-'), agent: 'claude' });
   const scopes = found.installed.map(f => f.scope);
-  assert.ok(scopes.includes('project'), `expected 'project' in ${scopes.join(',')}`);
-  assert.ok(scopes.includes('local'), `expected 'local' in ${scopes.join(',')}`);
+  expect(scopes.includes('project'), `expected 'project' in ${scopes.join(',')}`).toBeTruthy();
+  expect(scopes.includes('local'), `expected 'local' in ${scopes.join(',')}`).toBeTruthy();
 });
 
 test('install: refreshes existing hook whose timeout drifted (5 → 10)', () => {
@@ -64,7 +74,7 @@ test('install: refreshes existing hook whose timeout drifted (5 → 10)', () => 
   // Pre-existing hook with the exact desired command BUT obsolete timeout=5.
   // Without the upgrade path, this would noop and the timeout would stay 5.
   // Le spec npx épingle la version du produit, jamais celle d'un package.json voisin.
-  const { version: versionDuProduit } = require('../../package.json');
+  const versionDuProduit = pkg.version;
   const command = `npx --yes @vcueto/agent-viz@${versionDuProduit} hook --source=claude`;
   const settingsFile = path.join(projectRoot, '.claude', 'settings.json');
   fs.mkdirSync(path.dirname(settingsFile), { recursive: true });
@@ -81,32 +91,32 @@ test('install: refreshes existing hook whose timeout drifted (5 → 10)', () => 
     cwd: projectRoot,
     packageRoot: makeTempDir('avtest-pkg-timeout-'),
   });
-  const r = result.claude;
+  const r = result.claude as AgentInstallResult;
   // Une config d'avant PostToolUseFailure : les 5 anciens sont rafraîchis ET le
   // 6e est posé au passage — d'où 'installed+updated' et non 'updated'.
-  assert.equal(r.action, 'installed+updated', `expected action='installed+updated', got '${r.action}'`);
-  assert.equal(r.updated.length, 5, `expected all 5 events refreshed, got ${r.updated.length}`);
-  assert.deepEqual(r.missing, ['PostToolUseFailure'], 'seul le nouvel evenement doit manquer');
+  expect(r.action, `expected action='installed+updated', got '${r.action}'`).toBe('installed+updated');
+  expect(r.updated?.length, `expected all 5 events refreshed, got ${r.updated?.length}`).toBe(5);
+  expect(r.missing, 'seul le nouvel evenement doit manquer').toEqual(['PostToolUseFailure']);
 
   const persisted = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
   for (const ev of ['UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop', 'SessionStart']) {
     const h = persisted.hooks[ev][0].hooks[0];
-    assert.equal(h.timeout, 10, `${ev} timeout should be upgraded to 10, got ${h.timeout}`);
-    assert.equal(h.command, command, `${ev} command should be preserved`);
+    expect(h.timeout, `${ev} timeout should be upgraded to 10, got ${h.timeout}`).toBe(10);
+    expect(h.command, `${ev} command should be preserved`).toBe(command);
   }
   // Le 6e echappe a la boucle ci-dessus (elle compare a l'ANCIENNE commande) :
   // il faut sa propre assertion, sinon rien ne prouve qu'il a atteint le disque.
   const ajoute = persisted.hooks.PostToolUseFailure[0].hooks[0];
-  assert.equal(ajoute.timeout, 10, `PostToolUseFailure timeout should be 10, got ${ajoute.timeout}`);
+  expect(ajoute.timeout, `PostToolUseFailure timeout should be 10, got ${ajoute.timeout}`).toBe(10);
 });
 
 test('resolveScope: no explicit scope defaults to user (global) even inside a project', () => {
   const projectRoot = makeTempDir('avtest-defscope-');
   fs.mkdirSync(path.join(projectRoot, '.git'));
-  for (const agent of ['claude', 'copilot']) {
+  for (const agent of ['claude', 'copilot'] as const) {
     const r = resolveScope({ cwd: projectRoot, agent });
-    assert.equal(r.scope, 'user', `${agent}: default scope should be 'user', got '${r.scope}'`);
-    assert.equal(r.projectRoot, null, `${agent}: user scope must not carry a projectRoot`);
+    expect(r.scope, `${agent}: default scope should be 'user', got '${r.scope}'`).toBe('user');
+    expect(r.projectRoot, `${agent}: user scope must not carry a projectRoot`).toBe(null);
   }
 });
 
@@ -114,16 +124,15 @@ test('resolveScope: explicit --local still resolves to the per-repo file', () =>
   const projectRoot = makeTempDir('avtest-localscope-');
   fs.mkdirSync(path.join(projectRoot, '.git'));
   const r = resolveScope({ scope: 'local', cwd: projectRoot, agent: 'claude' });
-  assert.equal(r.scope, 'local');
-  assert.equal(r.projectRoot, projectRoot);
+  expect(r.scope).toBe('local');
+  expect(r.projectRoot).toBe(projectRoot);
 });
 
 test('resolveScope: explicit --local with no project still throws', () => {
   const lonelyHome = makeTempDir('avtest-noproj-');
-  assert.throws(
+  expect(
     () => resolveScope({ scope: 'local', cwd: lonelyHome, agent: 'claude', packageRoot: lonelyHome }),
-    /--local requested but no/,
-  );
+  ).toThrow(/--local requested but no/);
 });
 
 test('install: crossScope flags pre-existing hook in a different scope', () => {
@@ -138,27 +147,24 @@ test('install: crossScope flags pre-existing hook in a different scope', () => {
     cwd: projectRoot,
     packageRoot: makeTempDir('avtest-pkg2-'),
   });
-  const r = result.claude;
-  assert.ok(r, 'expected claude install result');
-  assert.ok(Array.isArray(r.crossScope), 'crossScope should be an array');
-  const otherScopes = r.crossScope.map(s => s.scope);
-  assert.ok(otherScopes.includes('local'), `expected 'local' in crossScope ${otherScopes.join(',')}`);
-  assert.ok(!otherScopes.includes('project'), `current scope 'project' must not appear in crossScope`);
+  const r = result.claude as AgentInstallResult;
+  expect(r, 'expected claude install result').toBeTruthy();
+  expect(Array.isArray(r.crossScope), 'crossScope should be an array').toBeTruthy();
+  const otherScopes = (r.crossScope ?? []).map(s => s.scope);
+  expect(otherScopes.includes('local'), `expected 'local' in crossScope ${otherScopes.join(',')}`).toBeTruthy();
+  expect(!otherScopes.includes('project'), `current scope 'project' must not appear in crossScope`).toBeTruthy();
 });
 
 test('EVENTS: l abonnement aux echecs d outil est declare', () => {
-  assert.ok(EVENTS.includes('PostToolUseFailure'),
-    'sans cet evenement, retryStorm ne peut se declencher sur aucune machine');
+  expect(EVENTS.includes('PostToolUseFailure'), 'sans cet evenement, retryStorm ne peut se declencher sur aucune machine').toBeTruthy();
 });
 
 // Les cinq evenements que les deux agents partageaient avant PostToolUseFailure.
 const EVENTS_COPILOT_ATTENDUS = ['UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop', 'SessionStart'];
 
 test('EVENTS: la liste de Claude porte l echec, celle de Copilot ne l invente pas', () => {
-  assert.ok(_internals.eventsFor('claude').includes('PostToolUseFailure'),
-    'PostToolUseFailure est un evenement Claude Code : il doit rester declare cote Claude');
-  assert.deepEqual(_internals.eventsFor('copilot'), EVENTS_COPILOT_ATTENDUS,
-    'rien ne prouve que Copilot connaisse PostToolUseFailure : ne pas ecrire ce nom chez lui');
+  expect(_internals.eventsFor('claude').includes('PostToolUseFailure'), 'PostToolUseFailure est un evenement Claude Code : il doit rester declare cote Claude').toBeTruthy();
+  expect(_internals.eventsFor('copilot'), 'rien ne prouve que Copilot connaisse PostToolUseFailure : ne pas ecrire ce nom chez lui').toEqual(EVENTS_COPILOT_ATTENDUS);
 });
 
 test('installCopilot: le fichier ecrit ne declare que les evenements connus de Copilot', () => {
@@ -170,9 +176,9 @@ test('installCopilot: le fichier ecrit ne declare que les evenements connus de C
     cwd: projectRoot,
     packageRoot: makeTempDir('avtest-pkg-copilot-'),
   });
-  const written = JSON.parse(fs.readFileSync(result.copilot.target.file, 'utf8'));
-  assert.deepEqual(Object.keys(written.hooks), EVENTS_COPILOT_ATTENDUS,
-    'agent-viz ne doit ecrire aucun nom d evenement non mesure dans la config d un tiers');
+  const copilot = result.copilot as AgentInstallResult;
+  const written = JSON.parse(fs.readFileSync(copilot.target!.file, 'utf8'));
+  expect(Object.keys(written.hooks), 'agent-viz ne doit ecrire aucun nom d evenement non mesure dans la config d un tiers').toEqual(EVENTS_COPILOT_ATTENDUS);
 });
 
 test('install: une configuration aux 5 anciens evenements ne gagne que le nouveau', () => {
@@ -184,6 +190,5 @@ test('install: une configuration aux 5 anciens evenements ne gagne que le nouvea
   const missing = _internals.auditSettings(settings, cmd)
     .filter(a => !a.installed)
     .map(a => a.event);
-  assert.deepEqual(missing, ['PostToolUseFailure'],
-    'la migration doit ajouter le nouvel evenement sans doublonner les autres');
+  expect(missing, 'la migration doit ajouter le nouvel evenement sans doublonner les autres').toEqual(['PostToolUseFailure']);
 });

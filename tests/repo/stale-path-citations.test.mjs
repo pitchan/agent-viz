@@ -59,7 +59,7 @@ const LISTE_BLANCHE = [
   { fichier: 'src/server/install-hooks/settings-io.ts', fragment: 'node /abs/.../agent-viz/lib/hook.js', raison: 'une des 4 formes historiques que `isAgentVizHook` doit reconnaitre' },
 
   // DONNEES DE TEST — un chemin SIMULE, dont on asserte autre chose que le chemin.
-  { fichier: 'tests/unit/install-hooks.test.cjs', fragment: "'node /tmp/agent-viz/lib/hook.js --source=claude'", raison: 'jumeau cote test de la forme historique n 2 : perime EXPRES' },
+  { fichier: 'tests/unit/install-hooks.test.ts', fragment: "'node /tmp/agent-viz/lib/hook.js --source=claude'", raison: 'jumeau cote test de la forme historique n 2 : perime EXPRES' },
   { fichier: 'tests/unit/tool-subject.test.mjs', fragment: "file_path: '/home/v/agent-viz/lib/hook.js'", raison: 'chemin simule hors de ce depot : le test asserte le SUJET, pas l adresse' },
   { fichier: 'tests/unit/watchdog-alert-content.test.mjs', fragment: '"session_id" lib/server/observatory --stats', raison: 'commande rg SIMULEE dans un evenement : le test asserte le libelle de l alerte' },
   { fichier: 'tests/unit/watchdog-alert-content.test.mjs', fragment: "file_path: '/repo/lib/hook.js'", raison: 'chemin simule hors de ce depot' },

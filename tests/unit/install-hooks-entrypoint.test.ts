@@ -21,9 +21,8 @@
 // ligne au `.gitignore` de `findProjectRoot(cwd)`, qu aucun detournement de
 // home ne protege.
 
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { expect, test } from 'vitest';
+import { spawnSync, type SpawnSyncOptionsWithStringEncoding } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -56,7 +55,7 @@ function homeJetable() {
   return fs.mkdtempSync(path.join(os.tmpdir(), PREFIXE));
 }
 
-function efface(dir) {
+function efface(dir: string) {
   // Garde-fou : on ne supprime que ce qu on vient de fabriquer.
   if (dir && dir.includes(PREFIXE)) fs.rmSync(dir, { recursive: true, force: true });
 }
@@ -64,14 +63,14 @@ function efface(dir) {
 // Liste RECURSIVE des fichiers sous `dir` (chemins relatifs, tries). Un
 // `readdirSync` a plat ne verrait pas `.claude/settings.json`, qui est
 // justement le fichier que la garde ecrit.
-function fichiersSous(dir) {
-  const trouves = [];
-  const pile = [dir];
+function fichiersSous(dir: string) {
+  const trouves: string[] = [];
+  const pile: string[] = [dir];
   while (pile.length > 0) {
     // Le dossier courant se retient ici, jamais via `Dirent.path` /
     // `Dirent.parentPath` : ces deux champs n existent pas sur toutes les
     // versions de Node, et un `undefined` fabriquerait des chemins faux.
-    const courant = pile.pop();
+    const courant = pile.pop()!;
     for (const e of fs.readdirSync(courant, { withFileTypes: true })) {
       const p = path.join(courant, e.name);
       if (e.isDirectory()) pile.push(p);
@@ -81,7 +80,7 @@ function fichiersSous(dir) {
   return trouves.sort();
 }
 
-function environnement(maison) {
+function environnement(maison: string) {
   return {
     ...process.env,
     USERPROFILE: maison,
@@ -93,12 +92,14 @@ function environnement(maison) {
   };
 }
 
-const options = (maison) => ({ cwd: maison, encoding: 'utf8', env: environnement(maison) });
+const options = (maison: string): SpawnSyncOptionsWithStringEncoding =>
+  ({ cwd: maison, encoding: 'utf8', env: environnement(maison) });
 
-const lanceCommeScript = (args, maison) => spawnSync(process.execPath, [INSTALL_HOOKS, ...args], options(maison));
+const lanceCommeScript = (args: string[], maison: string) =>
+  spawnSync(process.execPath, [INSTALL_HOOKS, ...args], options(maison));
 // Le chargement se fait par `import()` et pas par `require()` : choix delibere,
 // motif complet a `SOURCE_DU_FILS`. Ne pas le remplacer.
-const lanceCommeImport = (maison) => spawnSync(process.execPath, ['-e', SOURCE_DU_FILS], options(maison));
+const lanceCommeImport = (maison: string) => spawnSync(process.execPath, ['-e', SOURCE_DU_FILS], options(maison));
 
 test('G1 : lance comme un script, la branche de point d entree s execute et parle', () => {
   const maison = homeJetable();
@@ -106,25 +107,19 @@ test('G1 : lance comme un script, la branche de point d entree s execute et parl
     // `--check` est le mode qui N ECRIT PAS (mesure) : ce test n a besoin que
     // de la sortie, pas d une installation.
     const r = lanceCommeScript(['--user', '--check'], maison);
-    assert.equal(r.error, undefined, `le fils n a pas demarre : ${r.error}`);
+    expect(r.error, `le fils n a pas demarre : ${r.error}`).toBe(undefined);
 
     // On lit la SORTIE, pas le code de retour : `--check` sort en 1 quand les
     // hooks ne sont pas installes (mesure), ce qui est le cas d un home neuf.
-    assert.ok(
-      r.stdout.includes(SEULE_LA_BRANCHE_GARDEE),
-      `la sortie doit porter ${JSON.stringify(SEULE_LA_BRANCHE_GARDEE)}\n`
-      + `stdout=${JSON.stringify(r.stdout)}\nstderr=${JSON.stringify(r.stderr)}`,
-    );
+    expect(r.stdout.includes(SEULE_LA_BRANCHE_GARDEE), `la sortie doit porter ${JSON.stringify(SEULE_LA_BRANCHE_GARDEE)}\n`
+      + `stdout=${JSON.stringify(r.stdout)}\nstderr=${JSON.stringify(r.stderr)}`).toBeTruthy();
 
     // Et cette sortie doit venir du home DETOURNE. Sans ce controle, un test
     // vert pourrait etre un test qui vient de lire le vrai `~/.claude`. On
     // compare sur le suffixe aleatoire du dossier, insensible a la casse : le
     // prefixe du chemin, lui, peut etre normalise par l OS.
     const marqueur = path.basename(maison).toLowerCase();
-    assert.ok(
-      r.stdout.toLowerCase().includes(marqueur),
-      `la sortie doit citer le home jetable (${marqueur}) ; stdout=${JSON.stringify(r.stdout)}`,
-    );
+    expect(r.stdout.toLowerCase().includes(marqueur), `la sortie doit citer le home jetable (${marqueur}) ; stdout=${JSON.stringify(r.stdout)}`).toBeTruthy();
   } finally {
     efface(maison);
   }
@@ -134,10 +129,10 @@ test('G2 : importe, le module se tait — sortie 0, rien sur stdout ni stderr, r
   const maison = homeJetable();
   try {
     // ASSIETTE : sans elle, un « aucun fichier ecrit » final ne prouverait rien.
-    assert.deepEqual(fichiersSous(maison), [], 'le home jetable doit partir vide');
+    expect(fichiersSous(maison), 'le home jetable doit partir vide').toEqual([]);
 
     const r = lanceCommeImport(maison);
-    assert.equal(r.error, undefined, `le fils n a pas demarre : ${r.error}`);
+    expect(r.error, `le fils n a pas demarre : ${r.error}`).toBe(undefined);
 
     // stderr et le code de sortie D ABORD. Un chargement qui ECHOUE parle sur
     // stderr et sort en non-zero ; un test qui n observerait que stdout lirait
@@ -149,16 +144,13 @@ test('G2 : importe, le module se tait — sortie 0, rien sur stdout ni stderr, r
     // apparaissait, ce serait le signe qu on l a remplace par un `require()`.
     // Attention : son ABSENCE ne prouve rien en sens inverse — un `require()`
     // sur un module ES SANS top-level await reussit (mesure, Node v24.15.0).
-    assert.equal(r.stderr, '', `stderr doit etre vide, recu : ${r.stderr}`);
-    assert.equal(r.status, 0, `le fils doit sortir en 0, recu : ${r.status}`);
-    assert.equal(r.stdout, '', `stdout doit etre vide, recu : ${r.stdout}`);
+    expect(r.stderr, `stderr doit etre vide, recu : ${r.stderr}`).toBe('');
+    expect(r.status, `le fils doit sortir en 0, recu : ${r.status}`).toBe(0);
+    expect(r.stdout, `stdout doit etre vide, recu : ${r.stdout}`).toBe('');
 
     // Le bord le plus couteux : la garde toujours vraie ecrit un
     // `.claude/settings.json` sous le home.
-    assert.deepEqual(
-      fichiersSous(maison), [],
-      'un simple import ne doit ecrire aucun fichier sous le home',
-    );
+    expect(fichiersSous(maison), 'un simple import ne doit ecrire aucun fichier sous le home').toEqual([]);
   } finally {
     efface(maison);
   }
