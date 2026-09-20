@@ -10,9 +10,9 @@ export default defineConfig({
     // variable dynamic import ». Ces trois fichiers en portent un pour recharger un module.
     dynamicImportVarsOptions: {
       exclude: [
-        /watchdog-client-reader\.test\.mjs$/,
-        /watchdog-service\.test\.mjs$/,
-        /watchdog-wiring\.test\.mjs$/,
+        /watchdog-client-reader\.test\.ts$/,
+        /watchdog-service\.test\.ts$/,
+        /watchdog-wiring\.test\.ts$/,
       ],
     },
   },

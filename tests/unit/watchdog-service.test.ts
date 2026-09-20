@@ -1,4 +1,3 @@
-'use strict';
 // Le service est la jonction entre le module de detection pur
 // (src/engine/watchdog/detector.ts) et le serveur. Ce fichier fige ce qui doit
 // rester vrai de cette jonction : ce qui est diffuse a deja ete consigne, un
@@ -12,9 +11,7 @@
 // voit PAS depuis `list()`, qui lit la memoire vive : il ne se voit que dans le
 // fichier. C'est pour ca que l'idempotence est mesuree ici sur le fichier.
 
-import test from 'node:test';
-import { after } from 'node:test';
-import assert from 'node:assert/strict';
+import { afterAll, expect, test } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -25,45 +22,45 @@ import { catchUpFromDisk } from '../../src/server/watchdog/catch-up.ts';
 const T = 1_700_000_000_000;
 const SID = 'sess-1';
 const HORLOGE = () => T + 3_600_000;
-const lignes = fp => fs.readFileSync(fp, 'utf8').split('\n').filter(l => l.trim()).length;
+const lignes = (fp: string) => fs.readFileSync(fp, 'utf8').split('\n').filter(l => l.trim()).length;
 
 // Les dossiers temporaires sont ramasses a la fin : cette machine porte
 // l'instrument de mesure du projet, une quinzaine de dossiers abandonnes par
 // execution finissent par se voir.
-const aNettoyer = [];
-const neufDossier = (prefixe) => {
+const aNettoyer: string[] = [];
+const neufDossier = (prefixe: string) => {
   const d = fs.mkdtempSync(path.join(os.tmpdir(), prefixe));
   aNettoyer.push(d);
   return d;
 };
 const tmpFile = () => path.join(neufDossier('avtest-svc-'), 'alerts.jsonl');
 const tmpDir = () => neufDossier('avtest-events-');
-after(() => { for (const d of aNettoyer) fs.rmSync(d, { recursive: true, force: true }); });
+afterAll(() => { for (const d of aNettoyer) fs.rmSync(d, { recursive: true, force: true }); });
 
 // Plusieurs des garanties de ce module ne se distinguent de leur absence QUE
 // par la plainte : un balayage sans dossier rend 0 comme un dossier vide, un
 // acquittement refuse ne rend rien de visible. Sans lire la plainte, le test
 // ne pourrait pas voir la difference — et ne pourrait donc pas echouer.
-async function enEcoutant(fn) {
+async function enEcoutant<T>(fn: () => Promise<T> | T) {
   const vrai = console.error;
-  const dits = [];
-  console.error = (...a) => dits.push(a.map(String).join(' '));
+  const dits: string[] = [];
+  console.error = (...a: any[]) => dits.push(a.map(String).join(' '));
   try { return { valeur: await fn(), dits }; } finally { console.error = vrai; }
 }
 
-const pre = (i, ts, sid = SID) => ({
+const pre = (i: number, ts: number, sid = SID) => ({
   hook_event_name: 'PreToolUse', session_id: sid, tool_name: 'Bash',
   tool_use_id: `t${i}`, tool_input: { command: 'npm run build' }, cwd: 'f:\\p',
   _ts: new Date(ts).toISOString(),
 });
-const fail = (i, ts, sid = SID) => ({
+const fail = (i: number, ts: number, sid = SID) => ({
   hook_event_name: 'PostToolUseFailure', session_id: sid, tool_name: 'Bash',
   tool_use_id: `t${i}`, cwd: 'f:\\p', _ts: new Date(ts).toISOString(),
 });
 
 // Dix lignes : cinq appels identiques qui echouent, de quoi declencher `loop`.
 const flot = (sid = SID) => {
-  const out = [];
+  const out: string[] = [];
   for (let i = 1; i <= 5; i++) {
     out.push(JSON.stringify(pre(i, T + i * 1000, sid)), JSON.stringify(fail(i, T + i * 1000 + 500, sid)));
   }
@@ -72,7 +69,7 @@ const flot = (sid = SID) => {
 
 // L'horloge est passee au journal AUSSI. Voir l'en-tete : c'est la condition
 // pour que la relecture du fichier voie ce que le detecteur vient d'y ecrire.
-async function svc(filePath, opts = {}) {
+async function svc(filePath: string, opts: Omit<Parameters<typeof createWatchdogService>[0], 'journal'> = {}) {
   const now = opts.now || HORLOGE;
   return createWatchdogService({
     journal: createJournal({ filePath, now }), now, ...opts,
@@ -87,11 +84,11 @@ test('service: une boucle d echecs est consignee et rendue une fois', async () =
     raised.push(...s.onEvent(pre(i, T + i * 1000)));
     raised.push(...s.onEvent(fail(i, T + i * 1000 + 500)));
   }
-  assert.deepEqual(raised.map(a => a.type), ['loop']);
-  assert.equal(s.list({ sinceDays: 90 }).length, 1);
+  expect(raised.map(a => a.type)).toEqual(['loop']);
+  expect(s.list({ sinceDays: 90 }).length).toBe(1);
   // Consigne AVANT d'etre rendue : ce que l'appelant s'appretera a diffuser
   // est deja sur le disque, pas seulement en memoire vive.
-  assert.equal(lignes(filePath), 1);
+  expect(lignes(filePath)).toBe(1);
 });
 
 test('service: rejouer le meme flot n ajoute rien', async () => {
@@ -104,9 +101,9 @@ test('service: rejouer le meme flot n ajoute rien', async () => {
     raised.push(...s2.onEvent(pre(i, T + i * 1000)));
     raised.push(...s2.onEvent(fail(i, T + i * 1000 + 500)));
   }
-  assert.deepEqual(raised, [], 'un fait deja consigne n est pas un fait nouveau');
-  assert.equal(s2.list({ sinceDays: 90 }).length, 1);
-  assert.equal(lignes(filePath), 1, 'et rien de plus n a ete ecrit');
+  expect(raised, 'un fait deja consigne n est pas un fait nouveau').toEqual([]);
+  expect(s2.list({ sinceDays: 90 }).length).toBe(1);
+  expect(lignes(filePath), 'et rien de plus n a ete ecrit').toBe(1);
 });
 
 test('service: pendant un rattrapage, stuck se tait - et reparle apres', async () => {
@@ -117,12 +114,12 @@ test('service: pendant un rattrapage, stuck se tait - et reparle apres', async (
   // vrai controle positif, et pas une absence qui s explique toute seule.
   const s = await svc(filePath, { now: () => T + 4 * 60_000, isCatchingUp: () => catching });
   s.onEvent(pre(1, T));                       // outil encore en vol
-  assert.deepEqual(s.tick(), [], 'l horloge murale n est pas l heure des evenements relus');
+  expect(s.tick(), 'l horloge murale n est pas l heure des evenements relus').toEqual([]);
   catching = false;
-  assert.equal(s.tick().length, 1, 'controle positif : le rattrapage fini, il parle');
+  expect(s.tick().length, 'controle positif : le rattrapage fini, il parle').toBe(1);
   // Le battement consigne comme l evenement : une alerte qui n existe que sur
   // le chemin de l horloge doit se retrouver au journal comme les autres.
-  assert.equal(lignes(filePath), 1);
+  expect(lignes(filePath)).toBe(1);
 });
 
 test('service: acquitter rend la parole au detecteur, pas seulement au journal', async () => {
@@ -130,17 +127,17 @@ test('service: acquitter rend la parole au detecteur, pas seulement au journal',
   let maintenant = T + 4 * 60_000;
   const s = await svc(filePath, { now: () => maintenant });
   s.onEvent(pre(1, T));                       // outil encore en vol
-  const [a] = s.tick();
-  assert.equal(a.type, 'stuck');
+  const a = s.tick()[0]!;
+  expect(a.type).toBe('stuck');
   maintenant = T + 5 * 60_000;
-  assert.deepEqual(s.tick(), [], 'non acquittee, la meme condition ne se redit pas');
+  expect(s.tick(), 'non acquittee, la meme condition ne se redit pas').toEqual([]);
   s.ack(a.id, a.createdAt);
   maintenant = T + 6 * 60_000;
   // `stuck` ne declare pas de fin d episode : l acquittement est la SEULE
   // chose qui lui rende la parole. Si `ack` n allait qu au journal, cette
   // alerte-la ne pourrait plus jamais se redire de toute la session.
-  assert.equal(s.tick().length, 1, 'acquittee, la condition qui dure peut se redire');
-  assert.equal(lignes(filePath), 3, 'alerte, acquittement, alerte');
+  expect(s.tick().length, 'acquittee, la condition qui dure peut se redire').toBe(1);
+  expect(lignes(filePath), 'alerte, acquittement, alerte').toBe(3);
 });
 
 test('service: un acquittement que le journal refuse n eteint pas l alerte', async () => {
@@ -148,17 +145,17 @@ test('service: un acquittement que le journal refuse n eteint pas l alerte', asy
   let maintenant = T + 4 * 60_000;
   const s = await svc(filePath, { now: () => maintenant });
   s.onEvent(pre(1, T));                       // outil encore en vol
-  const [a] = s.tick();
+  const a = s.tick()[0]!;
   // Une cle hors contrat — exactement ce qu'un parametre de route sait
   // produire. Le journal la refuse, donc l acquittement n a PAS eu lieu.
   const { dits } = await enEcoutant(() => s.ack(a.id, 'pas une date'));
-  assert.match(dits.join('\n'), /acquittement sans \(id, createdAt\)/);
+  expect(dits.join('\n')).toMatch(/acquittement sans \(id, createdAt\)/);
   maintenant = T + 6 * 60_000;
   // Le controle positif est le test precedent : avec une cle valide, elle
   // reparle. Ici elle doit rester eteinte, sinon l utilisateur aurait vu son
   // geste pris en compte et l alerte reviendrait NON acquittee au redemarrage.
-  assert.deepEqual(s.tick(), [], 'rien n a ete consigne, donc rien n a ete acquitte');
-  assert.equal(lignes(filePath), 1, 'seule l alerte est au journal');
+  expect(s.tick(), 'rien n a ete consigne, donc rien n a ete acquitte').toEqual([]);
+  expect(lignes(filePath), 'seule l alerte est au journal').toBe(1);
 });
 
 test('service: ack rapporte ce que le journal a retenu', async () => {
@@ -166,23 +163,23 @@ test('service: ack rapporte ce que le journal a retenu', async () => {
   let maintenant = T + 4 * 60_000;
   const s = await svc(filePath, { now: () => maintenant });
   s.onEvent(pre(1, T));                       // outil encore en vol
-  const [a] = s.tick();
+  const a = s.tick()[0]!;
   // Le service SAIT si l acquittement a ete retenu — le journal le lui dit —
   // et jeter cette information ferait repondre 200 a la route sur un
   // acquittement que le journal vient de refuser. L utilisateur verrait son
   // geste pris en compte, et l alerte reviendrait NON acquittee au redemarrage.
-  assert.equal(s.ack(a.id, a.createdAt), true, 'retenu');
+  expect(s.ack(a.id, a.createdAt), 'retenu').toBe(true);
   const { valeur } = await enEcoutant(() => s.ack(a.id, 'pas une date'));
-  assert.equal(valeur, false, 'refuse — et l appelant doit pouvoir le savoir');
+  expect(valeur, 'refuse — et l appelant doit pouvoir le savoir').toBe(false);
 });
 
 test('service: acquitter ecrit une ligne et le relit', async () => {
   const filePath = tmpFile();
   const s = await svc(filePath);
   for (let i = 1; i <= 5; i++) { s.onEvent(pre(i, T + i * 1000)); s.onEvent(fail(i, T + i * 1000 + 500)); }
-  const [a] = s.list({ sinceDays: 90 });
+  const a = s.list({ sinceDays: 90 })[0]!;
   s.ack(a.id, a.createdAt);
-  assert.equal((await svc(filePath)).list({ sinceDays: 90 })[0].acknowledged, true);
+  expect((await svc(filePath)).list({ sinceDays: 90 })[0]!.acknowledged).toBe(true);
 });
 
 test('service: activeIds dit ce qui est ENCORE vif, ce que le journal ignore', async () => {
@@ -194,20 +191,20 @@ test('service: activeIds dit ce qui est ENCORE vif, ce que le journal ignore', a
   const filePath = tmpFile();
   let maintenant = T + 4 * 60_000;
   const s = await svc(filePath, { now: () => maintenant });
-  assert.deepEqual(s.activeIds(), [], 'rien n a encore ete leve');
+  expect(s.activeIds(), 'rien n a encore ete leve').toEqual([]);
   s.onEvent(pre(1, T));                       // outil encore en vol
-  const [a] = s.tick();
-  assert.equal(a.type, 'stuck');
+  const a = s.tick()[0]!;
+  expect(a.type).toBe('stuck');
   // Consignee ET vive : les deux reponses sont vraies en meme temps, et ce sont
   // deux questions differentes.
-  assert.deepEqual(s.activeIds(), [a.id]);
-  assert.equal(s.list({ sinceDays: 90 }).length, 1);
+  expect(s.activeIds()).toEqual([a.id]);
+  expect(s.list({ sinceDays: 90 }).length).toBe(1);
   s.ack(a.id, a.createdAt);
   // Acquittee : le journal la garde — c'est sa memoire — mais elle n'est plus
   // vive. Si `activeIds` rendait les alertes au lieu de leurs identifiants, ou
   // relisait le journal, cette ligne ne pourrait pas distinguer les deux.
-  assert.deepEqual(s.activeIds(), []);
-  assert.equal(s.list({ sinceDays: 90 }).length, 1, 'la memoire, elle, ne perd rien');
+  expect(s.activeIds()).toEqual([]);
+  expect(s.list({ sinceDays: 90 }).length, 'la memoire, elle, ne perd rien').toBe(1);
 });
 
 test('service: list se mesure sur l horloge du service, pas sur celle du journal', async () => {
@@ -219,10 +216,13 @@ test('service: list se mesure sur l horloge du service, pas sur celle du journal
     journal: createJournal({ filePath }), now: HORLOGE,
   });
   for (let i = 1; i <= 5; i++) { s.onEvent(pre(i, T + i * 1000)); s.onEvent(fail(i, T + i * 1000 + 500)); }
-  assert.equal(s.list({ sinceDays: 90 }).length, 1);
+  expect(s.list({ sinceDays: 90 }).length).toBe(1);
   // Et l'horloge du service gagne aussi sur celle qu'un appelant croirait
-  // pouvoir imposer : c'est le service qui dit quelle heure il est.
-  assert.equal(s.list({ sinceDays: 90, now: T + 400 * 86_400_000 }).length, 1);
+  // pouvoir imposer : c'est le service qui dit quelle heure il est. `now` ici
+  // n'existe pas dans le type de `list` ; passer par une variable evite le
+  // controle des proprietes en trop, qui rejetterait l'objet litteral.
+  const imposee = { sinceDays: 90, now: T + 400 * 86_400_000 };
+  expect(s.list(imposee).length).toBe(1);
 });
 
 test('catch-up: relit les fichiers en entier, deux fois sans doublon', async () => {
@@ -235,16 +235,16 @@ test('catch-up: relit les fichiers en entier, deux fois sans doublon', async () 
 
   const filePath = tmpFile();
   const s1 = await svc(filePath);
-  assert.equal(await catchUpFromDisk(s1, dir), 10);
-  assert.equal(s1.list({ sinceDays: 90 }).length, 1);
-  assert.equal(lignes(filePath), 1);
+  expect(await catchUpFromDisk(s1, dir)).toBe(10);
+  expect(s1.list({ sinceDays: 90 }).length).toBe(1);
+  expect(lignes(filePath)).toBe(1);
 
   const s2 = await svc(filePath);
   // Le nombre rendu mesure le BALAYAGE, pas la nouveaute : le second passage
   // relit exactement autant, et ne consigne rien.
-  assert.equal(await catchUpFromDisk(s2, dir), 10, 'le balayage relit tout, encore');
-  assert.equal(s2.list({ sinceDays: 90 }).length, 1);
-  assert.equal(lignes(filePath), 1, 'le rattrapage est idempotent — mesure sur le FICHIER');
+  expect(await catchUpFromDisk(s2, dir), 'le balayage relit tout, encore').toBe(10);
+  expect(s2.list({ sinceDays: 90 }).length).toBe(1);
+  expect(lignes(filePath), 'le rattrapage est idempotent — mesure sur le FICHIER').toBe(1);
 });
 
 // `null` est du JSON VALIDE : la primitive rend { ok:true, value:null } et `service.onEvent(null)`
@@ -264,8 +264,8 @@ test('catch-up: une ligne valant null est sautee, le rattrapage continue', async
   const relus = await catchUpFromDisk(s, dir);
 
   // Assert — les 10 evenements valides sont relus, le bruit est saute.
-  assert.equal(relus, 10, 'le bruit ne doit pas emporter le reste du rattrapage');
-  assert.equal(s.list({ sinceDays: 90 }).length, 1, 'la panne du fichier est bien detectee');
+  expect(relus, 'le bruit ne doit pas emporter le reste du rattrapage').toBe(10);
+  expect(s.list({ sinceDays: 90 }).length, 'la panne du fichier est bien detectee').toBe(1);
 });
 
 test('catch-up: un fichier prefixe par _ n est pas un flux d evenements', async () => {
@@ -275,8 +275,8 @@ test('catch-up: un fichier prefixe par _ n est pas un flux d evenements', async 
   fs.writeFileSync(path.join(dir, '_rejeu.jsonl'), flot());
   const filePath = tmpFile();
   const s = await svc(filePath);
-  assert.equal(await catchUpFromDisk(s, dir), 0);
-  assert.equal(s.list({ sinceDays: 90 }).length, 0);
+  expect(await catchUpFromDisk(s, dir)).toBe(0);
+  expect(s.list({ sinceDays: 90 }).length).toBe(0);
 });
 
 test('catch-up: une ligne illisible est sautee, celles d apres passent', async () => {
@@ -292,8 +292,8 @@ test('catch-up: une ligne illisible est sautee, celles d apres passent', async (
   ];
   fs.writeFileSync(path.join(dir, `${SID}.jsonl`), lines.join('\n') + '\n');
   const s = await svc(tmpFile());
-  assert.equal(await catchUpFromDisk(s, dir), 4, 'quatre lignes lisibles, la cassee ne se compte pas');
-  assert.equal(s.list({ sinceDays: 90 }).length, 1);
+  expect(await catchUpFromDisk(s, dir), 'quatre lignes lisibles, la cassee ne se compte pas').toBe(4);
+  expect(s.list({ sinceDays: 90 }).length).toBe(1);
 });
 
 // `catch-up.ts` decode chaque ligne par `decodeJsonlLine`, qui tolere le BOM. Un `JSON.parse`
@@ -317,7 +317,7 @@ test('catch-up: une ligne prefixee d un BOM est relue, pas perdue', async () => 
   const fed = await catchUpFromDisk(s, dir);
 
   // Assert
-  assert.equal(fed, 3, 'les trois lignes sont relues, celle au BOM comprise');
+  expect(fed, 'les trois lignes sont relues, celle au BOM comprise').toBe(3);
 });
 
 test('catch-up: une entree illisible se plaint, et n arrete pas les fichiers suivants', async () => {
@@ -328,12 +328,12 @@ test('catch-up: une entree illisible se plaint, et n arrete pas les fichiers sui
   fs.writeFileSync(path.join(dir, `${SID}.jsonl`), flot());
   const s = await svc(tmpFile());
   const { valeur, dits } = await enEcoutant(() => catchUpFromDisk(s, dir));
-  assert.equal(valeur, 10, 'le fichier d apres a bien ete lu');
-  assert.equal(s.list({ sinceDays: 90 }).length, 1);
+  expect(valeur, 'le fichier d apres a bien ete lu').toBe(10);
+  expect(s.list({ sinceDays: 90 }).length).toBe(1);
   // Un flux qu on n a pas su lire, c est des pannes qui ne seront pas
   // consignees. Le sauter en silence est le meme trou muet que pour le
   // dossier, dix lignes plus haut dans le meme fichier.
-  assert.match(dits.join('\n'), /flux d evenements illisible, aaa\.jsonl/);
+  expect(dits.join('\n')).toMatch(/flux d evenements illisible, aaa\.jsonl/);
 });
 
 test('catch-up: un fichier disparu entre le listage et la lecture ne se plaint pas', async () => {
@@ -350,10 +350,10 @@ test('catch-up: un fichier disparu entre le listage et la lecture ne se plaint p
   // celle-ci et l on rendrait des octets qu il a deja livres. C est le seul
   // test qui voie cet ordre : ici, si la limite etait demandee apres, le
   // fichier serait encore la et dix evenements seraient relus.
-  const limiteQuiSupprime = (p) => { fs.rmSync(p); return null; };
+  const limiteQuiSupprime = (p: string) => { fs.rmSync(p); return null; };
   const { valeur, dits } = await enEcoutant(() => catchUpFromDisk(s, dir, limiteQuiSupprime));
-  assert.equal(valeur, 0);
-  assert.equal(dits.join('\n'), '', 'une session purgee n est pas une anomalie');
+  expect(valeur).toBe(0);
+  expect(dits.join('\n'), 'une session purgee n est pas une anomalie').toBe('');
 });
 
 test('catch-up: la limite vive borne la lecture, son absence lit tout', async () => {
@@ -366,29 +366,29 @@ test('catch-up: la limite vive borne la lecture, son absence lit tout', async ()
 
   // Bornee : le chemin vif possede tout ce qui suit, le relire le compterait
   // deux fois — et le detecteur compte, meme quand le journal dedoublonne.
-  assert.equal(await catchUpFromDisk(await svc(tmpFile()), dir, () => troisLignes), 3);
+  expect(await catchUpFromDisk(await svc(tmpFile()), dir, () => troisLignes)).toBe(3);
   // Aucun watcher sur ce fichier : personne d autre ne le lit, on prend tout.
-  assert.equal(await catchUpFromDisk(await svc(tmpFile()), dir, () => null), 10);
+  expect(await catchUpFromDisk(await svc(tmpFile()), dir, () => null)).toBe(10);
   // Appelant qui ne fournit rien : on prend tout aussi. Relire de trop ne perd
   // jamais un fait ; c est le repli le plus sur.
-  assert.equal(await catchUpFromDisk(await svc(tmpFile()), dir), 10);
+  expect(await catchUpFromDisk(await svc(tmpFile()), dir)).toBe(10);
   // Et zero est une VRAIE reponse — un watcher arme sur un fichier vide possede
   // tout le fichier. Le confondre avec « pas de limite » rouvrirait le
   // recouvrement en entier.
-  assert.equal(await catchUpFromDisk(await svc(tmpFile()), dir, () => 0), 0);
+  expect(await catchUpFromDisk(await svc(tmpFile()), dir, () => 0)).toBe(0);
 });
 
 test('catch-up: un dossier absent n est pas une erreur', async () => {
   const s = await svc(tmpFile());
-  assert.equal(await catchUpFromDisk(s, path.join(os.tmpdir(), 'avtest-nexiste-pas-xyz')), 0);
+  expect(await catchUpFromDisk(s, path.join(os.tmpdir(), 'avtest-nexiste-pas-xyz'))).toBe(0);
 });
 
 test('catch-up: un dossier illisible se plaint, un dossier absent se tait', async () => {
   const s = await svc(tmpFile());
   // Absent : le silence est legitime, c est un premier demarrage.
   const absent = await enEcoutant(() => catchUpFromDisk(s, path.join(os.tmpdir(), 'avtest-nexiste-pas-xyz')));
-  assert.equal(absent.valeur, 0);
-  assert.equal(absent.dits.join('\n'), '', 'un premier demarrage n a rien a dire');
+  expect(absent.valeur).toBe(0);
+  expect(absent.dits.join('\n'), 'un premier demarrage n a rien a dire').toBe('');
   // Illisible : un FICHIER la ou un dossier est attendu. Meme forme d echec
   // qu un EACCES ou qu un verrou d antivirus sous Windows — et la, le
   // rattrapage NE FAIT PAS son travail. Rendre 0 sans un mot le rendrait
@@ -398,8 +398,8 @@ test('catch-up: un dossier illisible se plaint, un dossier absent se tait', asyn
   const fichier = path.join(neufDossier('avtest-pasundossier-'), 'x.jsonl');
   fs.writeFileSync(fichier, flot());
   const casse = await enEcoutant(() => catchUpFromDisk(s, fichier));
-  assert.equal(casse.valeur, 0);
-  assert.match(casse.dits.join('\n'), /dossier d evenements illisible/);
+  expect(casse.valeur).toBe(0);
+  expect(casse.dits.join('\n')).toMatch(/dossier d evenements illisible/);
 });
 
 // ─── Le cablage (index.ts) ────────────────────────────────────────────────
@@ -414,9 +414,9 @@ async function neufIndex() {
 
 // Un faux module de detection : il ne detecte rien, il rapporte ce que
 // `canObserve` repondait au moment ou l evenement lui est passe.
-function fauxModule(vu, casse = false) {
+function fauxModule(vu: { pendant: boolean[]; sonde: (() => boolean) | null }, casse = false) {
   return async () => ({
-    createWatchdog({ canObserve }) {
+    createWatchdog({ canObserve }: { canObserve: () => boolean }) {
       vu.sonde = canObserve;
       return {
         processEvent() {
@@ -434,8 +434,8 @@ function fauxModule(vu, casse = false) {
 
 test('index: une seule instance, et getWatchdogService la rend', async () => {
   const idx = await neufIndex();
-  assert.equal(idx.getWatchdogService(), null, 'rien avant l initialisation');
-  const vu = { pendant: [], sonde: null };
+  expect(idx.getWatchdogService(), 'rien avant l initialisation').toBe(null);
+  const vu: { pendant: boolean[]; sonde: (() => boolean) | null } = { pendant: [], sonde: null };
   const opts = {
     journalPath: tmpFile(), now: HORLOGE, loadModule: fauxModule(vu),
     // Un appelant qui croirait pouvoir tenir ce drapeau lui-meme : c est
@@ -445,9 +445,9 @@ test('index: une seule instance, et getWatchdogService la rend', async () => {
   };
   const a = await idx.initWatchdog(opts);
   const b = await idx.initWatchdog(opts);
-  assert.equal(b, a, 'la seconde initialisation rend la premiere instance');
-  assert.equal(idx.getWatchdogService(), a);
-  assert.equal(vu.sonde(), true, 'le drapeau du module fait autorite, pas l option');
+  expect(b, 'la seconde initialisation rend la premiere instance').toBe(a);
+  expect(idx.getWatchdogService()).toBe(a);
+  expect(vu.sonde!(), 'le drapeau du module fait autorite, pas l option').toBe(true);
 });
 
 test('index: deux initialisations CONCURRENTES ne font qu un seul service', async () => {
@@ -458,14 +458,14 @@ test('index: deux initialisations CONCURRENTES ne font qu un seul service', asyn
   // premier appel AVANT que le second commence. Il faut deux appels qui se
   // chevauchent vraiment pour atteindre le `await` interne a deux.
   const [a, b] = await Promise.all([idx.initWatchdog(opts), idx.initWatchdog(opts)]);
-  assert.equal(a, b, 'une garde posee sur la valeur ne survit pas a un await');
+  expect(a, 'une garde posee sur la valeur ne survit pas a un await').toBe(b);
 
   // Et la consequence, qui est ce qui compte : deux services, ce serait deux
   // journaux, donc deux `seen` — et le meme fait consigne deux fois dans le
   // meme fichier, le doublon exact que ce module existe pour empecher.
   for (let i = 1; i <= 5; i++) { a.onEvent(pre(i, T + i * 1000)); a.onEvent(fail(i, T + i * 1000 + 500)); }
   for (let i = 1; i <= 5; i++) { b.onEvent(pre(i, T + i * 1000)); b.onEvent(fail(i, T + i * 1000 + 500)); }
-  assert.equal(lignes(journalPath), 1);
+  expect(lignes(journalPath)).toBe(1);
 });
 
 test('index: un module de detection introuvable degrade, il ne tue pas le serveur', async () => {
@@ -478,10 +478,10 @@ test('index: un module de detection introuvable degrade, il ne tue pas le serveu
   }));
   // Une promesse rejetee et non attrapee tue le processus sous Node 24 : le
   // chien de garde est un supplement, il ne doit pas emporter le serveur.
-  assert.equal(valeur, null, 'la promesse se resout a null, elle ne rejette pas');
-  assert.equal(idx.getWatchdogService(), null);
-  assert.match(dits.join('\n'), /detection indisponible/);
-  assert.equal(await idx.runCatchUp(dir), 0, 'et le reste du demarrage continue');
+  expect(valeur, 'la promesse se resout a null, elle ne rejette pas').toBe(null);
+  expect(idx.getWatchdogService()).toBe(null);
+  expect(dits.join('\n')).toMatch(/detection indisponible/);
+  expect(await idx.runCatchUp(dir), 'et le reste du demarrage continue').toBe(0);
 });
 
 test('index: un balayage sans dossier se plaint au lieu de passer pour un dossier vide', async () => {
@@ -491,31 +491,31 @@ test('index: un balayage sans dossier se plaint au lieu de passer pour un dossie
   // S il l oublie, `catchUpFromDisk` rendrait 0 sans un mot — indiscernable
   // d un dossier legitimement vide. La plainte est la seule difference.
   const { valeur, dits } = await enEcoutant(() => idx.runCatchUp());
-  assert.equal(valeur, 0);
-  assert.match(dits.join('\n'), /sans dossier d evenements/);
+  expect(valeur).toBe(0);
+  expect(dits.join('\n')).toMatch(/sans dossier d evenements/);
 });
 
 test('index: le drapeau est leve pendant le rattrapage et baisse apres', async () => {
   const dir = tmpDir();
   fs.writeFileSync(path.join(dir, `${SID}.jsonl`), flot());
   const idx = await neufIndex();
-  const vu = { pendant: [], sonde: null };
+  const vu: { pendant: boolean[]; sonde: (() => boolean) | null } = { pendant: [], sonde: null };
   await idx.initWatchdog({ journalPath: tmpFile(), now: HORLOGE, loadModule: fauxModule(vu) });
-  assert.equal(vu.sonde(), true, 'hors rattrapage, le service observe');
-  assert.equal(await idx.runCatchUp(dir), 10);
-  assert.equal(vu.pendant.length, 10);
-  assert.deepEqual([...new Set(vu.pendant)], [false], 'aucun evenement relu ne s est cru observe');
-  assert.equal(vu.sonde(), true, 'le drapeau est retombe');
+  expect(vu.sonde!(), 'hors rattrapage, le service observe').toBe(true);
+  expect(await idx.runCatchUp(dir)).toBe(10);
+  expect(vu.pendant.length).toBe(10);
+  expect([...new Set(vu.pendant)], 'aucun evenement relu ne s est cru observe').toEqual([false]);
+  expect(vu.sonde!(), 'le drapeau est retombe').toBe(true);
 });
 
 test('index: le drapeau retombe meme si le balayage casse', async () => {
   const dir = tmpDir();
   fs.writeFileSync(path.join(dir, `${SID}.jsonl`), flot());
   const idx = await neufIndex();
-  const vu = { pendant: [], sonde: null };
+  const vu: { pendant: boolean[]; sonde: (() => boolean) | null } = { pendant: [], sonde: null };
   await idx.initWatchdog({ journalPath: tmpFile(), now: HORLOGE, loadModule: fauxModule(vu, true) });
-  await assert.rejects(() => idx.runCatchUp(dir), /detecteur casse/);
-  assert.equal(vu.sonde(), true, 'sinon `stuck` resterait muet pour toujours');
+  await expect(idx.runCatchUp(dir)).rejects.toThrow(/detecteur casse/);
+  expect(vu.sonde!(), 'sinon `stuck` resterait muet pour toujours').toBe(true);
 });
 
 test('index: sans service, le balayage ne fait rien plutot que de casser', async () => {
@@ -523,7 +523,7 @@ test('index: sans service, le balayage ne fait rien plutot que de casser', async
   fs.writeFileSync(path.join(dir, `${SID}.jsonl`), flot());
   // Le service est asynchrone a creer ; un demarrage qui appellerait le
   // balayage trop tot ne doit pas tomber sur un `null`.
-  assert.equal(await (await neufIndex()).runCatchUp(dir), 0);
+  expect(await (await neufIndex()).runCatchUp(dir)).toBe(0);
 });
 
 test('index: un redemarrage complet ne reconsigne pas le passe', async () => {
@@ -533,15 +533,15 @@ test('index: un redemarrage complet ne reconsigne pas le passe', async () => {
 
   const un = await neufIndex();
   await un.initWatchdog({ journalPath, now: HORLOGE });
-  assert.equal(await un.runCatchUp(dir), 10);
-  assert.equal(lignes(journalPath), 1);
+  expect(await un.runCatchUp(dir)).toBe(10);
+  expect(lignes(journalPath)).toBe(1);
 
   // Serveur eteint, serveur rallume, meme dossier d evenements. Le journal
   // qu `initWatchdog` fabrique doit relire son fichier avec l horloge du
   // service, sans quoi il repart la memoire vide et ecrit tout une 2e fois.
   const deux = await neufIndex();
   await deux.initWatchdog({ journalPath, now: HORLOGE });
-  assert.equal(await deux.runCatchUp(dir), 10);
-  assert.equal(lignes(journalPath), 1, 'le passe etait deja connu');
-  assert.equal(deux.getWatchdogService().list({ sinceDays: 90 }).length, 1);
+  expect(await deux.runCatchUp(dir)).toBe(10);
+  expect(lignes(journalPath), 'le passe etait deja connu').toBe(1);
+  expect(deux.getWatchdogService().list({ sinceDays: 90 }).length).toBe(1);
 });

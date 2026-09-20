@@ -1,4 +1,3 @@
-'use strict';
 // Ce que ce fichier protege : l'ORDRE. Une alerte annoncee sur le flux mais
 // absente du journal serait exactement le defaut qu'on repare — une panne
 // visible seulement pour qui regardait au bon moment.
@@ -8,12 +7,11 @@
 // demarrage — l'instance, puis le rattrapage de ce qui s'est passe serveur
 // eteint, puis seulement le battement.
 
-import test from 'node:test';
-import { after } from 'node:test';
-import assert from 'node:assert/strict';
+import { afterAll, expect, test } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import type { SseClient } from '../../src/server/sse.ts';
 
 // ── Le bac a sable, pose AVANT le premier import de `src/server/**` ─────────
 // C'est la seule chose qui compte dans l'ordre de ce fichier. Charger
@@ -43,18 +41,18 @@ const {
 // La redirection est verifiee, pas supposee : si elle ne prenait pas, tout ce
 // fichier travaillerait sur les vraies donnees de l'utilisateur en silence.
 test('bac a sable: ni le vrai dossier d evenements ni le vrai journal', () => {
-  assert.ok(DIR.startsWith(BAC), `dossier d evenements hors du bac : ${DIR}`);
-  assert.ok(DEFAULT_PATH.startsWith(BAC), `journal par defaut hors du bac : ${DEFAULT_PATH}`);
+  expect(DIR.startsWith(BAC), `dossier d evenements hors du bac : ${DIR}`).toBeTruthy();
+  expect(DEFAULT_PATH.startsWith(BAC), `journal par defaut hors du bac : ${DEFAULT_PATH}`).toBeTruthy();
 });
 
 const T = 1_700_000_000_000;
 const SID = 'sess-1';
 const HORLOGE = () => T + 3_600_000;
-const lignes = fp => fs.readFileSync(fp, 'utf8').split('\n').filter(l => l.trim()).length;
-const echapper = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const lignes = (fp: string) => fs.readFileSync(fp, 'utf8').split('\n').filter(l => l.trim()).length;
+const echapper = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-const aNettoyer = [BAC];
-const neufDossier = (prefixe) => {
+const aNettoyer: string[] = [BAC];
+const neufDossier = (prefixe: string) => {
   const d = fs.mkdtempSync(path.join(BAC, prefixe));
   aNettoyer.push(d);
   return d;
@@ -64,8 +62,8 @@ const tmpDir = () => neufDossier('events-');
 
 // Les auditeurs SSE sont retires entre les tests : un auditeur oublie
 // continuerait a compter les messages du test suivant.
-const auditeurs = [];
-after(() => {
+const auditeurs: SseClient[] = [];
+afterAll(() => {
   for (const c of auditeurs) sseClients.delete(c);
   for (const d of aNettoyer) fs.rmSync(d, { recursive: true, force: true });
 });
@@ -74,10 +72,11 @@ after(() => {
 // `sseClients` — s'y inscrire est donc la facon d'ecouter le flux sans
 // remplacer la fonction, que `event-reader` a deja capturee par
 // destructuration au chargement.
-function ecouterSSE(surMessage) {
-  const recus = [];
-  const client = {
-    write(msg) {
+type Recus = any[] & { fermer: () => void };
+function ecouterSSE(surMessage?: (m: any) => void): Recus {
+  const recus = [] as unknown as Recus;
+  const client: SseClient = {
+    write(msg: string) {
       const m = JSON.parse(msg.slice('data: '.length));
       recus.push(m);
       if (surMessage) surMessage(m);
@@ -89,40 +88,40 @@ function ecouterSSE(surMessage) {
   return recus;
 }
 
-async function jusqua(predicat, quoi, msMax = 3000) {
+async function jusqua(predicat: () => boolean, quoi: string, msMax = 3000) {
   const fin = Date.now() + msMax;
   while (Date.now() < fin) {
     if (predicat()) return;
     await new Promise(r => setTimeout(r, 5));
   }
-  assert.fail(`delai depasse en attendant : ${quoi}`);
+  expect.fail(`delai depasse en attendant : ${quoi}`);
 }
 
 // Plusieurs garanties du cablage ne se distinguent de leur absence QUE par ce
 // qui est dit : un rattrapage casse qu'on rattrape ne rend rien de visible.
-async function enEcoutant(fn) {
+async function enEcoutant<T>(fn: () => Promise<T> | T) {
   const vraiErr = console.error;
   const vraiLog = console.log;
-  const dits = [];
-  console.error = (...a) => dits.push(a.map(String).join(' '));
-  console.log = (...a) => dits.push(a.map(String).join(' '));
+  const dits: string[] = [];
+  console.error = (...a: any[]) => dits.push(a.map(String).join(' '));
+  console.log = (...a: any[]) => dits.push(a.map(String).join(' '));
   try { return { valeur: await fn(), dits: dits.join('\n') }; }
   finally { console.error = vraiErr; console.log = vraiLog; }
 }
 
-const pre = (i, ts, sid = SID) => ({
+const pre = (i: number, ts: number, sid = SID) => ({
   hook_event_name: 'PreToolUse', session_id: sid, tool_name: 'Bash',
   tool_use_id: `t${i}`, tool_input: { command: 'npm run build' }, cwd: 'f:\\p',
   _ts: new Date(ts).toISOString(),
 });
-const fail = (i, ts, sid = SID) => ({
+const fail = (i: number, ts: number, sid = SID) => ({
   hook_event_name: 'PostToolUseFailure', session_id: sid, tool_name: 'Bash',
   tool_use_id: `t${i}`, cwd: 'f:\\p', _ts: new Date(ts).toISOString(),
 });
 
 // Dix lignes : cinq appels identiques qui echouent, de quoi declencher `loop`.
 const flot = (sid = SID) => {
-  const out = [];
+  const out: string[] = [];
   for (let i = 1; i <= 5; i++) {
     out.push(JSON.stringify(pre(i, T + i * 1000, sid)), JSON.stringify(fail(i, T + i * 1000 + 500, sid)));
   }
@@ -135,7 +134,7 @@ const flot = (sid = SID) => {
 // declencheur est ce qui rend l'ordre observable : l'alerte doit etre le
 // DERNIER message du flux, jamais l'avant-dernier.
 const flotJusquAuDeclencheur = () => {
-  const out = [];
+  const out: string[] = [];
   for (let i = 1; i <= 3; i++) {
     out.push(JSON.stringify(pre(i, T + i * 1000)), JSON.stringify(fail(i, T + i * 1000 + 500)));
   }
@@ -147,13 +146,13 @@ const flotJusquAuDeclencheur = () => {
 // deja posee dans l'index : `agentSource: 'copilot'` prend la branche « ce
 // producteur ne rapporte pas de jetons » et evite au test de reveiller le
 // lecteur de transcription, qui n'a rien a voir avec ce qu'on mesure ici.
-function fichierDeSession(nom, contenu) {
+function fichierDeSession(nom: string, contenu: string) {
   const fp = path.join(tmpDir(), `${nom}.jsonl`);
   fs.writeFileSync(fp, contenu);
   sessionIndex.set(nom, {
     id: nom, promptCache: null, promptWindow: 0,
     eventCount: 0, size: 0, mtime: Date.now(), agentSource: 'copilot',
-  });
+  } as any);
   return fp;
 }
 
@@ -161,21 +160,23 @@ function fichierDeSession(nom, contenu) {
 // marqueur `_boum`. C'est la seule facon d'eprouver le chemin d'echec sans
 // priver de detecteur tous les autres tests, qui partagent la meme instance —
 // celle qu `event-reader` a chargee et qu'aucun vidage de cache n'atteint.
-const moduleQuiLeveSurMarqueur = async () => {
+// Le cast final satisfait `loadModule` : la vraie forme d'`acknowledge` est
+// plus etroite que celle, deliberement large, que ce champ exige.
+const moduleQuiLeveSurMarqueur = (async () => {
   const vrai = await import('../../src/engine/watchdog/detector.ts');
   return {
-    createWatchdog(opts) {
+    createWatchdog(opts: any) {
       const wd = vrai.createWatchdog(opts);
       return {
         ...wd,
-        processEvent(evt) {
+        processEvent(evt: any) {
           if (evt && evt._boum) throw new Error('detecteur casse');
           return wd.processEvent(evt);
         },
       };
     },
   };
-};
+}) as unknown as () => Promise<{ createWatchdog: (opts: unknown) => any }>;
 
 // ─── L'ordre, au niveau du service ────────────────────────────────────────────
 
@@ -184,10 +185,10 @@ test('cablage: ce qui est diffuse est deja consigne', async () => {
   const journal = createJournal({ filePath });
   const service = await createWatchdogService({ journal, now: () => T + 60_000 });
 
-  const broadcast = [];
-  const feed = (evt) => { for (const a of service.onEvent(evt)) {
+  const broadcast: any[] = [];
+  const feed = (evt: Record<string, unknown>) => { for (const a of service.onEvent(evt)) {
     // Au moment ou l'appelant diffuse, la ligne doit deja etre sur le disque.
-    assert.match(fs.readFileSync(filePath, 'utf8'), new RegExp(a.id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    expect(fs.readFileSync(filePath, 'utf8')).toMatch(new RegExp(echapper(String(a.id))));
     broadcast.push(a);
   } };
 
@@ -198,7 +199,7 @@ test('cablage: ce qui est diffuse est deja consigne', async () => {
     feed({ hook_event_name: 'PostToolUseFailure', session_id: 's', tool_name: 'Bash',
       tool_use_id: `t${i}`, cwd: 'f:\\p', _ts: new Date(T + i * 1000 + 500).toISOString() });
   }
-  assert.equal(broadcast.length, 1);
+  expect(broadcast.length).toBe(1);
 });
 
 // ─── Le lecteur d'evenements ─────────────────────────────────────────────────
@@ -209,19 +210,19 @@ test('cablage: ce qui est diffuse est deja consigne', async () => {
 
 test('event-reader: sans chien de garde, le flux d evenements passe quand meme', async () => {
   const idx = await import('../../src/server/watchdog/index.ts');
-  assert.equal(idx.getWatchdogService(), null, 'precondition : l instance partagee n est pas encore initialisee');
+  expect(idx.getWatchdogService(), 'precondition : l instance partagee n est pas encore initialisee').toBe(null);
 
   const recus = ecouterSSE();
   const fp = fichierDeSession('sans-garde', flotJusquAuDeclencheur());
   await readAndBroadcast(fp);
   recus.fermer();
-  assert.equal(recus.filter(m => m.type === 'event').length, 7);
-  assert.equal(recus.filter(m => m.type === 'alert').length, 0);
+  expect(recus.filter(m => m.type === 'event').length).toBe(7);
+  expect(recus.filter(m => m.type === 'alert').length).toBe(0);
   // Le curseur a avance, mais RIEN n a ete nourri : la frontiere doit rester le
   // curseur. La poser ici — a l octet ou cette lecture a commence — ouvrirait
   // au balayage un trou grand comme tout le demarrage, puisque c est exactement
   // ce que fait le vif tant que le service n existe pas.
-  assert.equal(liveHandoffOffset(fp), fs.statSync(fp).size);
+  expect(liveHandoffOffset(fp)).toBe(fs.statSync(fp).size);
 });
 
 // Le lecteur vif decode chaque ligne par la primitive commune du moteur, qui tolere le BOM.
@@ -242,10 +243,7 @@ test('event-reader: une ligne prefixee d un BOM en milieu de fichier atteint le 
 
   // Assert
   recus.fermer();
-  assert.deepEqual(
-    recus.filter(m => m.type === 'event').map(m => m.event.tool_use_id),
-    ['t1', 't2', 't3'],
-  );
+  expect(recus.filter(m => m.type === 'event').map(m => m.event.tool_use_id)).toEqual(['t1', 't2', 't3']);
 });
 
 // Le journal de l'instance partagee — celle qu `event-reader` tient. Il est
@@ -274,8 +272,8 @@ test('event-reader: ce que le chien de garde voit part sur le flux, apres l even
   // resterait nulle et l'echec se lirait « aucune alerte diffusee », ce qui
   // designerait le mauvais coupable. Fichier absent = journal vide, et c'est
   // la comparaison qui tranche.
-  let journalAuMomentDeLaDiffusion = null;
-  const surMessage = (m) => {
+  let journalAuMomentDeLaDiffusion: { id: string; contenu: string } | null = null;
+  const surMessage = (m: any) => {
     if (m.type !== 'alert' || journalAuMomentDeLaDiffusion !== null) return;
     let contenu = '';
     try { contenu = fs.readFileSync(journalPath, 'utf8'); } catch { /* pas encore de journal */ }
@@ -285,27 +283,23 @@ test('event-reader: ce que le chien de garde voit part sur le flux, apres l even
   await readAndBroadcast(fichierDeSession('avec-garde', flotJusquAuDeclencheur()));
   recus.fermer();
 
-  assert.ok(journalAuMomentDeLaDiffusion, 'une alerte a bien ete diffusee');
-  assert.match(
-    journalAuMomentDeLaDiffusion.contenu,
-    new RegExp(echapper(journalAuMomentDeLaDiffusion.id)),
-    'la ligne du journal precede la diffusion',
-  );
+  expect(journalAuMomentDeLaDiffusion, 'une alerte a bien ete diffusee').toBeTruthy();
+  expect(journalAuMomentDeLaDiffusion!.contenu, 'la ligne du journal precede la diffusion').toMatch(new RegExp(echapper(journalAuMomentDeLaDiffusion!.id)));
 
   const types = recus.map(m => m.type);
-  assert.equal(types.filter(t => t === 'event').length, 7, 'le canevas recoit tout, comme avant');
+  expect(types.filter(t => t === 'event').length, 'le canevas recoit tout, comme avant').toBe(7);
   const alertes = recus.filter(m => m.type === 'alert');
-  assert.equal(alertes.length, 1);
-  assert.equal(alertes[0].alert.type, 'loop');
+  expect(alertes.length).toBe(1);
+  expect(alertes[0].alert.type).toBe('loop');
   // L'alerte est le DERNIER message : elle suit l'evenement qui l'a produite,
   // elle ne le precede pas.
-  assert.equal(types.at(-1), 'alert');
-  assert.equal(lignes(journalPath), 1);
+  expect(types.at(-1)).toBe('alert');
+  expect(lignes(journalPath)).toBe(1);
 });
 
 test('event-reader: relire le meme fichier ne rediffuse pas l alerte', async () => {
   const idx = await import('../../src/server/watchdog/index.ts');
-  assert.ok(idx.getWatchdogService(), 'precondition : le service est en place');
+  expect(idx.getWatchdogService(), 'precondition : le service est en place').toBeTruthy();
 
   const fp = fichierDeSession('rejeu', flotJusquAuDeclencheur());
   await readAndBroadcast(fp);
@@ -315,8 +309,8 @@ test('event-reader: relire le meme fichier ne rediffuse pas l alerte', async () 
   fs.appendFileSync(fp, JSON.stringify(fail(4, T + 4500)) + '\n');
   await readAndBroadcast(fp);
   recus.fermer();
-  assert.equal(recus.filter(m => m.type === 'event').length, 1);
-  assert.equal(recus.filter(m => m.type === 'alert').length, 0, 'un fait deja consigne n est pas un fait nouveau');
+  expect(recus.filter(m => m.type === 'event').length).toBe(1);
+  expect(recus.filter(m => m.type === 'alert').length, 'un fait deja consigne n est pas un fait nouveau').toBe(0);
 });
 
 test('cablage: le rattrapage s arrete la ou le chemin vif prend la main', async () => {
@@ -332,9 +326,9 @@ test('cablage: le rattrapage s arrete la ou le chemin vif prend la main', async 
   const fp = fichierDeSession('partage', JSON.stringify(pre(1, T + 1000, SP)) + '\n');
   const priseEnMain = fs.statSync(fp).size;
   resetFileOffset(fp, priseEnMain);
-  assert.equal(liveHandoffOffset(fp), priseEnMain, 'le lecteur d evenements expose sa frontiere');
+  expect(liveHandoffOffset(fp), 'le lecteur d evenements expose sa frontiere').toBe(priseEnMain);
   // Un fichier que personne ne suit : le balayage en est seul responsable.
-  assert.equal(liveHandoffOffset(path.join(path.dirname(fp), 'jamais-suivi.jsonl')), null);
+  expect(liveHandoffOffset(path.join(path.dirname(fp), 'jamais-suivi.jsonl'))).toBe(null);
   // Et zero est une REPONSE, pas une absence de reponse : un watcher arme sur
   // un fichier vide possede tout ce qui y sera ecrit. Un test de veracite
   // (`get(fp) || null`) le retournerait en « lis tout » et rouvrirait le
@@ -342,23 +336,22 @@ test('cablage: le rattrapage s arrete la ou le chemin vif prend la main', async 
   const vide = path.join(path.dirname(fp), 'vide.jsonl');
   fs.writeFileSync(vide, '');
   resetFileOffset(vide, 0);
-  assert.equal(liveHandoffOffset(vide), 0);
+  expect(liveHandoffOffset(vide)).toBe(0);
   fs.appendFileSync(fp, JSON.stringify(pre(2, T + 2000, SP)) + '\n'
                       + JSON.stringify(pre(3, T + 3000, SP)) + '\n');
 
   const recus = ecouterSSE();
   const { valeur } = await enEcoutant(() => idx.runCatchUp(path.dirname(fp), liveHandoffOffset));
-  assert.equal(valeur, 1, 'le passe s arrete a l octet ou le vif commence');
+  expect(valeur, 'le passe s arrete a l octet ou le vif commence').toBe(1);
   await readAndBroadcast(fp);   // le chemin vif livre exactement le reste
   recus.fermer();
-  assert.equal(recus.filter(m => m.type === 'event').length, 2);
-  assert.equal(recus.filter(m => m.type === 'alert').length, 0,
-    'trois appels comptes trois fois, pas cinq');
+  expect(recus.filter(m => m.type === 'event').length).toBe(2);
+  expect(recus.filter(m => m.type === 'alert').length, 'trois appels comptes trois fois, pas cinq').toBe(0);
 });
 
 test('cablage: la frontiere est l octet ou le vif a NOURRI, pas son curseur', async () => {
   const idx = await import('../../src/server/watchdog/index.ts');
-  assert.ok(idx.getWatchdogService(), 'precondition : le service est en place');
+  expect(idx.getWatchdogService(), 'precondition : le service est en place').toBeTruthy();
   const SN = 'sess-nourri';
   // L1 : ecrite pendant que le serveur demarrait, AVANT que le service existe.
   const l1 = JSON.stringify(pre(1, T + 1000, SN)) + '\n';
@@ -379,15 +372,15 @@ test('cablage: la frontiere est l octet ou le vif a NOURRI, pas son curseur', as
   // La frontiere doit etre restee a L1 — la ou le vif a commence a NOURRIR —
   // et non au curseur, qui est passe au-dessus de L2 et L3, ni au debut de la
   // lecture B, qui est passe au-dessus de L2.
-  assert.equal(liveHandoffOffset(fp), Buffer.byteLength(l1));
+  expect(liveHandoffOffset(fp)).toBe(Buffer.byteLength(l1));
 
   const avant = lignes(journalPartage);
   const { valeur } = await enEcoutant(() => idx.runCatchUp(path.dirname(fp), liveHandoffOffset));
-  assert.equal(valeur, 1, 'le balayage ne relit que ce qui precede la premiere pature');
+  expect(valeur, 'le balayage ne relit que ce qui precede la premiere pature').toBe(1);
   // Trois appels reels, comptes trois fois. Frontiere sur le curseur : CINQ ; reecrite a chaque
   // lecture : QUATRE. Les deux franchissent le seuil de `loop` et ecrivent au journal, en ajout
   // seul, une ligne DURABLE annoncant une boucle que personne n a faite.
-  assert.equal(lignes(journalPartage), avant, 'trois appels comptes trois fois');
+  expect(lignes(journalPartage), 'trois appels comptes trois fois').toBe(avant);
 });
 
 test('cablage: la frontiere s efface avec le watcher et avec la compaction', async () => {
@@ -395,11 +388,11 @@ test('cablage: la frontiere s efface avec le watcher et avec la compaction', asy
   // l autre : la premiere purge laisserait la frontiere deja absente, et la
   // seconde n aurait plus rien a effacer.
   const SN = 'sess-purge';
-  const nourri = async (nom) => {
+  const nourri = async (nom: string) => {
     const fp = fichierDeSession(nom, JSON.stringify(pre(1, T + 1000, SN)) + '\n');
     resetFileOffset(fp, 0);
     await readAndBroadcast(fp);
-    assert.equal(liveHandoffOffset(fp), 0, 'le vif a nourri depuis le premier octet');
+    expect(liveHandoffOffset(fp), 'le vif a nourri depuis le premier octet').toBe(0);
     return fp;
   };
 
@@ -407,19 +400,19 @@ test('cablage: la frontiere s efface avec le watcher et avec la compaction', asy
   // garder la frontiere cloturerait une part du fichier que personne ne lit.
   const a = await nourri('purge-watcher');
   unwatchSession(a);
-  assert.equal(liveHandoffOffset(a), null);
+  expect(liveHandoffOffset(a)).toBe(null);
 
   // La compaction reecrit le fichier plus court : l ancien octet designe une
   // disposition qui n existe plus, et le garder cloturerait le balayage hors
   // d une partie du NOUVEAU fichier.
   const b = await nourri('purge-compaction');
   resetFileOffset(b, 42);
-  assert.equal(liveHandoffOffset(b), 42, 'apres compaction, le curseur reprend la frontiere');
+  expect(liveHandoffOffset(b), 'apres compaction, le curseur reprend la frontiere').toBe(42);
 });
 
 test('event-reader: un detecteur qui leve se dit une fois, et le canevas continue', async () => {
   const idx = await import('../../src/server/watchdog/index.ts');
-  assert.ok(idx.getWatchdogService(), 'precondition : le service est en place');
+  expect(idx.getWatchdogService(), 'precondition : le service est en place').toBeTruthy();
   // Sans garde, l enveloppe `catch {}` de la boucle avalerait l exception : le chien de
   // garde cesserait de produire des alertes POUR TOUJOURS, et rien ne le dirait.
   const boum = { ...pre(9, T + 9000, 'sess-boum'), _boum: true };
@@ -427,10 +420,10 @@ test('event-reader: un detecteur qui leve se dit une fois, et le canevas continu
   const recus = ecouterSSE();
   const { dits } = await enEcoutant(() => readAndBroadcast(fichierDeSession('boum', contenu)));
   recus.fermer();
-  assert.equal(recus.filter(m => m.type === 'event').length, 2, 'le canevas est servi quand meme');
+  expect(recus.filter(m => m.type === 'event').length, 'le canevas est servi quand meme').toBe(2);
   const plaintes = dits.split('\n').filter(l => /detection failed/.test(l));
-  assert.equal(plaintes.length, 1, 'dite une fois — pas zero, pas a chaque evenement');
-  assert.match(plaintes[0], /detecteur casse/);
+  expect(plaintes.length, 'dite une fois — pas zero, pas a chaque evenement').toBe(1);
+  expect(plaintes[0]).toMatch(/detecteur casse/);
 });
 
 // ─── Le demarrage ────────────────────────────────────────────────────────────
@@ -480,23 +473,23 @@ test('demarrage: l instance d abord, le rattrapage ensuite', async () => {
     init: { journalPath, now: HORLOGE },
   }));
   clearInterval(valeur);
-  assert.match(dits, /rattrapage : 10 evenements relus/);
-  assert.equal(lignes(journalPath), 1, 'la panne survenue serveur eteint est au journal');
+  expect(dits).toMatch(/rattrapage : 10 evenements relus/);
+  expect(lignes(journalPath), 'la panne survenue serveur eteint est au journal').toBe(1);
 });
 
 test('demarrage: le rattrapage ne diffuse rien', async () => {
   const idx = await neufIndex();
   const dir = tmpDir();
   fs.writeFileSync(path.join(dir, `${SID}.jsonl`), flot());
-  const recus = [];
+  const recus: any[] = [];
   const { valeur } = await enEcoutant(() => idx.startWatchdog({
-    dir, broadcastAlert: a => recus.push(a), liveFrom: () => null, cadenceMs: 60_000,
+    dir, broadcastAlert: (a: any) => recus.push(a), liveFrom: () => null, cadenceMs: 60_000,
     init: { journalPath: tmpFile(), now: HORLOGE },
   }));
   clearInterval(valeur);
   // Les curseurs d'evenements sont poses a la FIN des fichiers, deliberement :
   // rouvrir le serveur ne doit pas rejouer l'activite passee sur le canevas.
-  assert.deepEqual(recus, [], 'le rattrapage nourrit le chien de garde, il ne parle pas au canevas');
+  expect(recus, 'le rattrapage nourrit le chien de garde, il ne parle pas au canevas').toEqual([]);
 });
 
 test('demarrage: la ligne rapporte le nombre relu et n en conclut rien', async () => {
@@ -508,11 +501,11 @@ test('demarrage: la ligne rapporte le nombre relu et n en conclut rien', async (
     init: { journalPath: tmpFile(), now: HORLOGE },
   }));
   clearInterval(valeur);
-  assert.match(dits, /rattrapage : 10 evenements relus/);
+  expect(dits).toMatch(/rattrapage : 10 evenements relus/);
   // `runCatchUp` rend 0 dans QUATRE situations : pas de service, pas de dossier
   // nomme, dossier absent, dossier vide. Aucune ne permet de conclure quoi que
   // ce soit sur les pannes.
-  assert.doesNotMatch(dits, /aucune panne|pas de panne|rien a signaler/i);
+  expect(dits).not.toMatch(/aucune panne|pas de panne|rien a signaler/i);
 });
 
 test('demarrage: le battement bat, et ce qu il leve part sur le flux', async () => {
@@ -523,12 +516,11 @@ test('demarrage: le battement bat, et ce qu il leve part sur le flux', async () 
   // chose a dire, mais seulement sur le chemin du battement.
   fs.writeFileSync(path.join(dir, `${SID}.jsonl`), JSON.stringify(pre(1, T)) + '\n');
   const journalPath = tmpFile();
-  const recus = [];
+  const recus: any[] = [];
   // L'anteriorite se mesure AU MOMENT de la diffusion, pas apres coup : un
   // controle final ne prouverait que la coexistence des deux, jamais l'ordre.
-  const broadcastAlert = (alert) => {
-    assert.match(fs.readFileSync(journalPath, 'utf8'), new RegExp(echapper(alert.id)),
-      'consignee avant d etre dite');
+  const broadcastAlert = (alert: any) => {
+    expect(fs.readFileSync(journalPath, 'utf8'), 'consignee avant d etre dite').toMatch(new RegExp(echapper(alert.id)));
     recus.push(alert);
   };
   const { valeur } = await enEcoutant(() => idx.startWatchdog({
@@ -538,8 +530,8 @@ test('demarrage: le battement bat, et ce qu il leve part sur le flux', async () 
   try {
     await jusqua(() => recus.length > 0, 'une alerte levee par le battement');
   } finally { clearInterval(valeur); }
-  assert.equal(recus[0].type, 'stuck', 'le battement rend une ALERTE, l enveloppe est l affaire du serveur');
-  assert.equal(lignes(journalPath), 1);
+  expect(recus[0].type, 'le battement rend une ALERTE, l enveloppe est l affaire du serveur').toBe('stuck');
+  expect(lignes(journalPath)).toBe(1);
 });
 
 test('demarrage: le minuteur ne retient jamais le processus', async () => {
@@ -549,7 +541,7 @@ test('demarrage: le minuteur ne retient jamais le processus', async () => {
     init: { journalPath: tmpFile(), now: HORLOGE },
   }));
   try {
-    assert.equal(valeur.hasRef(), false, 'sans unref, `agent-viz start` ne rendrait jamais la main');
+    expect(valeur.hasRef(), 'sans unref, `agent-viz start` ne rendrait jamais la main').toBe(false);
   } finally { clearInterval(valeur); }
 });
 
@@ -564,8 +556,8 @@ test('demarrage: un rattrapage qui casse n empeche pas le serveur de demarrer', 
     init: { journalPath: tmpFile(), now: HORLOGE, loadModule: moduleCasse },
   }));
   try {
-    assert.match(dits, /detecteur casse/, 'et l on dit pourquoi le passe manque');
-    assert.ok(valeur, 'le battement est quand meme lance');
+    expect(dits, 'et l on dit pourquoi le passe manque').toMatch(/detecteur casse/);
+    expect(valeur, 'le battement est quand meme lance').toBeTruthy();
   } finally { clearInterval(valeur); }
 });
 
@@ -580,7 +572,7 @@ test('demarrage: sans service, le battement ne tue pas le processus', async () =
     // Une exception dans un rappel de minuteur n'est attrapee par personne :
     // elle tue le processus. Le chien de garde est un supplement.
     await new Promise(r => setTimeout(r, 60));
-    assert.equal(idx.getWatchdogService(), null);
+    expect(idx.getWatchdogService()).toBe(null);
   } finally { clearInterval(valeur); }
 });
 
@@ -588,9 +580,9 @@ test('demarrage: un battement qui leve ne tue pas le demon, et se dit une fois',
   const idx = await neufIndex();
   const vraiErr = console.error;
   const vraiLog = console.log;
-  const dits = [];
-  console.error = (...a) => dits.push(a.map(String).join(' '));
-  console.log = (...a) => dits.push(a.map(String).join(' '));
+  const dits: string[] = [];
+  console.error = (...a: any[]) => dits.push(a.map(String).join(' '));
+  console.log = (...a: any[]) => dits.push(a.map(String).join(' '));
   let battement;
   try {
     // Le battement bat toutes les 5 ms ; sans garde, la premiere exception
@@ -608,9 +600,9 @@ test('demarrage: un battement qui leve ne tue pas le demon, et se dit une fois',
     console.log = vraiLog;
   }
   const plaintes = dits.filter(l => /battement en echec/.test(l));
-  assert.equal(plaintes.length, 1, 'dite une fois — pas zero, pas a chaque battement');
-  assert.match(plaintes[0], /battement casse/);
-  assert.ok(idx.getWatchdogService(), 'et le service est toujours la, le processus aussi');
+  expect(plaintes.length, 'dite une fois — pas zero, pas a chaque battement').toBe(1);
+  expect(plaintes[0]).toMatch(/battement casse/);
+  expect(idx.getWatchdogService(), 'et le service est toujours la, le processus aussi').toBeTruthy();
 });
 
 test('demarrage: ce que le serveur oublie de fournir se dit a voix haute', async () => {
@@ -624,14 +616,14 @@ test('demarrage: ce que le serveur oublie de fournir se dit a voix haute', async
     init: { journalPath: tmpFile(), now: HORLOGE },
   }));
   clearInterval(sansFrontiere.valeur);
-  assert.match(sansFrontiere.dits, /sans frontiere du chemin vif/);
+  expect(sansFrontiere.dits).toMatch(/sans frontiere du chemin vif/);
 
   const sansCanal = await enEcoutant(async () => (await neufIndex()).startWatchdog({
     dir: tmpDir(), liveFrom: () => null, cadenceMs: 60_000,
     init: { journalPath: tmpFile(), now: HORLOGE },
   }));
   clearInterval(sansCanal.valeur);
-  assert.match(sansCanal.dits, /sans canal de diffusion/);
+  expect(sansCanal.dits).toMatch(/sans canal de diffusion/);
 
   // Controle negatif : fournis tous les deux, le demarrage n a rien a redire.
   const complet = await enEcoutant(async () => (await neufIndex()).startWatchdog({
@@ -639,7 +631,7 @@ test('demarrage: ce que le serveur oublie de fournir se dit a voix haute', async
     init: { journalPath: tmpFile(), now: HORLOGE },
   }));
   clearInterval(complet.valeur);
-  assert.doesNotMatch(complet.dits, /sans frontiere|sans canal/);
+  expect(complet.dits).not.toMatch(/sans frontiere|sans canal/);
 });
 
 // ─── Le dernier maillon : ce que `src/server/server.ts` passe reellement ─────
@@ -673,7 +665,7 @@ const SOURCE_SERVEUR = fs.readFileSync(
 // compromis, pas une garantie, et le voila dit.
 //
 // Rend null plutot que de lever : voir `appelSurveille`.
-function decouperAppel(source, nom) {
+function decouperAppel(source: string, nom: string) {
   const debut = source.indexOf(`${nom}({`);
   if (debut === -1) return null;
   let profondeur = 0;
@@ -689,18 +681,18 @@ function decouperAppel(source, nom) {
 // fichier au lieu des seuls tests de ce contrat, sans message qui dise pourquoi.
 function appelSurveille() {
   const appel = decouperAppel(SOURCE_SERVEUR, 'startWatchdog');
-  assert.ok(appel, 'appel `startWatchdog({` introuvable dans src/server/server.ts — reformatage ?');
+  expect(appel, 'appel `startWatchdog({` introuvable dans src/server/server.ts — reformatage ?').toBeTruthy();
   return appel;
 }
 
 test('serveur: le chien de garde recoit le vrai dossier et la vraie frontiere', () => {
   const appel = appelSurveille();
   // `DIR` : la seule definition faisant autorite du dossier d evenements.
-  assert.match(appel, /\bdir:\s*DIR\b/);
+  expect(appel).toMatch(/\bdir:\s*DIR\b/);
   // `liveFrom` : sans lui, les deux chemins relisent les memes octets et le
   // produit annonce des boucles qui n ont pas eu lieu. `startWatchdog` s en
   // plaint au demarrage, mais mieux vaut que la suite le dise d abord.
-  assert.match(appel, /\bliveFrom:\s*liveHandoffOffset\b/);
+  expect(appel).toMatch(/\bliveFrom:\s*liveHandoffOffset\b/);
 });
 
 test('serveur: l enveloppe SSE est composee ici, et le canal n est pas broadcastSSE nu', () => {
@@ -713,11 +705,7 @@ test('serveur: l enveloppe SSE est composee ici, et le canal n est pas broadcast
   // Le raccourci se verifie DANS LES DEUX SENS, d ou le `(?<=\1)` : `{ …, alert }` n est licite
   // que si le parametre s appelle `alert`. Sans cette moitie, `a => broadcastSSE({ type: 'alert', a })`
   // passe et emet `{type:'alert', a:{…}}`, ou le client du navigateur lit `msg.alert === undefined`.
-  assert.match(
-    appelSurveille(),
-    /broadcastAlert:\s*(\w+)\s*=>\s*broadcastSSE\(\{\s*type:\s*'alert',\s*(?:alert(?<=\1)|alert:\s*\1)\s*\}\)/,
-    'le chien de garde rend une alerte nue ; c est ICI que le protocole du serveur l habille',
-  );
+  expect(appelSurveille(), 'le chien de garde rend une alerte nue ; c est ICI que le protocole du serveur l habille').toMatch(/broadcastAlert:\s*(\w+)\s*=>\s*broadcastSSE\(\{\s*type:\s*'alert',\s*(?:alert(?<=\1)|alert:\s*\1)\s*\}\)/);
 });
 
 test('index: initWatchdog(null) ne fabrique pas une promesse rejetee', async () => {
@@ -726,6 +714,6 @@ test('index: initWatchdog(null) ne fabrique pas une promesse rejetee', async () 
   // produit un TypeError, donc une promesse rejetee memorisee — le meme rejet non attrape que
   // `initWatchdog` evite pour un module de detection absent.
   const service = await idx.initWatchdog(null);
-  assert.ok(service, 'un appelant qui passe null merite un service, pas un plantage');
-  assert.equal(idx.getWatchdogService(), service);
+  expect(service, 'un appelant qui passe null merite un service, pas un plantage').toBeTruthy();
+  expect(idx.getWatchdogService()).toBe(service);
 });

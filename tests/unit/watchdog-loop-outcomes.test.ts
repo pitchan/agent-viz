@@ -4,22 +4,21 @@
 // someone for. The detector can only say it if it remembers how each call
 // ended, so that is what these tests pin.
 
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { expect, test } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { createWatchdog } from '../../src/engine/watchdog/detector.ts';
+import { createWatchdog, type Alert } from '../../src/engine/watchdog/detector.ts';
 
 const T = 1_700_000_000_000;
 const SID = 'sess-1';
 
-function pre(i, ts) {
+function pre(i: number, ts: number) {
   return {
     hook_event_name: 'PreToolUse', session_id: SID, tool_name: 'Bash',
     tool_use_id: `t${i}`, tool_input: { command: 'npm run build' },
     cwd: 'f:\\DEV\\projet', _ts: new Date(ts).toISOString(),
   };
 }
-function post(i, ts, failed) {
+function post(i: number, ts: number, failed: boolean) {
   return {
     hook_event_name: failed ? 'PostToolUseFailure' : 'PostToolUse',
     session_id: SID, tool_name: 'Bash', tool_use_id: `t${i}`,
@@ -28,11 +27,11 @@ function post(i, ts, failed) {
 }
 
 // Four identical calls, the first three already came back failing.
-function runFailingLoop(wd) {
-  let last = null;
+function runFailingLoop(wd: ReturnType<typeof createWatchdog>): Alert | null {
+  let last: Alert | null = null;
   for (let i = 1; i <= 4; i++) {
     const r = wd.processEvent(pre(i, T + i * 1000));
-    if (r.newAlerts.length) last = r.newAlerts[0];
+    if (r.newAlerts.length) last = r.newAlerts[0]!;
     if (i < 4) wd.processEvent(post(i, T + i * 1000 + 500, true));
   }
   return last;
@@ -41,11 +40,10 @@ function runFailingLoop(wd) {
 test('loop: chaque occurrence porte son identifiant et son issue', () => {
   const wd = createWatchdog({ now: () => T + 10_000 });
   const alert = runFailingLoop(wd);
-  assert.ok(alert, 'la boucle doit lever une alerte');
-  assert.equal(alert.occurrences.length, 4);
-  assert.deepEqual(alert.occurrences.map(o => o.toolUseId), ['t1', 't2', 't3', 't4']);
-  assert.deepEqual(alert.occurrences.map(o => o.failed), [true, true, true, null],
-    'le dernier appel est encore en vol : son issue est inconnue, pas fausse');
+  expect(alert, 'la boucle doit lever une alerte').toBeTruthy();
+  expect(alert!.occurrences.length).toBe(4);
+  expect(alert!.occurrences.map(o => o.toolUseId)).toEqual(['t1', 't2', 't3', 't4']);
+  expect(alert!.occurrences.map(o => o.failed), 'le dernier appel est encore en vol : son issue est inconnue, pas fausse').toEqual([true, true, true, null]);
 });
 
 test('loop: le libelle COMPTE les echecs, il ne quantifie jamais', () => {
@@ -54,48 +52,47 @@ test('loop: le libelle COMPTE les echecs, il ne quantifie jamais', () => {
   // affirmerait sur un appel dont l'issue n'est pas connue — et qui ne le sera
   // jamais, l'alerte etant une photographie.
   const alert = runFailingLoop(wd);
-  assert.ok(alert, 'la boucle doit lever une alerte');
-  assert.match(alert.message, / — 3 of 4 failing$/);
-  assert.doesNotMatch(alert.message, /\ball\b/);
+  expect(alert, 'la boucle doit lever une alerte').toBeTruthy();
+  expect(alert!.message).toMatch(/ — 3 of 4 failing$/);
+  expect(alert!.message).not.toMatch(/\ball\b/);
 });
 
 test('loop: une repetition qui reussit ne parle pas d echec', () => {
   const wd = createWatchdog({ now: () => T + 10_000 });
-  let last = null;
+  let last: Alert | null = null;
   for (let i = 1; i <= 4; i++) {
     const r = wd.processEvent(pre(i, T + i * 1000));
-    if (r.newAlerts.length) last = r.newAlerts[0];
+    if (r.newAlerts.length) last = r.newAlerts[0]!;
     if (i < 4) wd.processEvent(post(i, T + i * 1000 + 500, false));
   }
-  assert.ok(last, 'la boucle doit lever une alerte');
-  assert.doesNotMatch(last.message, /failing/);
+  expect(last, 'la boucle doit lever une alerte').toBeTruthy();
+  expect(last!.message).not.toMatch(/failing/);
 });
 
 test('loop: une repetition en partie en echec compte, elle ne generalise pas', () => {
   const wd = createWatchdog({ now: () => T + 10_000 });
-  let last = null;
+  let last: Alert | null = null;
   for (let i = 1; i <= 4; i++) {
     const r = wd.processEvent(pre(i, T + i * 1000));
-    if (r.newAlerts.length) last = r.newAlerts[0];
+    if (r.newAlerts.length) last = r.newAlerts[0]!;
     if (i < 4) wd.processEvent(post(i, T + i * 1000 + 500, i === 1));
   }
-  assert.ok(last, 'la boucle doit lever une alerte');
-  assert.match(last.message, / — 1 of 4 failing$/);
+  expect(last, 'la boucle doit lever une alerte').toBeTruthy();
+  expect(last!.message).toMatch(/ — 1 of 4 failing$/);
 });
 
 test('une interruption humaine n est pas un echec de la commande', () => {
   const wd = createWatchdog({ now: () => T + 10_000 });
-  let last = null;
+  let last: Alert | null = null;
   for (let i = 1; i <= 4; i++) {
     const r = wd.processEvent(pre(i, T + i * 1000));
-    if (r.newAlerts.length) last = r.newAlerts[0];
+    if (r.newAlerts.length) last = r.newAlerts[0]!;
     // Echap humain : l appel s arrete, mais on n apprend RIEN sur la commande.
     if (i < 4) wd.processEvent({ ...post(i, T + i * 1000 + 500, true), is_interrupt: true });
   }
-  assert.ok(last, 'la boucle doit lever une alerte');
-  assert.deepEqual(last.occurrences.map(o => o.failed), [null, null, null, null],
-    'inconnu, pas echoue : compter une reprise en main comme une panne serait une fausse alerte');
-  assert.doesNotMatch(last.message, /failing/);
+  expect(last, 'la boucle doit lever une alerte').toBeTruthy();
+  expect(last!.occurrences.map(o => o.failed), 'inconnu, pas echoue : compter une reprise en main comme une panne serait une fausse alerte').toEqual([null, null, null, null]);
+  expect(last!.message).not.toMatch(/failing/);
 });
 
 // Ce que ce test protege : la DONNEE, pas seulement sa mise en forme.
@@ -116,45 +113,43 @@ test('une interruption humaine n est pas un echec de la commande', () => {
 // Mutation attrapee : `occ.slice(0, N).map(...)` chez le producteur.
 test('loop: l alerte porte toutes les repetitions de la fenetre, jamais un echantillon', () => {
   const wd = createWatchdog({ now: () => T + 60_000 });
-  let premiere = null;
+  let premiere: Alert | null = null;
   for (let i = 1; i <= 4; i++) {
     const r = wd.processEvent(pre(i, T + i * 1000));
-    if (r.newAlerts.length) premiere = r.newAlerts[0];
+    if (r.newAlerts.length) premiere = r.newAlerts[0]!;
   }
-  assert.equal(premiere.count, 4, 'la premiere alerte se leve au seuil');
+  expect(premiere!.count, 'la premiere alerte se leve au seuil').toBe(4);
 
   // Sous le verrou : la boucle continue, rien ne se leve, tout s'accumule.
   for (let i = 5; i <= 7; i++) {
-    assert.equal(wd.processEvent(pre(i, T + i * 1000)).newAlerts.length, 0,
-      'une alerte deja active dedoublonne');
+    expect(wd.processEvent(pre(i, T + i * 1000)).newAlerts.length, 'une alerte deja active dedoublonne').toBe(0);
   }
 
-  wd.acknowledge(premiere.id);
-  const seconde = wd.processEvent(pre(8, T + 8000)).newAlerts[0];
+  wd.acknowledge(premiere!.id);
+  const seconde = wd.processEvent(pre(8, T + 8000)).newAlerts[0]!;
 
-  assert.ok(seconde, 'le verrou a saute : la boucle qui dure doit se redire');
-  assert.equal(seconde.count, 8, 'les huit appels tiennent dans la fenetre de 60 s');
-  assert.equal(seconde.occurrences.length, 8, 'le compte n est pas plus riche que la donnee');
-  assert.deepEqual(seconde.occurrences.map(o => o.toolUseId),
-    ['t1', 't2', 't3', 't4', 't5', 't6', 't7', 't8']);
-  assert.match(seconde.message, /called 8×/);
+  expect(seconde, 'le verrou a saute : la boucle qui dure doit se redire').toBeTruthy();
+  expect(seconde.count, 'les huit appels tiennent dans la fenetre de 60 s').toBe(8);
+  expect(seconde.occurrences.length, 'le compte n est pas plus riche que la donnee').toBe(8);
+  expect(seconde.occurrences.map(o => o.toolUseId)).toEqual(['t1', 't2', 't3', 't4', 't5', 't6', 't7', 't8']);
+  expect(seconde.message).toMatch(/called 8×/);
 });
 
 test('toute alerte porte le projet ou elle s est produite', () => {
   const wd = createWatchdog({ now: () => T + 10_000 });
-  assert.equal(runFailingLoop(wd).cwd, 'f:\\DEV\\projet');
+  expect(runFailingLoop(wd)!.cwd).toBe('f:\\DEV\\projet');
 });
 
 test('retryStorm porte lui aussi le projet', () => {
   const wd = createWatchdog({ now: () => T + 10_000 });
-  let last = null;
+  let last: Alert | null = null;
   for (let i = 1; i <= 3; i++) {
     const r = wd.processEvent(post(i, T + i * 1000, true));
-    if (r.newAlerts.length) last = r.newAlerts[0];
+    if (r.newAlerts.length) last = r.newAlerts[0]!;
   }
-  assert.ok(last, 'trois echecs consecutifs doivent lever une alerte');
-  assert.equal(last.type, 'retryStorm');
-  assert.equal(last.cwd, 'f:\\DEV\\projet');
+  expect(last, 'trois echecs consecutifs doivent lever une alerte').toBeTruthy();
+  expect(last!.type).toBe('retryStorm');
+  expect(last!.cwd).toBe('f:\\DEV\\projet');
 });
 
 test('stuck porte aussi le projet, sans avoir d evenement sous la main', () => {
@@ -163,8 +158,8 @@ test('stuck porte aussi le projet, sans avoir d evenement sous la main', () => {
   wd.processEvent(pre(1, T));
   clock = T + 4 * 60_000;               // au-dela de silenceMs, en deca d abandonnedMs
   const { newAlerts } = wd.tick();
-  assert.equal(newAlerts.length, 1);
-  assert.equal(newAlerts[0].cwd, 'f:\\DEV\\projet');
+  expect(newAlerts.length).toBe(1);
+  expect(newAlerts[0]!.cwd).toBe('f:\\DEV\\projet');
 });
 
 // ─── Le relevé réel ────────────────────────────────────────────────────────
@@ -188,29 +183,25 @@ test('un releve reel de PostToolUseFailure marque bien son occurrence en echec',
   };
   wd.processEvent(paired);
   wd.processEvent(failureEvent);        // le relevé, sans rien y toucher
-  let last = null;
+  let last: Alert | null = null;
   for (let i = 2; i <= 4; i++) {
     const r = wd.processEvent({
       ...paired, tool_use_id: `t${i}`, _ts: new Date(FT - 4000 + i * 1000).toISOString(),
     });
-    if (r.newAlerts.length) last = r.newAlerts[0];
+    if (r.newAlerts.length) last = r.newAlerts[0]!;
   }
-  assert.ok(last, 'quatre appels identiques doivent lever une alerte');
-  assert.equal(last.occurrences[0].toolUseId, failureEvent.tool_use_id);
-  assert.deepEqual(last.occurrences.map(o => o.failed), [true, null, null, null]);
-  assert.equal(last.cwd, failureEvent.cwd);
-  assert.match(last.message, / — 1 of 4 failing$/,
-    'un seul echec connu sur quatre se dit comme tel, jamais « all »');
+  expect(last, 'quatre appels identiques doivent lever une alerte').toBeTruthy();
+  expect(last!.occurrences[0]!.toolUseId).toBe(failureEvent.tool_use_id);
+  expect(last!.occurrences.map(o => o.failed)).toEqual([true, null, null, null]);
+  expect(last!.cwd).toBe(failureEvent.cwd);
+  expect(last!.message, 'un seul echec connu sur quatre se dit comme tel, jamais « all »').toMatch(/ — 1 of 4 failing$/);
 });
 
 // Aucun detecteur ne consomme `error` ni `duration_ms`, d ou cette assertion : sans elle,
 // les retirer de la charge relevee laisserait la suite verte, et leur forme reelle serait
 // perdue en silence. On epingle la FORME, pas un libelle.
 test('la charge relevee porte error en chaine et duration_ms en nombre', () => {
-  assert.equal(typeof failureEvent.error, 'string',
-    'error est une chaine plate, pas un objet structure');
-  assert.match(failureEvent.error, /^Exit code \d+\n[\s\S]+$/,
-    'code de sortie puis stderr, colles par un \\n');
-  assert.ok(Number.isFinite(failureEvent.duration_ms),
-    'duration_ms est une duree en millisecondes');
+  expect(typeof failureEvent.error, 'error est une chaine plate, pas un objet structure').toBe('string');
+  expect(failureEvent.error, 'code de sortie puis stderr, colles par un \\n').toMatch(/^Exit code \d+\n[\s\S]+$/);
+  expect(Number.isFinite(failureEvent.duration_ms), 'duration_ms est une duree en millisecondes').toBeTruthy();
 });
