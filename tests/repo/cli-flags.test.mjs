@@ -15,7 +15,7 @@ const HOOK_SONDE = "export function runHook() { console.log('SONDE_HOOK_OK'); }\
 // `server/cli.js` sort de la liste des témoins : bin/agent-viz.js appelle
 // directement ses `cmdXxx`, un module vide casserait l'appel avant même que
 // les fichiers témoins ci-dessous soient importés. Il garde donc le
-// contenu par défaut de bin-sandbox.mjs (le miroir de src/server/cli.ts).
+// contenu par défaut de bin-sandbox.ts (le miroir de src/server/cli.ts).
 function ecrireDistAvecTemoins(racine, contenus = {}) {
   const temoins = Object.fromEntries(REQUIS.filter(rel => rel !== 'server/cli.js').map(rel => {
     const versRacine = '../'.repeat(rel.split('/').length);

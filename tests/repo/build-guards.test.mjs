@@ -230,7 +230,7 @@ test('la liste du bac a sable est le miroir exact de REQUIRED_DIST_FILES', () =>
     'REQUIS (tests/helpers/bin-sandbox.ts) doit lister exactement les memes fichiers que la garde');
 });
 
-// Meme famille de verrou que le precedent, pour le meme risque : cli-defaut-stub.mjs
+// Meme famille de verrou que le precedent, pour le meme risque : cli-defaut-stub.ts
 // recopie a la main les exports de src/server/cli.ts (les bacs a sable doivent rester
 // hermetiques, sans dependre d'un `npm run build` du vrai depot). Sans ce verrou, un export
 // renomme ou retire dans cli.ts laisserait le stub silencieusement desynchronise, et seul
@@ -247,5 +247,5 @@ test('le stub par defaut de dist/server/cli.js exporte exactement les memes fonc
 
   // Assert
   assert.deepEqual(exportsStub, exportsReels,
-    'cli-defaut-stub.mjs (tests/helpers/) doit exporter exactement les memes fonctions, dans le meme ordre, que src/server/cli.ts');
+    'cli-defaut-stub.ts (tests/helpers/) doit exporter exactement les memes fonctions, dans le meme ordre, que src/server/cli.ts');
 });

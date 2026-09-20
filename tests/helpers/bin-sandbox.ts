@@ -41,7 +41,7 @@ export function nouvelleRacine(prefixe: string, { version = '0.0.0', bom = false
   fs.copyFileSync(BIN_REEL, path.join(racine, 'bin', 'agent-viz.js'));
   if (!sansPackageJson) {
     const contenu = JSON.stringify({ name: 'sonde-agent-viz', version, type: 'module' });
-    fs.writeFileSync(path.join(racine, 'package.json'), bom ? `﻿${contenu}` : contenu);
+    fs.writeFileSync(path.join(racine, 'package.json'), bom ? `\uFEFF${contenu}` : contenu);
   }
   return racine;
 }
