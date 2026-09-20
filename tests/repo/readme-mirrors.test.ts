@@ -1,8 +1,7 @@
 // Le README recopie deux données du code : les événements que capture le hook de
 // Claude Code, et le nombre de copies gardées par fichier de hooks. Ce test les
 // verrouille contre leur source, qui fait foi.
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { expect, test } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { AGENT_CONFIG } from '../../src/server/install-hooks/config.ts';
@@ -13,7 +12,7 @@ const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const readme = () => readFileSync(path.join(ROOT, 'README.md'), 'utf8').replace(/\r\n/g, '\n');
 
 // Une section de niveau 2, sous-sections comprises, jusqu'au titre de niveau 2 suivant.
-function section(texte, titre) {
+function section(texte: string, titre: string) {
   const debut = texte.indexOf(`## ${titre}\n`);
   const fin = texte.indexOf('\n## ', debut + 1);
   return debut === -1 ? '' : texte.slice(debut, fin === -1 ? undefined : fin);
@@ -24,10 +23,10 @@ test('le README « Captured events » nomme exactement les événements du hook 
   const attendus = [...AGENT_CONFIG.claude.events].sort();
   const texte = section(readme(), 'Captured events');
   // Act
-  const premierePhrase = (texte.split('\n').find(ligne => ligne.startsWith('`')) ?? '').split('. ')[0];
+  const premierePhrase = (texte.split('\n').find((ligne: string) => ligne.startsWith('`')) ?? '').split('. ')[0]!;
   const nommes = [...premierePhrase.matchAll(/`([A-Za-z]+)`/g)].map(m => m[1]).sort();
   // Assert
-  assert.deepEqual(nommes, attendus, texte);
+  expect(nommes, texte).toEqual(attendus);
 });
 
 test('le README marque « Claude Code only » chaque événement que Copilot ne capture pas', () => {
@@ -37,9 +36,9 @@ test('le README marque « Claude Code only » chaque événement que Copilot ne 
   // Act
   const texte = section(readme(), 'Captured events');
   // Assert
-  assert.ok(propresAClaude.length > 0, 'aucun événement propre à Claude Code : le test ne vérifie plus rien');
+  expect(propresAClaude.length > 0, 'aucun événement propre à Claude Code : le test ne vérifie plus rien').toBeTruthy();
   for (const ev of propresAClaude) {
-    assert.ok(texte.includes(`\`${ev}\` (Claude Code only)`), `« \`${ev}\` (Claude Code only) » attendu :\n${texte}`);
+    expect(texte.includes(`\`${ev}\` (Claude Code only)`), `« \`${ev}\` (Claude Code only) » attendu :\n${texte}`).toBeTruthy();
   }
 });
 
@@ -49,5 +48,5 @@ test('le README « Hook management » annonce le nombre de copies que garde le m
   // Act
   const texte = section(readme(), 'Hook management');
   // Assert
-  assert.ok(texte.includes(attendu), `« ${attendu} » attendu dans « Hook management » :\n${texte}`);
+  expect(texte.includes(attendu), `« ${attendu} » attendu dans « Hook management » :\n${texte}`).toBeTruthy();
 });

@@ -1,8 +1,7 @@
 // La doc Node dit que `stripTypeScriptTypes` n'est pas stable d'une version
 // à l'autre : ce test rejoue, sur les 32 vrais fichiers servis au navigateur
 // (29 modules + 3 primitives du moteur), le même retrait que le serveur.
-import { test, after } from 'node:test';
-import assert from 'node:assert/strict';
+import { afterAll, expect, test } from 'vitest';
 import { readdirSync, statSync, readFileSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -17,7 +16,7 @@ process.env.TMP = BAC;
 process.env.TMPDIR = BAC;
 process.env.USERPROFILE = BAC;
 process.env.HOME = BAC;
-after(() => rmSync(BAC, { recursive: true, force: true }));
+afterAll(() => rmSync(BAC, { recursive: true, force: true }));
 
 const { ROUTES, readStaticFile } = await import('../../src/server/routes.ts');
 
@@ -29,7 +28,7 @@ const ROOT = path.resolve(import.meta.dirname, '..', '..');
 function enginePrimitives() {
   return ROUTES
     .filter(r => r.method === 'GET' && typeof r.path === 'string' && r.path.startsWith('/src/engine/'))
-    .map(r => path.join(ROOT, ...r.path.split('/')));
+    .map(r => path.join(ROOT, ...r.path!.split('/')));
 }
 
 // Le préfixe `/src/web/` sert tout ce qui est sur le disque : on énumère donc
@@ -51,9 +50,9 @@ const PRIMITIVES = enginePrimitives();
 const SERVED = [...MODULES, ...PRIMITIVES];
 
 test('la liste blanche sert exactement 32 fichiers (29 modules + 3 primitives du moteur)', () => {
-  assert.equal(MODULES.length, 29, `ASSIETTE : ${MODULES.length} module(s) .ts sous src/web, attendu 29.`);
-  assert.equal(PRIMITIVES.length, 3, `ASSIETTE : ${PRIMITIVES.length} primitive(s) du moteur en liste blanche, attendu 3.`);
-  assert.equal(SERVED.length, 32);
+  expect(MODULES.length, `ASSIETTE : ${MODULES.length} module(s) .ts sous src/web, attendu 29.`).toBe(29);
+  expect(PRIMITIVES.length, `ASSIETTE : ${PRIMITIVES.length} primitive(s) du moteur en liste blanche, attendu 3.`).toBe(3);
+  expect(SERVED.length).toBe(32);
 });
 
 test('aucun prefixe de route ne recouvre /src/engine/ : le filtre ci-dessus ne saute rien', () => {
@@ -67,14 +66,13 @@ test('aucun prefixe de route ne recouvre /src/engine/ : le filtre ci-dessus ne s
   // tout le moteur. Le premier ne passe que `r.prefix.startsWith(...)`, le
   // second que `...startsWith(r.prefix)`. Les deux sens, donc. `/src/web/`,
   // la route legitime, n'est attrape par aucun des deux.
-  const recouvre = (prefixe) => prefixe.startsWith('/src/engine')
+  const recouvre = (prefixe: string) => prefixe.startsWith('/src/engine')
     || '/src/engine/'.startsWith(prefixe);
   const fautives = ROUTES
     .filter(r => typeof r.prefix === 'string' && recouvre(r.prefix))
     .map(r => r.prefix);
-  assert.deepEqual(fautives, [],
-    'la liste blanche du moteur nomme des chemins exacts : aucun prefixe ne doit '
-    + `recouvrir /src/engine/ — trouve : ${fautives.join(', ')}`);
+  expect(fautives, 'la liste blanche du moteur nomme des chemins exacts : aucun prefixe ne doit '
+    + `recouvrir /src/engine/ — trouve : ${fautives.join(', ')}`).toEqual([]);
 });
 
 for (const abs of SERVED) {
@@ -88,13 +86,9 @@ for (const abs of SERVED) {
     const { mime, body } = await readStaticFile(abs);
 
     // Assert
-    assert.equal(mime, 'application/javascript; charset=utf-8');
-    assert.equal(
-      body.toString('utf8').split('\n').length,
-      source.split('\n').length,
-      `${rel} : le corps servi n'a pas le même nombre de lignes que la source — `
-      + 'les piles d\'erreur du navigateur mentiraient sur le numéro de ligne.',
-    );
+    expect(mime).toBe('application/javascript; charset=utf-8');
+    expect(body.toString('utf8').split('\n').length, `${rel} : le corps servi n'a pas le même nombre de lignes que la source — `
+      + 'les piles d\'erreur du navigateur mentiraient sur le numéro de ligne.').toBe(source.split('\n').length);
 
     // .mjs et non .js : sans package.json dans le bac, Node 24 classe un
     // .js par detection et ne verifie RIEN si le corps ressemble a un
@@ -103,8 +97,8 @@ for (const abs of SERVED) {
     writeFileSync(compile, body);
     try {
       execFileSync(process.execPath, ['--check', compile], { stdio: 'pipe' });
-    } catch (err) {
-      assert.fail(`${rel} : node --check refuse le corps servi :\n${String(err.stderr || err.message)}`);
+    } catch (err: any) {
+      expect.fail(`${rel} : node --check refuse le corps servi :\n${String(err.stderr || err.message)}`);
     }
   });
 }

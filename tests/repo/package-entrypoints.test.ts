@@ -10,8 +10,7 @@
 //
 // Chaque entree de `files` est un chemin LITTERAL (le depot n emploie aucun glob) : un motif
 // y rougirait nommement, un faux positif visible plutot qu un faux negatif silencieux.
-import { test, after } from 'node:test';
-import assert from 'node:assert/strict';
+import { afterAll, expect, test } from 'vitest';
 import { readFileSync, statSync, mkdtempSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -23,22 +22,22 @@ const PKG = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
 // designer un FICHIER. Ce troisieme champ n est pas decoratif : un `bin` ou un
 // `main` qui pointerait sur un DOSSIER resout quand meme, et `statSync` seul le
 // laisserait passer.
-function entreesDeclarees(pkg) {
-  const acc = [];
+function entreesDeclarees(pkg: any) {
+  const acc: { origine: string; valeur: string; fichier: boolean }[] = [];
   for (const [nom, valeur] of Object.entries(pkg.bin ?? {})) {
-    acc.push({ origine: `bin.${nom}`, valeur, fichier: true });
+    acc.push({ origine: `bin.${nom}`, valeur: valeur as string, fichier: true });
   }
   if (typeof pkg.main === 'string') {
     acc.push({ origine: 'main', valeur: pkg.main, fichier: true });
   }
-  (pkg.files ?? []).forEach((valeur, i) => {
+  (pkg.files ?? []).forEach((valeur: string, i: number) => {
     acc.push({ origine: `files[${i}]`, valeur, fichier: false });
   });
   return acc;
 }
 
 // `null` quand l entree resout. Sinon, la raison, en clair.
-function defaut(entree) {
+function defaut(entree: { origine: string; valeur: string; fichier: boolean }) {
   let etat;
   try {
     etat = statSync(path.join(ROOT, entree.valeur));
@@ -59,13 +58,9 @@ test('chaque point d entree declare resout sur le disque', () => {
     .map(({ entree, raison }) => `${entree.origine} → ${entree.valeur} : ${raison}`);
 
   // Assert
-  assert.deepEqual(
-    mortes,
-    [],
-    'npm ignore EN SILENCE une entree `files` inexistante, et un `bin` mort ne se voit qu a ' +
+  expect(mortes, 'npm ignore EN SILENCE une entree `files` inexistante, et un `bin` mort ne se voit qu a ' +
       'l installation. Faire suivre l adresse au deplacement — ou, si l entree vit sous `dist/`, ' +
-      'lancer `npm run build` avant de conclure.',
-  );
+      'lancer `npm run build` avant de conclure.').toEqual([]);
 });
 
 // `tsc` ecrase ce qu il emet mais n efface pas ce qu il n emet plus : sans l effacement en
@@ -90,13 +85,9 @@ test('le script build efface dist/engine avant de compiler', () => {
   }
 
   // Assert
-  assert.deepEqual(
-    manques,
-    [],
-    'le build doit s auto-nettoyer : sans cet effacement, un marqueur ou un fichier emis par une ' +
+  expect(manques, 'le build doit s auto-nettoyer : sans cet effacement, un marqueur ou un fichier emis par une ' +
       'version anterieure survit dans `dist/engine/` et repart dans le tarball, sans qu aucune ' +
-      'commande ne rougisse (exit 0).',
-  );
+      'commande ne rougisse (exit 0).').toEqual([]);
 });
 
 test('package.json declare encore ses trois familles de points d entree', () => {
@@ -111,13 +102,9 @@ test('package.json declare encore ses trois familles de points d entree', () => 
   if (!Array.isArray(PKG.files) || PKG.files.length === 0) manques.push('files');
 
   // Assert
-  assert.deepEqual(
-    manques,
-    [],
-    'un champ de point d entree disparu ne fait rougir aucun autre filet du depot : retirer ' +
+  expect(manques, 'un champ de point d entree disparu ne fait rougir aucun autre filet du depot : retirer ' +
       '`files` livrerait tout l arbre dans le tarball, retirer `bin` ou `main` livrerait un ' +
-      'paquet sans commande ni entree de module.',
-  );
+      'paquet sans commande ni entree de module.').toEqual([]);
 });
 
 // Une route /src/engine/... servie mais absente de `files` ne serait pas
@@ -126,19 +113,19 @@ test('package.json declare encore ses trois familles de points d entree', () => 
 
 // Charger `routes.ts` charge `session-index.ts`, qui cree
 // `os.tmpdir()/agent-events` des sa lecture : le bac est pose avant l'import,
-// meme parade que `served-web-graph.test.mjs`.
+// meme parade que `served-web-graph.test.ts`.
 const BAC = mkdtempSync(path.join(os.tmpdir(), 'avtest-entrypoints-'));
 process.env.TEMP = BAC;
 process.env.TMP = BAC;
 process.env.TMPDIR = BAC;
 process.env.USERPROFILE = BAC;
 process.env.HOME = BAC;
-after(() => rmSync(BAC, { recursive: true, force: true }));
+afterAll(() => rmSync(BAC, { recursive: true, force: true }));
 
 // Verificateur pur : `routes` sont des chemins relatifs (sans le '/' de tete,
 // la forme que `files` porte) ; `files` est l'ensemble declare par
 // `package.json`. Rend les routes absentes du manifeste, EN LES NOMMANT.
-export function routesAbsentesDuManifeste(routes, files) {
+export function routesAbsentesDuManifeste(routes: string[], files: Set<string>) {
   return routes.filter((r) => !files.has(r));
 }
 
@@ -147,7 +134,7 @@ test('le verificateur signale une route absente du manifeste, en la nommant', ()
     ['src/engine/core/usage.ts', 'src/engine/core/clock-time.ts'],
     new Set(['src/engine/core/usage.ts']),
   );
-  assert.deepEqual(absentes, ['src/engine/core/clock-time.ts']);
+  expect(absentes).toEqual(['src/engine/core/clock-time.ts']);
 });
 
 test('le verificateur accepte quand toutes les routes figurent dans le manifeste', () => {
@@ -155,25 +142,21 @@ test('le verificateur accepte quand toutes les routes figurent dans le manifeste
     ['src/engine/core/usage.ts'],
     new Set(['src/engine/core/usage.ts', 'dist/engine/']),
   );
-  assert.deepEqual(absentes, []);
+  expect(absentes).toEqual([]);
 });
 
 const { ROUTES } = await import('../../src/server/routes.ts');
 const routesEngine = ROUTES
   .filter((r) => typeof r.path === 'string' && r.path.startsWith('/src/engine/'))
-  .map((r) => r.path.slice(1)); // retire le '/' de tete : `files` porte des chemins relatifs
+  .map((r) => r.path!.slice(1)); // retire le '/' de tete : `files` porte des chemins relatifs
 
 test('assiette : au moins une route /src/engine/... a verifier', () => {
   // Un balayage qui ne voit rien passerait aussi, et ne prouverait rien.
-  assert.ok(routesEngine.length >= 1, `assiette suspecte : ${routesEngine.length} route(s) vue(s).`);
+  expect(routesEngine.length >= 1, `assiette suspecte : ${routesEngine.length} route(s) vue(s).`).toBeTruthy();
 });
 
 test('chaque route /src/engine/... du serveur figure dans `files`', () => {
   const absentes = routesAbsentesDuManifeste(routesEngine, new Set(PKG.files ?? []));
-  assert.deepEqual(
-    absentes,
-    [],
-    'route(s) servie(s) par le serveur mais absente(s) de `files` : le paquet publie ne les ' +
-      `livrerait pas, alors que le serveur de developpement les sert : ${absentes.join(', ')}`,
-  );
+  expect(absentes, 'route(s) servie(s) par le serveur mais absente(s) de `files` : le paquet publie ne les ' +
+      `livrerait pas, alors que le serveur de developpement les sert : ${absentes.join(', ')}`).toEqual([]);
 });

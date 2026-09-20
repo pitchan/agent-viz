@@ -4,7 +4,7 @@
 //
 // Ce filet n'est PAS un test unitaire (il lit le vrai disque, cf. `tests/CLAUDE.md` § 4) :
 // c'est une vérification d'hygiène du dépôt, d'où `tests/repo/` — même famille que
-// `stale-path-citations.test.mjs` et `documentation-citations.test.mjs`.
+// `stale-path-citations.test.ts` et `documentation-citations.test.mjs`.
 //
 // Deux règles, lues sur ce que `tests/helpers/comment-lines.ts` reconnaît comme commentaire :
 //   1. aucune ligne de commentaire ne porte un des marqueurs de MOTIFS ;
@@ -13,8 +13,7 @@
 // Une donnée datée qui n'est pas un récit, comme la date à laquelle un tarif change, entre
 // dans LISTE_BLANCHE avec sa raison ; une entrée qui ne couvre plus rien est ROUGE, sans quoi
 // elle couvrirait un jour un récit neuf.
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { expect, test } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { commentPart, commentBlocks } from '../helpers/comment-lines.ts';
@@ -51,12 +50,12 @@ const MARQUEUR = new RegExp(MOTIFS.map((m) => String.raw`(?<![\p{L}\p{N}_])` + m
 
 // La détection, une seule, partagée par le balayage réel et par le contrôle négatif : le
 // marqueur trouvé dans la part commentée de la ligne, ou `null`.
-export function marqueurDeRecit(ligne) {
+export function marqueurDeRecit(ligne: string) {
   const trouve = commentPart(ligne).match(MARQUEUR);
   return trouve ? trouve[0] : null;
 }
 
-export function blocsTropLongs(lignes, limite = LIMITE_BLOC) {
+export function blocsTropLongs(lignes: string[], limite = LIMITE_BLOC) {
   return commentBlocks(lignes).filter((b) => b.length > limite);
 }
 
@@ -105,7 +104,7 @@ const LISTE_BLANCHE = [
 
 function fichiersBalayes() {
   const acc = [];
-  const marche = (dir) => {
+  const marche = (dir: string) => {
     for (const e of readdirSync(dir, { withFileTypes: true })) {
       const abs = path.join(dir, e.name);
       if (e.isDirectory()) {
@@ -120,10 +119,13 @@ function fichiersBalayes() {
   return acc;
 }
 
-const lignesDe = (rel) => readFileSync(path.join(ROOT, rel), 'utf8').split(/\r?\n/);
+const lignesDe = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8').split(/\r?\n/);
+
+type Occurrence = { fichier: string; ligne: number; marqueur: string; texte: string };
+type EntreeBlanche = { fichier: string; fragment: string; raison: string };
 
 function lignesDeRecit() {
-  const trouvees = [];
+  const trouvees: Occurrence[] = [];
   for (const rel of fichiersBalayes()) {
     lignesDe(rel).forEach((ligne, i) => {
       const marqueur = marqueurDeRecit(ligne);
@@ -133,10 +135,10 @@ function lignesDeRecit() {
   return trouvees;
 }
 
-const couvertePar = (occ, liste = LISTE_BLANCHE) =>
+const couvertePar = (occ: Occurrence, liste: EntreeBlanche[] = LISTE_BLANCHE) =>
   liste.find((e) => e.fichier === occ.fichier && occ.texte.includes(e.fragment));
 
-const orphelinesDe = (liste, vues) => liste.filter((e) => !vues.some((o) => couvertePar(o, [e])));
+const orphelinesDe = (liste: EntreeBlanche[], vues: Occurrence[]) => liste.filter((e) => !vues.some((o) => couvertePar(o, [e])));
 
 // ── L'instrument prouve qu'il mord ───────────────────────────────────────────
 test('une ligne de commentaire fabriquée qui renvoie à une étape numérotée est refusée', () => {
@@ -148,19 +150,19 @@ test('une ligne de commentaire fabriquée qui renvoie à une étape numérotée 
   const marqueur = marqueurDeRecit(fabriquee);
 
   // Assert
-  assert.equal(marqueur, 'étape 3', `la ligne fabriquée ${JSON.stringify(fabriquee)} doit être refusée par MARQUEUR`);
+  expect(marqueur, `la ligne fabriquée ${JSON.stringify(fabriquee)} doit être refusée par MARQUEUR`).toBe('étape 3');
 });
 
 test('un bloc fabriqué de plus de trente lignes est vu, un bloc de trente lignes passe', () => {
   // Arrange
-  const bloc = (n) => Array.from({ length: n }, () => '/' + '/ une ligne de commentaire');
+  const bloc = (n: number) => Array.from({ length: n }, () => '/' + '/ une ligne de commentaire');
   const lignes = [...bloc(LIMITE_BLOC), 'const x = 1;', ...bloc(LIMITE_BLOC + 1)];
 
   // Act
   const longs = blocsTropLongs(lignes);
 
   // Assert
-  assert.deepEqual(longs, [{ line: LIMITE_BLOC + 2, length: LIMITE_BLOC + 1 }]);
+  expect(longs).toEqual([{ line: LIMITE_BLOC + 2, length: LIMITE_BLOC + 1 }]);
 });
 
 // ── Le balayage réel ─────────────────────────────────────────────────────────
@@ -175,8 +177,7 @@ test('le balayage lit des fichiers et un plancher de lignes de commentaire', () 
   );
 
   // Assert
-  assert.ok(lignesCommentees >= PLANCHER_LIGNES,
-    `assiette suspecte : ${lignesCommentees} lignes de commentaire lues dans ${fichiers.length} fichiers, attendu au moins ${PLANCHER_LIGNES} — le balayage ne lit plus le dépôt`);
+  expect(lignesCommentees >= PLANCHER_LIGNES, `assiette suspecte : ${lignesCommentees} lignes de commentaire lues dans ${fichiers.length} fichiers, attendu au moins ${PLANCHER_LIGNES} — le balayage ne lit plus le dépôt`).toBeTruthy();
 });
 
 test('aucun commentaire ne renvoie à une date, un document numéroté ou une étape, hors liste blanche', () => {
@@ -187,13 +188,9 @@ test('aucun commentaire ne renvoie à une date, un document numéroté ou une é
   const refusees = toutes.filter((o) => !couvertePar(o));
 
   // Assert
-  assert.deepEqual(
-    refusees.map((o) => `${o.fichier}:${o.ligne} [${o.marqueur}] ${o.texte}`),
-    [],
-    "un commentaire dit pourquoi le code est ainsi, au présent : le réécrire sans le renvoi ni la date. "
+  expect(refusees.map((o) => `${o.fichier}:${o.ligne} [${o.marqueur}] ${o.texte}`), "un commentaire dit pourquoi le code est ainsi, au présent : le réécrire sans le renvoi ni la date. "
       + "Si le marqueur est une DONNÉE (une date à laquelle un tarif change, par exemple) et non un récit, "
-      + "inscrire la ligne dans LISTE_BLANCHE avec son fichier, un fragment de la ligne et sa raison.",
-  );
+      + "inscrire la ligne dans LISTE_BLANCHE avec son fichier, un fragment de la ligne et sa raison.").toEqual([]);
 });
 
 test('chaque entrée de la liste blanche couvre encore une ligne datée', () => {
@@ -204,12 +201,8 @@ test('chaque entrée de la liste blanche couvre encore une ligne datée', () => 
   const orphelines = orphelinesDe(LISTE_BLANCHE, toutes);
 
   // Assert
-  assert.deepEqual(
-    orphelines.map((e) => `${e.fichier} → ${e.fragment}`),
-    [],
-    "une entrée de liste blanche sans ligne à couvrir a survécu à ce qu'elle protégeait : la retirer, "
-      + "sinon elle couvrira un jour un commentaire neuf.",
-  );
+  expect(orphelines.map((e) => `${e.fichier} → ${e.fragment}`), "une entrée de liste blanche sans ligne à couvrir a survécu à ce qu'elle protégeait : la retirer, "
+      + "sinon elle couvrira un jour un commentaire neuf.").toEqual([]);
 });
 
 test('aucun bloc de commentaire ne dépasse trente lignes', () => {
@@ -220,6 +213,5 @@ test('aucun bloc de commentaire ne dépasse trente lignes', () => {
   const longs = fichiers.flatMap((rel) => blocsTropLongs(lignesDe(rel)).map((b) => `${rel}:${b.line} (${b.length} lignes)`));
 
   // Assert
-  assert.deepEqual(longs, [],
-    `un bloc de commentaire de plus de ${LIMITE_BLOC} lignes raconte au lieu d'expliquer : garder une idée par paragraphe, trois lignes par idée, et nommer le test qui tient ce que le bloc affirme.`);
+  expect(longs, `un bloc de commentaire de plus de ${LIMITE_BLOC} lignes raconte au lieu d'expliquer : garder une idée par paragraphe, trois lignes par idée, et nommer le test qui tient ce que le bloc affirme.`).toEqual([]);
 });

@@ -9,8 +9,7 @@
 //     chargeur de Node et vitest les chargent déjà et échouent sur une cible absente ;
 //   - la casse : le disque de Windows ne la distingue pas, `./Usage.ts` y trouve `usage.ts` ;
 //     `forceConsistentCasingInFileNames` du `tsconfig.json` la couvre au typecheck, pas ce filet.
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { expect, test } from 'vitest';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -19,9 +18,9 @@ const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const ts = createRequire(path.join(ROOT, 'package.json'))('typescript');
 const RACINES = ['src', 'tests'];
 
-const rel = (abs) => path.relative(ROOT, abs).replaceAll('\\', '/');
+const rel = (abs: string) => path.relative(ROOT, abs).replaceAll('\\', '/');
 
-function fichiersTs(dir) {
+function fichiersTs(dir: string) {
   return readdirSync(dir, { recursive: true })
     .map((nom) => path.join(dir, String(nom)))
     .filter((p) => p.endsWith('.ts') && statSync(p).isFile())
@@ -31,14 +30,14 @@ function fichiersTs(dir) {
 // Les quatre formes qui nomment un module : `import … from`, `export … from`, `import('…')`
 // à littéral, et `import('…')` en position de type. La ligne rendue est celle du littéral,
 // pour qu'un import écrit sur plusieurs lignes se retrouve à l'endroit du spécificateur.
-function specificateurs(abs) {
+function specificateurs(abs: string) {
   const sf = ts.createSourceFile(abs, readFileSync(abs, 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-  const out = [];
-  const garder = (litteral) => out.push({
+  const out: { spec: string; ligne: number }[] = [];
+  const garder = (litteral: any) => out.push({
     spec: litteral.text,
     ligne: sf.getLineAndCharacterOfPosition(litteral.getStart(sf)).line + 1,
   });
-  const visiter = (n) => {
+  const visiter = (n: any) => {
     if ((ts.isImportDeclaration(n) || ts.isExportDeclaration(n))
       && n.moduleSpecifier && ts.isStringLiteral(n.moduleSpecifier)) {
       garder(n.moduleSpecifier);
@@ -55,7 +54,7 @@ function specificateurs(abs) {
   return out;
 }
 
-export function lireRacines(dossiers) {
+export function lireRacines(dossiers: string[]) {
   let fichiers = 0;
   let relatifs = 0;
   const defauts = [];
@@ -80,10 +79,8 @@ test('assiette : au moins 120 fichiers .ts et 300 spécificateurs relatifs lus s
   // Act
   const { fichiers, relatifs } = lireRacines(dossiers);
   // Assert
-  assert.ok(fichiers >= 120,
-    `ASSIETTE : ${fichiers} fichier(s) .ts lu(s), attendu >= 120 — la marche ne voit plus le disque.`);
-  assert.ok(relatifs >= 300,
-    `ASSIETTE : ${relatifs} spécificateur(s) relatif(s) lu(s), attendu >= 300 — la lecture des imports ne mord plus.`);
+  expect(fichiers >= 120, `ASSIETTE : ${fichiers} fichier(s) .ts lu(s), attendu >= 120 — la marche ne voit plus le disque.`).toBeTruthy();
+  expect(relatifs >= 300, `ASSIETTE : ${relatifs} spécificateur(s) relatif(s) lu(s), attendu >= 300 — la lecture des imports ne mord plus.`).toBeTruthy();
 });
 
 test('chaque spécificateur relatif d\'un .ts de src et tests désigne un fichier qui existe', () => {
@@ -92,8 +89,7 @@ test('chaque spécificateur relatif d\'un .ts de src et tests désigne un fichie
   // Act
   const { defauts } = lireRacines(dossiers);
   // Assert
-  assert.deepEqual(defauts, [],
-    `${defauts.length} spécificateur(s) relatif(s) sans fichier :\n  ${defauts.join('\n  ')}\n`
+  expect(defauts, `${defauts.length} spécificateur(s) relatif(s) sans fichier :\n  ${defauts.join('\n  ')}\n`
     + 'Remède : écrire le spécificateur en .ts, le nom réel de la source — vitest résout .js vers .ts '
-    + 'en silence, Node ne le fait pas.');
+    + 'en silence, Node ne le fait pas.').toEqual([]);
 });

@@ -11,8 +11,7 @@
 // Le motif prefere le FAUX POSITIF, visible et inscrit en liste blanche nommee, au
 // FAUX NEGATIF silencieux. D ou le second test : une entree de liste blanche qui ne
 // trouve plus rien est ROUGE, sans quoi elle couvrirait un jour une citation neuve.
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { expect, test } from 'vitest';
 import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 
@@ -41,7 +40,7 @@ const EXCLUS = [
   // grandit a chaque entree ajoutee, donc tout chiffre y serait faux au commit
   // suivant. Pour le connaitre, la commande :
   //   grep -cE '(^|[^A-Za-z0-9_-])(lib|public|netgain)/' <ce fichier>
-  'tests/repo/stale-path-citations.test.mjs',
+  'tests/repo/stale-path-citations.test.ts',
 ];
 
 // Les trois racines mortes. `(^|[^A-Za-z0-9_-])` evite `sqlib/`, `republic/`…
@@ -74,8 +73,8 @@ const LISTE_BLANCHE = [
 ];
 
 function fichiersBalayes() {
-  const acc = [];
-  const marche = dir => {
+  const acc: string[] = [];
+  const marche = (dir: string) => {
     for (const e of readdirSync(dir, { withFileTypes: true })) {
       const abs = path.join(dir, e.name);
       const rel = path.relative(ROOT, abs).replaceAll('\\', '/');
@@ -97,8 +96,11 @@ function fichiersBalayes() {
   return acc;
 }
 
+type Occurrence = { fichier: string; ligne: number; texte: string; chemin?: string };
+type EntreeBlanche = { fichier: string; fragment: string; raison: string };
+
 function occurrences() {
-  const trouvees = [];
+  const trouvees: Occurrence[] = [];
   for (const rel of fichiersBalayes()) {
     readFileSync(path.join(ROOT, rel), 'utf8').split(/\r?\n/).forEach((ligne, i) => {
       if (RACINE_MORTE.test(ligne)) trouvees.push({ fichier: rel, ligne: i + 1, texte: ligne });
@@ -110,10 +112,10 @@ function occurrences() {
 // Les deux helpers de liste blanche, partages par les trois filets de ce fichier :
 // une occurrence est couverte par une entree de meme fichier dont le fragment est
 // dans la ligne ; une entree qui ne couvre plus rien est orpheline.
-const couvertePar = (occ, liste = LISTE_BLANCHE) =>
+const couvertePar = (occ: Occurrence, liste: EntreeBlanche[] = LISTE_BLANCHE) =>
   liste.find(e => e.fichier === occ.fichier && occ.texte.includes(e.fragment));
 
-const orphelinesDe = (liste, occurrencesVues) =>
+const orphelinesDe = (liste: EntreeBlanche[], occurrencesVues: Occurrence[]) =>
   liste.filter(e => !occurrencesVues.some(o => couvertePar(o, [e])));
 
 test('aucune citation de lib/, public/ ou netgain/ hors liste blanche', () => {
@@ -125,12 +127,8 @@ test('aucune citation de lib/, public/ ou netgain/ hors liste blanche', () => {
 
   // Assert — pas de plancher : un balayage qui ne lit rien rend orphelines les
   // entrees de LISTE_BLANCHE, et le test suivant rougit en les nommant.
-  assert.deepEqual(
-    perimees.map(o => `${o.fichier}:${o.ligne} \u2192 ${o.texte.trim()}`),
-    [],
-    '`lib/`, `public/` et `netgain/` n existent plus : une citation qui les nomme envoie le lecteur nulle part. ' +
-      'La corriger, ou l inscrire dans LISTE_BLANCHE avec sa raison.',
-  );
+  expect(perimees.map(o => `${o.fichier}:${o.ligne} \u2192 ${o.texte.trim()}`), '`lib/`, `public/` et `netgain/` n existent plus : une citation qui les nomme envoie le lecteur nulle part. ' +
+      'La corriger, ou l inscrire dans LISTE_BLANCHE avec sa raison.').toEqual([]);
 });
 
 test('chaque entree de la liste blanche protege encore quelque chose', () => {
@@ -141,12 +139,8 @@ test('chaque entree de la liste blanche protege encore quelque chose', () => {
   const orphelines = orphelinesDe(LISTE_BLANCHE, toutes);
 
   // Assert
-  assert.deepEqual(
-    orphelines.map(e => `${e.fichier} \u2192 ${e.fragment}`),
-    [],
-    'une entree de liste blanche sans occurrence est une exemption qui a survecu a ce qu elle protegeait : ' +
-      'la retirer, sinon elle couvrira un jour une citation neuve.',
-  );
+  expect(orphelines.map(e => `${e.fichier} \u2192 ${e.fragment}`), 'une entree de liste blanche sans occurrence est une exemption qui a survecu a ce qu elle protegeait : ' +
+      'la retirer, sinon elle couvrira un jour une citation neuve.').toEqual([]);
 });
 
 // ── Les citations d un ancien nom `*.test.js` ───────────────────────────────
@@ -158,7 +152,7 @@ test('chaque entree de la liste blanche protege encore quelque chose', () => {
 // Deux listes posees PAR-DESSUS `fichiersBalayes()`, reutilise tel quel : lui seul
 // porte les exclusions communes. Ni l une ni l autre ne touche `EXCLUS` ni
 // `LISTE_BLANCHE` : y ajouter changerait ce que les deux tests ci-dessus prouvent.
-const EXCLUS_TEST_JS = [
+const EXCLUS_TEST_JS: string[] = [
   // Litteraux fabriques ('a.test.js', 'b.test.js'...) : donnees de test pour
   // `formatId` et le reporter node:test, pas des citations d un fichier reel.
   // Rien a proteger fragment par fragment : le fichier entier est hors sujet.
@@ -171,10 +165,10 @@ const CITATION_TEST_JS = /[A-Za-z0-9_-]+\.test\.js\b/;
 
 // Une entree = { fichier, fragment, raison } : une citation d un ancien nom
 // `*.test.js` que reecrire rendrait fausse. Aucune n est citee aujourd hui.
-const LISTE_BLANCHE_TEST_JS = [];
+const LISTE_BLANCHE_TEST_JS: EntreeBlanche[] = [];
 
 function occurrencesTestJs() {
-  const trouvees = [];
+  const trouvees: Occurrence[] = [];
   for (const rel of fichiersBalayes()) {
     if (EXCLUS_TEST_JS.some(x => rel === x || rel.startsWith(x))) continue;
     readFileSync(path.join(ROOT, rel), 'utf8').split(/\r?\n/).forEach((ligne, i) => {
@@ -192,12 +186,8 @@ test('aucune citation d un ancien nom .test.js hors liste blanche, et chaque exe
   const perimees = toutes.filter(o => !couvertePar(o, LISTE_BLANCHE_TEST_JS));
 
   // Assert
-  assert.deepEqual(
-    perimees.map(o => `${o.fichier}:${o.ligne} \u2192 ${o.texte.trim()}`),
-    [],
-    'citation d un ancien nom .test.js hors liste blanche : la reecrire avec le nom actuel, ' +
-      'ou l inscrire dans LISTE_BLANCHE_TEST_JS avec sa raison.',
-  );
+  expect(perimees.map(o => `${o.fichier}:${o.ligne} \u2192 ${o.texte.trim()}`), 'citation d un ancien nom .test.js hors liste blanche : la reecrire avec le nom actuel, ' +
+      'ou l inscrire dans LISTE_BLANCHE_TEST_JS avec sa raison.').toEqual([]);
 
   // Act \u2014 seconde garantie : aucune exemption (EXCLUS_TEST_JS ou
   // LISTE_BLANCHE_TEST_JS) n a survecu a ce qu elle protegeait.
@@ -209,16 +199,8 @@ test('aucune citation d un ancien nom .test.js hors liste blanche, et chaque exe
   const blancheOrphelines = orphelinesDe(LISTE_BLANCHE_TEST_JS, toutes);
 
   // Assert
-  assert.deepEqual(
-    exclusOrphelins,
-    [],
-    'une entree de EXCLUS_TEST_JS dont le fichier ne cite plus aucun .test.js : exemption devenue inutile, a retirer.',
-  );
-  assert.deepEqual(
-    blancheOrphelines.map(e => `${e.fichier} \u2192 ${e.fragment}`),
-    [],
-    'une entree de LISTE_BLANCHE_TEST_JS sans occurrence a survecu a ce qu elle protegeait : la retirer.',
-  );
+  expect(exclusOrphelins, 'une entree de EXCLUS_TEST_JS dont le fichier ne cite plus aucun .test.js : exemption devenue inutile, a retirer.').toEqual([]);
+  expect(blancheOrphelines.map(e => `${e.fichier} \u2192 ${e.fragment}`), 'une entree de LISTE_BLANCHE_TEST_JS sans occurrence a survecu a ce qu elle protegeait : la retirer.').toEqual([]);
 });
 
 // ── Les citations d un fichier `src/` absent du disque ──────────────────────
@@ -232,10 +214,10 @@ const CITATION_SRC = /(?<![A-Za-z0-9_-])src\/(?:server|engine|web)\/[A-Za-z0-9_.
 
 // Une entree = { fichier, fragment, raison } : une sortie historique que la
 // reecrire rendrait fausse. Aucune n est citee aujourd hui.
-const LISTE_BLANCHE_SRC = [];
+const LISTE_BLANCHE_SRC: EntreeBlanche[] = [];
 
 function citationsSrc() {
-  const trouvees = [];
+  const trouvees: Occurrence[] = [];
   for (const rel of DOCUMENTS_CITANT_SRC) {
     readFileSync(path.join(ROOT, rel), 'utf8').split(/\r?\n/).forEach((ligne, i) => {
       for (const m of ligne.matchAll(CITATION_SRC)) {
@@ -246,36 +228,28 @@ function citationsSrc() {
   return trouvees;
 }
 
-const estFichier = rel => existsSync(path.join(ROOT, rel)) && statSync(path.join(ROOT, rel)).isFile();
+const estFichier = (rel: string) => existsSync(path.join(ROOT, rel)) && statSync(path.join(ROOT, rel)).isFile();
 
 test('aucune citation d un fichier src/ absent du disque hors liste blanche', () => {
   // Arrange
   const toutes = citationsSrc();
 
   // Act
-  const absentes = toutes.filter(o => !estFichier(o.chemin) && !couvertePar(o, LISTE_BLANCHE_SRC));
+  const absentes = toutes.filter(o => !estFichier(o.chemin!) && !couvertePar(o, LISTE_BLANCHE_SRC));
 
   // Assert — plancher : un motif qui ne mord plus rendrait un vert sans rien lire.
-  assert.ok(toutes.length >= 10, `assiette suspecte : ${toutes.length} citations src/ vues, attendu >= 10`);
-  assert.deepEqual(
-    absentes.map(o => `${o.fichier}:${o.ligne} → ${o.chemin}`),
-    [],
-    'une citation d un fichier src/ qui n existe pas envoie le lecteur nulle part : ' +
-      'la faire suivre le code, ou l inscrire dans LISTE_BLANCHE_SRC avec sa raison.',
-  );
+  expect(toutes.length >= 10, `assiette suspecte : ${toutes.length} citations src/ vues, attendu >= 10`).toBeTruthy();
+  expect(absentes.map(o => `${o.fichier}:${o.ligne} → ${o.chemin}`), 'une citation d un fichier src/ qui n existe pas envoie le lecteur nulle part : ' +
+      'la faire suivre le code, ou l inscrire dans LISTE_BLANCHE_SRC avec sa raison.').toEqual([]);
 });
 
 test('chaque entree de LISTE_BLANCHE_SRC protege encore une citation absente', () => {
   // Arrange
-  const absentes = citationsSrc().filter(o => !estFichier(o.chemin));
+  const absentes = citationsSrc().filter(o => !estFichier(o.chemin!));
 
   // Act
   const orphelines = orphelinesDe(LISTE_BLANCHE_SRC, absentes);
 
   // Assert
-  assert.deepEqual(
-    orphelines.map(e => `${e.fichier} → ${e.fragment}`),
-    [],
-    'une entree de LISTE_BLANCHE_SRC qui ne couvre plus aucune citation absente : la retirer.',
-  );
+  expect(orphelines.map(e => `${e.fichier} → ${e.fragment}`), 'une entree de LISTE_BLANCHE_SRC qui ne couvre plus aucune citation absente : la retirer.').toEqual([]);
 });

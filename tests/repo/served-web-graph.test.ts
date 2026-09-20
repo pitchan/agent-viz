@@ -24,12 +24,11 @@
 //   - que les modules atteints tournent dans un navigateur : une API Node atteinte sans
 //     import (`process.env`, `globalThis.require`) lui echappe ;
 //   - que la table de routes ne s'ouvre pas trop (un prefixe qui recouvre `/src/engine/`)
-//     ni que le corps servi compile : c'est `served-ts-strip-check.test.mjs` ;
+//     ni que le corps servi compile : c'est `served-ts-strip-check.test.ts` ;
 //   - que le graphe est complet quand R0 signale un `import()` calcule ;
 //   - que le paquet publie emporte ce que R4 declare servi : c'est
-//     `package-entrypoints.test.mjs`, qui croise les routes du moteur avec `files`.
-import { test, after } from 'node:test';
-import assert from 'node:assert/strict';
+//     `package-entrypoints.test.ts`, qui croise les routes du moteur avec `files`.
+import { afterAll, expect, test } from 'vitest';
 import { createRequire, stripTypeScriptTypes } from 'node:module';
 import { existsSync, readdirSync, readFileSync, statSync, mkdtempSync, rmSync } from 'node:fs';
 import os from 'node:os';
@@ -37,21 +36,21 @@ import path from 'node:path';
 
 // Charger `routes.ts` charge `session-index.ts`, qui cree
 // `os.tmpdir()/agent-events` des sa lecture : le bac est pose avant l'import,
-// meme parade que `served-ts-strip-check.test.mjs`.
+// meme parade que `served-ts-strip-check.test.ts`.
 const BAC = mkdtempSync(path.join(os.tmpdir(), 'avtest-web-graph-'));
 process.env.TEMP = BAC;
 process.env.TMP = BAC;
 process.env.TMPDIR = BAC;
 process.env.USERPROFILE = BAC;
 process.env.HOME = BAC;
-after(() => rmSync(BAC, { recursive: true, force: true }));
+afterAll(() => rmSync(BAC, { recursive: true, force: true }));
 
 const { ROUTES } = await import('../../src/server/routes.ts');
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const ts = createRequire(path.join(ROOT, 'package.json'))('typescript');
 
-const rel = (abs) => path.relative(ROOT, abs).replaceAll('\\', '/');
+const rel = (abs: string) => path.relative(ROOT, abs).replaceAll('\\', '/');
 
 // Le prefixe `/src/web/` sert tout ce qui est sur le disque : on enumere donc
 // le disque, comme `staticHandler` le ferait pour n'importe quelle requete.
@@ -68,11 +67,11 @@ function racines() {
 // Les aretes d'un source, classees VALEUR / TYPE par l'arbre syntaxique.
 // `kind` permet de relire le MEME code sur du JS deja deshabille de ses types
 // (dernier test), ou l'ImportTypeNode n'existe plus.
-function aretes(chemin, texte, kind) {
+function aretes(chemin: string, texte: string, kind: any) {
   const sf = ts.createSourceFile(chemin, texte, ts.ScriptTarget.Latest, true, kind);
-  const ligne = (n) => sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1;
-  const out = [];
-  const visiter = (n) => {
+  const ligne = (n: any) => sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1;
+  const out: any[] = [];
+  const visiter = (n: any) => {
     if (ts.isImportDeclaration(n)) {
       // `importClause.isTypeOnly` seul : c'est `import type …` qui efface la
       // ligne. Un `ImportSpecifier.isTypeOnly` n'efface QUE le nom, l'import
@@ -103,7 +102,7 @@ function aretes(chemin, texte, kind) {
   return out;
 }
 
-const aretesSource = (abs) => aretes(abs, readFileSync(abs, 'utf8'), ts.ScriptKind.TS);
+const aretesSource = (abs: string) => aretes(abs, readFileSync(abs, 'utf8'), ts.ScriptKind.TS);
 
 function marcher() {
   const vus = new Map();
@@ -111,7 +110,7 @@ function marcher() {
   const file = racines();
   for (const r of file) vus.set(r, 'racine');
   while (file.length) {
-    const p = file.shift();
+    const p = file.shift()!;
     for (const a of aretesSource(p)) {
       if (!a.valeur) continue;
       const ou = `${rel(p)}:${a.ligne}`;
@@ -149,8 +148,8 @@ const horsWeb = [...vus.keys()].filter((a) => !rel(a).startsWith('src/web/')).so
 
 // R4 lit la vraie table. `prefix` y est accepte parce que la table le connait
 // (c'est ainsi que `/src/web/` est servi) ; l'interdiction d'un prefixe sur
-// `/src/engine/` appartient a `served-ts-strip-check.test.mjs`.
-function servi(chemin) {
+// `/src/engine/` appartient a `served-ts-strip-check.test.ts`.
+function servi(chemin: string) {
   return ROUTES.some((r) => r.method === 'GET'
     && ((typeof r.path === 'string' && r.path === chemin)
       || (typeof r.prefix === 'string' && chemin.startsWith(r.prefix))));
@@ -162,22 +161,19 @@ test('assiette : au moins 27 racines sous src/web et au moins 2 modules atteints
   // atteint que par des imports de forme MIXTE : s'ils etaient classes
   // « type », ce compte tomberait a 1.
   const n = racines().length;
-  assert.ok(n >= 27, `ASSIETTE : ${n} racine(s) .ts sous src/web, attendu >= 27.`);
-  assert.ok(horsWeb.length >= 2,
-    `ASSIETTE : ${horsWeb.length} module(s) atteint(s) hors src/web, attendu >= 2 — `
-    + 'une arete de forme mixte a-t-elle ete classee « type » ?');
+  expect(n >= 27, `ASSIETTE : ${n} racine(s) .ts sous src/web, attendu >= 27.`).toBeTruthy();
+  expect(horsWeb.length >= 2, `ASSIETTE : ${horsWeb.length} module(s) atteint(s) hors src/web, attendu >= 2 — `
+    + 'une arete de forme mixte a-t-elle ete classee « type » ?').toBeTruthy();
 });
 
 test('R0-R3 : le graphe de valeur atteignable depuis src/web ne contient que des .ts relatifs existants', () => {
-  assert.deepEqual(defauts, [],
-    `${defauts.length} arete(s) que le navigateur ne saurait pas charger :\n  ${defauts.join('\n  ')}`);
+  expect(defauts, `${defauts.length} arete(s) que le navigateur ne saurait pas charger :\n  ${defauts.join('\n  ')}`).toEqual([]);
 });
 
 test('R4 : chaque module atteint hors src/web est servi par la table ROUTES', () => {
   const absents = horsWeb.map((a) => `/${rel(a)}`).filter((u) => !servi(u));
-  assert.deepEqual(absents, [],
-    'atteints depuis src/web mais ABSENTS de la table de routes (le navigateur recevrait 404) :\n  '
-    + `${absents.join('\n  ')}\n  (chemin d'arrivee : ${horsWeb.map((a) => `${rel(a)} <- ${vus.get(a)}`).join(' ; ')})`);
+  expect(absents, 'atteints depuis src/web mais ABSENTS de la table de routes (le navigateur recevrait 404) :\n  '
+    + `${absents.join('\n  ')}\n  (chemin d'arrivee : ${horsWeb.map((a) => `${rel(a)} <- ${vus.get(a)}`).join(' ; ')})`).toEqual([]);
 });
 
 test('la classification type/valeur est celle que le retrait de types applique vraiment', () => {
@@ -191,7 +187,7 @@ test('la classification type/valeur est celle que le retrait de types applique v
     let nu;
     try {
       nu = stripTypeScriptTypes(readFileSync(abs, 'utf8'), { mode: 'strip' });
-    } catch (err) {
+    } catch (err: any) {
       ecarts.push(`${rel(abs)} : retrait des types impossible — ${err.message}`);
       continue;
     }
@@ -202,12 +198,12 @@ test('la classification type/valeur est celle que le retrait de types applique v
         + `mais le corps servi demande [${survivants.join(', ')}].`);
     }
   }
-  assert.deepEqual(ecarts, [], `classification dementie par le corps servi :\n  ${ecarts.join('\n  ')}`);
+  expect(ecarts, `classification dementie par le corps servi :\n  ${ecarts.join('\n  ')}`).toEqual([]);
 });
 
 // R5 : hors de src/web/, le navigateur n'atteint en valeur que des modules du moteur.
 // R4 ne suffit pas : une route exacte vers un fichier de src/server/ le rendrait vert.
-const horsMoteur = (relatifs) => relatifs.filter((r) => !r.startsWith('src/engine/'));
+const horsMoteur = (relatifs: string[]) => relatifs.filter((r) => !r.startsWith('src/engine/'));
 
 test('R5 : hors src/web, le graphe de valeur n\'atteint que src/engine, jamais src/server', () => {
   // Arrange : la marche du module (`horsWeb`, `vus`).
@@ -217,9 +213,8 @@ test('R5 : hors src/web, le graphe de valeur n\'atteint que src/engine, jamais s
 
   // Assert
   // Controle negatif : le predicat signale un module du serveur.
-  assert.deepEqual(horsMoteur(['src/engine/core/usage.ts', 'src/server/pricing.ts']), ['src/server/pricing.ts']);
-  assert.deepEqual(fautifs, [],
-    `atteints en valeur depuis src/web hors du moteur :\n  ${fautifs.join('\n  ')}`);
+  expect(horsMoteur(['src/engine/core/usage.ts', 'src/server/pricing.ts'])).toEqual(['src/server/pricing.ts']);
+  expect(fautifs, `atteints en valeur depuis src/web hors du moteur :\n  ${fautifs.join('\n  ')}`).toEqual([]);
 });
 
 test('frontiere de type : seul `import type` est mis de cote, toute autre forme est une arete de valeur', () => {
@@ -237,5 +232,5 @@ test('frontiere de type : seul `import type` est mis de cote, toute autre forme 
   const vues = aretes('sonde.ts', texte, ts.ScriptKind.TS).map((a) => [a.ligne, a.valeur]);
 
   // Assert
-  assert.deepEqual(vues, [[1, false], [2, true], [3, true]]);
+  expect(vues).toEqual([[1, false], [2, true], [3, true]]);
 });

@@ -568,8 +568,8 @@ qui explique le pont ci-dessous.
 
 | Dialecte | Fichiers | Écrits en |
 |---|---|---|
-| CommonJS + ESM | 0 `.test.cjs` + 17 `.test.mjs` | `node:test` |
-| TypeScript | 114 `.test.ts` | l'API de vitest |
+| CommonJS + ESM | 0 `.test.cjs` + 8 `.test.mjs` | `node:test` |
+| TypeScript | 123 `.test.ts` | l'API de vitest |
 
 **L'extension dit le régime.** Sous une racine `"type": "module"`, un `.js`
 **est** un module ES, où `require()` n'existe pas : un test CommonJS s'écrit en
@@ -584,7 +584,7 @@ est écrit une seule fois, à côté de la commande qui le refait, et
 `tests/repo/architecture-test-counts.test.mjs` le compare au disque :
 
 ```
-grep -rlE "(require\(|from )['\"]node:test['\"]" tests | wc -l   → 17
+grep -rlE "(require\(|from )['\"]node:test['\"]" tests | wc -l   → 8
 ```
 
 Le test du pont, `tests/unit/node-test-bridge.test.mjs`, passe lui-même par le

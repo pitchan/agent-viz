@@ -10,13 +10,12 @@
 // silencieux).
 //
 // Le cas le plus probable : `.test.js`, l extension des tests CommonJS avant leur
-// renommage en `.test.cjs`. `stale-path-citations.test.mjs` guette les CITATIONS d un
+// renommage en `.test.cjs`. `stale-path-citations.test.ts` guette les CITATIONS d un
 // ancien nom ; celui-ci guette la PRESENCE d un fichier qu aucun executeur ne lira.
 //
 // Meme famille que ses voisins de `tests/repo/` : il lit le vrai disque, ce
 // n est pas un test unitaire (cf. `tests/CLAUDE.md` § 4).
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { expect, test } from 'vitest';
 import { readdirSync } from 'node:fs';
 import path from 'node:path';
 
@@ -44,8 +43,8 @@ const EXCEPTIONS = new Map([
 ]);
 
 function fichiersDeTest() {
-  const acc = [];
-  const marche = dir => {
+  const acc: string[] = [];
+  const marche = (dir: string) => {
     for (const e of readdirSync(dir, { withFileTypes: true })) {
       const abs = path.join(dir, e.name);
       if (e.isDirectory()) marche(abs);
@@ -57,8 +56,8 @@ function fichiersDeTest() {
 }
 
 function fichiersDeTestHorsDeTests() {
-  const acc = [];
-  const marche = dir => {
+  const acc: string[] = [];
+  const marche = (dir: string) => {
     for (const e of readdirSync(dir, { withFileTypes: true })) {
       const abs = path.join(dir, e.name);
       const rel = path.relative(ROOT, abs).replaceAll('\\', '/');
@@ -73,7 +72,7 @@ function fichiersDeTestHorsDeTests() {
   return acc;
 }
 
-const couvertParUneException = rel => [...EXCEPTIONS.keys()].some(prefixe => rel.startsWith(prefixe));
+const couvertParUneException = (rel: string) => [...EXCEPTIONS.keys()].some(prefixe => rel.startsWith(prefixe));
 
 test('tout fichier *.test.* ou *.spec.* sous tests/ porte une extension que les executeurs lisent', () => {
   // Arrange
@@ -84,14 +83,10 @@ test('tout fichier *.test.* ou *.spec.* sous tests/ porte une extension que les 
 
   // Assert — l assiette est dite AVANT le verdict : un balayage qui ne voit
   // rien passerait aussi, et ne prouverait rien.
-  assert.ok(tous.length >= 100, `assiette suspecte : ${tous.length} fichiers de test vus, attendu >= 100`);
-  assert.deepEqual(
-    invisibles,
-    [],
-    'ce fichier n est lu par AUCUN des deux executeurs (vitest : .test.{cjs,mjs,ts} ; ' +
+  expect(tous.length >= 100, `assiette suspecte : ${tous.length} fichiers de test vus, attendu >= 100`).toBeTruthy();
+  expect(invisibles, 'ce fichier n est lu par AUCUN des deux executeurs (vitest : .test.{cjs,mjs,ts} ; ' +
       'node --test : .test.{cjs,mjs}) : il ne tournera jamais, vert par absence. ' +
-      'Le renommer vers une extension lue, ou etendre les motifs des executeurs ET ce filet ensemble.',
-  );
+      'Le renommer vers une extension lue, ou etendre les motifs des executeurs ET ce filet ensemble.').toEqual([]);
 });
 
 test('aucun fichier *.test.* ou *.spec.* hors de tests/, sauf sous une exception nommee', () => {
@@ -102,12 +97,8 @@ test('aucun fichier *.test.* ou *.spec.* hors de tests/, sauf sous une exception
   const nonCouverts = horsDeTests.filter(rel => !couvertParUneException(rel));
 
   // Assert
-  assert.deepEqual(
-    nonCouverts,
-    [],
-    'les deux executeurs ne lisent que tests/ : ce fichier ne tournera jamais. ' +
-      'Le deplacer sous tests/, ou inscrire son dossier dans EXCEPTIONS avec sa raison.',
-  );
+  expect(nonCouverts, 'les deux executeurs ne lisent que tests/ : ce fichier ne tournera jamais. ' +
+      'Le deplacer sous tests/, ou inscrire son dossier dans EXCEPTIONS avec sa raison.').toEqual([]);
 });
 
 test('chaque exception d emplacement couvre encore au moins un fichier de test', () => {
@@ -118,5 +109,5 @@ test('chaque exception d emplacement couvre encore au moins un fichier de test',
   const orphelines = [...EXCEPTIONS.keys()].filter(prefixe => !horsDeTests.some(rel => rel.startsWith(prefixe)));
 
   // Assert
-  assert.deepEqual(orphelines, [], 'une exception qui ne couvre plus aucun fichier doit sortir de EXCEPTIONS');
+  expect(orphelines, 'une exception qui ne couvre plus aucun fichier doit sortir de EXCEPTIONS').toEqual([]);
 });
