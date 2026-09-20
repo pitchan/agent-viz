@@ -1,4 +1,3 @@
-'use strict';
 // Filet de CARACTÉRISATION pour src/server/housekeep.ts : `compactSession` garde
 // la queue d'un fichier de session et résume toute son histoire, en décodant chaque
 // ligne par `decodeJsonlLine`.
@@ -7,56 +6,55 @@
 // comportement ACTUEL, verrues comprises : un test rouge pose la question « le
 // changement est-il voulu ? », pas « comment le faire repasser au vert ? ».
 
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { afterAll, expect, test } from 'vitest';
+import type { SessionRecord } from '../../src/server/session-index.ts';
 
 // Le dossier de travail est calculé une fois pour toutes par session-index,
-// depuis os.tmpdir(). On le redirige AVANT le premier require — `node --test`
-// donne un processus par fichier de test, donc l'environnement posé ici ne
-// fuit sur aucune autre suite.
+// depuis os.tmpdir(). On le redirige AVANT le chargement du module — un import
+// dynamique, plus bas, s'assure que session-index.ts et housekeep.ts le lisent
+// APRES cette redirection plutot qu'a leur hissage statique.
 const RACINE = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-viz-housekeep-'));
 process.env.TMPDIR = RACINE;
 process.env.TEMP = RACINE;
 process.env.TMP = RACINE;
 
-const { test, after } = require('node:test');
-const assert = require('node:assert/strict');
-
-const { sessionIndex, idFromPath, COMPACT_KEEP_EVENTS } = require('../../src/server/session-index.ts');
-const { compactSession } = require('../../src/server/housekeep.ts');
+const { sessionIndex, idFromPath, COMPACT_KEEP_EVENTS } = await import('../../src/server/session-index.ts');
+const { compactSession } = await import('../../src/server/housekeep.ts');
 
 const DOSSIER = path.join(RACINE, 'agent-events');
 fs.mkdirSync(DOSSIER, { recursive: true });
 
-after(() => { fs.rmSync(RACINE, { recursive: true, force: true }); });
+afterAll(() => { fs.rmSync(RACINE, { recursive: true, force: true }); });
 
 let compteur = 0;
 
 // Écrit un fichier de session et l'inscrit dans l'index (compactSession sort
 // immédiatement si l'index n'a pas d'entrée pour ce fichier).
-function poseUneSession(lignes, { indexe = true } = {}) {
+function poseUneSession(lignes: string[], { indexe = true }: { indexe?: boolean } = {}) {
   const fp = path.join(DOSSIER, `sess-${++compteur}.jsonl`);
   fs.writeFileSync(fp, lignes.join('\n') + '\n');
   const id = idFromPath(fp);
-  if (indexe) sessionIndex.set(id, { id, promptCache: null, size: 0, eventCount: 0 });
+  if (indexe) sessionIndex.set(id, { id, promptCache: null, size: 0, eventCount: 0 } as SessionRecord);
   return { fp, id, resume: fp.replace('.jsonl', '.summary.json') };
 }
 
 // Un événement outil, celui que le résumé recense.
-function evenementOutil(i) {
+function evenementOutil(i: number) {
   return JSON.stringify({
     hook_event_name: 'PreToolUse', tool_name: 'Read', tool_use_id: `t${i}`, _ts: `2026-08-10T00:00:${String(i % 60).padStart(2, '0')}.000Z`,
   });
 }
 
-function litResume(chemin) {
+function litResume(chemin: string) {
   return JSON.parse(fs.readFileSync(chemin, 'utf8'));
 }
 
 test('le seuil de compaction est bien celui que ces tests supposent', () => {
-  assert.equal(COMPACT_KEEP_EVENTS, 100,
-    'COMPACT_KEEP_EVENTS a bougé — les tailles choisies ci-dessous ne testent plus ce qu’elles annoncent');
+  expect(COMPACT_KEEP_EVENTS,
+    'COMPACT_KEEP_EVENTS a bougé — les tailles choisies ci-dessous ne testent plus ce qu’elles annoncent').toBe(100);
 });
 
 test('au-delà du seuil : la queue est conservée, le résumé compte TOUTE l’histoire', async () => {
@@ -66,19 +64,19 @@ test('au-delà du seuil : la queue est conservée, le résumé compte TOUTE l’
   await compactSession(s.fp);
 
   const restant = fs.readFileSync(s.fp, 'utf8').trim().split('\n');
-  assert.equal(restant.length, COMPACT_KEEP_EVENTS, 'le fichier ne garde pas exactement la queue');
-  assert.equal(JSON.parse(restant[0]).tool_use_id, `t${total - COMPACT_KEEP_EVENTS}`,
-    'la queue conservée ne commence pas au bon événement');
+  expect(restant.length, 'le fichier ne garde pas exactement la queue').toBe(COMPACT_KEEP_EVENTS);
+  expect(JSON.parse(restant[0]!).tool_use_id,
+    'la queue conservée ne commence pas au bon événement').toBe(`t${total - COMPACT_KEEP_EVENTS}`);
 
   const resume = litResume(s.resume);
-  assert.equal(resume.totalEvents, total, 'le résumé doit compter les lignes AVANT la coupe');
-  assert.equal(resume.tools.length, total, 'les outils sont recensés sur toute l’histoire, pas sur la queue');
-  assert.equal(resume.id, s.id);
+  expect(resume.totalEvents, 'le résumé doit compter les lignes AVANT la coupe').toBe(total);
+  expect(resume.tools.length, 'les outils sont recensés sur toute l’histoire, pas sur la queue').toBe(total);
+  expect(resume.id).toBe(s.id);
 
   // L’index est remis d’aplomb sur le nouveau fichier, plus petit.
-  const rec = sessionIndex.get(s.id);
-  assert.equal(rec.eventCount, COMPACT_KEEP_EVENTS);
-  assert.equal(rec.size, fs.statSync(s.fp).size);
+  const rec = sessionIndex.get(s.id)!;
+  expect(rec.eventCount).toBe(COMPACT_KEEP_EVENTS);
+  expect(rec.size).toBe(fs.statSync(s.fp).size);
 });
 
 test('en deçà du seuil : rien n’est touché, aucun résumé n’est écrit', async () => {
@@ -87,8 +85,8 @@ test('en deçà du seuil : rien n’est touché, aucun résumé n’est écrit',
 
   await compactSession(s.fp);
 
-  assert.equal(fs.readFileSync(s.fp, 'utf8'), avant, 'le fichier a été réécrit alors qu’il est sous le seuil');
-  assert.equal(fs.existsSync(s.resume), false, 'un résumé a été écrit sous le seuil');
+  expect(fs.readFileSync(s.fp, 'utf8'), 'le fichier a été réécrit alors qu’il est sous le seuil').toBe(avant);
+  expect(fs.existsSync(s.resume), 'un résumé a été écrit sous le seuil').toBe(false);
 });
 
 test('sans entrée dans l’index, la compaction ne fait rien du tout', async () => {
@@ -97,8 +95,8 @@ test('sans entrée dans l’index, la compaction ne fait rien du tout', async ()
 
   await compactSession(s.fp);
 
-  assert.equal(fs.readFileSync(s.fp, 'utf8'), avant);
-  assert.equal(fs.existsSync(s.resume), false);
+  expect(fs.readFileSync(s.fp, 'utf8')).toBe(avant);
+  expect(fs.existsSync(s.resume)).toBe(false);
 });
 
 // --- Ce que ce décodeur fait des lignes qu'il n'arrive pas à lire.
@@ -112,14 +110,14 @@ test('CARACTÉRISATION — une ligne illisible est comptée dans totalEvents mai
   await compactSession(s.fp);
 
   const resume = litResume(s.resume);
-  assert.equal(resume.totalEvents, lignes.length,
-    'totalEvents compte les LIGNES, pas les événements décodés — verrue épinglée volontairement');
+  expect(resume.totalEvents,
+    'totalEvents compte les LIGNES, pas les événements décodés — verrue épinglée volontairement').toBe(lignes.length);
   // Assertion discriminante : un simple compte passerait aussi si une AUTRE
   // ligne avait été perdue. On vérifie que les bonnes sont toutes là.
-  const vus = new Set(resume.tools.map(t => t.id));
-  assert.equal(vus.size, bonnes.length, 'exactement les lignes valides doivent être recensées');
+  const vus = new Set(resume.tools.map((t: any) => t.id));
+  expect(vus.size, 'exactement les lignes valides doivent être recensées').toBe(bonnes.length);
   for (let i = 0; i < bonnes.length; i++) {
-    assert.equal(vus.has(`t${i}`), true, `l’événement t${i}, pourtant valide, a disparu du résumé`);
+    expect(vus.has(`t${i}`), `l’événement t${i}, pourtant valide, a disparu du résumé`).toBe(true);
   }
 });
 
@@ -134,10 +132,10 @@ test('un BOM est toléré où qu’il soit dans le fichier', async () => {
   await compactSession(s.fp);
 
   const resume = litResume(s.resume);
-  const vus = new Set(resume.tools.map(t => t.id));
-  assert.equal(vus.has('t3'), true,
-    'l’événement préfixé d’un BOM est décodé, pas perdu');
-  assert.equal(vus.size, lignes.length, 'aucune ligne ne manque');
+  const vus = new Set(resume.tools.map((t: any) => t.id));
+  expect(vus.has('t3'),
+    'l’événement préfixé d’un BOM est décodé, pas perdu').toBe(true);
+  expect(vus.size, 'aucune ligne ne manque').toBe(lignes.length);
 });
 
 test('CARACTÉRISATION — une ligne vide au milieu est traitée comme une ligne illisible', async () => {
@@ -148,19 +146,19 @@ test('CARACTÉRISATION — une ligne vide au milieu est traitée comme une ligne
   await compactSession(s.fp);
 
   const resume = litResume(s.resume);
-  assert.equal(resume.totalEvents, lignes.length, 'la ligne vide du milieu compte comme une ligne');
-  assert.equal(resume.tools.length, lignes.length - 1, 'et ne produit aucun outil');
+  expect(resume.totalEvents, 'la ligne vide du milieu compte comme une ligne').toBe(lignes.length);
+  expect(resume.tools.length, 'et ne produit aucun outil').toBe(lignes.length - 1);
 });
 
 test('CARACTÉRISATION — le saut de ligne final ne fabrique PAS de ligne fantôme (trim avant découpe)', async () => {
   const lignes = Array.from({ length: COMPACT_KEEP_EVENTS + 20 }, (_, i) => evenementOutil(i));
   const s = poseUneSession(lignes); // poseUneSession ajoute un '\n' final
-  assert.equal(fs.readFileSync(s.fp, 'utf8').endsWith('\n'), true, 'le fichier doit bien finir par un saut de ligne');
+  expect(fs.readFileSync(s.fp, 'utf8').endsWith('\n'), 'le fichier doit bien finir par un saut de ligne').toBe(true);
 
   await compactSession(s.fp);
 
-  assert.equal(litResume(s.resume).totalEvents, lignes.length,
-    'un saut de ligne final ne doit pas ajouter une ligne au compte');
+  expect(litResume(s.resume).totalEvents,
+    'un saut de ligne final ne doit pas ajouter une ligne au compte').toBe(lignes.length);
 });
 
 test('CARACTÉRISATION — seuls les trois événements d’outil alimentent le résumé', async () => {
@@ -173,7 +171,7 @@ test('CARACTÉRISATION — seuls les trois événements d’outil alimentent le 
   await compactSession(s.fp);
 
   const resume = litResume(s.resume);
-  assert.equal(resume.tools.length, lignes.length - 1, 'UserPromptSubmit ne doit pas produire d’entrée d’outil');
-  const noms = new Set(resume.tools.map(t => t.event));
-  assert.deepEqual([...noms].sort(), ['PostToolUse', 'PostToolUseFailure', 'PreToolUse']);
+  expect(resume.tools.length, 'UserPromptSubmit ne doit pas produire d’entrée d’outil').toBe(lignes.length - 1);
+  const noms = new Set(resume.tools.map((t: any) => t.event));
+  expect([...noms].sort()).toEqual(['PostToolUse', 'PostToolUseFailure', 'PreToolUse']);
 });

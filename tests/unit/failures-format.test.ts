@@ -3,25 +3,26 @@
 // anglais : traduire une phrase deja faite serait la seule facon de la voir
 // diverger de ce que le detecteur a reellement mesure.
 
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { expect, test } from 'vitest';
 import { failureLine, projectLabel, failuresSummary, groupKey, groupAlerts, causeLabel, episodeLabel, panelAlerts } from '../../src/web/observatory/failures-format.ts';
-import { _DETECTOR_TYPES } from '../../src/engine/watchdog/detector.ts';
+import { _DETECTOR_TYPES, type Alert } from '../../src/engine/watchdog/detector.ts';
 import { readAlert } from '../../src/web/viz-alert-shape.ts';
 
 const T0 = Date.UTC(2026, 7, 7, 14, 42, 0);
 
 // Une alerte complete, avec tous les champs qu'ecrit le detecteur : chaque
 // fixture ne declare que ce qui differe.
-const alerte = (sur = {}) => ({
+const alerte = (sur: Record<string, any> = {}): Alert => ({
   id: 'loop:s1:Bash', type: 'loop', sessionId: 's1', toolName: 'Bash', count: 4,
   createdAt: T0, message: 'Bash called 4 times with the same input in 15s',
   agentId: '', agentType: '', subject: 'npm run build', occurrences: [], tools: [],
   cwd: 'f:\\DEV\\Demo IA OPTIM\\SKILLS TOKEN SAVERS', standing: false, patternId: '',
   acknowledged: false, ...sur,
 });
-const occurrences = (...issues) => issues.map((failed, i) => ({ ts: T0 + i * 5_000, toolUseId: `t${i}`, failed }));
-const outil = (toolName, subject) => ({ toolUseId: `u-${toolName}`, toolName, subject, startedAt: T0, agentId: '', agentType: '' });
+const occurrences = (...issues: Array<boolean | null>) =>
+  issues.map((failed, i) => ({ ts: T0 + i * 5_000, toolUseId: `t${i}`, failed }));
+const outil = (toolName: string, subject: string) =>
+  ({ toolUseId: `u-${toolName}`, toolName, subject, startedAt: T0, agentId: '', agentType: '' });
 
 const base = alerte({ occurrences: occurrences(true, true, true, null) });
 
@@ -38,34 +39,34 @@ test('les fixtures de ce fichier ont la forme qu une alerte doit avoir pour entr
   // Act
   const lues = fixtures.map(f => readAlert(f));
   // Assert
-  assert.deepEqual(lues, fixtures);
+  expect(lues).toEqual(fixtures);
 });
 
 test('le projet se nomme par son chemin reel, lettre de lecteur en majuscule', () => {
-  assert.equal(projectLabel('f:\\DEV\\projet'), 'F:\\DEV\\projet');
-  assert.equal(projectLabel(''), 'projet inconnu');
+  expect(projectLabel('f:\\DEV\\projet')).toBe('F:\\DEV\\projet');
+  expect(projectLabel('')).toBe('projet inconnu');
 });
 
 test('une boucle en echec COMPTE, en francais, sans traduire le message anglais', () => {
   const l = failureLine(base);
-  assert.equal(l.headline, 'Bash · même commande 4×, 3 sur 4 en échec');
-  assert.equal(l.subject, 'npm run build');
-  assert.equal(l.project, 'F:\\DEV\\Demo IA OPTIM\\SKILLS TOKEN SAVERS');
+  expect(l.headline).toBe('Bash · même commande 4×, 3 sur 4 en échec');
+  expect(l.subject).toBe('npm run build');
+  expect(l.project).toBe('F:\\DEV\\Demo IA OPTIM\\SKILLS TOKEN SAVERS');
 });
 
 test('une boucle en partie en echec affiche son denominateur', () => {
   const l = failureLine({ ...base, occurrences: occurrences(true, false, false, null) });
-  assert.equal(l.headline, 'Bash · même commande 4×, 1 sur 4 en échec');
+  expect(l.headline).toBe('Bash · même commande 4×, 1 sur 4 en échec');
 });
 
 test('une boucle sans echec connu ne parle pas d echec', () => {
   const l = failureLine({ ...base, occurrences: occurrences(false, false, false, null) });
-  assert.equal(l.headline, 'Bash · même commande 4×');
+  expect(l.headline).toBe('Bash · même commande 4×');
 });
 
 test('un orage d echecs se distingue d une boucle', () => {
   const l = failureLine({ ...base, type: 'retryStorm', count: 3, occurrences: [] });
-  assert.equal(l.headline, 'Bash · 3 échecs consécutifs');
+  expect(l.headline).toBe('Bash · 3 échecs consécutifs');
 });
 
 test('une session bloquee nomme ce qu elle attend', () => {
@@ -73,8 +74,8 @@ test('une session bloquee nomme ce qu elle attend', () => {
     ...base, type: 'stuck', toolName: '', count: 2, subject: '', occurrences: [],
     tools: [outil('Bash', 'npm run build'), outil('Read', 'a.js')],
   });
-  assert.equal(l.headline, 'Aucun événement · 2 outils encore en vol');
-  assert.equal(l.subject, 'Bash · npm run build');
+  expect(l.headline).toBe('Aucun événement · 2 outils encore en vol');
+  expect(l.subject).toBe('Bash · npm run build');
 });
 
 // Un seul outil en vol est le cas le plus frequent d'une session bloquee : le
@@ -84,7 +85,7 @@ test('une session bloquee sur un seul outil parle au singulier', () => {
     ...base, type: 'stuck', toolName: '', count: 1, subject: '', occurrences: [],
     tools: [outil('Bash', 'npm run build')],
   });
-  assert.equal(l.headline, 'Aucun événement · 1 outil encore en vol');
+  expect(l.headline).toBe('Aucun événement · 1 outil encore en vol');
 });
 
 // ── Appel mal formé ────────────────────────────────────────────────────────
@@ -98,13 +99,13 @@ test('une session bloquee sur un seul outil parle au singulier', () => {
 
 test('un appel mal forme dit LEQUEL, en francais, depuis le seul identifiant', () => {
   const l = failureLine(invocation);
-  assert.equal(l.headline,
+  expect(l.headline).toBe(
     'Bash · appel mal formé : un chemin Windows non protégé sous un shell POSIX');
-  assert.equal(l.subject, '', 'aucun texte de commande n a ete consigne, rien a montrer');
+  expect(l.subject, 'aucun texte de commande n a ete consigne, rien a montrer').toBe('');
 });
 
 test('un appel mal forme repete dit combien de fois', () => {
-  assert.equal(failureLine({ ...invocation, count: 3 }).headline,
+  expect(failureLine({ ...invocation, count: 3 }).headline).toBe(
     'Bash · appel mal formé : un chemin Windows non protégé sous un shell POSIX, 3 fois dans la session');
 });
 
@@ -112,7 +113,7 @@ test('un appel mal forme repete dit combien de fois', () => {
 // session » se lit comme du bruit sur une ligne de tableau de bord.
 // Mutation attrapee : afficher le compte sans condition.
 test('une premiere occurrence ne parle pas de repetition', () => {
-  assert.doesNotMatch(failureLine(invocation).headline, /fois dans la session/);
+  expect(failureLine(invocation).headline).not.toMatch(/fois dans la session/);
 });
 
 // La table des motifs (src/engine/watchdog/invocation-patterns.ts) grandit a chaque cas
@@ -123,17 +124,17 @@ test('une premiere occurrence ne parle pas de repetition', () => {
 // Mutation attrapee : retirer le repli et composer directement avec la table.
 test('un motif que le bloc ne connait pas encore retombe sur une formulation generique', () => {
   const l = failureLine({ ...invocation, patternId: 'inv-motif-de-demain' });
-  assert.equal(l.headline, 'Bash · appel mal formé : un réglage du poste de travail');
-  assert.doesNotMatch(l.headline, /inv-motif-de-demain/,
-    'un identifiant technique n est pas une phrase francaise');
+  expect(l.headline).toBe('Bash · appel mal formé : un réglage du poste de travail');
+  expect(l.headline, 'un identifiant technique n est pas une phrase francaise')
+    .not.toMatch(/inv-motif-de-demain/);
 });
 
 test('chaque cause du releve dit ce qui a ete mal ecrit, pas ce que l outil a repondu', () => {
   const antislash = failureLine({ ...invocation, patternId: 'inv-bash-trailing-backslash-in-path' });
-  assert.equal(antislash.headline,
+  expect(antislash.headline).toBe(
     'Bash · appel mal formé : un guillemet double non fermé — typiquement un chemin Windows terminé par un antislash');
   const heredoc = failureLine({ ...invocation, patternId: 'inv-bash-heredoc-too-large' });
-  assert.equal(heredoc.headline,
+  expect(heredoc.headline).toBe(
     'Bash · appel mal formé : un guillemet simple non fermé — typiquement un heredoc trop gros pour la ligne de commande');
 });
 
@@ -142,8 +143,8 @@ test('la phrase du filet est celle qui sert quand la cause n est pas caracterise
   // decrit un symptome sans nommer de remede, parce que le filet ne se declenche
   // que lorsque aucune des deux ancres ne reconnait la forme.
   const l = failureLine({ ...invocation, patternId: 'inv-bash-unbalanced-quote' });
-  assert.match(l.headline, /guillemet ouvert et jamais refermé/);
-  assert.doesNotMatch(l.headline, /réglage du poste de travail/);
+  expect(l.headline).toMatch(/guillemet ouvert et jamais refermé/);
+  expect(l.headline).not.toMatch(/réglage du poste de travail/);
 });
 
 // ── Le filet : aucun detecteur ne peut arriver muet ────────────────────────
@@ -160,11 +161,10 @@ test('la phrase du filet est celle qui sert quand la cause n est pas caracterise
 // vivent dans leur propre registre cote navigateur. D'ou le filet pose sur les
 // types de DETECTEURS et pas sur « tout ce qui porte un type ».
 test('tout type d alerte du detecteur a sa formulation francaise', () => {
-  assert.ok(_DETECTOR_TYPES.length >= 4, 'la liste des detecteurs doit etre reelle');
+  expect(_DETECTOR_TYPES.length >= 4, 'la liste des detecteurs doit etre reelle').toBeTruthy();
   for (const type of _DETECTOR_TYPES) {
-    const headline = failureLine({ ...invocation, type }).headline;
-    assert.notEqual(headline, type,
-      `${type} n a pas de formulation francaise : le bloc afficherait son nom de type`);
+    const headline = failureLine({ ...invocation, type: type as Alert['type'] }).headline;
+    expect(headline, `${type} n a pas de formulation francaise : le bloc afficherait son nom de type`).not.toBe(type);
   }
 });
 
@@ -174,13 +174,12 @@ test('tout type d alerte du detecteur a sa formulation francaise', () => {
 //
 // Mutation attrapee : remplacer le libelle par un quantificateur de vivacite.
 test('le resume compte les non acquittees, il ne prononce pas « en cours »', () => {
-  assert.equal(failuresSummary([]), 'aucune');
-  assert.equal(failuresSummary([alerte({ acknowledged: true })]), 'aucune');
-  assert.equal(failuresSummary([alerte({ acknowledged: false })]), '1 non acquittée');
-  assert.equal(
+  expect(failuresSummary([])).toBe('aucune');
+  expect(failuresSummary([alerte({ acknowledged: true })])).toBe('aucune');
+  expect(failuresSummary([alerte({ acknowledged: false })])).toBe('1 non acquittée');
+  expect(
     failuresSummary([alerte({ acknowledged: false }), alerte({ acknowledged: true }), alerte({ acknowledged: false })]),
-    '2 non acquittées',
-  );
+  ).toBe('2 non acquittées');
 });
 
 // ── Ce que le panneau accepte de montrer : des fautes, pas des etats ───────
@@ -198,16 +197,16 @@ test('panelAlerts ecarte les silences (stuck) et garde tout le reste', () => {
     invocation,
     { ...base, type: 'retryStorm' },
   ]);
-  assert.deepEqual(kept.map(a => a.type), ['loop', 'badInvocation', 'retryStorm']);
+  expect(kept.map(a => a.type)).toEqual(['loop', 'badInvocation', 'retryStorm']);
 });
 
 // ── Regroupement par cause ─────────────────────────────────────────────────
 
 test('la clef de groupe suit la cause, pas l episode', () => {
-  assert.equal(groupKey(invocation), 'badInvocation:inv-bash-windows-path-unquoted');
-  assert.equal(groupKey(base), 'loop:Bash');
-  assert.equal(groupKey({ ...base, type: 'retryStorm', toolName: 'Grep' }), 'retryStorm:Grep');
-  assert.equal(groupKey({ ...base, type: 'stuck' }), 'stuck');
+  expect(groupKey(invocation)).toBe('badInvocation:inv-bash-windows-path-unquoted');
+  expect(groupKey(base)).toBe('loop:Bash');
+  expect(groupKey({ ...base, type: 'retryStorm', toolName: 'Grep' })).toBe('retryStorm:Grep');
+  expect(groupKey({ ...base, type: 'stuck' })).toBe('stuck');
 });
 
 test('les episodes d une meme cause se regroupent, tries du plus recent au plus ancien', () => {
@@ -216,10 +215,10 @@ test('les episodes d une meme cause se regroupent, tries du plus recent au plus 
     { ...invocation, createdAt: 300, acknowledged: false },
     { ...invocation, createdAt: 200, acknowledged: false },
   ]);
-  assert.equal(groupes.length, 1);
-  assert.deepEqual(groupes[0].episodes.map(e => e.createdAt), [300, 200, 100]);
-  assert.equal(groupes[0].lastAt, 300);
-  assert.equal(groupes[0].unacked, 2);
+  expect(groupes.length).toBe(1);
+  expect(groupes[0]!.episodes.map(e => e.createdAt)).toEqual([300, 200, 100]);
+  expect(groupes[0]!.lastAt).toBe(300);
+  expect(groupes[0]!.unacked).toBe(2);
 });
 
 test('les groupes a traiter passent devant, puis le plus recent', () => {
@@ -228,45 +227,45 @@ test('les groupes a traiter passent devant, puis le plus recent', () => {
     { ...invocation, createdAt: 100, acknowledged: false },                // à traiter, ancien
     { ...base, type: 'retryStorm', createdAt: 500, acknowledged: false },  // à traiter, récent
   ]);
-  assert.deepEqual(groupes.map(g => g.key),
+  expect(groupes.map(g => g.key)).toEqual(
     ['retryStorm:Bash', 'badInvocation:inv-bash-windows-path-unquoted', 'loop:Bash']);
 });
 
 // ── Libellés : la cause n emprunte jamais les chiffres d un episode ────────
 
 test('causeLabel nomme la cause, sans compter', () => {
-  const [g] = groupAlerts([{ ...base, count: 4 }, { ...base, count: 7, createdAt: 50 }]);
-  assert.equal(causeLabel(g), 'Bash · même commande répétée');
-  assert.doesNotMatch(causeLabel(g), /\d/);
+  const g = groupAlerts([{ ...base, count: 4 }, { ...base, count: 7, createdAt: 50 }])[0]!;
+  expect(causeLabel(g)).toBe('Bash · même commande répétée');
+  expect(causeLabel(g)).not.toMatch(/\d/);
 });
 
 test('causeLabel d un appel mal forme reprend la phrase du motif', () => {
-  const [g] = groupAlerts([invocation]);
-  assert.equal(causeLabel(g),
+  const g = groupAlerts([invocation])[0]!;
+  expect(causeLabel(g)).toBe(
     'Bash · appel mal formé : un chemin Windows non protégé sous un shell POSIX');
 });
 
 test('l outil ne se dit que s il est uniforme dans le groupe', () => {
-  const [g] = groupAlerts([
+  const g = groupAlerts([
     { ...invocation, toolName: 'Bash' },
     { ...invocation, toolName: 'PowerShell', createdAt: 50 },
-  ]);
-  assert.equal(causeLabel(g),
+  ])[0]!;
+  expect(causeLabel(g)).toBe(
     'appel mal formé : un chemin Windows non protégé sous un shell POSIX');
 });
 
 test('causeLabel des autres types', () => {
-  assert.equal(causeLabel(groupAlerts([{ ...base, type: 'retryStorm' }])[0]),
+  expect(causeLabel(groupAlerts([{ ...base, type: 'retryStorm' }])[0]!)).toBe(
     'Bash · échecs consécutifs');
-  assert.equal(causeLabel(groupAlerts([{ ...base, type: 'stuck', toolName: '' }])[0]),
+  expect(causeLabel(groupAlerts([{ ...base, type: 'stuck', toolName: '' }])[0]!)).toBe(
     'Aucun événement · outils encore en vol');
 });
 
 test('episodeLabel dit les faits du seul episode', () => {
-  assert.equal(episodeLabel(base), 'même commande 4×, 3 sur 4 en échec');
-  assert.equal(episodeLabel({ ...base, type: 'retryStorm', count: 3 }), '3 échecs consécutifs');
-  assert.equal(episodeLabel({ ...base, type: 'stuck', count: 2 }), '2 outils encore en vol');
-  assert.equal(episodeLabel({ ...base, type: 'stuck', count: 1 }), '1 outil encore en vol');
-  assert.equal(episodeLabel({ ...invocation, count: 3 }), '3 fois dans la session');
-  assert.equal(episodeLabel(invocation), '', 'une premiere occurrence ne parle pas de repetition');
+  expect(episodeLabel(base)).toBe('même commande 4×, 3 sur 4 en échec');
+  expect(episodeLabel({ ...base, type: 'retryStorm', count: 3 })).toBe('3 échecs consécutifs');
+  expect(episodeLabel({ ...base, type: 'stuck', count: 2 })).toBe('2 outils encore en vol');
+  expect(episodeLabel({ ...base, type: 'stuck', count: 1 })).toBe('1 outil encore en vol');
+  expect(episodeLabel({ ...invocation, count: 3 })).toBe('3 fois dans la session');
+  expect(episodeLabel(invocation), 'une premiere occurrence ne parle pas de repetition').toBe('');
 });

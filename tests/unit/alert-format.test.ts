@@ -6,16 +6,15 @@
 // pinned here. What the bubble *displays* still needs a human; what it *says*
 // is proved below.
 
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { expect, test } from 'vitest';
 import { alertActor, alertActorLine, alertDetailLines, notificationPayload } from '../../src/web/viz-alert-format.ts';
 import { pricingDriftAlert } from '../../src/web/viz-pricing-drift-alert.ts';
 import { clockTime } from '../../src/engine/core/clock-time.ts';
 
 // Built from local-time components so the expectation holds in any timezone.
-const at = (h, m, s) => new Date(2026, 7, 7, h, m, s).getTime();
+const at = (h: number, m: number, s: number) => new Date(2026, 7, 7, h, m, s).getTime();
 
-function loopAlert(over = {}) {
+function loopAlert(over: Record<string, any> = {}) {
   return {
     type: 'loop', sessionId: 'sid-abcdef12', toolName: 'Bash', count: 4,
     createdAt: at(14, 3, 24), message: 'Bash called 4× with the same input in 15s',
@@ -26,7 +25,7 @@ function loopAlert(over = {}) {
   };
 }
 
-function stuckAlert(over = {}) {
+function stuckAlert(over: Record<string, any> = {}) {
   return {
     type: 'stuck', sessionId: 'sid-abcdef12', toolName: '', count: 2,
     createdAt: at(14, 10, 0), message: 'No event for 240s while 2 tool(s) still running',
@@ -42,18 +41,18 @@ function stuckAlert(over = {}) {
 // ─── Clock ─────────────────────────────────────────────────────────────────
 
 test('clockTime renders a wall-clock time, zero-padded', () => {
-  assert.equal(clockTime(at(14, 3, 9)), '14:03:09');
-  assert.equal(clockTime(at(9, 0, 0)), '09:00:00');
+  expect(clockTime(at(14, 3, 9))).toBe('14:03:09');
+  expect(clockTime(at(9, 0, 0))).toBe('09:00:00');
 });
 
 // ─── Who ───────────────────────────────────────────────────────────────────
 
 test('alertActor names the subagent by type and short id', () => {
-  assert.equal(alertActor(loopAlert({ agentId: 'ag-9c2f11a0', agentType: 'Explore' })), 'Explore ag-9c2f1');
+  expect(alertActor(loopAlert({ agentId: 'ag-9c2f11a0', agentType: 'Explore' }))).toBe('Explore ag-9c2f1');
 });
 
 test('alertActor says main thread when no agent ran it', () => {
-  assert.equal(alertActor(loopAlert()), 'main thread');
+  expect(alertActor(loopAlert())).toBe('main thread');
 });
 
 test('alertActorLine nomme l\'acteur d\'une alerte de session et se tait pour un stuck', () => {
@@ -64,13 +63,13 @@ test('alertActorLine nomme l\'acteur d\'une alerte de session et se tait pour un
   const lignes = alertes.map(alertActorLine);
 
   // Assert
-  assert.deepEqual(lignes, ['main thread', 'Explore ag-9c2f1', '']);
+  expect(lignes).toEqual(['main thread', 'Explore ag-9c2f1', '']);
 });
 
 // ─── Detail lines ──────────────────────────────────────────────────────────
 
 test('a loop lists the real clock time of every repeat', () => {
-  assert.deepEqual(alertDetailLines(loopAlert()), ['Repeats at 14:03:09, 14:03:14, 14:03:19, 14:03:24']);
+  expect(alertDetailLines(loopAlert())).toEqual(['Repeats at 14:03:09, 14:03:14, 14:03:19, 14:03:24']);
 });
 
 // Only loop's window bounds `occurrences`: repeats keep piling up while an alert
@@ -81,11 +80,11 @@ test('a loop caps how many repeat times it prints and says what it dropped', () 
     ts: at(14, 3, 0) + i * 250, toolUseId: `t${i}`, failed: null,
   }));
   const lines = alertDetailLines(loopAlert({ occurrences: many, count: 240 }));
-  assert.equal(lines.length, 1);
-  assert.match(lines[0], /…and 235 more$/, 'ce qui est retire doit etre annonce');
-  assert.equal(lines[0].split(',').length, 5, 'cinq horodatages, pas deux cent quarante');
-  assert.ok(lines[0].length < 120,
-    `une ligne de panneau reste lisible, celle-ci fait ${lines[0].length} caracteres`);
+  expect(lines.length).toBe(1);
+  expect(lines[0]!, 'ce qui est retire doit etre annonce').toMatch(/…and 235 more$/);
+  expect(lines[0]!.split(',').length, 'cinq horodatages, pas deux cent quarante').toBe(5);
+  expect(lines[0]!.length < 120,
+    `une ligne de panneau reste lisible, celle-ci fait ${lines[0]!.length} caracteres`).toBeTruthy();
 });
 
 test('a loop list of exactly the cap prints no overflow line', () => {
@@ -93,14 +92,14 @@ test('a loop list of exactly the cap prints no overflow line', () => {
     ts: at(14, 3, 0) + i * 1000, toolUseId: `t${i}`, failed: null,
   }));
   const lines = alertDetailLines(loopAlert({ occurrences: exactly, count: 5 }));
-  assert.doesNotMatch(lines[0], /more/, 'rien n a ete retire, rien ne doit le dire');
+  expect(lines[0], 'rien n a ete retire, rien ne doit le dire').not.toMatch(/more/);
 });
 
 // The line leads with the clock so the list can be scanned down its left
 // edge, and names an actor only when there is one to name — repeating
 // "(main thread)" on every row is noise that pushes the subject off-screen.
 test('a stuck alert lists each in-flight tool with its subject and start time', () => {
-  assert.deepEqual(alertDetailLines(stuckAlert()), [
+  expect(alertDetailLines(stuckAlert())).toEqual([
     '14:05:00 · Bash · npm run build',
     '14:06:00 · Read · hook.js · Explore ag-9c2f1',
   ]);
@@ -115,10 +114,10 @@ test('a stuck list cuts each subject shorter than a standalone one', () => {
   const lines = alertDetailLines(stuckAlert({
     tools: [{ toolUseId: 'tA', toolName: 'Bash', subject: long, startedAt: at(14, 5, 0), agentId: '', agentType: '' }],
   }));
-  assert.equal(lines.length, 1);
-  const shown = lines[0].split(' · ')[2];
-  assert.equal(shown.length, 40, 'a list row has to fit the panel width on one line');
-  assert.ok(shown.endsWith('…'));
+  expect(lines.length).toBe(1);
+  const shown = lines[0]!.split(' · ')[2]!;
+  expect(shown.length, 'a list row has to fit the panel width on one line').toBe(40);
+  expect(shown.endsWith('…')).toBeTruthy();
 });
 
 test('a stuck list caps how many tools it prints and says what it dropped', () => {
@@ -127,8 +126,8 @@ test('a stuck list caps how many tools it prints and says what it dropped', () =
     startedAt: at(14, 5, i), agentId: '', agentType: '',
   }));
   const lines = alertDetailLines(stuckAlert({ tools, count: 9 }));
-  assert.equal(lines.length, 6, 'five tools plus one line accounting for the rest');
-  assert.equal(lines[5], '…and 4 more');
+  expect(lines.length, 'five tools plus one line accounting for the rest').toBe(6);
+  expect(lines[5]).toBe('…and 4 more');
 });
 
 test('a stuck list of exactly the cap prints no overflow line', () => {
@@ -136,21 +135,20 @@ test('a stuck list of exactly the cap prints no overflow line', () => {
     toolUseId: `t${i}`, toolName: 'Bash', subject: `cmd ${i}`,
     startedAt: at(14, 5, i), agentId: '', agentType: '',
   }));
-  assert.equal(alertDetailLines(stuckAlert({ tools, count: 5 })).length, 5);
+  expect(alertDetailLines(stuckAlert({ tools, count: 5 })).length).toBe(5);
 });
 
 test('an alert with nothing structured to add produces no detail lines', () => {
   const retry = { ...loopAlert(), type: 'retryStorm', occurrences: [], tools: [] };
-  assert.deepEqual(alertDetailLines(retry), []);
+  expect(alertDetailLines(retry)).toEqual([]);
 });
 
 // ─── Notification body ─────────────────────────────────────────────────────
 
 test('notification body carries the command and the repeat times, not just the pattern name', () => {
   const { title, body } = notificationPayload(loopAlert());
-  assert.equal(title, 'agent-viz: loop');
-  assert.equal(
-    body,
+  expect(title).toBe('agent-viz: loop');
+  expect(body).toBe(
     'Bash called 4× with the same input in 15s\n'
     + 'npm test\n'
     + 'Repeats at 14:03:09, 14:03:14, 14:03:19, 14:03:24\n'
@@ -160,13 +158,12 @@ test('notification body carries the command and the repeat times, not just the p
 
 test('notification body names the agent when a subagent is at fault', () => {
   const { body } = notificationPayload(loopAlert({ agentId: 'ag-9c2f11a0', agentType: 'Explore' }));
-  assert.match(body, /Explore ag-9c2f1$/);
+  expect(body).toMatch(/Explore ag-9c2f1$/);
 });
 
 test('notification body of a stuck alert says what is in flight', () => {
   const { body } = notificationPayload(stuckAlert());
-  assert.equal(
-    body,
+  expect(body).toBe(
     'No event for 240s while 2 tool(s) still running\n'
     + '14:05:00 · Bash · npm run build\n'
     + '14:06:00 · Read · hook.js · Explore ag-9c2f1',
@@ -181,13 +178,13 @@ test('la notification d\'une alerte hors session ne nomme aucun acteur', () => {
   const { body } = notificationPayload(derive);
 
   // Assert
-  assert.equal(body, derive.message);
+  expect(body).toBe(derive.message);
 });
 
 test('an oversized command is cut, so one alert cannot flood the panel', () => {
   const huge = 'x'.repeat(500);
   const { body } = notificationPayload(loopAlert({ subject: huge }));
-  const line = body.split('\n')[1];
-  assert.equal(line.length, 200);
-  assert.ok(line.endsWith('…'), 'the cut must be visible, not silent');
+  const line = body.split('\n')[1]!;
+  expect(line.length).toBe(200);
+  expect(line.endsWith('…'), 'the cut must be visible, not silent').toBeTruthy();
 });

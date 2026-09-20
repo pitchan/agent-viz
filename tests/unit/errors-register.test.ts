@@ -5,15 +5,14 @@
 // ramasse-miettes efface un noeud d'outil fini au bout de dix minutes, et un
 // echec peut arriver sans son noeud (`PreToolUse` manque, noeud deja ramasse).
 
-import test, { beforeEach } from 'node:test';
-import assert from 'node:assert/strict';
+import { beforeEach, expect, test } from 'vitest';
 
 import {
   recordError, recordSuccess, getErrors, getErrorsSummary,
   resetErrors, onErrorsChanged, ERRORS_MAX,
 } from '../../src/web/viz-errors.ts';
 
-const echec = (extra = {}) => ({
+const echec = (extra: Record<string, any> = {}) => ({
   hook_event_name: 'PostToolUseFailure',
   session_id: '11111111-2222-3333-4444-555555555555',
   tool_name: 'Read',
@@ -24,7 +23,7 @@ const echec = (extra = {}) => ({
   ...extra,
 });
 
-const succes = (extra = {}) => ({
+const succes = (extra: Record<string, any> = {}) => ({
   hook_event_name: 'PostToolUse',
   session_id: '11111111-2222-3333-4444-555555555555',
   tool_name: 'Bash',
@@ -42,11 +41,11 @@ test('un echec enregistre porte de quoi le comprendre SANS le graphe', () => {
   // Act
   recordError(evt);
   // Assert — les quatre champs qui repondent « quoi, sur quoi, pourquoi, quand »
-  const [rec] = getErrors();
-  assert.equal(rec.toolName, 'Read');
-  assert.equal(rec.subject, 'soutenance-septembre-2026.md');
-  assert.match(rec.message, /exceeds maximum allowed tokens/);
-  assert.equal(rec.ts, '2026-08-18T13:20:52.000Z');
+  const rec = getErrors()[0]!;
+  expect(rec.toolName).toBe('Read');
+  expect(rec.subject).toBe('soutenance-septembre-2026.md');
+  expect(rec.message).toMatch(/exceeds maximum allowed tokens/);
+  expect(rec.ts).toBe('2026-08-18T13:20:52.000Z');
 });
 
 test('l echec retient le noeud a rejoindre, sous l identifiant du graphe', () => {
@@ -54,14 +53,14 @@ test('l echec retient le noeud a rejoindre, sous l identifiant du graphe', () =>
   recordError(echec());
   // Assert — `t:` est le prefixe que viz-layout donne aux noeuds d'outil ;
   // sans lui le volet ne saurait pas quoi selectionner.
-  assert.equal(getErrors()[0].nodeId, 't:toolu_001');
+  expect(getErrors()[0]!.nodeId).toBe('t:toolu_001');
 });
 
 test('l echec retient sa session — le bandeau n en montre jamais qu une', () => {
   // Arrange / Act
   recordError(echec());
   // Assert
-  assert.equal(getErrors()[0].sessionId, '11111111-2222-3333-4444-555555555555');
+  expect(getErrors()[0]!.sessionId).toBe('11111111-2222-3333-4444-555555555555');
 });
 
 test('un echec SANS noeud correspondant est enregistre quand meme', () => {
@@ -73,8 +72,8 @@ test('un echec SANS noeud correspondant est enregistre quand meme', () => {
   // Act
   recordError(orphelin);
   // Assert
-  assert.equal(getErrors().length, 1);
-  assert.equal(getErrors()[0].nodeId, null, 'aucun noeud a rejoindre, et c est dit');
+  expect(getErrors().length).toBe(1);
+  expect(getErrors()[0]!.nodeId, 'aucun noeud a rejoindre, et c est dit').toBe(null);
 });
 
 test('ce qui n est pas un echec n entre pas dans le registre', () => {
@@ -83,7 +82,7 @@ test('ce qui n est pas un echec n entre pas dans le registre', () => {
   // Act
   recordError(succes);
   // Assert
-  assert.equal(getErrors().length, 0);
+  expect(getErrors().length).toBe(0);
 });
 
 test('un outil inconnu du tableau des sujets ne fait pas tomber la capture', () => {
@@ -94,8 +93,8 @@ test('un outil inconnu du tableau des sujets ne fait pas tomber la capture', () 
   // Act
   recordError(exotique);
   // Assert
-  assert.equal(getErrors()[0].subject, '');
-  assert.match(getErrors()[0].message, /exceeds/);
+  expect(getErrors()[0]!.subject).toBe('');
+  expect(getErrors()[0]!.message).toMatch(/exceeds/);
 });
 
 test('les erreurs se lisent dans l ordre ou elles sont survenues', () => {
@@ -107,7 +106,7 @@ test('les erreurs se lisent dans l ordre ou elles sont survenues', () => {
   // Act
   const recs = getErrors();
   // Assert
-  assert.deepEqual(recs.map(r => r.nodeId), ['t:a', 't:b']);
+  expect(recs.map(r => r.nodeId)).toEqual(['t:a', 't:b']);
 });
 
 test('le registre est plafonne en lignes DISTINCTES, les plus anciennes partent', () => {
@@ -118,9 +117,9 @@ test('le registre est plafonne en lignes DISTINCTES, les plus anciennes partent'
   // Act
   const recs = getErrors();
   // Assert
-  assert.equal(recs.length, ERRORS_MAX);
-  assert.equal(recs[recs.length - 1].nodeId, `t:t${ERRORS_MAX + 4}`, 'la derniere erreur est gardee');
-  assert.equal(recs[0].nodeId, 't:t5', 'les cinq premieres sont tombees');
+  expect(recs.length).toBe(ERRORS_MAX);
+  expect(recs[recs.length - 1]!.nodeId, 'la derniere erreur est gardee').toBe(`t:t${ERRORS_MAX + 4}`);
+  expect(recs[0]!.nodeId, 'les cinq premieres sont tombees').toBe('t:t5');
 });
 
 test('getErrors rend une COPIE — l appelant ne peut pas corrompre le registre', () => {
@@ -129,7 +128,7 @@ test('getErrors rend une COPIE — l appelant ne peut pas corrompre le registre'
   // Act
   getErrors().length = 0;
   // Assert
-  assert.equal(getErrors().length, 1);
+  expect(getErrors().length).toBe(1);
 });
 
 test('le changement de session vide le registre', () => {
@@ -140,7 +139,7 @@ test('le changement de session vide le registre', () => {
   // Act
   resetErrors();
   // Assert
-  assert.equal(getErrors().length, 0);
+  expect(getErrors().length).toBe(0);
 });
 
 test('l abonne est prevenu a chaque erreur, et au vidage', () => {
@@ -151,7 +150,7 @@ test('l abonne est prevenu a chaque erreur, et au vidage', () => {
   recordError(echec());
   resetErrors();
   // Assert — c'est ce signal qui repeint la pastille et le point du flux
-  assert.equal(appels, 2);
+  expect(appels).toBe(2);
 });
 
 test('un evenement ignore ne reveille personne', () => {
@@ -161,7 +160,7 @@ test('un evenement ignore ne reveille personne', () => {
   // Act
   recordError(echec({ hook_event_name: 'PostToolUse', error: undefined }));
   // Assert
-  assert.equal(appels, 0);
+  expect(appels).toBe(0);
 });
 
 // ─── Vieillissement honnete : repetition, continuite, dernier verdict ───────
@@ -174,9 +173,9 @@ test('une erreur neuve dit : jamais repetee, rien reussi depuis', () => {
   // Arrange / Act
   recordError(echec());
   // Assert
-  const [rec] = getErrors();
-  assert.equal(rec.count, 1);
-  assert.equal(rec.successesSince, 0);
+  const rec = getErrors()[0]!;
+  expect(rec.count).toBe(1);
+  expect(rec.successesSince).toBe(0);
 });
 
 test('le fait de continuite compte les outils reussis DEPUIS l erreur, pas avant', () => {
@@ -189,7 +188,7 @@ test('le fait de continuite compte les outils reussis DEPUIS l erreur, pas avant
   recordSuccess(succes({ tool_use_id: 'ok4' }));
   recordSuccess(succes({ tool_use_id: 'ok5' }));
   // Assert
-  assert.equal(getErrors()[0].successesSince, 3);
+  expect(getErrors()[0]!.successesSince).toBe(3);
 });
 
 test('la meme erreur qui revient s empile sur sa ligne au lieu d en creer une', () => {
@@ -199,9 +198,9 @@ test('la meme erreur qui revient s empile sur sa ligne au lieu d en creer une', 
   recordError(echec({ tool_use_id: 'x2' }));
   // Assert — une ligne, deux occurrences, et c'est la DERNIERE qu'on rejoint
   const recs = getErrors();
-  assert.equal(recs.length, 1);
-  assert.equal(recs[0].count, 2);
-  assert.equal(recs[0].nodeId, 't:x2');
+  expect(recs.length).toBe(1);
+  expect(recs[0]!.count).toBe(2);
+  expect(recs[0]!.nodeId).toBe('t:x2');
 });
 
 test('quand l erreur revient, la continuite repart de la DERNIERE occurrence', () => {
@@ -212,7 +211,7 @@ test('quand l erreur revient, la continuite repart de la DERNIERE occurrence', (
   // Act
   recordError(echec({ tool_use_id: 'x2' }));
   // Assert — « 2 reussis depuis » eut ete un mensonge : l'echec vient de revenir
-  assert.equal(getErrors()[0].successesSince, 0);
+  expect(getErrors()[0]!.successesSince).toBe(0);
 });
 
 test('deux sujets differents restent deux lignes distinctes', () => {
@@ -220,7 +219,7 @@ test('deux sujets differents restent deux lignes distinctes', () => {
   recordError(echec({ tool_input: { file_path: 'a.md' } }));
   recordError(echec({ tool_input: { file_path: 'b.md' } }));
   // Assert
-  assert.equal(getErrors().length, 2);
+  expect(getErrors().length).toBe(2);
 });
 
 test('sans sujet connu, c est le message qui identifie la repetition', () => {
@@ -232,8 +231,8 @@ test('sans sujet connu, c est le message qui identifie la repetition', () => {
   recordError(echec({ tool_name: 'OutilJamaisVu', tool_use_id: 'y3', error: 'autre panne' }));
   // Assert
   const recs = getErrors();
-  assert.equal(recs.length, 2);
-  assert.equal(recs[0].count, 2);
+  expect(recs.length).toBe(2);
+  expect(recs[0]!.count).toBe(2);
 });
 
 test('le resume dit le TOTAL des echecs, pas le nombre de lignes', () => {
@@ -244,8 +243,8 @@ test('le resume dit le TOTAL des echecs, pas le nombre de lignes', () => {
   // Act
   const s = getErrorsSummary();
   // Assert
-  assert.equal(s.total, 3);
-  assert.equal(s.hasRepeat, true);
+  expect(s.total).toBe(3);
+  expect(s.hasRepeat).toBe(true);
 });
 
 test('le resume sans repetition ne crie pas', () => {
@@ -253,16 +252,16 @@ test('le resume sans repetition ne crie pas', () => {
   recordError(echec({ tool_input: { file_path: 'a.md' } }));
   recordError(echec({ tool_input: { file_path: 'b.md' } }));
   // Assert
-  assert.equal(getErrorsSummary().hasRepeat, false);
+  expect(getErrorsSummary().hasRepeat).toBe(false);
 });
 
 test('le resume sait si le TOUT DERNIER outil a echoue', () => {
   // Arrange / Act / Assert — vrai juste apres l'echec…
   recordError(echec());
-  assert.equal(getErrorsSummary().lastFailed, true);
+  expect(getErrorsSummary().lastFailed).toBe(true);
   // …faux des que la session repart
   recordSuccess(succes());
-  assert.equal(getErrorsSummary().lastFailed, false);
+  expect(getErrorsSummary().lastFailed).toBe(false);
 });
 
 test('un succes sans erreur enregistree ne reveille personne', () => {
@@ -274,7 +273,7 @@ test('un succes sans erreur enregistree ne reveille personne', () => {
   // Act
   recordSuccess(succes());
   // Assert
-  assert.equal(appels, 0);
+  expect(appels).toBe(0);
 });
 
 test('apres une erreur, chaque succes reveille — la pastille doit vieillir a l ecran', () => {
@@ -285,7 +284,7 @@ test('apres une erreur, chaque succes reveille — la pastille doit vieillir a l
   // Act
   recordSuccess(succes());
   // Assert
-  assert.equal(appels, 1);
+  expect(appels).toBe(1);
 });
 
 test('l abonne apprend la RAISON du reveil', () => {
@@ -293,14 +292,14 @@ test('l abonne apprend la RAISON du reveil', () => {
   // parce qu'elles sont rares. Un succes n'a pas ce prix : il doit pouvoir ne
   // repeindre que la pastille. D'ou la raison, transmise avec la liste.
   // Arrange
-  const raisons = [];
+  const raisons: string[] = [];
   onErrorsChanged((_recs, raison) => { raisons.push(raison); });
   // Act
   recordError(echec());
   recordSuccess(succes());
   resetErrors();
   // Assert
-  assert.deepEqual(raisons, ['error', 'success', 'reset']);
+  expect(raisons).toEqual(['error', 'success', 'reset']);
 });
 
 test('le vidage oublie aussi le dernier verdict', () => {
@@ -309,6 +308,6 @@ test('le vidage oublie aussi le dernier verdict', () => {
   // Act
   resetErrors();
   // Assert — sinon la session suivante heriterait d'un « en train d'echouer »
-  assert.equal(getErrorsSummary().lastFailed, false);
-  assert.equal(getErrorsSummary().total, 0);
+  expect(getErrorsSummary().lastFailed).toBe(false);
+  expect(getErrorsSummary().total).toBe(0);
 });
