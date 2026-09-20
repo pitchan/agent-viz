@@ -5,7 +5,7 @@
 //
 // The watchdog records what it sees, whenever it saw it, stamped with the real time
 // of the triggering event. Deciding what is recent enough to SHOW belongs to
-// src/web/viz-alert-freshness.ts — see tests/unit/alert-freshness.test.mjs.
+// src/web/viz-alert-freshness.ts — see tests/unit/alert-freshness.test.ts.
 //
 // What this file pins:
 //

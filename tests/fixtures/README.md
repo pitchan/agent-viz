@@ -39,4 +39,4 @@ valeurs neutres, cohérentes entre elles (`transcript_path` dérive bien du
 `permission_mode`, `effort`, `_ts`, `_source`, ainsi que le nombre et l'ordre
 des champs. C'est cela, le contrat — ne pas le « nettoyer ».
 
-Lecteur : `tests/unit/watchdog-loop-outcomes.test.mjs`.
+Lecteur : `tests/unit/watchdog-loop-outcomes.test.ts`.

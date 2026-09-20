@@ -9,7 +9,7 @@ import { execFileSync } from 'node:child_process';
 
 // Charger `routes.ts` charge `session-index.ts`, qui crée
 // `os.tmpdir()/agent-events` dès sa lecture : le bac est posé avant l'import,
-// même parade que `tests/unit/static-ts-route.test.cjs`.
+// même parade que `tests/unit/static-ts-route.test.ts`.
 const BAC = mkdtempSync(path.join(os.tmpdir(), 'avtest-served-ts-'));
 process.env.TEMP = BAC;
 process.env.TMP = BAC;

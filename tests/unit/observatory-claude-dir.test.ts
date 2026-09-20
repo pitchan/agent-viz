@@ -115,4 +115,4 @@ test('une variable VIDE retombe sur le home', async () => {
 
 // Les deux moitiés lisent au MÊME ENDROIT : les tests ci-dessus le verrouillent par le
 // comportement réel d'`observatory/index.ts`. Une définition locale de `resolveClaudeDir`
-// ou de `resolveClaudeJsonPath` dans `src/server/` fait rougir `no-local-engine-primitives.test.mjs`.
+// ou de `resolveClaudeJsonPath` dans `src/server/` fait rougir `no-local-engine-primitives.test.ts`.

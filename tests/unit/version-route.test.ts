@@ -4,7 +4,7 @@
 // est la reponse par HTTP — la seule preuve d'instrument qui vaille ici.
 
 // ── Le bac a sable, pose AVANT le premier import de `src/server/**` ─────────
-// Meme piege, meme parade que dans watchdog-routes.test.cjs : charger
+// Meme piege, meme parade que dans watchdog-routes.test.ts : charger
 // `src/server/routes` charge `session-index`, qui cree
 // `os.tmpdir()/agent-events` des sa lecture. `os.tmpdir()` et `os.homedir()`
 // relisent l'environnement a chaque appel. Un import statique de ces deux

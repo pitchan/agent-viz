@@ -10,7 +10,7 @@ import type { AgentInstaller, Target } from '../../src/server/install-hooks/type
 
 // Un bac à sable qui ressemble à un projet : `resolveScope({ scope: 'project' })`
 // exige un `.git` pour trouver la racine. La portée `user`, elle, vise le bac de
-// `test-support/env-guard.mjs`, commun à tous les tests de ce fichier.
+// `test-support/env-guard.ts`, commun à tous les tests de ce fichier.
 function sandboxProject(prefix: string) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
   fs.mkdirSync(path.join(root, '.git'));

@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS scan_state (
 //
 // Nullable beyond `id`: the SCHEMA above declares none of these columns
 // NOT NULL (SQLite honours that literally), and a database without session_kind
-// proves it — observatory-migrations.test.cjs inserts a row with only
+// proves it — observatory-migrations.test.ts inserts a row with only
 // (id, project, scan_version) set, exactly the shape applyMigrations exists
 // to tolerate. A stricter, non-null type here would make toSessionRow throw
 // on a database this product explicitly promises to open without loss.

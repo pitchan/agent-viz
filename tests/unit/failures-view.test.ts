@@ -1,5 +1,5 @@
 // La vue accordeon, testee sur un faux document — meme parti que le stub de
-// observatory-confirm-button.test.mjs : pas de navigateur, pas de jsdom.
+// observatory-confirm-button.test.ts : pas de navigateur, pas de jsdom.
 import { expect, test } from 'vitest';
 import { renderFailures } from '../../src/web/observatory/failures-view.ts';
 import type { Alert } from '../../src/engine/watchdog/detector.ts';

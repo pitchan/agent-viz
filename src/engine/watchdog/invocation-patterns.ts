@@ -23,7 +23,7 @@
 //
 // A limit written rather than hidden: bash is translatable through LANG/LC_ALL, so under a
 // non-English locale the `inv-bash-*` patterns fall silent; no stable POSIX identifier exists.
-// Each rule has its tests in tests/unit/invocation-patterns.test.mjs.
+// Each rule has its tests in tests/unit/invocation-patterns.test.ts.
 
 /**
  * The patterns are DATA, not code: adding one is a line in this table, never

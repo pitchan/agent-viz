@@ -10,7 +10,7 @@
 //
 // Les erreurs VIEILLISSENT, sans jamais etre interpretees : trois faits comptables
 // separent la sonde rattrapee de l'agent qui boucle — la repetition, la continuite
-// (outils reussis depuis), le dernier verdict ; tests/unit/errors-register.test.mjs.
+// (outils reussis depuis), le dernier verdict ; tests/unit/errors-register.test.ts.
 //
 // Portee : une session. `clearState` le vide au changement de session, sinon
 // le rejeu du journal compterait deux fois et le volet melangerait deux

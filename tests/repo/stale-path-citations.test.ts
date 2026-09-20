@@ -6,7 +6,7 @@
 //
 // Ce filet n est PAS un test unitaire (il lit le vrai disque, cf.
 // `tests/CLAUDE.md` § 4) : c est une verification d hygiene du depot, d ou
-// `tests/repo/` — meme famille que `documentation-citations.test.mjs`.
+// `tests/repo/` — meme famille que `documentation-citations.test.ts`.
 //
 // Le motif prefere le FAUX POSITIF, visible et inscrit en liste blanche nommee, au
 // FAUX NEGATIF silencieux. D ou le second test : une entree de liste blanche qui ne
@@ -264,10 +264,6 @@ test('chaque entree de LISTE_BLANCHE_SRC protege encore une citation absente', (
 const OUTIL_TEST_MORT = /test-support\/(?:bridge|ids)\/|npm run test:(?:ids:)?node\b/;
 
 const LISTE_BLANCHE_OUTIL_MORT: EntreeBlanche[] = [
-  // Ce document decrit encore le pont et le script npm retires ; sa mise a
-  // jour est une revue distincte de ce filet-ci.
-  { fichier: 'tests/CLAUDE.md', fragment: 'test-support/bridge/', raison: 'la reecriture de ce document est une revue distincte de ce filet-ci' },
-  { fichier: 'tests/CLAUDE.md', fragment: 'npm run test:node', raison: 'meme document que l entree precedente, meme revue distincte' },
   // DONNEES DE TEST — chaine synthetique pour verifier qu un script npm
   // quelconque en `test:*` est classe comme test, pas une citation de
   // l outillage de ce depot.

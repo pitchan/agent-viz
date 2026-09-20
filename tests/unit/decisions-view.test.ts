@@ -1,6 +1,6 @@
 // La section « Décisions rendues » (le journal) et le contrôle
 // « Non merci » d'une carte active, testés sur un faux document — même parti
-// que failures-view.test.mjs : pas de navigateur, pas de jsdom.
+// que failures-view.test.ts : pas de navigateur, pas de jsdom.
 import { expect, test } from 'vitest';
 import { renderDecisions, refusalControls } from '../../src/web/observatory/decisions-view.ts';
 

@@ -10,3 +10,7 @@ dist/
 # is invoked with a bare filename instead of a path-prefixed one.
 /snapshot-*.yml
 /page-*.yml
+
+# Raw vitest output, when redirected to a file at the repo root instead of
+# a scratch location.
+/vitest-output.txt

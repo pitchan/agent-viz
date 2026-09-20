@@ -770,5 +770,5 @@ export { DEFAULTS as _DEFAULTS };
 // a detector added without its wording would print its type name there, which
 // reads as a broken tool rather than as a failed session. A test that reads
 // this list is what makes that impossible to do silently — see
-// tests/unit/failures-format.test.mjs.
+// tests/unit/failures-format.test.ts.
 export const _DETECTOR_TYPES = Object.keys(DETECTORS);

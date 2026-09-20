@@ -255,7 +255,7 @@ engine together). After changing engine source, rebuild it (`npm run build`)
 the build and the test suite first (`prepublishOnly`).
 
 Every test file is `.test.ts`, written against vitest's own API
-(`import { test, expect } from 'vitest'`). vitest loads `test-support/env-guard.mjs`
+(`import { test, expect } from 'vitest'`). vitest loads `test-support/env-guard.ts`
 first: it redirects `HOME`, `USERPROFILE`, `TEMP` and `TMP` to a throwaway
 sandbox and forces a dead port, so a test can never write to your real
 `~/.claude/settings.json` or reopen your observatory database.

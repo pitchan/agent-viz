@@ -2,7 +2,7 @@
 // l'IMPORTE depuis `src/engine/core/`. Une importation ne peut pas diverger de ce
 // qu'elle importe ; une jumelle locale, si. Ce filet ne lit jamais `dist/`.
 //
-// Analyse SYNTAXIQUE (API de `typescript`), comme `served-web-graph.test.mjs` : une
+// Analyse SYNTAXIQUE (API de `typescript`), comme `served-web-graph.test.ts` : une
 // expression régulière verrait aussi un commentaire ou une chaîne. Un import, même
 // renommé (`import { x as nom }`), n'est pas une définition et passe.
 //

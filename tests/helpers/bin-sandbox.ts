@@ -14,7 +14,7 @@ const PREFIXE_COMMUN = 'agent-viz-';
 
 // Les fichiers que la garde exige réellement (miroir de REQUIRED_DIST_FILES
 // dans bin/agent-viz.js), relatifs à dist/. Le miroir est verrouillé par
-// tests/repo/build-guards.test.mjs : les deux listes doivent rester identiques.
+// tests/repo/build-guards.test.ts : les deux listes doivent rester identiques.
 export const REQUIS = [
   'server/lifecycle.js',
   'server/server.js',

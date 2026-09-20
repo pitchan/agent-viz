@@ -7,7 +7,7 @@ import type { UsageRecord } from './claude.ts';
 
 // Mêmes types de paramètres que `claude.ts`, volontairement : c'est le
 // contrat de Liskov que `index.ts` documente et que le test
-// (`transcript-adapters.test.cjs`) vérifie à l'exécution — deux adaptateurs
+// (`transcript-adapters.test.ts`) vérifie à l'exécution — deux adaptateurs
 // interchangeables, jamais deux formes d'appel.
 function discoverPath(_firstEvent: unknown): null { return null; }
 function parseUsageLine(_line: string, _rec: UsageRecord): false { return false; }

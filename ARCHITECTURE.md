@@ -211,7 +211,7 @@ echo "import x from '../../server/usage.js'" \
 #    moteur nommées par ROUTES, et jamais src/server/. Les lignes
 #    `import type { … } from` sont permises vers le moteur et le serveur, parce
 #    que le retrait des types les efface. Un test tient cette règle, pas un grep.
-npm test -- tests/repo/served-web-graph.test.mjs                    # → tous passés, exit 0
+npm test -- tests/repo/served-web-graph.test.ts                    # → tous passés, exit 0
 #    Contrôles négatifs, dans le même fichier : R5 vérifie d'abord que son
 #    prédicat signale `src/server/pricing.ts`, et le test « frontière de type »
 #    vérifie qu'un import en valeur écrit sur trois lignes est vu et que seul
@@ -279,7 +279,7 @@ printf "import 'node:fs'\nrequire('node:path')\nawait import('node:os')\n" \
 compilateur ne les refuse pas non plus : `src/web/` partage le seul
 `tsconfig.json` du projet et reçoit `"types": ["node"]` avec le reste, donc un
 `import fs from 'node:fs'` direct dans le navigateur compile. Ce qui les tient
-est un test de graphe, `tests/repo/served-web-graph.test.mjs` : sa règle R1
+est un test de graphe, `tests/repo/served-web-graph.test.ts` : sa règle R1
 refuse tout spécificateur non relatif — `node:` ou paquet nu — atteint depuis
 `src/web/`, directement ou par transitivité, en nommant le fichier et le
 spécificateur. Aucun outil de lint ne le remplace : ESLint ne franchit pas un
@@ -313,7 +313,7 @@ grep -rn "node:" src/web/ | grep -vE "node: [A-Z][A-Za-z]*"          # → vide,
 echo "import fs from 'node:fs'" | grep -vE "node: [A-Z][A-Za-z]*"    # → 1 ligne, exit 0
 ```
 
-**La règle n° 2 est tenue par un test de dépôt, `tests/repo/served-web-graph.test.mjs`.**
+**La règle n° 2 est tenue par un test de dépôt, `tests/repo/served-web-graph.test.ts`.**
 Les règles n° 1 et n° 3 gardent leurs commandes, rejouées à la main. La règle
 n° 3 est aussi tenue par la règle R1 du même test, qui refuse tout import
 `node:` atteint depuis `src/web/`, directement ou par transitivité. R1 ne voit
@@ -336,7 +336,7 @@ git grep -nE "from '(\.\./)+engine/" -- src/server
 ```
 
 Une primitive du moteur n'a qu'une définition : un fichier de `src/server/` qui
-en redéfinit une localement fait rougir `tests/repo/no-local-engine-primitives.test.mjs`.
+en redéfinit une localement fait rougir `tests/repo/no-local-engine-primitives.test.ts`.
 
 `src/server/observatory/engine.ts` construit, au chargement du module, la valeur
 `engine` : les cinq fonctions du moteur que l'observatoire reçoit
@@ -377,7 +377,7 @@ présences et des dates, pas l'issue du build.
 | un fichier compilé isolé manque dans ce que charge le démon, `dist/server/server.js` compris | le démon sort au démarrage ; `start` rend `exited during startup` et la fin du journal, où Node nomme le fichier. Exception : le détecteur du chien de garde, chargé à part — le démon démarre sans surveillance des pannes et ne s'en plaint que dans le journal |
 | `npm run build` en erreur | sa propre sortie — les erreurs de `tsc` et un code de sortie non nul —, jamais la garde |
 
-`tests/repo/build-guards.test.mjs` rejoue les situations de la garde sur un arbre
+`tests/repo/build-guards.test.ts` rejoue les situations de la garde sur un arbre
 synthétique hors du dépôt.
 
 **La frontière du navigateur est tenue par trois filets de dépôt**, qui lisent
@@ -385,9 +385,9 @@ la table `ROUTES` de `src/server/routes.ts` au lieu d'en recopier une :
 
 | Filet | Ce qu'il tient |
 |---|---|
-| `tests/repo/served-web-graph.test.mjs` | le graphe d'imports en valeur atteignable depuis `src/web/` : uniquement des chemins relatifs en `.ts` qui existent ; chaque module atteint hors de `src/web/` est servi par `ROUTES` (R4) et se trouve dans `src/engine/`, jamais dans `src/server/` (R5) ; les lignes `import type` sont mises de côté parce que le serveur les efface. |
-| `tests/repo/served-ts-strip-check.test.mjs` | chaque fichier servi, types retirés par le même chemin que la requête HTTP, passe `node --check` ; aucun préfixe de route ne recouvre `/src/engine/` |
-| `tests/repo/package-entrypoints.test.mjs` | chaque route `/src/engine/…` figure dans le champ `files` de `package.json`, donc dans le paquet publié |
+| `tests/repo/served-web-graph.test.ts` | le graphe d'imports en valeur atteignable depuis `src/web/` : uniquement des chemins relatifs en `.ts` qui existent ; chaque module atteint hors de `src/web/` est servi par `ROUTES` (R4) et se trouve dans `src/engine/`, jamais dans `src/server/` (R5) ; les lignes `import type` sont mises de côté parce que le serveur les efface. |
+| `tests/repo/served-ts-strip-check.test.ts` | chaque fichier servi, types retirés par le même chemin que la requête HTTP, passe `node --check` ; aucun préfixe de route ne recouvre `/src/engine/` |
+| `tests/repo/package-entrypoints.test.ts` | chaque route `/src/engine/…` figure dans le champ `files` de `package.json`, donc dans le paquet publié |
 
 ---
 
@@ -457,11 +457,11 @@ git grep -nF "require('@vcueto/agent-viz')" -- src bin tests     → vide, exit 
 ```
 
 **Un test permanent tient les trois premières lignes de cette table**, plus
-chaque entrée du champ `files` — `tests/repo/package-entrypoints.test.mjs` : elles
+chaque entrée du champ `files` — `tests/repo/package-entrypoints.test.ts` : elles
 doivent résoudre sur le disque. Ni le typecheck ni le build ne lisent ces
 entrées, et **npm ignore en silence une entrée `files` inexistante** : `npm pack`
 rend `exit 0` sans la nommer. Ce qu'il ne dit pas : que le point d'entrée
-*s'exécute*. Résoudre n'est pas tourner : `tests/repo/bin-help.test.mjs` lance
+*s'exécute*. Résoudre n'est pas tourner : `tests/repo/bin-help.test.ts` lance
 `bin/agent-viz.js` dans un vrai sous-processus, mais aucun test ne lance
 `dist/engine/cli.js`.
 
@@ -547,7 +547,7 @@ phrase resterait grammaticalement vraie.
 | moteur | `src/engine/` → `dist/engine/` |
 | navigateur | `src/web/` |
 
-`tests/repo/stale-path-citations.test.mjs` rougit quand ce document cite un
+`tests/repo/stale-path-citations.test.ts` rougit quand ce document cite un
 fichier `.ts`, `.js`, `.mjs` ou `.cjs` de `src/server/`, `src/engine/` ou
 `src/web/` qui n'existe pas. Il ne vérifie ni un dossier ni un numéro de
 ligne : un ancrage `fichier:ligne` qui a glissé reste vert.
@@ -589,7 +589,7 @@ fichier qui existe tel qu'il est écrit : vitest résout seul `./x.js` vers
 le refuse.
 
 **Un garde d'environnement est posé au HARNAIS, pas dans les tests** —
-`test-support/env-guard.mjs`, seule entrée des `setupFiles` de vitest. Il
+`test-support/env-guard.ts`, seule entrée des `setupFiles` de vitest. Il
 détourne `HOME`, `USERPROFILE`, `TEMP` et `TMP` vers un bac jetable et force
 un port mort avant qu'une seule ligne de test s'exécute. Sa raison est
 mesurée : plusieurs tests chargent des modules qui, sous une garde qui lâche,

@@ -4,7 +4,7 @@
 //
 // Ce filet n'est PAS un test unitaire (il lit le vrai disque, cf. `tests/CLAUDE.md` § 4) :
 // c'est une vérification d'hygiène du dépôt, d'où `tests/repo/` — même famille que
-// `stale-path-citations.test.ts` et `documentation-citations.test.mjs`.
+// `stale-path-citations.test.ts` et `documentation-citations.test.ts`.
 //
 // Deux règles, lues sur ce que `tests/helpers/comment-lines.ts` reconnaît comme commentaire :
 //   1. aucune ligne de commentaire ne porte un des marqueurs de MOTIFS ;

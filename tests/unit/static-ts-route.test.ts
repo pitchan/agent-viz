@@ -2,7 +2,7 @@
 // la source (piles d'erreur justes), et une syntaxe que Node ne sait pas
 // effacer se dit — fichier, code d'erreur — jamais un 404 muet ou une page blanche.
 
-// Même piège, même parade que dans version-route.test.cjs : charger
+// Même piège, même parade que dans version-route.test.ts : charger
 // `src/server/routes` charge `session-index`, qui crée
 // `os.tmpdir()/agent-events` dès sa lecture.
 import fs from 'node:fs';

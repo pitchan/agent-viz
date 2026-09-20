@@ -174,7 +174,7 @@ test('accumulateUsage with different msgIds cumulates normally', () => {
 // ventilation de cache, les gardes de champ, l'identifiant vide.
 //
 // Une définition locale d'`emptyUsageBucket` dans `src/server/` fait rougir
-// `tests/repo/no-local-engine-primitives.test.mjs`.
+// `tests/repo/no-local-engine-primitives.test.ts`.
 // ---------------------------------------------------------------------------
 
 test('le seau porte les DEUX ventilations de cache', () => {

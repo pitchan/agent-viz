@@ -3,7 +3,7 @@
 // d'imports et d'appels), en JS brut : les bacs sont hermétiques, ils ne
 // dépendent jamais d'un `npm run build` du vrai dépôt. Un test qui a besoin
 // d'un comportement précis pour UNE commande passe son propre contenu via
-// `contenus['server/cli.js']` (voir tests/repo/build-guards.test.mjs) ; celui-ci
+// `contenus['server/cli.js']` (voir tests/repo/build-guards.test.ts) ; celui-ci
 // ne sert que de filet par défaut pour les autres.
 export const CLI_PAR_DEFAUT: string = `
 import path from 'node:path';
