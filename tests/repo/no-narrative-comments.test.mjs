@@ -82,22 +82,22 @@ const LISTE_BLANCHE = [
     raison: "le test épingle le coût de part et d'autre de la bascule de tarif : cette date est la donnée sous test",
   },
   {
-    fichier: 'tests/unit/pricing.test.cjs',
+    fichier: 'tests/unit/pricing.test.ts',
     fragment: 'an explicit post-2026-09-01 date pins',
     raison: "le test fixe la date du message pour choisir le tarif catalogue : cette date est la donnée sous test",
   },
   {
-    fichier: 'tests/unit/pricing.test.cjs',
+    fichier: 'tests/unit/pricing.test.ts',
     fragment: 'From 2026-09-01 the embedded table',
     raison: "la date de bascule dit quel tarif la table embarquée rend : elle est la donnée sous test",
   },
   {
-    fichier: 'tests/unit/pricing.test.cjs',
+    fichier: 'tests/unit/pricing.test.ts',
     fragment: 'dated intro period',
     raison: "la date de fin du tarif de lancement est la donnée que ce test fait franchir à `getPrice`",
   },
   {
-    fichier: 'tests/unit/tokens.test.cjs',
+    fichier: 'tests/unit/tokens.test.ts',
     fragment: 'changes tariff on',
     raison: "le test compte les jetons au tarif de lancement puis au tarif catalogue : cette date sépare les deux",
   },

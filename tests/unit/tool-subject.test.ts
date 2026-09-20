@@ -5,13 +5,13 @@
 // short label, the watchdog alert must show the command in full. So the module
 // returns the untruncated subject and each consumer slices it itself.
 
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { expect, test } from 'vitest';
 import { toolSubject } from '../../src/engine/core/tool-subject.ts';
+import type { ToolCallEvent } from '../../src/engine/core/tool-subject.ts';
 
 test('Bash: returns the full command, untruncated', () => {
   const long = 'npm run build -- --workspace=netgain --silent && node scripts/verify.js --strict';
-  assert.equal(toolSubject({ tool_name: 'Bash', tool_input: { command: long } }), long);
+  expect(toolSubject({ tool_name: 'Bash', tool_input: { command: long } })).toBe(long);
 });
 
 // PowerShell carries its command in the same field as Bash. Without its entry in
@@ -19,49 +19,41 @@ test('Bash: returns the full command, untruncated', () => {
 // the one fact the reader needs.
 test('PowerShell: returns the full command, untruncated', () => {
   const long = 'Get-Content "F:/DEV/rejeu-r7/sans/backend/log.txt" -Tail 50; if ($?) { npm run replay }';
-  assert.equal(toolSubject({ tool_name: 'PowerShell', tool_input: { command: long } }), long);
+  expect(toolSubject({ tool_name: 'PowerShell', tool_input: { command: long } })).toBe(long);
 });
 
 test('Read/Write/Edit: returns the basename of the path', () => {
   for (const tool of ['Read', 'Write', 'Edit']) {
-    assert.equal(
-      toolSubject({ tool_name: tool, tool_input: { file_path: 'F:\\DEV\\agent-viz\\lib\\hook.js' } }),
-      'hook.js',
-      `${tool} should reduce a Windows path to its basename`,
-    );
-    assert.equal(
-      toolSubject({ tool_name: tool, tool_input: { file_path: '/home/v/agent-viz/lib/hook.js' } }),
-      'hook.js',
-      `${tool} should reduce a POSIX path to its basename`,
-    );
+    expect(toolSubject({ tool_name: tool, tool_input: { file_path: 'F:\\DEV\\agent-viz\\lib\\hook.js' } }), `${tool} should reduce a Windows path to its basename`).toBe('hook.js');
+    expect(toolSubject({ tool_name: tool, tool_input: { file_path: '/home/v/agent-viz/lib/hook.js' } }), `${tool} should reduce a POSIX path to its basename`).toBe('hook.js');
   }
 });
 
 test('Grep/Glob: returns the pattern', () => {
-  assert.equal(toolSubject({ tool_name: 'Grep', tool_input: { pattern: 'agent_id' } }), 'agent_id');
-  assert.equal(toolSubject({ tool_name: 'Glob', tool_input: { pattern: '**/*.mjs' } }), '**/*.mjs');
+  expect(toolSubject({ tool_name: 'Grep', tool_input: { pattern: 'agent_id' } })).toBe('agent_id');
+  expect(toolSubject({ tool_name: 'Glob', tool_input: { pattern: '**/*.mjs' } })).toBe('**/*.mjs');
 });
 
 test('Agent: returns the description; Skill: returns the skill name', () => {
-  assert.equal(toolSubject({ tool_name: 'Agent', tool_input: { description: 'Audit the CSS' } }), 'Audit the CSS');
-  assert.equal(toolSubject({ tool_name: 'Skill', tool_input: { skill: 'superpowers:brainstorming' } }), 'superpowers:brainstorming');
+  expect(toolSubject({ tool_name: 'Agent', tool_input: { description: 'Audit the CSS' } })).toBe('Audit the CSS');
+  expect(toolSubject({ tool_name: 'Skill', tool_input: { skill: 'superpowers:brainstorming' } })).toBe('superpowers:brainstorming');
 });
 
 test('unknown tool → empty string', () => {
-  assert.equal(toolSubject({ tool_name: 'SomeFutureTool', tool_input: { whatever: 1 } }), '');
+  expect(toolSubject({ tool_name: 'SomeFutureTool', tool_input: { whatever: 1 } } as unknown as ToolCallEvent)).toBe('');
 });
 
 test('missing tool_input → empty string', () => {
-  assert.equal(toolSubject({ tool_name: 'Bash' }), '');
+  expect(toolSubject({ tool_name: 'Bash' })).toBe('');
 });
 
 test('known tool with the identifying field missing → empty string', () => {
-  assert.equal(toolSubject({ tool_name: 'Bash', tool_input: { description: 'no command here' } }), '');
+  expect(toolSubject({ tool_name: 'Bash', tool_input: { description: 'no command here' } })).toBe('');
 });
 
 // tool_input vient d'un hook, pas de ce module : file_path peut arriver hors
 // chaine. Verrouille la coercition `String()` de basename() — un typage seul
 // ne peut pas la tenir, un JSON de hook n'est pas contraint par TypeScript.
 test('Read: un file_path hors chaîne ne fait pas lever', () => {
-  assert.equal(toolSubject({ tool_name: 'Read', tool_input: { file_path: 42 } }), '42');
+  expect(toolSubject({ tool_name: 'Read', tool_input: { file_path: 42 } } as unknown as ToolCallEvent)).toBe('42');
 });

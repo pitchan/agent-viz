@@ -1,4 +1,3 @@
-'use strict';
 // Ce que ce fichier protège : un `.ts` servi garde EXACTEMENT les lignes de
 // la source (piles d'erreur justes), et une syntaxe que Node ne sait pas
 // effacer se dit — fichier, code d'erreur — jamais un 404 muet ou une page blanche.
@@ -6,9 +5,9 @@
 // Même piège, même parade que dans version-route.test.cjs : charger
 // `src/server/routes` charge `session-index`, qui crée
 // `os.tmpdir()/agent-events` dès sa lecture.
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 const BAC = fs.mkdtempSync(path.join(os.tmpdir(), 'avtest-static-ts-'));
 process.env.TEMP = BAC;
@@ -17,14 +16,12 @@ process.env.TMPDIR = BAC;
 process.env.USERPROFILE = BAC;
 process.env.HOME = BAC;
 
-const test = require('node:test');
-const { after } = require('node:test');
-const assert = require('node:assert/strict');
-const { execFileSync } = require('node:child_process');
+import { afterAll, expect, test } from 'vitest';
+import { execFileSync } from 'node:child_process';
 
-const { readStaticFile } = require('../../src/server/routes.ts');
+const { readStaticFile } = await import('../../src/server/routes.ts');
 
-after(() => fs.rmSync(BAC, { recursive: true, force: true }));
+afterAll(() => fs.rmSync(BAC, { recursive: true, force: true }));
 
 const FIXTURES = path.join(__dirname, '..', 'fixtures', 'static-ts');
 const VALIDE = path.join(FIXTURES, 'valid-sample.ts');
@@ -38,31 +35,26 @@ test('.ts valide : Content-Type JS, corps compilable, meme nombre de lignes que 
   const { mime, body } = await readStaticFile(VALIDE);
 
   // Assert
-  assert.equal(mime, 'application/javascript; charset=utf-8');
-  assert.equal(
-    body.toString('utf8').split('\n').length,
-    source.split('\n').length,
-    'le corps servi n a pas le meme nombre de lignes que la source : les numeros de ligne des erreurs navigateur mentiraient',
-  );
+  expect(mime).toBe('application/javascript; charset=utf-8');
+  expect(body.toString('utf8').split('\n').length, 'le corps servi n a pas le meme nombre de lignes que la source : les numeros de ligne des erreurs navigateur mentiraient').toBe(source.split('\n').length);
   // .mjs et non .js : sans package.json dans le bac, Node 24 classe un .js
   // par detection et ne verifie RIEN si le corps ressemble a un module ES
   // (import/export) — un .js rendrait toujours exit 0 ici.
   const compilable = path.join(BAC, 'stripped.mjs');
   fs.writeFileSync(compilable, body);
-  assert.doesNotThrow(
+  expect(
     () => execFileSync(process.execPath, ['--check', compilable], { stdio: 'pipe' }),
     'node --check refuse le corps servi',
-  );
+  ).not.toThrow();
 });
 
 test('.ts avec syntaxe non effaçable : l erreur nomme le fichier et le code Node', async () => {
   // Arrange + Act + Assert — un seul comportement observable ici : le rejet.
-  await assert.rejects(
-    () => readStaticFile(ENUM),
-    (err) => {
-      assert.match(err.message, /unsupported-enum\.ts/, 'le fichier fautif n est pas nomme dans le message');
-      assert.match(err.message, /ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX/, 'le code d erreur Node n apparait pas dans le message');
-      return true;
-    },
-  );
+  try {
+    await readStaticFile(ENUM);
+    expect.fail('devrait avoir rejete');
+  } catch (err: any) {
+    expect(err.message, 'le fichier fautif n est pas nomme dans le message').toMatch(/unsupported-enum\.ts/);
+    expect(err.message, 'le code d erreur Node n apparait pas dans le message').toMatch(/ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX/);
+  }
 });
