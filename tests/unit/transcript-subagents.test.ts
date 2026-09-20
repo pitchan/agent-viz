@@ -1,4 +1,3 @@
-'use strict';
 // Integration: sub-agent transcript discovery + tailing.
 //
 // Claude Code ≥ ~2.1.143 writes each sub-agent's transcript to a sibling file
@@ -6,19 +5,25 @@
 // events in the parent transcript. ensureSubagentTails must find those files,
 // stream them, and credit usage to the matching perAgent bucket.
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
-const fs = require('fs');
+import { expect, test } from 'vitest';
+import fs from 'node:fs';
 const fsp = fs.promises;
-const path = require('path');
-const os = require('os');
+import path from 'node:path';
+import os from 'node:os';
 
-const { _internals } = require('../../src/server/transcript.ts');
-const { ensureTokens, clearTokensTimer } = require('../../src/server/tokens.ts');
+import { _internals } from '../../src/server/transcript.ts';
+import { ensureTokens, clearTokensTimer } from '../../src/server/tokens.ts';
+import type { SessionRecord } from '../../src/server/session-index.ts';
 
 const { ensureTranscriptSlice, makeTail, ensureSubagentTails } = _internals;
 
-function assistantLine(agentId, model, inTok, outTok) {
+// Fixture partielle : `transcript`/`tokens` sont les tranches que
+// transcript.ts/tokens.ts posent eux-mêmes sur l'enregistrement, pas ce que
+// session-index.ts connaît — `any` ici, jamais un `SessionRecord` complet.
+type RecFixture = SessionRecord & { transcript: any; tokens: any };
+type Tranche = ReturnType<typeof ensureTranscriptSlice>;
+
+function assistantLine(agentId: string, model: string, inTok: number, outTok: number) {
   return JSON.stringify({
     type: 'assistant', isSidechain: true, agentId,
     message: { model, usage: { input_tokens: inTok, output_tokens: outTok } },
@@ -34,14 +39,14 @@ async function tmpSession() {
   return { dir, mainPath, subDir };
 }
 
-function freshRec() {
-  const rec = { id: 'sess-1', tokens: null };
+function freshRec(): { rec: RecFixture; tr: Tranche } {
+  const rec = { id: 'sess-1', tokens: null } as unknown as RecFixture;
   ensureTokens(rec);
   const tr = ensureTranscriptSlice(rec);
   return { rec, tr };
 }
 
-function cleanup(rec, tr, dir) {
+function cleanup(rec: RecFixture, tr: Tranche, dir: string) {
   if (tr.main && tr.main.watcher) { try { tr.main.watcher.close(); } catch {} }
   for (const t of tr.subagents.values()) { if (t.watcher) { try { t.watcher.close(); } catch {} } }
   clearTokensTimer(rec);
@@ -60,10 +65,10 @@ test('ensureSubagentTails discovers agent-*.jsonl and credits perAgent buckets',
   await ensureSubagentTails(tr, rec);
 
   const bucket = rec.tokens.perAgent.get('AAA');
-  assert.ok(bucket, 'perAgent bucket for AAA must exist');
-  assert.equal(bucket.in, 2000);
-  assert.equal(bucket.out, 100);
-  assert.equal(bucket.lastModel, 'claude-haiku-4-5');
+  expect(bucket, 'perAgent bucket for AAA must exist').toBeTruthy();
+  expect(bucket.in).toBe(2000);
+  expect(bucket.out).toBe(100);
+  expect(bucket.lastModel).toBe('claude-haiku-4-5');
 
   await cleanup(rec, tr, dir);
 });
@@ -80,8 +85,8 @@ test('ensureSubagentTails is idempotent — re-scan does not double-count', asyn
   await ensureSubagentTails(tr, rec);
   await ensureSubagentTails(tr, rec);
 
-  assert.equal(rec.tokens.perAgent.get('AAA').in, 2000, 'tokens must not be counted twice');
-  assert.equal(tr.subagents.size, 1);
+  expect(rec.tokens.perAgent.get('AAA').in, 'tokens must not be counted twice').toBe(2000);
+  expect(tr.subagents.size).toBe(1);
 
   await cleanup(rec, tr, dir);
 });
@@ -101,9 +106,9 @@ test('ensureSubagentTails picks up a sub-agent file that appears on a later scan
     assistantLine('BBB', 'claude-sonnet-4-5', 500, 200));
   await ensureSubagentTails(tr, rec);
 
-  assert.equal(rec.tokens.perAgent.get('AAA').in, 1000);
-  assert.equal(rec.tokens.perAgent.get('BBB').in, 500);
-  assert.equal(tr.subagents.size, 2);
+  expect(rec.tokens.perAgent.get('AAA').in).toBe(1000);
+  expect(rec.tokens.perAgent.get('BBB').in).toBe(500);
+  expect(tr.subagents.size).toBe(2);
 
   await cleanup(rec, tr, dir);
 });
@@ -116,8 +121,8 @@ test('ensureSubagentTails is a no-op when there is no subagents/ directory', asy
 
   await ensureSubagentTails(tr, rec);
 
-  assert.equal(tr.subagents.size, 0);
-  assert.equal(rec.tokens.perAgent.size, 0);
+  expect(tr.subagents.size).toBe(0);
+  expect(rec.tokens.perAgent.size).toBe(0);
 
   await cleanup(rec, tr, dir);
 });

@@ -1,4 +1,3 @@
-'use strict';
 // Regression: transcript discovery robustness.
 //
 // Two historical bugs silently disabled token tracking for a whole session:
@@ -11,26 +10,31 @@
 // Plus: while the transcript stays unreachable, the token snapshot must carry
 // a `transcriptMissing` flag so the UI can show an explicit state.
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
-const fs = require('fs');
+import { expect, test } from 'vitest';
+import fs from 'node:fs';
 const fsp = fs.promises;
-const path = require('path');
-const os = require('os');
+import path from 'node:path';
+import os from 'node:os';
 
-const {
+import {
   getTranscriptPath, ensureTranscriptWatcher, closeTranscriptResources, _internals,
-} = require('../../src/server/transcript.ts');
-const { tokensSnapshot, ensureTokens, clearTokensTimer } = require('../../src/server/tokens.ts');
-const { sessionIndex } = require('../../src/server/session-index.ts');
+} from '../../src/server/transcript.ts';
+import { tokensSnapshot, ensureTokens, clearTokensTimer } from '../../src/server/tokens.ts';
+import { sessionIndex } from '../../src/server/session-index.ts';
+import type { SessionRecord } from '../../src/server/session-index.ts';
 
 const { readFirstLine } = _internals;
+
+// Fixture partielle : ces tests ne posent que les champs qu'ils lisent, jamais
+// le `SessionRecord` complet. `transcript`/`tokens` restent `any` — ce sont les
+// tranches que `transcript.ts`/`tokens.ts` posent eux-mêmes sur l'enregistrement.
+type RecFixture = SessionRecord & { transcript: any; tokens: any };
 
 async function tmpDir() {
   return fsp.mkdtemp(path.join(os.tmpdir(), 'aviz-disc-'));
 }
 
-const claudeUsageLine = (model, inTok, outTok) => JSON.stringify({
+const claudeUsageLine = (model: string, inTok: number, outTok: number) => JSON.stringify({
   type: 'assistant', isSidechain: false,
   message: { model, usage: { input_tokens: inTok, output_tokens: outTok } },
 }) + '\n';
@@ -42,7 +46,7 @@ test('readFirstLine returns a complete line longer than 16 KB', async () => {
   const file = path.join(dir, 'f.jsonl');
   const big = 'x'.repeat(64 * 1024);
   await fsp.writeFile(file, big + '\n' + 'second\n');
-  assert.equal(await readFirstLine(file), big);
+  expect(await readFirstLine(file)).toBe(big);
   await fsp.rm(dir, { recursive: true, force: true });
 });
 
@@ -50,7 +54,7 @@ test('readFirstLine returns the only line of a file with no trailing newline', a
   const dir = await tmpDir();
   const file = path.join(dir, 'f.jsonl');
   await fsp.writeFile(file, 'only line, no newline');
-  assert.equal(await readFirstLine(file), 'only line, no newline');
+  expect(await readFirstLine(file)).toBe('only line, no newline');
   await fsp.rm(dir, { recursive: true, force: true });
 });
 
@@ -63,7 +67,7 @@ test('getTranscriptPath extracts transcript_path when the first event exceeds 16
     hook_event_name: 'UserPromptSubmit', _source: 'claude', session_id: 'sess',
     transcript_path: transcriptPath, prompt: 'A'.repeat(64 * 1024),
   }) + '\n');
-  assert.equal(await getTranscriptPath(sessionFile), transcriptPath);
+  expect(await getTranscriptPath(sessionFile)).toBe(transcriptPath);
   await fsp.rm(dir, { recursive: true, force: true });
 });
 
@@ -79,7 +83,7 @@ test('getTranscriptPath still leaves a trace when the first line is unreadable',
   const dir = await tmpDir();
   const sessionFile = path.join(dir, 'sess.jsonl');
   await fsp.writeFile(sessionFile, '{"hook_event_name":"UserPro\n');
-  const dits = [];
+  const dits: string[] = [];
   const vraiErr = console.error;
   console.error = (...a) => dits.push(a.map(String).join(' '));
 
@@ -89,8 +93,8 @@ test('getTranscriptPath still leaves a trace when the first line is unreadable',
   finally { console.error = vraiErr; }
 
   // Assert
-  assert.equal(trouve, null);
-  assert.match(dits.join('\n'), /unreadable first line/);
+  expect(trouve).toBe(null);
+  expect(dits.join('\n')).toMatch(/unreadable first line/);
   await fsp.rm(dir, { recursive: true, force: true });
 });
 
@@ -108,7 +112,7 @@ test('getTranscriptPath decodes a first line prefixed with a BOM', async () => {
   const trouve = await getTranscriptPath(sessionFile);
 
   // Assert
-  assert.equal(trouve, transcriptPath);
+  expect(trouve).toBe(transcriptPath);
   await fsp.rm(dir, { recursive: true, force: true });
 });
 
@@ -123,20 +127,20 @@ test('ensureTranscriptWatcher retries discovery after a transient missing transc
     hook_event_name: 'SessionStart', _source: 'claude',
     session_id: id, transcript_path: transcriptPath,
   }) + '\n');
-  const rec = { id, agentSource: 'claude', tokens: null };
+  const rec = { id, agentSource: 'claude', tokens: null } as unknown as RecFixture;
   sessionIndex.set(id, rec);
   try {
     // Transcript file does not exist yet → discovery must not latch.
     await ensureTranscriptWatcher(sessionFile);
-    assert.equal(rec.transcript.main, null, 'main tail must not be set while transcript is absent');
+    expect(rec.transcript.main, 'main tail must not be set while transcript is absent').toBe(null);
 
     // Transcript appears with a usage line.
     await fsp.writeFile(transcriptPath, claudeUsageLine('claude-sonnet-4-5', 1234, 10));
 
     // Retry must succeed — there is no permanent lock.
     await ensureTranscriptWatcher(sessionFile);
-    assert.ok(rec.transcript.main, 'main tail must be established on retry');
-    assert.equal(rec.tokens.main.in, 1234);
+    expect(rec.transcript.main, 'main tail must be established on retry').toBeTruthy();
+    expect(rec.tokens.main.in).toBe(1234);
   } finally {
     closeTranscriptResources(rec);
     clearTokensTimer(rec);
@@ -148,11 +152,11 @@ test('ensureTranscriptWatcher retries discovery after a transient missing transc
 // ─────────────────────── transcriptMissing ───────────────────────
 
 test('tokensSnapshot reports transcriptMissing', () => {
-  const rec = { id: 'snap-sess', tokens: null };
+  const rec: { id: string; tokens: any } = { id: 'snap-sess', tokens: null };
   ensureTokens(rec);
-  assert.equal(tokensSnapshot(rec).transcriptMissing, false);
+  expect(tokensSnapshot(rec)!.transcriptMissing).toBe(false);
   rec.tokens.transcriptMissing = true;
-  assert.equal(tokensSnapshot(rec).transcriptMissing, true);
+  expect(tokensSnapshot(rec)!.transcriptMissing).toBe(true);
 });
 
 test('ensureTranscriptWatcher flags transcriptMissing while absent and clears it on success', async () => {
@@ -164,16 +168,16 @@ test('ensureTranscriptWatcher flags transcriptMissing while absent and clears it
     hook_event_name: 'SessionStart', _source: 'claude',
     session_id: id, transcript_path: transcriptPath,
   }) + '\n');
-  const rec = { id, agentSource: 'claude', tokens: null };
+  const rec = { id, agentSource: 'claude', tokens: null } as unknown as RecFixture;
   sessionIndex.set(id, rec);
   try {
     await ensureTranscriptWatcher(sessionFile);
     const missing = tokensSnapshot(rec);
-    assert.equal(missing && missing.transcriptMissing, true, 'flagged missing while transcript absent');
+    expect(missing && missing.transcriptMissing, 'flagged missing while transcript absent').toBe(true);
 
     await fsp.writeFile(transcriptPath, claudeUsageLine('claude-sonnet-4-5', 500, 5));
     await ensureTranscriptWatcher(sessionFile);
-    assert.equal(tokensSnapshot(rec).transcriptMissing, false, 'cleared once transcript discovered');
+    expect(tokensSnapshot(rec)!.transcriptMissing, 'cleared once transcript discovered').toBe(false);
   } finally {
     closeTranscriptResources(rec);
     clearTokensTimer(rec);

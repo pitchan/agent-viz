@@ -1,54 +1,47 @@
 // Unit tests for src/web/viz-narrator.ts. Pure logic — no DOM, no fake timers.
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
+import { expect, test } from 'vitest';
 import {
   commonPathPrefix, composeNarrator,
   markNarratorDirty, setRenderFn,
 } from '../../src/web/viz-narrator.ts';
 
-function freshState() {
+// Fixtures volontairement lâches : ces smoke tests construisent des noeuds
+// partiels (un sous-ensemble des champs de VizNode), jamais le type réel —
+// `any` documente que la forme exacte n'est pas le contrat sous test ici.
+function freshState(): any {
   return {
     nodes: new Map(),
     timelineEntries: [],
     toolsCompleted: 0,
   };
 }
-function freshVis() {
+function freshVis(): any {
   return { runningNodes: new Set() };
 }
 
 test('commonPathPrefix: 3 paths under same dir → "<dir>/"', () => {
-  assert.equal(
-    commonPathPrefix(['auth/login.js', 'auth/middleware.js', 'auth/utils/jwt.js']),
-    'auth/'
-  );
+  expect(commonPathPrefix(['auth/login.js', 'auth/middleware.js', 'auth/utils/jwt.js'])).toBe('auth/');
 });
 
 test('commonPathPrefix: deeper common prefix → deepest shared dir', () => {
-  assert.equal(
-    commonPathPrefix(['a/b/c.js', 'a/b/d.js', 'a/x/y.js']),
-    'a/'
-  );
+  expect(commonPathPrefix(['a/b/c.js', 'a/b/d.js', 'a/x/y.js'])).toBe('a/');
 });
 
 test('commonPathPrefix: paths with no shared dir → null', () => {
-  assert.equal(commonPathPrefix(['a.js', 'b.js']), null);
+  expect(commonPathPrefix(['a.js', 'b.js'])).toBe(null);
 });
 
 test('commonPathPrefix: less than 2 paths → null', () => {
-  assert.equal(commonPathPrefix(['a/b/c.js']), null);
-  assert.equal(commonPathPrefix([]), null);
+  expect(commonPathPrefix(['a/b/c.js'])).toBe(null);
+  expect(commonPathPrefix([])).toBe(null);
 });
 
 test('commonPathPrefix: identical paths → their dir', () => {
-  assert.equal(
-    commonPathPrefix(['auth/login.js', 'auth/login.js']),
-    'auth/'
-  );
+  expect(commonPathPrefix(['auth/login.js', 'auth/login.js'])).toBe('auth/');
 });
 
 test('composeNarrator: empty state → null', () => {
-  assert.equal(composeNarrator(freshState(), freshVis(), Date.now()), null);
+  expect(composeNarrator(freshState(), freshVis(), Date.now())).toBe(null);
 });
 
 test('composeNarrator: session present but 0 events → null', () => {
@@ -57,10 +50,10 @@ test('composeNarrator: session present but 0 events → null', () => {
     id: 's:abc', type: 'session', status: 'running',
     parentId: null, children: [], startTime: '2026-05-07T10:00:00Z',
   });
-  assert.equal(composeNarrator(state, freshVis(), Date.now()), null);
+  expect(composeNarrator(state, freshVis(), Date.now())).toBe(null);
 });
 
-function withSessionAndTool(state, opts) {
+function withSessionAndTool(state: any, opts: any) {
   const sid = 's:abc';
   const session = state.nodes.get(sid) || {
     id: sid, type: 'session', status: 'running',
@@ -96,7 +89,7 @@ test('composeNarrator: single Read running on main thread → "Read" tone active
   const vis = freshVis();
   vis.runningNodes.add('t:1');
   const result = composeNarrator(state, vis, Date.now());
-  assert.deepEqual(result, { text: 'Read', tone: 'active' });
+  expect(result).toEqual({ text: 'Read', tone: 'active' });
 });
 
 test('composeNarrator: 3 Reads + 1 Edit running → "3 reads +1" tone active', () => {
@@ -115,9 +108,8 @@ test('composeNarrator: 3 Reads + 1 Edit running → "3 reads +1" tone active', (
   vis.runningNodes.add('t:3');
   vis.runningNodes.add('t:4');
   const result = composeNarrator(state, vis, Date.now());
-  assert.equal(result.tone, 'active');
-  assert.ok(result.text.startsWith('3 reads +1'),
-    `expected primary "3 reads +1", got "${result.text}"`);
+  expect(result!.tone).toBe('active');
+  expect(result!.text.startsWith('3 reads +1'), `expected primary "3 reads +1", got "${result!.text}"`).toBeTruthy();
 });
 
 test('composeNarrator: 3 Reads same dir → "3 reads · auth/" tone active', () => {
@@ -134,19 +126,19 @@ test('composeNarrator: 3 Reads same dir → "3 reads · auth/" tone active', () 
   vis.runningNodes.add('t:2');
   vis.runningNodes.add('t:3');
   const result = composeNarrator(state, vis, Date.now());
-  assert.deepEqual(result, { text: '3 reads · auth/', tone: 'active' });
+  expect(result).toEqual({ text: '3 reads · auth/', tone: 'active' });
 });
 
 test('composeNarrator: tool running under sub-agent → primary = sub-agent label', () => {
   const state = freshState();
   const sid = 's:abc';
-  const session = {
+  const session: any = {
     id: sid, type: 'session', status: 'running',
     parentId: null, children: [], startTime: '2026-05-07T10:00:00Z',
   };
   state.nodes.set(sid, session);
   const aid = 'a:cr';
-  const agent = {
+  const agent: any = {
     id: aid, type: 'agent', label: 'code-reviewer', sub: '',
     status: 'running', parentId: sid, children: [],
     startTime: '2026-05-07T10:00:01Z',
@@ -154,7 +146,7 @@ test('composeNarrator: tool running under sub-agent → primary = sub-agent labe
   state.nodes.set(aid, agent);
   session.children.push(agent);
   const tid = 't:1';
-  const tool = {
+  const tool: any = {
     id: tid, type: 'tool', label: 'Read', sub: 'src/a.js',
     status: 'running', parentId: aid, children: [],
     startTime: '2026-05-07T10:00:02Z',
@@ -169,22 +161,21 @@ test('composeNarrator: tool running under sub-agent → primary = sub-agent labe
   const vis = freshVis();
   vis.runningNodes.add(tid);
   const result = composeNarrator(state, vis, Date.now());
-  assert.equal(result.tone, 'active');
-  assert.ok(result.text.startsWith('code-reviewer'),
-    `expected primary to start with "code-reviewer", got "${result.text}"`);
+  expect(result!.tone).toBe('active');
+  expect(result!.text.startsWith('code-reviewer'), `expected primary to start with "code-reviewer", got "${result!.text}"`).toBeTruthy();
 });
 
 test('composeNarrator: idle 30s + error 14s ago → "idle 14s · err 14s" tone error', () => {
   const state = freshState();
   const sid = 's:abc';
-  const session = {
+  const session: any = {
     id: sid, type: 'session', status: 'running',
     parentId: null, children: [], startTime: '2026-05-07T10:00:00Z',
   };
   state.nodes.set(sid, session);
   const now = Date.parse('2026-05-07T10:00:30.000Z');
   const errEndIso = new Date(now - 14_000).toISOString();
-  const tool = {
+  const tool: any = {
     id: 't:err', type: 'tool', label: 'Edit', sub: 'auth/x.js',
     status: 'error', parentId: sid, children: [],
     startTime: '2026-05-07T10:00:10Z', endTime: errEndIso,
@@ -197,8 +188,8 @@ test('composeNarrator: idle 30s + error 14s ago → "idle 14s · err 14s" tone e
   );
   const vis = freshVis();
   const result = composeNarrator(state, vis, now);
-  assert.equal(result.tone, 'error');
-  assert.match(result.text, /^idle 14s · err 14s$/);
+  expect(result!.tone).toBe('error');
+  expect(result!.text).toMatch(/^idle 14s · err 14s$/);
 });
 
 test('composeNarrator: session done → "session done · N tools · Xm" tone done', () => {
@@ -215,7 +206,7 @@ test('composeNarrator: session done → "session done · N tools · Xm" tone don
     type: 'session', label: 'Session', sub: '',
   });
   const result = composeNarrator(state, freshVis(), Date.now());
-  assert.deepEqual(result, { text: 'session done · 42 tools · 3.2m', tone: 'done' });
+  expect(result).toEqual({ text: 'session done · 42 tools · 3.2m', tone: 'done' });
 });
 
 test('composeNarrator: session done sans borne de fin → la phrase garde son « ? »', () => {
@@ -239,7 +230,7 @@ test('composeNarrator: session done sans borne de fin → la phrase garde son «
   const result = composeNarrator(state, freshVis(), Date.now());
 
   // Assert
-  assert.deepEqual(result, { text: 'session done · 7 tools · ?', tone: 'done' });
+  expect(result).toEqual({ text: 'session done · 7 tools · ?', tone: 'done' });
 });
 
 test('driver: markNarratorDirty calls renderFn once per microtask burst', async () => {
@@ -250,11 +241,11 @@ test('driver: markNarratorDirty calls renderFn once per microtask burst', async 
   markNarratorDirty();
   await Promise.resolve();
   await Promise.resolve();
-  assert.equal(calls, 1, 'expected coalesced single call');
+  expect(calls, 'expected coalesced single call').toBe(1);
   markNarratorDirty();
   await Promise.resolve();
   await Promise.resolve();
-  assert.equal(calls, 2);
+  expect(calls).toBe(2);
   setRenderFn(null);
 });
 

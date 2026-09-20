@@ -20,13 +20,19 @@
 //   - le `message` (notification) ne sort aucun texte ; `subject` porte la
 //     commande declenchante.
 
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
-import { createWatchdog } from '../../src/engine/watchdog/detector.ts';
+import { expect, test } from 'vitest';
+import { createWatchdog, type Alert } from '../../src/engine/watchdog/detector.ts';
 
 const T = 1_700_000_000_000;
 const SID = 'sid1';
-const iso = ms => new Date(ms).toISOString();
+const iso = (ms: number) => new Date(ms).toISOString();
+
+// `noUncheckedIndexedAccess` : `Array.prototype.filter`/`.processEvent(...).newAlerts`
+// ne rendent jamais une tuple, donc `arr[0]` ou `const [x] = arr` typent `T | undefined`.
+// Chaque appelant sait déjà, par son assertion de longueur, que l'élément existe.
+function premier<T>(arr: T[]): T {
+  return arr[0]!;
+}
 
 // Echantillons repris du releve decrit dans docs/sources-externes.md, caviardes.
 // Ce ne sont pas des messages inventes.
@@ -68,11 +74,21 @@ const LECTURE_AVANT_ECRITURE =
 // c'est 36 % des echecs du releve.
 const VERDICT_NPM = 'npm ERR! code ELIFECYCLE\nnpm ERR! errno 1';
 
+// Fixture volontairement lâche (`[key: string]: any`) : `...reste` doit pouvoir
+// porter n'importe quel champ hook additionnel (`is_interrupt`, `tool_input`,
+// `hook_event_name` en override...), et `error` accepte aussi `null` ou un objet
+// mal formé — des entrées réelles que ces tests posent délibérément.
+type EchecArgs = {
+  at?: number; session?: string; tool?: string; error?: any;
+  id?: string; agentId?: string; agentType?: string; cwd?: string;
+  [key: string]: any;
+};
+
 function echec({
   at = T, session = SID, tool = 'Bash', error = CHEMIN_WINDOWS,
   id = 't1', agentId, agentType, cwd = 'f:\\DEV\\agent-viz', ...reste
-} = {}) {
-  const evt = {
+}: EchecArgs = {}): Record<string, any> {
+  const evt: Record<string, any> = {
     session_id: session, hook_event_name: 'PostToolUseFailure',
     tool_name: tool, tool_use_id: id, error, cwd, _ts: iso(at), ...reste,
   };
@@ -81,30 +97,30 @@ function echec({
   return evt;
 }
 
-const leve = (wd, evt) => wd.processEvent(evt).newAlerts.filter(a => a.type === 'badInvocation');
+const leve = (wd: ReturnType<typeof createWatchdog>, evt: Record<string, any>): Alert[] =>
+  wd.processEvent(evt).newAlerts.filter(a => a.type === 'badInvocation');
 
 // ─── Ce que le detecteur nomme ─────────────────────────────────────────────
 
 test('un chemin Windows avale par le shell POSIX est nomme, et par son motif', () => {
   const wd = createWatchdog({ now: () => T });
-  const [alerte] = leve(wd, echec());
-  assert.ok(alerte, 'le chemin Windows avale par le shell POSIX doit lever une alerte');
-  assert.equal(alerte.type, 'badInvocation');
-  assert.equal(alerte.patternId, 'inv-bash-windows-path-unquoted');
-  assert.equal(alerte.toolName, 'Bash');
-  assert.equal(alerte.count, 1);
-  assert.equal(alerte.cwd, 'f:\\DEV\\agent-viz');
-  assert.equal(alerte.createdAt, T, 'l heure est celle de l evenement, pas la notre');
+  const alerte = premier(leve(wd, echec()));
+  expect(alerte, 'le chemin Windows avale par le shell POSIX doit lever une alerte').toBeTruthy();
+  expect(alerte.type).toBe('badInvocation');
+  expect(alerte.patternId).toBe('inv-bash-windows-path-unquoted');
+  expect(alerte.toolName).toBe('Bash');
+  expect(alerte.count).toBe(1);
+  expect(alerte.cwd).toBe('f:\\DEV\\agent-viz');
+  expect(alerte.createdAt, 'l heure est celle de l evenement, pas la notre').toBe(T);
 });
 
 test('le message reste anglais et nomme le motif, comme les trois autres', () => {
   // `message` est la formulation PARTAGEE avec la notification bureau. Le
   // francais du bloc Pannes se compose ailleurs, a partir des champs.
   const wd = createWatchdog({ now: () => T });
-  const [alerte] = leve(wd, echec());
-  assert.match(alerte.message, /^Bash /);
-  assert.ok(alerte.message.includes('inv-bash-windows-path-unquoted'),
-    'le motif doit se lire dans le message : c est tout ce que la notification aura');
+  const alerte = premier(leve(wd, echec()));
+  expect(alerte.message).toMatch(/^Bash /);
+  expect(alerte.message.includes('inv-bash-windows-path-unquoted'), 'le motif doit se lire dans le message : c est tout ce que la notification aura').toBeTruthy();
 });
 
 // ─── Le filtre, et c est le seul ───────────────────────────────────────────
@@ -115,17 +131,17 @@ test('un motif d invocation hors reglage du poste est reconnu POUR ETRE TU', () 
   // ne prouve pas qu une instruction manque, il prouve qu une instruction
   // existante ne tient pas. Deux diagnostics, un seul est demontre.
   const wd = createWatchdog({ now: () => T });
-  assert.deepEqual(leve(wd, echec({ tool: 'Write', error: LECTURE_AVANT_ECRITURE })), []);
+  expect(leve(wd, echec({ tool: 'Write', error: LECTURE_AVANT_ECRITURE }))).toEqual([]);
 });
 
 test('un verdict n est jamais une faute d invocation', () => {
   const wd = createWatchdog({ now: () => T });
-  assert.deepEqual(leve(wd, echec({ error: VERDICT_NPM })), []);
+  expect(leve(wd, echec({ error: VERDICT_NPM }))).toEqual([]);
 });
 
 test('un texte qu aucun motif ne reconnait est muet', () => {
   const wd = createWatchdog({ now: () => T });
-  assert.deepEqual(leve(wd, echec({ error: 'la commande a fait ce qu on lui demandait' })), []);
+  expect(leve(wd, echec({ error: 'la commande a fait ce qu on lui demandait' }))).toEqual([]);
 });
 
 test('un echec sans champ error est muet, il ne fait pas tomber le flux', () => {
@@ -136,10 +152,10 @@ test('un echec sans champ error est muet, il ne fait pas tomber le flux', () => 
   const wd = createWatchdog({ now: () => T });
   const sansErreur = echec();
   delete sansErreur.error;
-  assert.deepEqual(leve(wd, sansErreur), []);
-  assert.deepEqual(leve(wd, echec({ id: 't2', error: '' })), []);
-  assert.deepEqual(leve(wd, echec({ id: 't3', error: null })), []);
-  assert.deepEqual(leve(wd, echec({ id: 't4', error: { message: CHEMIN_WINDOWS } })), []);
+  expect(leve(wd, sansErreur)).toEqual([]);
+  expect(leve(wd, echec({ id: 't2', error: '' }))).toEqual([]);
+  expect(leve(wd, echec({ id: 't3', error: null }))).toEqual([]);
+  expect(leve(wd, echec({ id: 't4', error: { message: CHEMIN_WINDOWS } }))).toEqual([]);
 });
 
 test('un echec qui ne nomme pas son outil ne fabrique pas une phrase creuse', () => {
@@ -149,14 +165,14 @@ test('un echec qui ne nomme pas son outil ne fabrique pas une phrase creuse', ()
   const wd = createWatchdog({ now: () => T });
   const sansOutil = echec();
   delete sansOutil.tool_name;
-  assert.deepEqual(leve(wd, sansOutil), []);
+  expect(leve(wd, sansOutil)).toEqual([]);
 });
 
 test('un echec sans session est muet : il n y a pas de fait a rattacher', () => {
   const wd = createWatchdog({ now: () => T });
   const sansSession = echec();
   delete sansSession.session_id;
-  assert.deepEqual(leve(wd, sansSession), []);
+  expect(leve(wd, sansSession)).toEqual([]);
 });
 
 // ─── L humain qui reprend la main ──────────────────────────────────────────
@@ -168,7 +184,7 @@ test('une interruption humaine n est pas une faute d invocation', () => {
   // une faute est tres exactement la fausse alerte que ce chien de garde
   // existe pour ne pas faire.
   const wd = createWatchdog({ now: () => T });
-  assert.deepEqual(leve(wd, echec({ is_interrupt: true })), []);
+  expect(leve(wd, echec({ is_interrupt: true }))).toEqual([]);
 });
 
 test('l interruption ne consomme pas non plus le compteur du motif', () => {
@@ -176,30 +192,30 @@ test('l interruption ne consomme pas non plus le compteur du motif', () => {
   // premier echec reel serait annonce « 2 fois dans la session ».
   const wd = createWatchdog({ now: () => T });
   leve(wd, echec({ is_interrupt: true }));
-  const [alerte] = leve(wd, echec({ id: 't2', at: T + 1000 }));
-  assert.equal(alerte.count, 1, 'l Echap de l utilisateur n a rien compte');
+  const alerte = premier(leve(wd, echec({ id: 't2', at: T + 1000 })));
+  expect(alerte.count, 'l Echap de l utilisateur n a rien compte').toBe(1);
 });
 
 // ─── Seul PostToolUseFailure nourrit ce detecteur ──────────────────────────
 
 test('ni PreToolUse ni PostToolUse ne nourrissent ce detecteur', () => {
   const wd = createWatchdog({ now: () => T });
-  assert.deepEqual(leve(wd, echec({ hook_event_name: 'PreToolUse' })), []);
-  assert.deepEqual(leve(wd, echec({ hook_event_name: 'PostToolUse' })), []);
+  expect(leve(wd, echec({ hook_event_name: 'PreToolUse' }))).toEqual([]);
+  expect(leve(wd, echec({ hook_event_name: 'PostToolUse' }))).toEqual([]);
 });
 
 // ─── L identite : l acteur ET le motif, jamais l outil ─────────────────────
 
 test('l identite porte la session, l acteur et le motif', () => {
   const wd = createWatchdog({ now: () => T });
-  const [principal] = leve(wd, echec());
-  assert.equal(principal.id, 'badInvocation:sid1:inv-bash-windows-path-unquoted');
+  const principal = premier(leve(wd, echec()));
+  expect(principal.id).toBe('badInvocation:sid1:inv-bash-windows-path-unquoted');
 
   const autre = createWatchdog({ now: () => T });
-  const [sousAgent] = leve(autre, echec({ agentId: 'ag-a', agentType: 'Explore' }));
-  assert.equal(sousAgent.id, 'badInvocation:sid1:ag-a:inv-bash-windows-path-unquoted');
-  assert.equal(sousAgent.agentId, 'ag-a');
-  assert.equal(sousAgent.agentType, 'Explore');
+  const sousAgent = premier(leve(autre, echec({ agentId: 'ag-a', agentType: 'Explore' })));
+  expect(sousAgent.id).toBe('badInvocation:sid1:ag-a:inv-bash-windows-path-unquoted');
+  expect(sousAgent.agentId).toBe('ag-a');
+  expect(sousAgent.agentType).toBe('Explore');
 });
 
 test('deux sous-agents butant sur le meme reglage sont deux alertes', () => {
@@ -208,19 +224,19 @@ test('deux sous-agents butant sur le meme reglage sont deux alertes', () => {
   const wd = createWatchdog({ now: () => T });
   const a = leve(wd, echec({ id: 'a1', agentId: 'ag-a', agentType: 'Explore' }));
   const b = leve(wd, echec({ id: 'b1', at: T + 60_000, agentId: 'ag-b', agentType: 'Plan' }));
-  assert.equal(a.length, 1);
-  assert.equal(b.length, 1);
-  assert.notEqual(a[0].id, b[0].id);
-  assert.equal(wd.getActiveAlerts().length, 2);
+  expect(a.length).toBe(1);
+  expect(b.length).toBe(1);
+  expect(premier(a).id).not.toBe(premier(b).id);
+  expect(wd.getActiveAlerts().length).toBe(2);
 });
 
 test('deux motifs differents du meme acteur sont deux alertes', () => {
   const wd = createWatchdog({ now: () => T });
   const un = leve(wd, echec({ id: 'x1' }));
   const deux = leve(wd, echec({ id: 'x2', at: T + 1000, error: ANTISLASH_FINAL }));
-  assert.equal(un[0].patternId, 'inv-bash-windows-path-unquoted');
-  assert.equal(deux[0].patternId, 'inv-bash-trailing-backslash-in-path');
-  assert.equal(wd.getActiveAlerts().length, 2);
+  expect(premier(un).patternId).toBe('inv-bash-windows-path-unquoted');
+  expect(premier(deux).patternId).toBe('inv-bash-trailing-backslash-in-path');
+  expect(wd.getActiveAlerts().length).toBe(2);
 });
 
 test('une cmdlet PowerShell sous bash est reconnue mais ne dit rien', () => {
@@ -228,15 +244,15 @@ test('une cmdlet PowerShell sous bash est reconnue mais ne dit rien', () => {
   // distingue un cmdlet d un binaire absent que par la casse du nom. Le detecteur n a rien a
   // decider ici — il lit le drapeau.
   const wd = createWatchdog({ now: () => T });
-  assert.deepEqual(leve(wd, echec({ id: 'z1', error: CMDLET_SOUS_BASH })), []);
-  assert.equal(wd.getActiveAlerts().length, 0);
+  expect(leve(wd, echec({ id: 'z1', error: CMDLET_SOUS_BASH }))).toEqual([]);
+  expect(wd.getActiveAlerts().length).toBe(0);
 });
 
 test('un heredoc trop gros leve une alerte, avec son propre motif', () => {
   const wd = createWatchdog({ now: () => T });
   const a = leve(wd, echec({ id: 'h1', error: HEREDOC_TROP_GROS }));
-  assert.equal(a.length, 1);
-  assert.equal(a[0].patternId, 'inv-bash-heredoc-too-large');
+  expect(a.length).toBe(1);
+  expect(premier(a).patternId).toBe('inv-bash-heredoc-too-large');
 });
 
 test('une forme non caracterisee sonne quand meme, sous le motif du filet', () => {
@@ -244,47 +260,45 @@ test('une forme non caracterisee sonne quand meme, sous le motif du filet', () =
   // se taisait, les formes qu aucune des deux ancres ne reconnait deviendraient muettes.
   const wd = createWatchdog({ now: () => T });
   const a = leve(wd, echec({ id: 'q1', error: QUOTE_SANS_ANCRE }));
-  assert.equal(a.length, 1, 'une forme non reconnue ne doit jamais se taire');
-  assert.equal(a[0].patternId, 'inv-bash-unbalanced-quote');
+  expect(a.length, 'une forme non reconnue ne doit jamais se taire').toBe(1);
+  expect(premier(a).patternId).toBe('inv-bash-unbalanced-quote');
 });
 
 test('le meme reglage manquant ne merite qu une alerte tant qu elle n est pas acquittee', () => {
   const wd = createWatchdog({ now: () => T });
   const premiere = leve(wd, echec({ id: 'y1' }));
-  assert.equal(premiere.length, 1);
-  assert.deepEqual(leve(wd, echec({ id: 'y2', at: T + 1000 })), [],
-    'un reglage a poser une fois ne se dit pas deux fois');
+  expect(premiere.length).toBe(1);
+  expect(leve(wd, echec({ id: 'y2', at: T + 1000 })), 'un reglage a poser une fois ne se dit pas deux fois').toEqual([]);
 
-  wd.acknowledge(premiere[0].id);
+  wd.acknowledge(premier(premiere).id);
   const apres = leve(wd, echec({ id: 'y3', at: T + 2000 }));
-  assert.equal(apres.length, 1, 'acquittee, elle peut reparler');
-  assert.equal(apres[0].count, 3, 'et elle dit combien de fois, pas seulement qu elle revient');
+  expect(apres.length, 'acquittee, elle peut reparler').toBe(1);
+  expect(premier(apres).count, 'et elle dit combien de fois, pas seulement qu elle revient').toBe(3);
 });
 
 test('le compteur suit le motif ET l acteur, pas la session seule', () => {
   const wd = createWatchdog({ now: () => T });
   const a = leve(wd, echec({ id: 'a1', agentId: 'ag-a' }));
   const b = leve(wd, echec({ id: 'b1', at: T + 1000, agentId: 'ag-b' }));
-  assert.equal(a[0].count, 1);
-  assert.equal(b[0].count, 1, 'l echec de ag-a n est pas au compte de ag-b');
+  expect(premier(a).count).toBe(1);
+  expect(premier(b).count, 'l echec de ag-a n est pas au compte de ag-b').toBe(1);
 });
 
 test('deux sessions ne partagent pas leur compte', () => {
   const wd = createWatchdog({ now: () => T });
   leve(wd, echec({ id: 's1', session: 'sessA' }));
-  const [autre] = leve(wd, echec({ id: 's2', at: T + 1000, session: 'sessB' }));
-  assert.equal(autre.count, 1);
+  const autre = premier(leve(wd, echec({ id: 's2', at: T + 1000, session: 'sessB' })));
+  expect(autre.count).toBe(1);
 });
 
 // ─── Ni isStale ni isPastEpisode : le defaut sur ───────────────────────────
 
 test('une erreur passee ne se de-produit pas : aucun battement ne la retire', () => {
   const wd = createWatchdog({ now: () => T });
-  const [alerte] = leve(wd, echec());
-  assert.equal(alerte.standing, false, 'un echec est un moment, pas un etat');
+  const alerte = premier(leve(wd, echec()));
+  expect(alerte.standing, 'un echec est un moment, pas un etat').toBe(false);
   wd.tick();
-  assert.deepEqual(wd.getActiveAlerts().map(a => a.id), [alerte.id],
-    'rien de temporel ne peut la retirer : elle attend d etre lue');
+  expect(wd.getActiveAlerts().map(a => a.id), 'rien de temporel ne peut la retirer : elle attend d etre lue').toEqual([alerte.id]);
 });
 
 test('le temps qui passe ne rouvre pas le verrou de deduplication', () => {
@@ -293,36 +307,33 @@ test('le temps qui passe ne rouvre pas le verrou de deduplication', () => {
   // reglage manquant, une heure plus tard comme une seconde plus tard.
   const wd = createWatchdog({ now: () => T });
   leve(wd, echec({ id: 'z1' }));
-  assert.deepEqual(leve(wd, echec({ id: 'z2', at: T + 3_600_000 })), []);
+  expect(leve(wd, echec({ id: 'z2', at: T + 3_600_000 }))).toEqual([]);
 });
 
 // ─── Le sujet : la commande declenchante, jamais le message ni le motif seul ──
 
 test('l alerte consigne la commande declenchante', () => {
   const wd = createWatchdog({ now: () => T });
-  const [alerte] = leve(wd, echec({ tool_input: { command: 'cd F:\\DEV\\agent-viz && npm test' } }));
-  assert.ok(alerte, 'le chemin Windows doit lever une alerte');
-  assert.equal(alerte.subject, 'cd F:\\DEV\\agent-viz && npm test',
-    'la commande integrale, non tronquee');
-  assert.ok(alerte.message.includes('inv-bash-windows-path-unquoted'));
-  assert.ok(!alerte.message.includes('npm test'),
-    'le message notification reste sans commande : seul subject la porte');
+  const alerte = premier(leve(wd, echec({ tool_input: { command: 'cd F:\\DEV\\agent-viz && npm test' } })));
+  expect(alerte, 'le chemin Windows doit lever une alerte').toBeTruthy();
+  expect(alerte.subject, 'la commande integrale, non tronquee').toBe('cd F:\\DEV\\agent-viz && npm test');
+  expect(alerte.message.includes('inv-bash-windows-path-unquoted')).toBeTruthy();
+  expect(!alerte.message.includes('npm test'), 'le message notification reste sans commande : seul subject la porte').toBeTruthy();
 });
 
 test('le texte de l erreur, lui, ne se consigne toujours pas — seul subject porte du texte', () => {
   // La retention s arrete a la commande declenchante : rien du message d erreur ne traverse.
   const wd = createWatchdog({ now: () => T });
-  const [alerte] = leve(wd, echec({ tool_input: { command: 'npm run build' } }));
+  const alerte = premier(leve(wd, echec({ tool_input: { command: 'npm run build' } })));
   const serialisee = JSON.stringify(alerte);
-  assert.ok(!serialisee.includes('dvf-postgis-pipeline'),
-    'aucun fragment du message d erreur ne doit etre consigne');
-  assert.equal(alerte.subject, 'npm run build');
+  expect(!serialisee.includes('dvf-postgis-pipeline'), 'aucun fragment du message d erreur ne doit etre consigne').toBeTruthy();
+  expect(alerte.subject).toBe('npm run build');
 });
 
 test('sans tool_input le sujet est vide, jamais absent', () => {
   const wd = createWatchdog({ now: () => T });
-  const [alerte] = leve(wd, echec());
-  assert.equal(alerte.subject, '');
+  const alerte = premier(leve(wd, echec()));
+  expect(alerte.subject).toBe('');
 });
 
 // ─── Le contrat uniforme d alerte ──────────────────────────────────────────
@@ -333,8 +344,8 @@ test('patternId existe sur TOUTE alerte, pas seulement sur la sienne', () => {
   // bloc Pannes lirait `undefined` sur une boucle et composerait une phrase
   // creuse au lieu de tomber sur son repli.
   const wd = createWatchdog({ now: () => T });
-  const vues = new Map();
-  const garde = alertes => { for (const a of alertes) vues.set(a.type, a); };
+  const vues = new Map<string, Alert>();
+  const garde = (alertes: Alert[]) => { for (const a of alertes) vues.set(a.type, a); };
 
   for (let i = 0; i < 4; i++) {
     garde(wd.processEvent({
@@ -359,12 +370,11 @@ test('patternId existe sur TOUTE alerte, pas seulement sur la sienne', () => {
   });
   garde(parBattement.tick().newAlerts);
 
-  assert.deepEqual([...vues.keys()].sort(), ['badInvocation', 'loop', 'retryStorm', 'stuck'],
-    'les quatre sortes d alertes doivent avoir ete produites pour que ce test prouve quelque chose');
+  expect([...vues.keys()].sort(), 'les quatre sortes d alertes doivent avoir ete produites pour que ce test prouve quelque chose').toEqual(['badInvocation', 'loop', 'retryStorm', 'stuck']);
   for (const [type, a] of vues) {
-    assert.equal(typeof a.patternId, 'string', `${type} : patternId n est pas une chaine`);
+    expect(typeof a.patternId, `${type} : patternId n est pas une chaine`).toBe('string');
     if (type !== 'badInvocation') {
-      assert.equal(a.patternId, '', `${type} doit porter la valeur par defaut, pas rien`);
+      expect(a.patternId, `${type} doit porter la valeur par defaut, pas rien`).toBe('');
     }
   }
 });

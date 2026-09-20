@@ -2,10 +2,9 @@
 // state and vis are module-level singletons, so we reset their relevant slices
 // before each test to keep tests independent.
 
-import { test, beforeEach } from 'node:test';
-import assert from 'node:assert/strict';
+import { beforeEach, expect, test } from 'vitest';
 import { state, vis } from '../../src/web/viz-state.ts';
-import { processEvent, layoutDirtyRoots, calcDuration } from '../../src/web/viz-layout.ts';
+import { processEvent, layoutDirtyRoots, calcDuration, type HookEvent } from '../../src/web/viz-layout.ts';
 import { getErrors, resetErrors, onErrorsChanged } from '../../src/web/viz-errors.ts';
 
 function resetState() {
@@ -36,21 +35,21 @@ test('processEvent SessionStart creates a running session node + timeline entry'
   });
 
   const node = state.nodes.get(`s:${sid}`);
-  assert.ok(node, 'session node should exist');
-  assert.equal(node.type, 'session');
-  assert.equal(node.status, 'running');
-  assert.equal(node.label, 'Session');
-  assert.equal(node.sub, sid.slice(0, 8));
-  assert.equal(node.startTime, '2025-01-01T00:00:00.000Z');
-  assert.ok(vis.runningNodes.has(node.id), 'should be tracked as running in vis');
+  expect(node, 'session node should exist').toBeTruthy();
+  expect(node!.type).toBe('session');
+  expect(node!.status).toBe('running');
+  expect(node!.label).toBe('Session');
+  expect(node!.sub).toBe(sid.slice(0, 8));
+  expect(node!.startTime).toBe('2025-01-01T00:00:00.000Z');
+  expect(vis.runningNodes.has(node!.id), 'should be tracked as running in vis').toBeTruthy();
 
-  assert.equal(state.timelineEntries.length, 1);
-  assert.equal(state.timelineEntries[0].nodeId, node.id);
-  assert.equal(state.timelineEntries[0].type, 'session');
+  expect(state.timelineEntries.length).toBe(1);
+  expect(state.timelineEntries[0]!.nodeId).toBe(node!.id);
+  expect(state.timelineEntries[0]!.type).toBe('session');
 });
 
 // ─── calcDuration — la durée telle que la carte du graphe l'écrit ──────────
-// Le format lui-même est éprouvé dans viz-duration.test.mjs. Ce qui se joue ici
+// Le format lui-même est éprouvé dans viz-duration.test.ts. Ce qui se joue ici
 // est le passage par ce module (une durée nominale sort bien formatée) et la
 // traduction propre à cette vue : `null`, que le canevas et le panneau de détail
 // savent taire.
@@ -64,7 +63,7 @@ test('une durée nominale s écrit ici comme partout ailleurs', () => {
   const rendu = calcDuration(debut, fin);
 
   // Assert
-  assert.equal(rendu, '1.5s');
+  expect(rendu).toBe('1.5s');
 });
 
 test('une date illisible ne met jamais « NaNm » sur la carte', () => {
@@ -75,7 +74,7 @@ test('une date illisible ne met jamais « NaNm » sur la carte', () => {
   const rendu = calcDuration(debut, 'pas-une-date');
 
   // Assert
-  assert.equal(rendu, null);
+  expect(rendu).toBe(null);
 });
 
 // ─── L'échec d'un outil entre au registre, noeud ou pas ─────────────────────
@@ -98,14 +97,14 @@ test('un échec dont le noeud existe marque le noeud ET entre au registre', () =
     tool_input: { file_path: 'C:\\dev\\note.md' }, tool_use_id: 'tu-1',
     error: 'File content exceeds maximum allowed tokens',
     _ts: '2025-01-01T00:00:01.000Z',
-  });
+  } as HookEvent);
 
   // Assert
-  assert.equal(state.nodes.get('t:tu-1').status, 'error');
+  expect(state.nodes.get('t:tu-1')!.status).toBe('error');
   const recs = getErrors();
-  assert.equal(recs.length, 1);
-  assert.equal(recs[0].nodeId, 't:tu-1');
-  assert.match(recs[0].message, /exceeds maximum/);
+  expect(recs.length).toBe(1);
+  expect(recs[0]!.nodeId).toBe('t:tu-1');
+  expect(recs[0]!.message).toMatch(/exceeds maximum/);
 });
 
 test('quand le registre prévient, le noeud porte DÉJÀ le statut error', () => {
@@ -133,11 +132,11 @@ test('quand le registre prévient, le noeud porte DÉJÀ le statut error', () =>
     hook_event_name: 'PostToolUseFailure', session_id: sid, tool_name: 'Read',
     tool_input: { file_path: 'C:\\dev\\note.md' }, tool_use_id: 'tu-ordre',
     error: 'boum', _ts: '2025-01-01T00:00:01.000Z',
-  });
+  } as HookEvent);
   desabonner();
 
   // Assert
-  assert.equal(statutVuParLAbonne, 'error');
+  expect(statutVuParLAbonne).toBe('error');
 });
 
 test('un échec SANS noeud correspondant entre quand même au registre', () => {
@@ -150,12 +149,12 @@ test('un échec SANS noeud correspondant entre quand même au registre', () => {
     tool_input: { command: 'npm run build' }, tool_use_id: 'jamais-ouvert',
     error: 'Exit code 1',
     _ts: '2025-01-01T00:00:02.000Z',
-  });
+  } as HookEvent);
 
   // Assert
-  assert.equal(state.nodes.get('t:jamais-ouvert'), undefined, 'aucun noeud, comme attendu');
+  expect(state.nodes.get('t:jamais-ouvert'), 'aucun noeud, comme attendu').toBe(undefined);
   const recs = getErrors();
-  assert.equal(recs.length, 1, 'et pourtant l échec est consigné');
-  assert.equal(recs[0].toolName, 'Bash');
-  assert.equal(recs[0].subject, 'npm run build');
+  expect(recs.length, 'et pourtant l échec est consigné').toBe(1);
+  expect(recs[0]!.toolName).toBe('Bash');
+  expect(recs[0]!.subject).toBe('npm run build');
 });

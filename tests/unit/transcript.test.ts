@@ -1,4 +1,3 @@
-'use strict';
 // parseTranscriptEvent — bridge between raw transcript JSONL lines and the
 // per-bucket token accumulation. Verifies that:
 //   - the model field travels from `evt.message.model` (main thread) and
@@ -7,15 +6,19 @@
 //   - the inline subagent bucket creation uses the full newBucket() shape so
 //     pricing fields (costUsd, lastModel, contextMax) don't end up undefined
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
-const { _internals } = require('../../src/server/transcript.ts');
-const { ensureTokens } = require('../../src/server/tokens.ts');
+import { expect, test } from 'vitest';
+import { _internals } from '../../src/server/transcript.ts';
+import { ensureTokens } from '../../src/server/tokens.ts';
+import type { SessionRecord } from '../../src/server/session-index.ts';
 
 const { parseTranscriptEvent } = _internals;
 
-function freshRec() {
-  const rec = { id: 'test-sess', tokens: null };
+// Fixture partielle : `tokens` est la tranche que tokens.ts pose lui-même sur
+// l'enregistrement — `any` ici, jamais un `SessionRecord` complet.
+type RecFixture = SessionRecord & { tokens: any };
+
+function freshRec(): RecFixture {
+  const rec = { id: 'test-sess', tokens: null } as unknown as RecFixture;
   ensureTokens(rec);
   return rec;
 }
@@ -34,12 +37,12 @@ test('main-thread assistant line populates main bucket with model + cost', () =>
     },
   });
   const changed = parseTranscriptEvent(line, rec);
-  assert.equal(changed, true);
-  assert.equal(rec.tokens.main.in, 1000);
-  assert.equal(rec.tokens.main.lastModel, 'claude-sonnet-4-5');
-  assert.ok(rec.tokens.main.contextMax > 0, 'contextMax must be set from pricing');
+  expect(changed).toBe(true);
+  expect(rec.tokens.main.in).toBe(1000);
+  expect(rec.tokens.main.lastModel).toBe('claude-sonnet-4-5');
+  expect(rec.tokens.main.contextMax > 0, 'contextMax must be set from pricing').toBeTruthy();
   // Sonnet 4.5: 1000*3e-6 + 500*1.5e-5 = 0.003 + 0.0075 = 0.0105
-  assert.ok(Math.abs(rec.tokens.main.costUsd - 0.0105) < 1e-9, `got ${rec.tokens.main.costUsd}`);
+  expect(Math.abs(rec.tokens.main.costUsd - 0.0105) < 1e-9, `got ${rec.tokens.main.costUsd}`).toBeTruthy();
 });
 
 test('main-thread line is billed at the tariff in effect at its timestamp', () => {
@@ -59,11 +62,8 @@ test('main-thread line is billed at the tariff in effect at its timestamp', () =
       },
     },
   });
-  assert.equal(parseTranscriptEvent(line, rec), true);
-  assert.ok(
-    Math.abs(rec.tokens.main.costUsd - 0.003) < 1e-12,
-    `got ${rec.tokens.main.costUsd}, expected 0.003 (sticker rate at message date)`,
-  );
+  expect(parseTranscriptEvent(line, rec)).toBe(true);
+  expect(Math.abs(rec.tokens.main.costUsd - 0.003) < 1e-12, `got ${rec.tokens.main.costUsd}, expected 0.003 (sticker rate at message date)`).toBeTruthy();
 });
 
 test('subagent agent_progress line populates perAgent bucket with model + cost', () => {
@@ -85,17 +85,17 @@ test('subagent agent_progress line populates perAgent bucket with model + cost',
     },
   });
   const changed = parseTranscriptEvent(line, rec);
-  assert.equal(changed, true);
+  expect(changed).toBe(true);
   const bucket = rec.tokens.perAgent.get('agent-xyz');
-  assert.ok(bucket, 'agent bucket should be created');
-  assert.equal(bucket.in, 2000);
-  assert.equal(bucket.lastModel, 'claude-haiku-4-5');
+  expect(bucket, 'agent bucket should be created').toBeTruthy();
+  expect(bucket.in).toBe(2000);
+  expect(bucket.lastModel).toBe('claude-haiku-4-5');
   // Verify the subagent bucket got the FULL newBucket shape — a partial inline
   // literal here leaves pricing fields undefined, and costUsd += ... returns NaN.
-  assert.equal(typeof bucket.costUsd, 'number');
-  assert.ok(!Number.isNaN(bucket.costUsd));
+  expect(typeof bucket.costUsd).toBe('number');
+  expect(!Number.isNaN(bucket.costUsd)).toBeTruthy();
   // Haiku: 2000*1e-6 + 100*5e-6 = 0.002 + 0.0005 = 0.0025
-  assert.ok(Math.abs(bucket.costUsd - 0.0025) < 1e-9, `got ${bucket.costUsd}`);
+  expect(Math.abs(bucket.costUsd - 0.0025) < 1e-9, `got ${bucket.costUsd}`).toBeTruthy();
 });
 
 test('subagent transcript-file line (isSidechain + agentId) populates perAgent bucket', () => {
@@ -117,15 +117,15 @@ test('subagent transcript-file line (isSidechain + agentId) populates perAgent b
     },
   });
   const changed = parseTranscriptEvent(line, rec);
-  assert.equal(changed, true);
+  expect(changed).toBe(true);
   const bucket = rec.tokens.perAgent.get('a0b3d9c1c934d0613');
-  assert.ok(bucket, 'subagent bucket should be created');
-  assert.equal(bucket.in, 3);
-  assert.equal(bucket.cacheCreate, 3364);
-  assert.equal(bucket.cacheRead, 28466);
-  assert.equal(bucket.lastModel, 'claude-haiku-4-5');
-  assert.ok(bucket.contextMax > 0, 'contextMax must be set from pricing');
-  assert.equal(rec.tokens.main.in, 0, 'main bucket must stay untouched');
+  expect(bucket, 'subagent bucket should be created').toBeTruthy();
+  expect(bucket.in).toBe(3);
+  expect(bucket.cacheCreate).toBe(3364);
+  expect(bucket.cacheRead).toBe(28466);
+  expect(bucket.lastModel).toBe('claude-haiku-4-5');
+  expect(bucket.contextMax > 0, 'contextMax must be set from pricing').toBeTruthy();
+  expect(rec.tokens.main.in, 'main bucket must stay untouched').toBe(0);
 });
 
 test('sidechain assistant line without agentId is ignored (no miscrediting)', () => {
@@ -136,9 +136,9 @@ test('sidechain assistant line without agentId is ignored (no miscrediting)', ()
     type: 'assistant', isSidechain: true,
     message: { model: 'claude-haiku-4-5', usage: { input_tokens: 100, output_tokens: 50 } },
   });
-  assert.equal(parseTranscriptEvent(line, rec), false);
-  assert.equal(rec.tokens.main.in, 0);
-  assert.equal(rec.tokens.perAgent.size, 0);
+  expect(parseTranscriptEvent(line, rec)).toBe(false);
+  expect(rec.tokens.main.in).toBe(0);
+  expect(rec.tokens.perAgent.size).toBe(0);
 });
 
 test('lines without usage payload return false and do not touch buckets', () => {
@@ -150,17 +150,24 @@ test('lines without usage payload return false and do not touch buckets', () => 
     'not even json',
   ];
   for (const line of lines) {
-    assert.equal(parseTranscriptEvent(line, rec), false, `line should be ignored: ${line.slice(0, 40)}`);
+    expect(parseTranscriptEvent(line, rec), `line should be ignored: ${line.slice(0, 40)}`).toBe(false);
   }
-  assert.equal(rec.tokens.main.in, 0);
-  assert.equal(rec.tokens.main.costUsd, 0);
-  assert.equal(rec.tokens.perAgent.size, 0);
+  expect(rec.tokens.main.in).toBe(0);
+  expect(rec.tokens.main.costUsd).toBe(0);
+  expect(rec.tokens.perAgent.size).toBe(0);
 });
 
 // Seule l'absence de `usage` écarte une ligne. Un `usage` qui n'est pas un objet
 // arrive jusqu'au seau, qui le compte à part, au lieu de disparaître ici sans trace.
 // Un test de vérité (`!usage`) écarterait aussi `0`, `false` et `""`.
-const USAGE_NON_OBJET = [
+type CasUsageNonObjet = [
+  string,
+  string | number,
+  (usage: any) => Record<string, any>,
+  (rec: RecFixture) => any,
+];
+
+const USAGE_NON_OBJET: CasUsageNonObjet[] = [
   ['fil principal', 'x',
     (usage) => ({ type: 'assistant', isSidechain: false, message: { model: 'claude-sonnet-4-5', usage } }),
     (rec) => rec.tokens.main],
@@ -185,8 +192,8 @@ for (const [forme, valeur, ligne, seau] of USAGE_NON_OBJET) {
     const changed = parseTranscriptEvent(line, rec);
 
     // Assert
-    assert.equal(changed, true);
-    assert.equal(seau(rec).in, 0);
+    expect(changed).toBe(true);
+    expect(seau(rec).in).toBe(0);
   });
 
   test(`${forme} : un usage ${JSON.stringify(valeur)} rend le coût partiel et se compte à part`, () => {
@@ -198,8 +205,8 @@ for (const [forme, valeur, ligne, seau] of USAGE_NON_OBJET) {
     parseTranscriptEvent(line, rec);
 
     // Assert
-    assert.equal(seau(rec).costComplete, false);
-    assert.equal(seau(rec).malformedUsageMessages, 1);
+    expect(seau(rec).costComplete).toBe(false);
+    expect(seau(rec).malformedUsageMessages).toBe(1);
   });
 }
 
@@ -212,9 +219,9 @@ test('un usage null est écarté comme un usage absent : aucun seau ne bouge', (
   const changed = parseTranscriptEvent(line, rec);
 
   // Assert
-  assert.equal(changed, false);
-  assert.equal(rec.tokens.main.lastModel, null);
-  assert.equal(rec.tokens.perAgent.size, 0);
+  expect(changed).toBe(false);
+  expect(rec.tokens.main.lastModel).toBe(null);
+  expect(rec.tokens.perAgent.size).toBe(0);
 });
 
 test('main-thread line without model still records tokens but no cost', () => {
@@ -228,10 +235,10 @@ test('main-thread line without model still records tokens but no cost', () => {
       usage: { input_tokens: 500, output_tokens: 200 },
     },
   });
-  assert.equal(parseTranscriptEvent(line, rec), true);
-  assert.equal(rec.tokens.main.in, 500);
-  assert.equal(rec.tokens.main.lastModel, null);
-  assert.equal(rec.tokens.main.costUsd, 0);
+  expect(parseTranscriptEvent(line, rec)).toBe(true);
+  expect(rec.tokens.main.in).toBe(500);
+  expect(rec.tokens.main.lastModel).toBe(null);
+  expect(rec.tokens.main.costUsd).toBe(0);
 });
 
 test('parseTranscriptEvent short-circuits when line lacks "usage" substring', () => {
@@ -240,16 +247,16 @@ test('parseTranscriptEvent short-circuits when line lacks "usage" substring', ()
   // doesn't false-negative on a usage-bearing line.
   const rec = freshRec();
   // No "usage" substring → must short-circuit. Doesn't matter that it's valid JSON.
-  assert.equal(parseTranscriptEvent('{"type":"user","content":"hi"}', rec), false);
+  expect(parseTranscriptEvent('{"type":"user","content":"hi"}', rec)).toBe(false);
   // Empty / null / non-string → must not throw.
-  assert.equal(parseTranscriptEvent('', rec), false);
-  assert.equal(parseTranscriptEvent(null, rec), false);
+  expect(parseTranscriptEvent('', rec)).toBe(false);
+  expect(parseTranscriptEvent(null as any, rec)).toBe(false);
   // The substring must trigger the parse path.
   const line = JSON.stringify({
     type: 'assistant', isSidechain: false,
     message: { model: 'claude-sonnet-4-5', usage: { input_tokens: 1, output_tokens: 1 } },
   });
-  assert.equal(parseTranscriptEvent(line, rec), true);
+  expect(parseTranscriptEvent(line, rec)).toBe(true);
 });
 
 test('two messages on the same agent accumulate cost and overwrite lastModel', () => {
@@ -280,11 +287,11 @@ test('two messages on the same agent accumulate cost and overwrite lastModel', (
   parseTranscriptEvent(lineB, rec);
   const bucket = rec.tokens.perAgent.get('a-1');
   // Cumulative tokens
-  assert.equal(bucket.in, 2000);
+  expect(bucket.in).toBe(2000);
   // lastModel = the most recent one (last-wins, like the lastIn fields)
-  assert.equal(bucket.lastModel, 'claude-sonnet-4-5');
+  expect(bucket.lastModel).toBe('claude-sonnet-4-5');
   // Cost summed across both rates: 1000*1e-6 (haiku) + 1000*3e-6 (sonnet) = 0.001 + 0.003 = 0.004
-  assert.ok(Math.abs(bucket.costUsd - 0.004) < 1e-9, `got ${bucket.costUsd}`);
+  expect(Math.abs(bucket.costUsd - 0.004) < 1e-9, `got ${bucket.costUsd}`).toBeTruthy();
 });
 
 test('parseTranscriptEvent dispatches via rec.agentSource — copilot is no-op', () => {
@@ -301,9 +308,9 @@ test('parseTranscriptEvent dispatches via rec.agentSource — copilot is no-op',
       usage: { input_tokens: 9999, output_tokens: 9999 },
     },
   });
-  assert.equal(parseTranscriptEvent(line, rec), false);
-  assert.equal(rec.tokens.main.in, 0);
-  assert.equal(rec.tokens.main.costUsd, 0);
+  expect(parseTranscriptEvent(line, rec)).toBe(false);
+  expect(rec.tokens.main.in).toBe(0);
+  expect(rec.tokens.main.costUsd).toBe(0);
 });
 
 test('parseTranscriptEvent with agentSource=undefined still parses as Claude', () => {
@@ -314,6 +321,6 @@ test('parseTranscriptEvent with agentSource=undefined still parses as Claude', (
     type: 'assistant', isSidechain: false,
     message: { model: 'claude-sonnet-4-5', usage: { input_tokens: 100, output_tokens: 50 } },
   });
-  assert.equal(parseTranscriptEvent(line, rec), true);
-  assert.equal(rec.tokens.main.in, 100);
+  expect(parseTranscriptEvent(line, rec)).toBe(true);
+  expect(rec.tokens.main.in).toBe(100);
 });

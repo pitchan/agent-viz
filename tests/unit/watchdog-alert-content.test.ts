@@ -5,16 +5,19 @@
 // doing it. An alert you have to go investigate is only half an alert. These
 // tests pin the payload the panel needs to be able to show all three.
 
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
-import { createWatchdog } from '../../src/engine/watchdog/detector.ts';
+import { expect, test } from 'vitest';
+import { createWatchdog, type Alert } from '../../src/engine/watchdog/detector.ts';
 
 const T = 1_700_000_000_000;
-const iso = ms => new Date(ms).toISOString();
+const iso = (ms: number) => new Date(ms).toISOString();
 const clockAt = (start = T) => ({ now: () => start });
 
-function pre({ at, session = 'sid1', tool = 'Bash', input = { command: 'npm test' }, id = 't1', agentId, agentType }) {
-  const evt = {
+type PreArgs = {
+  at: number; session?: string; tool?: string; input?: Record<string, any>;
+  id?: string; agentId?: string; agentType?: string;
+};
+function pre({ at, session = 'sid1', tool = 'Bash', input = { command: 'npm test' }, id = 't1', agentId, agentType }: PreArgs) {
+  const evt: Record<string, any> = {
     session_id: session, hook_event_name: 'PreToolUse',
     tool_name: tool, tool_input: input, tool_use_id: id, _ts: iso(at),
   };
@@ -22,7 +25,8 @@ function pre({ at, session = 'sid1', tool = 'Bash', input = { command: 'npm test
   if (agentType) evt.agent_type = agentType;
   return evt;
 }
-function post({ at, session = 'sid1', tool = 'Bash', id = 't1' }) {
+type PostArgs = { at: number; session?: string; tool?: string; id?: string };
+function post({ at, session = 'sid1', tool = 'Bash', id = 't1' }: PostArgs) {
   return { session_id: session, hook_event_name: 'PostToolUse', tool_name: tool, tool_use_id: id, _ts: iso(at) };
 }
 
@@ -31,44 +35,40 @@ function post({ at, session = 'sid1', tool = 'Bash', id = 't1' }) {
 test('loop alert carries the exact command, not a truncated label', () => {
   const wd = createWatchdog({ now: clockAt().now });
   const command = 'rg --hidden --no-ignore "session_id" lib/server/observatory --stats';
-  let last = [];
+  let last: Alert[] = [];
   for (let i = 0; i < 4; i++) {
     last = wd.processEvent(pre({ at: T - 15_000 + i * 5_000, id: `t${i}`, input: { command } })).newAlerts;
   }
-  assert.equal(last[0].subject, command);
+  expect(last[0]!.subject).toBe(command);
 });
 
 test('loop alert carries one real timestamp per repeat', () => {
   const wd = createWatchdog({ now: clockAt().now });
   const times = [T - 15_000, T - 10_000, T - 5_000, T];
-  let last = [];
+  let last: Alert[] = [];
   times.forEach((at, i) => { last = wd.processEvent(pre({ at, id: `t${i}` })).newAlerts; });
-  assert.deepEqual(
-    last[0].occurrences,
-    times.map((ts, i) => ({ ts, toolUseId: `t${i}`, failed: null })),
-    'the panel must be able to print the four real clock times',
-  );
+  expect(last[0]!.occurrences, 'the panel must be able to print the four real clock times').toEqual(times.map((ts, i) => ({ ts, toolUseId: `t${i}`, failed: null })));
 });
 
 test('loop alert names the agent that ran the calls', () => {
   const wd = createWatchdog({ now: clockAt().now });
-  let last = [];
+  let last: Alert[] = [];
   for (let i = 0; i < 4; i++) {
     last = wd.processEvent(pre({
       at: T - 15_000 + i * 5_000, id: `t${i}`,
       agentId: 'ag-7f3c1b90', agentType: 'Explore',
     })).newAlerts;
   }
-  assert.equal(last[0].agentId, 'ag-7f3c1b90');
-  assert.equal(last[0].agentType, 'Explore');
+  expect(last[0]!.agentId).toBe('ag-7f3c1b90');
+  expect(last[0]!.agentType).toBe('Explore');
 });
 
 test('loop alert on the main thread leaves the agent fields empty', () => {
   const wd = createWatchdog({ now: clockAt().now });
-  let last = [];
+  let last: Alert[] = [];
   for (let i = 0; i < 4; i++) last = wd.processEvent(pre({ at: T - 15_000 + i * 5_000, id: `t${i}` })).newAlerts;
-  assert.equal(last[0].agentId, '');
-  assert.equal(last[0].agentType, '');
+  expect(last[0]!.agentId).toBe('');
+  expect(last[0]!.agentType).toBe('');
 });
 
 test('two agents running the same command are not merged into one loop', () => {
@@ -78,7 +78,7 @@ test('two agents running the same command are not merged into one loop', () => {
     wd.processEvent(pre({ at: T - 10_000 + i * 1_000, id: `a${i}`, agentId: 'ag-a', agentType: 'Explore' }));
     wd.processEvent(pre({ at: T - 10_000 + i * 1_000, id: `b${i}`, agentId: 'ag-b', agentType: 'Plan' }));
   }
-  assert.deepEqual(wd.getActiveAlerts(), [], 'four calls across two agents is not a loop');
+  expect(wd.getActiveAlerts(), 'four calls across two agents is not a loop').toEqual([]);
 });
 
 test('each looping agent gets its own alert', () => {
@@ -88,8 +88,8 @@ test('each looping agent gets its own alert', () => {
     wd.processEvent(pre({ at: T - 15_000 + i * 3_000, id: `b${i}`, agentId: 'ag-b', agentType: 'Plan' }));
   }
   const active = wd.getActiveAlerts();
-  assert.equal(active.length, 2);
-  assert.deepEqual(active.map(a => a.agentType).sort(), ['Explore', 'Plan']);
+  expect(active.length).toBe(2);
+  expect(active.map(a => a.agentType).sort()).toEqual(['Explore', 'Plan']);
 });
 
 // ─── Stuck: what is in flight, and since when ──────────────────────────────
@@ -99,7 +99,7 @@ test('stuck alert lists each in-flight tool with its subject and start time', ()
   wd.processEvent(pre({ at: T - 5 * 60_000, id: 'tA', tool: 'Bash', input: { command: 'npm run build' } }));
   wd.processEvent(pre({ at: T - 4 * 60_000, id: 'tB', tool: 'Read', input: { file_path: '/repo/lib/hook.js' } }));
   const alert = wd.tick().newAlerts[0];
-  assert.deepEqual(alert.tools, [
+  expect(alert!.tools).toEqual([
     { toolUseId: 'tA', toolName: 'Bash', subject: 'npm run build', startedAt: T - 5 * 60_000, agentId: '', agentType: '' },
     { toolUseId: 'tB', toolName: 'Read', subject: 'hook.js',       startedAt: T - 4 * 60_000, agentId: '', agentType: '' },
   ]);
@@ -111,9 +111,9 @@ test('a tool that completed is gone from the stuck list', () => {
   wd.processEvent(pre({ at: T - 5 * 60_000, id: 'tB', tool: 'Grep', input: { pattern: 'agent_id' } }));
   wd.processEvent(post({ at: T - 4 * 60_000, id: 'tA', tool: 'Bash' }));
   const alert = wd.tick().newAlerts[0];
-  assert.equal(alert.tools.length, 1);
-  assert.equal(alert.tools[0].toolUseId, 'tB');
-  assert.equal(alert.tools[0].subject, 'agent_id');
+  expect(alert!.tools.length).toBe(1);
+  expect(alert!.tools[0]!.toolUseId).toBe('tB');
+  expect(alert!.tools[0]!.subject).toBe('agent_id');
 });
 
 test('stuck alert names the agent holding the in-flight tool', () => {
@@ -123,8 +123,8 @@ test('stuck alert names the agent holding the in-flight tool', () => {
     agentId: 'ag-9c2', agentType: 'general-purpose',
   }));
   const alert = wd.tick().newAlerts[0];
-  assert.equal(alert.tools[0].agentId, 'ag-9c2');
-  assert.equal(alert.tools[0].agentType, 'general-purpose');
+  expect(alert!.tools[0]!.agentId).toBe('ag-9c2');
+  expect(alert!.tools[0]!.agentType).toBe('general-purpose');
 });
 
 // ─── Retry storm ───────────────────────────────────────────────────────────
@@ -135,7 +135,7 @@ test('stuck alert names the agent holding the in-flight tool', () => {
 test('retryStorm alert carries the subject of the failing call', () => {
   const wd = createWatchdog({ now: clockAt().now });
   const commands = ['npm ci', 'npm run build', 'npm test'];
-  let last = [];
+  let last: Alert[] = [];
   commands.forEach((command, i) => {
     last = wd.processEvent({
       session_id: 'sid1', hook_event_name: 'PostToolUseFailure',
@@ -143,5 +143,5 @@ test('retryStorm alert carries the subject of the failing call', () => {
       _ts: iso(T - 3_000 + i * 1_000),
     }).newAlerts;
   });
-  assert.equal(last[0].subject, 'npm test');
+  expect(last[0]!.subject).toBe('npm test');
 });
