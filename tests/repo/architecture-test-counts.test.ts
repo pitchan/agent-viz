@@ -1,6 +1,10 @@
 // Rien ne garde les comptes de fichiers de test qu'ARCHITECTURE.md § 9
 // affiche : ce filet les derive du disque, sous `tests/` seulement, et
 // rougit en nommant l'ecart des que le document et le disque divergent.
+//
+// Il tient aussi, separement, un invariant qui ne depend d'aucun nombre du
+// document : aucun fichier sous `tests/` n'importe `node:test` (§ 9 le dit en
+// prose, sans le chiffrer — voir `fichiersImportantNodeTest` plus bas).
 import { expect, test } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -43,6 +47,27 @@ export function compterDisque(root: string) {
   };
   marcher(path.join(root, 'tests'));
   return { ts };
+}
+
+// L'invariant que le pont protegeait avant de disparaitre : aucun fichier sous
+// `tests/` n'importe `node:test`. Ce module reste un built-in reel de Node 24,
+// et `vitest.config.mts` ne l'aliase plus vers rien : un `.test.ts` qui
+// l'importerait s'enregistrerait aupres du runner de Node, pas de celui de
+// vitest — ses tests tourneraient hors de la suite, en silence, ou pas du
+// tout. Independant de tout nombre ecrit dans ARCHITECTURE.md : cette
+// fonction ne lit que le disque, et rend les fichiers en cause, pas un compte.
+export function fichiersImportantNodeTest(root: string) {
+  const motif = /(require\(|from )['"]node:test['"]/;
+  const trouves: string[] = [];
+  const marcher = (dir: string) => {
+    for (const entree of readdirSync(dir, { withFileTypes: true })) {
+      const abs = path.join(dir, entree.name);
+      if (entree.isDirectory()) { marcher(abs); continue; }
+      if (motif.test(readFileSync(abs, 'utf8'))) trouves.push(path.relative(root, abs).replaceAll('\\', '/'));
+    }
+  };
+  marcher(path.join(root, 'tests'));
+  return trouves;
 }
 
 // ── Verificateurs purs : ce qui a bouge, NOMME ──────────────────────────────
@@ -98,6 +123,7 @@ const texteDoc = readFileSync(path.join(ROOT, 'ARCHITECTURE.md'), 'utf8');
 const docParse = parseComptesDoc(texteDoc);
 const docParseEtendu = parseComptesEtendusDoc(texteDoc);
 const disque = compterDisque(ROOT);
+const importateursNodeTest = fichiersImportantNodeTest(ROOT);
 
 test('assiette : le compte se lit, et le disque porte des fichiers de test', () => {
   expect(docParse !== null, 'le motif de lecture du compte `.test.ts` ne trouve plus rien dans ARCHITECTURE.md').toBeTruthy();
@@ -113,4 +139,10 @@ test('le compte de fichiers `.test.ts` que porte ARCHITECTURE.md § 9 suit le di
 test('le total de fichiers (titre et sortie vitest du § 9) suit le disque', () => {
   const ecarts = ecartsComptesEtendus(docParseEtendu!, disque.ts);
   expect(ecarts, 'ARCHITECTURE.md § 9 a gele pendant que le disque bougeait :\n  ' + ecarts.join('\n  ')).toEqual([]);
+});
+
+test('aucun fichier sous tests/ n importe node:test : plus aucun pont ne le relie a vitest', () => {
+  expect(importateursNodeTest, 'ces fichiers importent node:test, module que vitest.config.mts n alias plus vers rien : ' +
+      'leurs tests s enregistreraient aupres du runner de Node, pas de vitest, et tourneraient hors de la suite ' +
+      'ou pas du tout — les reecrire avec l API de vitest :\n  ' + importateursNodeTest.join('\n  ')).toEqual([]);
 });

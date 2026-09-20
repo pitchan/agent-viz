@@ -566,9 +566,15 @@ npx vitest run                          → tous passés, 130 fichiers
 vitest est le seul exécuteur (`include: tests/**/*.test.ts` de
 `vitest.config.mts`), et 130 `.test.ts` en sont l'unique dialecte : tous
 écrivent l'API de vitest (`import { test, expect } from 'vitest'`). Aucun
-pont, aucun second exécuteur, aucun fichier n'importe `node:test`.
-`tests/repo/architecture-test-counts.test.ts` compare ces nombres au disque et
-nomme l'écart s'il diverge.
+pont, aucun second exécuteur. `tests/repo/architecture-test-counts.test.ts`
+compare ces nombres au disque et nomme l'écart s'il diverge.
+
+**Aucun fichier n'importe `node:test`.** Le module reste un built-in réel de
+Node 24, et `vitest.config.mts` ne l'aliase plus vers rien : un `.test.ts` qui
+l'importerait s'enregistrerait auprès du runner de Node, pas de celui de
+vitest — ses tests tourneraient hors de la suite, en silence, ou pas du tout.
+`tests/repo/architecture-test-counts.test.ts` balaie `tests/` et nomme le
+fichier en cause s'il en trouve un.
 
 **Les sources du moteur se chargent en direct, sans étape de compilation.**
 `src/engine/**`, comme `src/server/**`, nomme ses voisins par leur chemin
