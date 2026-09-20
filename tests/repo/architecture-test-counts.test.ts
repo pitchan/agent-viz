@@ -136,10 +136,7 @@ const importsDisque = compterImportsNodeTest(ROOT);
 test('assiette : les deux tableaux se lisent, et le disque porte des fichiers de test', () => {
   expect(docParse !== null, 'le motif de lecture du tableau « Dialecte » ne trouve plus rien dans ARCHITECTURE.md').toBeTruthy();
   expect(docParseEtendu !== null, 'le motif de lecture du titre, de la sortie vitest et de la commande grep du § 9 ne trouve plus rien dans ARCHITECTURE.md').toBeTruthy();
-  // `cjs` peut légitimement valoir 0 : le dépôt ne porte plus aucun `.test.cjs`.
-  // `mjs`, `ts` et les imports node:test restent la vraie garde contre une
-  // assiette qui lirait un dossier vide.
-  expect(disque.cjs >= 0 && disque.mjs > 0 && disque.ts > 0 && importsDisque > 0, `assiette suspecte : ${JSON.stringify(disque)}, imports=${importsDisque}`).toBeTruthy();
+  expect(disque.mjs > 0 && disque.ts > 0 && importsDisque > 0, `assiette suspecte : ${JSON.stringify(disque)}, imports=${importsDisque}`).toBeTruthy();
 });
 
 test('les trois comptes de tests que porte ARCHITECTURE.md § 9 suivent le disque', () => {
