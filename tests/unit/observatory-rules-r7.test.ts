@@ -1,28 +1,28 @@
-'use strict';
 // R7 — modifications laissées sans vérification. Le fait vient du champ
 // verification du rapport stocké ; une session d'avant SCAN_VERSION 8 ne l'a
 // pas et est écartée, jamais devinée.
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+import { expect, test } from 'vitest';
+import * as r7 from '../../src/server/observatory/rules/r7-unverified-tail.ts';
+import { THRESHOLDS } from '../../src/server/observatory/rules/thresholds.ts';
+import type { Session } from '../../src/server/observatory/rules/types.ts';
 
-const r7 = require('../../src/server/observatory/rules/r7-unverified-tail.ts');
-const { THRESHOLDS } = require('../../src/server/observatory/rules/thresholds.ts');
+type Verification = NonNullable<Session['report']['verification']>;
 
-function session(id, verification, { project = 'F--proj', netTokens = 100000, costUsd = 10, costComplete = true } = {}) {
+function session(id: string, verification: Verification | undefined, { project = 'F--proj', netTokens = 100000, costUsd = 10, costComplete = true } = {}) {
   return {
     id, project, startedAt: '2026-08-01T10:00:00.000Z', endedAt: '2026-08-01T11:00:00.000Z',
     sessionKind: 'interactive', netTokens, costUsd, costComplete,
     report: { verification },
-  };
+  } as unknown as Session;
 }
-const stats = over => ({
+const stats = (over: Partial<Verification> = {}): Verification => ({
   verifications: 1, verificationsFailed: 0,
   lastVerification: { at: '2026-08-01T10:30:00.000Z', kind: 'test', ok: true, command: 'npm test' },
   editsTotal: 3, editsAfterLastVerification: 0, filesAfterLastVerificationTotal: 0,
   tokensAfterLastVerification: 0, ...over,
 });
-const ctx = sessions => ({ sessions, configItems: [] });
+const ctx = (sessions: Session[]) => ({ sessions, configItems: [] });
 
 test('R7 vise la session editant sans aucune verification et la queue au-dessus du seuil', () => {
   // Arrange
@@ -37,18 +37,18 @@ test('R7 vise la session editant sans aucune verification et la queue au-dessus 
   // Act
   const recs = r7.evaluate(ctx(sessions));
   // Assert
-  assert.equal(recs.length, 1);
-  assert.equal(recs[0].ruleId, 'R7');
-  assert.equal(recs[0].subject, 'F--proj');
-  assert.equal(recs[0].confidence, 'fait');
-  assert.equal(recs[0].costBasis, 'jetons-mesures');
-  assert.deepEqual(recs[0].evidence.sessions, ['s1', 's2', 's3']);
-  assert.equal(recs[0].evidence.sessionsNoVerification, 1);
-  assert.equal(recs[0].evidence.sessionsWithTail, 2);
-  assert.equal(recs[0].evidence.filesUnverifiedBySession, 5);
-  assert.equal(recs[0].evidence.tokensAfterLastVerification, 100000);
-  assert.equal(recs[0].evidence.excludedPendingRescan, 0);
-  assert.equal(recs[0].estimatedCostUsd, 10, 'au taux de session 0.0001 $/jeton');
+  expect(recs.length).toBe(1);
+  expect(recs[0]!.ruleId).toBe('R7');
+  expect(recs[0]!.subject).toBe('F--proj');
+  expect(recs[0]!.confidence).toBe('fait');
+  expect(recs[0]!.costBasis).toBe('jetons-mesures');
+  expect(recs[0]!.evidence.sessions).toEqual(['s1', 's2', 's3']);
+  expect(recs[0]!.evidence.sessionsNoVerification).toBe(1);
+  expect(recs[0]!.evidence.sessionsWithTail).toBe(2);
+  expect(recs[0]!.evidence.filesUnverifiedBySession).toBe(5);
+  expect(recs[0]!.evidence.tokensAfterLastVerification).toBe(100000);
+  expect(recs[0]!.evidence.excludedPendingRescan).toBe(0);
+  expect(recs[0]!.estimatedCostUsd, 'au taux de session 0.0001 $/jeton').toBe(10);
 });
 
 test('R7 compte les sessions ecartees faute du champ v8 dans la reco qu elle emet', () => {
@@ -66,14 +66,14 @@ test('R7 compte les sessions ecartees faute du champ v8 dans la reco qu elle eme
   // Act
   const recs = r7.evaluate(ctx(sessions));
   // Assert
-  assert.equal(recs.length, 1);
-  assert.equal(recs[0].evidence.excludedPendingRescan, 1);
-  assert.deepEqual(recs[0].evidence.sessions, ['s1', 's2', 's3']);
-  assert.equal(recs[0].evidence.sessionsNoVerification, 1);
-  assert.equal(recs[0].evidence.sessionsWithTail, 2);
-  assert.equal(recs[0].evidence.filesUnverifiedBySession, 5);
-  assert.equal(recs[0].evidence.tokensAfterLastVerification, 100000);
-  assert.equal(recs[0].estimatedCostUsd, 10, 'la session ecartee ne pese pas dans le cout');
+  expect(recs.length).toBe(1);
+  expect(recs[0]!.evidence.excludedPendingRescan).toBe(1);
+  expect(recs[0]!.evidence.sessions).toEqual(['s1', 's2', 's3']);
+  expect(recs[0]!.evidence.sessionsNoVerification).toBe(1);
+  expect(recs[0]!.evidence.sessionsWithTail).toBe(2);
+  expect(recs[0]!.evidence.filesUnverifiedBySession).toBe(5);
+  expect(recs[0]!.evidence.tokensAfterLastVerification).toBe(100000);
+  expect(recs[0]!.estimatedCostUsd, 'la session ecartee ne pese pas dans le cout').toBe(10);
 });
 
 // La regle ne filtre JAMAIS sur la fin de session — aucun
@@ -92,9 +92,8 @@ test('R7 ne titre pas une cloture de session, un fait qu elle ne mesure pas', ()
   // Act
   const recs = r7.evaluate(ctx(sessions));
   // Assert
-  assert.ok(!/termin|clos/i.test(recs[0].title),
-    `le titre affirme une fin de session non mesuree : « ${recs[0].title} »`);
-  assert.equal(recs[0].title, 'Sessions laissant des modifications non vérifiées');
+  expect(!/termin|clos/i.test(recs[0]!.title), `le titre affirme une fin de session non mesuree : « ${recs[0]!.title} »`).toBeTruthy();
+  expect(recs[0]!.title).toBe('Sessions laissant des modifications non vérifiées');
 });
 
 test('R7 reste muette sous le plancher de sessions par projet', () => {
@@ -106,7 +105,7 @@ test('R7 reste muette sous le plancher de sessions par projet', () => {
     session('s2', stats({ editsAfterLastVerification: 2, tokensAfterLastVerification: 25000 })),
   ];
   // Act + Assert (minSessions vaut 3 par calibration)
-  assert.deepEqual(r7.evaluate(ctx(deux)), []);
+  expect(r7.evaluate(ctx(deux))).toEqual([]);
 });
 
 test('R7 ignore les sessions sans edition et les queues sous le seuil', () => {
@@ -117,7 +116,7 @@ test('R7 ignore les sessions sans edition et les queues sous le seuil', () => {
     session('s3', stats()),
   ];
   // Act + Assert
-  assert.deepEqual(r7.evaluate(ctx(sessions)), []);
+  expect(r7.evaluate(ctx(sessions))).toEqual([]);
 });
 
 test('R7 ecarte une session stockee avant SCAN_VERSION 8, jamais devinee', () => {
@@ -125,5 +124,5 @@ test('R7 ecarte une session stockee avant SCAN_VERSION 8, jamais devinee', () =>
   // dans une reco emise, il ne fabrique donc aucune carte a lui seul.
   const sessions = [session('s1', undefined), session('s2', undefined)];
   // Act + Assert
-  assert.deepEqual(r7.evaluate(ctx(sessions)), []);
+  expect(r7.evaluate(ctx(sessions))).toEqual([]);
 });

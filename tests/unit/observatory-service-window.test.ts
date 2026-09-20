@@ -1,21 +1,20 @@
-'use strict';
 // The two structural rules, pinned: persistence always scans 90 days
 // while advice reads the chosen window on the human basis only; every
 // recommendation is stamped with the period it was observed on.
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
-
-const { createObservatoryService, WINDOW_DAYS } = require('../../src/server/observatory/service.ts');
+import { expect, test } from 'vitest';
+import { createObservatoryService, WINDOW_DAYS } from '../../src/server/observatory/service.ts';
+import type { Store, SessionRow } from '../../src/server/observatory/store.ts';
+import type { Engine } from '../../src/server/observatory/engine.ts';
 
 const NOW = new Date('2026-08-03T12:00:00.000Z');
-const daysAgo = n => new Date(NOW.getTime() - n * 24 * 3600 * 1000).toISOString();
+const daysAgo = (n: number) => new Date(NOW.getTime() - n * 24 * 3600 * 1000).toISOString();
 
 // A stored row whose report makes R1 fire (prefixChange dominant, 40 % of net):
 // with at least one recommendation emitted, the period-stamp assertions below
 // are real, never vacuously true on an empty list. The quiet-zero fields keep
 // the other six rules silent instead of throwing.
-const stat = (events, tokens) => ({ events, tokens });
+const stat = (events: number, tokens: number) => ({ events, tokens });
 const R1_REPORT = {
   context: {
     churnCauses: {
@@ -43,33 +42,34 @@ const HUMAN_ROW = {
   startedAt: daysAgo(2), endedAt: daysAgo(2), modelMain: 'claude-opus-4-8',
   netTokens: 100000, costUsd: 1, costComplete: true, sessionKind: 'interactive',
   reportJson: JSON.stringify(R1_REPORT),
-};
+} as unknown as SessionRow;
 
 // Real deps (service.ts head): { store, engine, collectConfig, broadcast,
 // now, claudeDir, sinceDays, scanSinceDays } — the engine arrives as a ready
 // value, and config collection is a separate collaborator from the store.
-function fakeDeps({ rows = [] } = {}) {
-  const calls = { listSessions: [], discoverSince: null, upserted: null };
+function fakeDeps({ rows = [] as SessionRow[] } = {}) {
+  const calls: { listSessions: any[]; discoverSince: Date | null; upserted: any[] | null } =
+    { listSessions: [], discoverSince: null, upserted: null };
   const store = {
-    listSessions: opts => { calls.listSessions.push(opts); return rows; },
+    listSessions: (opts: any) => { calls.listSessions.push(opts); return rows; },
     countByKind: () => ({ interactive: 2, headless: 5, unknown: 1 }),
     listConfigItems: () => [],
     replaceConfigItems: () => {},
-    upsertRecommendations: recs => { calls.upserted = recs; },
+    upsertRecommendations: (recs: any) => { calls.upserted = recs; },
     getScanState: () => null,
     setScanState: () => {},
     needsScan: () => false,
-  };
+  } as unknown as Store;
   const engine = {
-    discoverSessions: async (_dir, { since }) => { calls.discoverSince = since; return []; },
-    parseSince: raw => new Date(raw),
+    discoverSessions: async (_dir: string, { since }: { since: Date }) => { calls.discoverSince = since; return []; },
+    parseSince: (raw: string) => new Date(raw),
     scanSession: async () => { throw new Error('not reached: no session to scan'); },
     netTokens: () => 0,
-  };
+  } as unknown as Engine;
   return { calls, store, engine };
 }
 
-function serviceOf(deps) {
+function serviceOf(deps: ReturnType<typeof fakeDeps>) {
   // Mirror the real composition (index.ts): default advice window 30, scan window 90.
   return createObservatoryService({
     engine: deps.engine, store: deps.store,
@@ -80,46 +80,46 @@ function serviceOf(deps) {
 }
 
 test('WINDOW_DAYS is the 7/30/90 spec table', () => {
-  assert.deepEqual(WINDOW_DAYS, [7, 30, 90]);
+  expect(WINDOW_DAYS).toEqual([7, 30, 90]);
 });
 
 test('summary defaults: 30-day window, human kinds only, basis passed through', async () => {
   const deps = fakeDeps();
   const out = await serviceOf(deps).summary();
   const q = deps.calls.listSessions[0];
-  assert.deepEqual(q.kinds, ['interactive']);
-  assert.equal(q.since, daysAgo(30));
-  assert.deepEqual(out.basis.counts, { interactive: 2, headless: 5, unknown: 1 });
-  assert.equal(out.basis.includeMachine, false);
-  assert.deepEqual(out.period, { from: daysAgo(30), to: NOW.toISOString(), days: 30 });
+  expect(q.kinds).toEqual(['interactive']);
+  expect(q.since).toBe(daysAgo(30));
+  expect(out.basis!.counts).toEqual({ interactive: 2, headless: 5, unknown: 1 });
+  expect(out.basis!.includeMachine).toBe(false);
+  expect(out.period).toEqual({ from: daysAgo(30), to: NOW.toISOString(), days: 30 });
 });
 
 test('summary({days: 7}) narrows the window; an off-table value falls back to the default', async () => {
   const deps = fakeDeps();
   await serviceOf(deps).summary({ days: 7 });
-  assert.equal(deps.calls.listSessions[0].since, daysAgo(7));
+  expect(deps.calls.listSessions[0].since).toBe(daysAgo(7));
   await serviceOf(fakeDeps()).summary({ days: 12 }).then(out =>
-    assert.equal(out.period.days, 30, 'off-table windows are never honored silently'));
+    expect(out.period!.days, 'off-table windows are never honored silently').toBe(30));
 });
 
 test('summary({includeMachine: true}) lifts the kind filter but still announces the basis', async () => {
   const deps = fakeDeps();
   const out = await serviceOf(deps).summary({ includeMachine: true });
-  assert.equal(deps.calls.listSessions[0].kinds, undefined);
-  assert.equal(out.basis.includeMachine, true);
+  expect(deps.calls.listSessions[0].kinds).toBe(undefined);
+  expect(out.basis!.includeMachine).toBe(true);
 });
 
 test('scan persists 90 days but evaluates advice on the requested window, human only, and stamps the period', async () => {
   const deps = fakeDeps({ rows: [HUMAN_ROW] });
   await serviceOf(deps).scan({ days: 7 });
-  assert.equal(deps.calls.discoverSince.toISOString(), daysAgo(90), 'persistence window never shrinks');
+  expect(deps.calls.discoverSince!.toISOString(), 'persistence window never shrinks').toBe(daysAgo(90));
   const adviceQuery = deps.calls.listSessions.find(q => q.kinds);
-  assert.deepEqual(adviceQuery.kinds, ['interactive']);
-  assert.equal(adviceQuery.since, daysAgo(7));
-  assert.ok(deps.calls.upserted.length >= 1, 'the R1 fixture must produce at least one recommendation');
-  for (const rec of deps.calls.upserted) {
-    assert.equal(rec.periodFrom, daysAgo(7));
-    assert.equal(rec.periodTo, NOW.toISOString());
+  expect(adviceQuery.kinds).toEqual(['interactive']);
+  expect(adviceQuery.since).toBe(daysAgo(7));
+  expect(deps.calls.upserted!.length >= 1, 'the R1 fixture must produce at least one recommendation').toBeTruthy();
+  for (const rec of deps.calls.upserted!) {
+    expect(rec.periodFrom).toBe(daysAgo(7));
+    expect(rec.periodTo).toBe(NOW.toISOString());
   }
 });
 
@@ -129,9 +129,9 @@ test('scan names the project with the real working directory, keeping the slug a
   const row = { ...HUMAN_ROW, reportJson: JSON.stringify({ ...R1_REPORT, cwd: 'd:\\dvf-postgis-pipeline' }) };
   const deps = fakeDeps({ rows: [row] });
   await serviceOf(deps).scan({ days: 7 });
-  const rec = deps.calls.upserted.find(r => r.ruleId === 'R1');
-  assert.equal(rec.title, 'Cache perdu en cours de session : des jetons déjà servis sont refacturés — projet D:\\dvf-postgis-pipeline');
-  assert.equal(rec.subject, 'F--dvf', 'the persisted identity stays the slug');
+  const rec = deps.calls.upserted!.find(r => r.ruleId === 'R1');
+  expect(rec.title).toBe('Cache perdu en cours de session : des jetons déjà servis sont refacturés — projet D:\\dvf-postgis-pipeline');
+  expect(rec.subject, 'the persisted identity stays the slug').toBe('F--dvf');
 });
 
 // A transcript that never declared a cwd is a real case, not an anomaly: the
@@ -139,17 +139,17 @@ test('scan names the project with the real working directory, keeping the slug a
 test('a report without a cwd falls back to the slug in the title', async () => {
   const deps = fakeDeps({ rows: [HUMAN_ROW] });
   await serviceOf(deps).scan({ days: 7 });
-  const rec = deps.calls.upserted.find(r => r.ruleId === 'R1');
-  assert.equal(rec.title, 'Cache perdu en cours de session : des jetons déjà servis sont refacturés — projet F--dvf');
+  const rec = deps.calls.upserted!.find(r => r.ruleId === 'R1');
+  expect(rec.title).toBe('Cache perdu en cours de session : des jetons déjà servis sont refacturés — projet F--dvf');
 });
 
 test('sessions() exposes projectPath — the real path, or the slug when unknown', async () => {
   const withCwd = { ...HUMAN_ROW, reportJson: JSON.stringify({ ...R1_REPORT, cwd: 'f:\\DEV\\x' }) };
   const [named] = await serviceOf(fakeDeps({ rows: [withCwd] })).sessions();
-  assert.equal(named.projectPath, 'F:\\DEV\\x');
-  assert.equal(named.project, 'F--dvf');
-  assert.equal(named.reportJson, undefined, 'the full report never travels to the table view');
+  expect(named!.projectPath).toBe('F:\\DEV\\x');
+  expect(named!.project).toBe('F--dvf');
+  expect((named as unknown as Record<string, unknown>).reportJson, 'the full report never travels to the table view').toBe(undefined);
 
   const [unnamed] = await serviceOf(fakeDeps({ rows: [HUMAN_ROW] })).sessions();
-  assert.equal(unnamed.projectPath, 'F--dvf');
+  expect(unnamed!.projectPath).toBe('F--dvf');
 });

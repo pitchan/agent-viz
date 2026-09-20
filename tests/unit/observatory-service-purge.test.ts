@@ -1,17 +1,16 @@
-'use strict';
 // service.purge empties the store and does nothing else: the engine is built
 // when its module loads, so no engine check stands before the wipe.
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+import { expect, test } from 'vitest';
+import { createObservatoryService } from '../../src/server/observatory/service.ts';
 
-const { createObservatoryService } = require('../../src/server/observatory/service.ts');
+type ServiceDeps = Parameters<typeof createObservatoryService>[0];
 
 test('purge empties the store', async () => {
   let purged = false;
   const service = createObservatoryService({
     store: { purge: () => { purged = true; } },
-  });
+  } as unknown as ServiceDeps);
   await service.purge();
-  assert.equal(purged, true);
+  expect(purged).toBe(true);
 });

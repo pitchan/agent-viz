@@ -1,4 +1,3 @@
-'use strict';
 // Le verrou : aucune règle ne nomme elle-même son projet.
 //
 // Le libellé « — projet <slug> » est posé en un seul endroit (project-label.ts,
@@ -10,14 +9,13 @@
 // faire tirer ne verrouille rien, puisqu'une règle sans fixture serait sautée en
 // silence. Le test échoue donc aussi quand une règle 'project' ne produit rien.
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
-
-const { RULES } = require('../../src/server/observatory/rules/registry.ts');
-const { nameProjects } = require('../../src/server/observatory/project-label.ts');
+import { expect, test } from 'vitest';
+import { RULES } from '../../src/server/observatory/rules/registry.ts';
+import { nameProjects } from '../../src/server/observatory/project-label.ts';
+import type { Session } from '../../src/server/observatory/rules/types.ts';
 
 const KB = 1024;
-const stat = (events, tokens) => ({ events, tokens });
+const stat = (events: number, tokens: number) => ({ events, tokens });
 
 // Une session qui déclenche R1, R4, R5, R6 et R7 à la fois — chaque règle lit
 // une partie différente du rapport, elles ne s'excluent pas. Les valeurs sont
@@ -83,7 +81,7 @@ const ALL_FIRING_SESSION = {
 // R7 ne parle qu'au-dessus d'un plancher de sessions par projet (seuil calibré) :
 // la fixture en fournit trois, d'identités distinctes et de rapport identique.
 // Les autres règles agrègent déjà par projet et tirent tout autant.
-const SESSIONS = ['s1', 's2', 's3'].map(id => ({ ...ALL_FIRING_SESSION, id }));
+const SESSIONS = ['s1', 's2', 's3'].map(id => ({ ...ALL_FIRING_SESSION, id })) as unknown as Session[];
 
 const ctx = { sessions: SESSIONS, configItems: [] };
 const projectRules = () => RULES.filter(r => r.subjectKind === 'project');
@@ -91,24 +89,22 @@ const projectRules = () => RULES.filter(r => r.subjectKind === 'project');
 test('chaque règle déclare la nature de son sujet — contrat identique pour toutes', () => {
   const kinds = new Set(['project', 'mcpServer', 'tool']);
   for (const rule of RULES) {
-    assert.ok(kinds.has(rule.subjectKind), `${rule.id} : subjectKind manquant ou inconnu`);
+    expect(kinds.has(rule.subjectKind), `${rule.id} : subjectKind manquant ou inconnu`).toBeTruthy();
   }
 });
 
 test('la fixture fait bien tirer toutes les règles à sujet projet', () => {
-  assert.ok(projectRules().length >= 5, 'R1, R4, R5, R6 et R7 ont un projet pour sujet');
+  expect(projectRules().length >= 5, 'R1, R4, R5, R6 et R7 ont un projet pour sujet').toBeTruthy();
   for (const rule of projectRules()) {
-    assert.ok(rule.evaluate(ctx).length > 0,
-      `${rule.id} ne produit rien : l'invariant ci-dessous la sauterait en silence`);
+    expect(rule.evaluate(ctx).length > 0, `${rule.id} ne produit rien : l'invariant ci-dessous la sauterait en silence`).toBeTruthy();
   }
 });
 
 test('aucune règle à sujet projet ne nomme le projet dans son titre', () => {
   for (const rule of projectRules()) {
     for (const rec of rule.evaluate(ctx)) {
-      assert.ok(!rec.title.includes('projet'),
-        `${rule.id} nomme encore son projet : « ${rec.title} »`);
-      assert.equal(rec.subject, 'F--DEV-x', `${rule.id} : le sujet reste le slug`);
+      expect(!rec.title.includes('projet'), `${rule.id} nomme encore son projet : « ${rec.title} »`).toBeTruthy();
+      expect(rec.subject, `${rule.id} : le sujet reste le slug`).toBe('F--DEV-x');
     }
   }
 });
@@ -116,9 +112,9 @@ test('aucune règle à sujet projet ne nomme le projet dans son titre', () => {
 test('c’est nameProjects qui pose le projet, une seule fois, avec le vrai chemin', () => {
   const recs = projectRules().flatMap(rule => rule.evaluate(ctx));
   for (const named of nameProjects(recs, SESSIONS, RULES)) {
-    assert.match(named.title, /— projet F:\\DEV\\x$/);
+    expect(named.title).toMatch(/— projet F:\\DEV\\x$/);
     // Une seule occurrence : un suffixe resté dans une règle produirait un titre
     // à double mention, exactement le défaut que ce fichier verrouille.
-    assert.equal(named.title.split('— projet').length - 1, 1);
+    expect(named.title.split('— projet').length - 1).toBe(1);
   }
 });

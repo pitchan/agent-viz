@@ -1,30 +1,29 @@
-'use strict';
 // service.setRecommendationStatus : le service séquence (horloge injectée,
 // raison transmise telle quelle) — la validation vit à la route, la
 // persistance au magasin.
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
+import { expect, test } from 'vitest';
+import { createObservatoryService } from '../../src/server/observatory/service.ts';
 
-const { createObservatoryService } = require('../../src/server/observatory/service.ts');
+type ServiceDeps = Parameters<typeof createObservatoryService>[0];
 
 test('la raison d’arbitrage voyage jusqu’au magasin avec l’horloge injectée', async () => {
   // Arrange
-  let got;
+  let got: unknown;
   const service = createObservatoryService({
     store: {
-      setRecommendationStatus: (id, status, now, reason) => {
+      setRecommendationStatus: (id: number, status: string, now: string, reason?: string | null) => {
         got = { id, status, now, reason };
         return true;
       },
     },
     now: () => new Date('2026-08-18T10:00:00.000Z'),
-  });
+  } as unknown as ServiceDeps);
   // Act
   const ok = await service.setRecommendationStatus(7, 'arbitrated', 'déjà pesé hors session');
   // Assert
-  assert.equal(ok, true);
-  assert.deepEqual(got, {
+  expect(ok).toBe(true);
+  expect(got).toEqual({
     id: 7, status: 'arbitrated',
     now: '2026-08-18T10:00:00.000Z', reason: 'déjà pesé hors session',
   });
@@ -32,18 +31,18 @@ test('la raison d’arbitrage voyage jusqu’au magasin avec l’horloge inject�
 
 test('sans raison, le magasin reçoit null — jamais undefined', async () => {
   // Arrange
-  let got;
+  let got: unknown;
   const service = createObservatoryService({
     store: {
-      setRecommendationStatus: (id, status, now, reason) => {
+      setRecommendationStatus: (id: number, status: string, now: string, reason?: string | null) => {
         got = { id, status, reason };
         return true;
       },
     },
     now: () => new Date('2026-08-18T10:00:00.000Z'),
-  });
+  } as unknown as ServiceDeps);
   // Act
   await service.setRecommendationStatus(7, 'new');
   // Assert
-  assert.deepEqual(got, { id: 7, status: 'new', reason: null });
+  expect(got).toEqual({ id: 7, status: 'new', reason: null });
 });

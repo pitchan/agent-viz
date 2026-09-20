@@ -1,15 +1,14 @@
-'use strict';
 // The 'done' broadcast is the client's reload signal: it must fire only after
 // the recomputed advice is stored, or a post-purge reload reads a still-empty
 // recommendations table.
 
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
-
-const { createObservatoryService } = require('../../src/server/observatory/service.ts');
+import { expect, test } from 'vitest';
+import { createObservatoryService } from '../../src/server/observatory/service.ts';
+import type { Store } from '../../src/server/observatory/store.ts';
+import type { Engine } from '../../src/server/observatory/engine.ts';
 
 test("scan broadcasts 'done' only after recommendations are stored", async () => {
-  const sequence = [];
+  const sequence: string[] = [];
   const store = {
     listSessions: () => [],
     listConfigItems: () => [],
@@ -18,11 +17,11 @@ test("scan broadcasts 'done' only after recommendations are stored", async () =>
     getScanState: () => null,
     setScanState: () => {},
     needsScan: () => false,
-  };
+  } as unknown as Store;
   const engine = {
     discoverSessions: async () => [],
     scanSession: async () => { throw new Error('not reached: no session to scan'); },
-  };
+  } as unknown as Engine;
   const service = createObservatoryService({
     engine, store,
     collectConfig: async () => [],
@@ -35,8 +34,7 @@ test("scan broadcasts 'done' only after recommendations are stored", async () =>
 
   const done = sequence.indexOf('broadcast-done');
   const upsert = sequence.indexOf('upsert-recommendations');
-  assert.notEqual(done, -1, "the scan must still broadcast 'done'");
-  assert.notEqual(upsert, -1, 'the scan must still store recommendations');
-  assert.ok(upsert < done,
-    `'done' must come after the advice write, got: ${sequence.join(' -> ')}`);
+  expect(done, "the scan must still broadcast 'done'").not.toBe(-1);
+  expect(upsert, 'the scan must still store recommendations').not.toBe(-1);
+  expect(upsert < done, `'done' must come after the advice write, got: ${sequence.join(' -> ')}`).toBeTruthy();
 });
