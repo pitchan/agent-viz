@@ -16,7 +16,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['tests/**/*.test.ts'],
-    setupFiles: ['./test-support/env-guard.mjs'],
+    setupFiles: ['./test-support/env-guard.ts'],
     restoreMocks: true,
   },
 });

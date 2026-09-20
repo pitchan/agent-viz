@@ -1,5 +1,5 @@
 // Garde d'environnement du harnais, executee avant chaque fichier de test : premiere entree
-// de `setupFiles` sous vitest, `--import` de chaque processus fils sous node --test.
+// de `setupFiles` sous vitest.
 //
 // Elle est un PLANCHER : les detournements des tests gardent le dernier mot, mais un point
 // d'entree qui perd sa garde ecrit dans un bac jetable, jamais dans ~/.claude ni ~/.agent-viz.
@@ -10,9 +10,8 @@
 // Ce qu'elle ne couvre pas :
 //   1. le `.gitignore` du depot, ou `install-hooks.ts` peut ecrire (`git status` le voit) ;
 //   2. une execution hors harnais : script lance directement, `npm start`, le bin, test nu ;
-//   3. un `node --test` sans `--import` : seuls `test:node` et `test:ids:node` le portent ;
-//   4. son retrait : reste `tests/unit/install-hooks-entrypoint.test.mjs`, qui detecte sans empecher ;
-//   5. un demon reel deja lance, qui continue d'ecrire dans `~/.agent-viz/observatory.db`.
+//   3. son retrait : reste `tests/unit/install-hooks-entrypoint.test.ts`, qui detecte sans empecher ;
+//   4. un demon reel deja lance, qui continue d'ecrire dans `~/.agent-viz/observatory.db`.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -44,8 +43,8 @@ const AGE_MIN_PURGE_MS = 10 * 60 * 1000;
 //      sans jamais resoudre sa cible, donc sans jamais la supprimer non plus.
 //   3. un echec de suppression (bac verrouille par un autre processus) est
 //      avale : ce nettoyage ne doit jamais faire tomber un run.
-function purgeAnciensBacs(parent) {
-  let entrees;
+function purgeAnciensBacs(parent: string): void {
+  let entrees: fs.Dirent[];
   try { entrees = fs.readdirSync(parent, { withFileTypes: true }); }
   catch { return; }
   const maintenant = Date.now();
@@ -53,7 +52,7 @@ function purgeAnciensBacs(parent) {
     if (!entree.name.startsWith(PREFIXE_BAC)) continue;
     if (!entree.isDirectory()) continue; // lien symbolique ou fichier : jamais touche
     const cible = path.join(parent, entree.name);
-    let infos;
+    let infos: fs.Stats;
     try { infos = fs.statSync(cible); } catch { continue; }
     if (maintenant - infos.mtimeMs < AGE_MIN_PURGE_MS) continue; // trop recent : peut etre un voisin de CE run
     try { fs.rmSync(cible, { recursive: true, force: true }); } catch { /* verrouille par un autre processus : on continue */ }
@@ -61,8 +60,8 @@ function purgeAnciensBacs(parent) {
 }
 
 // Le marqueur empeche un second bac dans un processus qui l'a deja, pose ou herite.
-// Il ne relie pas les fichiers d'un run : sous vitest comme sous node --test, chaque
-// fichier de test cree son bac, d'ou le seuil d'age de la purge ci-dessus.
+// Il ne relie pas les fichiers d'un run : chaque fichier de test cree son bac,
+// d'ou le seuil d'age de la purge ci-dessus.
 if (!process.env.AGENT_VIZ_BAC_HARNAIS) {
   const parent = os.tmpdir();
   purgeAnciensBacs(parent);
