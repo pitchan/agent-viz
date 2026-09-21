@@ -79,39 +79,55 @@
 // SANS DRAPEAU (trouvé par la revue, 2026-08-10 — mécanisme, reproduction et
 // vérification d'absence dans l'en-tête de `lib/tokens.mjs`). Aucun de ces
 // cas n'a été mesuré dans ce dépôt à ce commit.
-import { tokenize } from './lib/tokens.mjs';
+import { tokenize, type Token } from './lib/tokens.ts';
+import type { SourceFile } from './lib/source-files.ts';
 
-function functionSpans(tokens) {
-  const spans = [];
+type FunctionSpan = { ligneDebut: number; ligneFin: number };
+
+function functionSpans(tokens: Token[]): FunctionSpan[] {
+  const spans: FunctionSpan[] = [];
   for (let i = 0; i < tokens.length; i++) {
-    if (tokens[i].v !== 'function') continue;
+    if (tokens[i]!.v !== 'function') continue;
     let j = i;
-    while (j < tokens.length && tokens[j].v !== '{') j++;
+    while (j < tokens.length && tokens[j]!.v !== '{') j++;
     if (j >= tokens.length) break;
     let depth = 0;
     for (; j < tokens.length; j++) {
-      if (tokens[j].v === '{') depth++;
-      else if (tokens[j].v === '}' && --depth === 0) break;
+      if (tokens[j]!.v === '{') depth++;
+      else if (tokens[j]!.v === '}' && --depth === 0) break;
     }
-    spans.push({ ligneDebut: tokens[i].line, ligneFin: tokens[Math.min(j, tokens.length - 1)].line });
+    spans.push({ ligneDebut: tokens[i]!.line, ligneFin: tokens[Math.min(j, tokens.length - 1)]!.line });
     // on NE saute PAS jusqu'à la fin : les fonctions imbriquées doivent être
     // comptées elles aussi.
   }
   return spans;
 }
 
-const stats = (values) => {
+type Stats = { mediane: number; p90: number; max: number };
+
+const stats = (values: number[]): Stats => {
   if (values.length === 0) return { mediane: 0, p90: 0, max: 0 };
   const s = [...values].sort((a, b) => a - b);
   return {
-    mediane: s[Math.floor(s.length / 2)],
-    p90: s[Math.min(s.length - 1, Math.floor(s.length * 0.9))],
-    max: s[s.length - 1],
+    mediane: s[Math.floor(s.length / 2)]!,
+    p90: s[Math.min(s.length - 1, Math.floor(s.length * 0.9))]!,
+    max: s[s.length - 1]!,
   };
 };
 
-export function measure(files) {
-  const parFichier = files.map(file => ({
+type FichierMesure = {
+  path: string;
+  zone: string;
+  lignes: number;
+  exports: number;
+  fonctionsMotCleFunction: FunctionSpan[];
+};
+
+export function measure(files: SourceFile[]): {
+  parFichier: FichierMesure[];
+  distribution: { lignes: Stats; fonctionsMotCleFunction: Stats; exports: Stats };
+} {
+  const parFichier: FichierMesure[] = files.map(file => ({
     path: file.path,
     zone: file.zone,
     lignes: file.text.split('\n').length,

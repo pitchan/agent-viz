@@ -1,4 +1,4 @@
-// `runHook` (src/server/hook.ts) n'est importé que par `bin/agent-viz.js` : ce
+// `runHook` (src/server/hook.ts) n'est importé que par `src/server/cli.ts` : ce
 // fichier l'exerce comme le harnais le lance, en processus enfant, la charge sur
 // l'entrée standard.
 //

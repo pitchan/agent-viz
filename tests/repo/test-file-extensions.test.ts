@@ -36,9 +36,7 @@ const DOSSIERS_IGNORES = new Set(['node_modules', '.git', 'dist', '.superpowers'
 
 // Hors de tests/, aucun executeur ne lit un fichier de test : chaque exception
 // dit pourquoi elle existe, et une exception qui ne couvre plus rien doit sortir.
-const EXCEPTIONS = new Map([
-  ['docs/audit/scripts/', 'outillage de l audit date : il se rejoue a la main, aucune suite ne le lance'],
-]);
+const EXCEPTIONS = new Map<string, string>([]);
 
 function fichiersDeTest() {
   const acc: string[] = [];

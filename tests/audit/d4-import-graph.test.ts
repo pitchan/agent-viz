@@ -1,8 +1,8 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
-import { buildGraph, analyseGraph } from './d4-import-graph.mjs';
+import { expect, test } from 'vitest';
+import { buildGraph, analyseGraph } from '../../docs/audit/scripts/d4-import-graph.ts';
+import type { SourceFile } from '../../docs/audit/scripts/lib/source-files.ts';
 
-const FILES = [
+const FILES: SourceFile[] = [
   { path: 'lib/a.js', zone: 'server', text: `const b = require('./b.js');\nconst fs = require('node:fs');` },
   { path: 'lib/b.js', zone: 'server', text: `const c = require('./c');` },
   { path: 'lib/c.js', zone: 'server', text: `const a = require('./a.js');` },
@@ -11,51 +11,51 @@ const FILES = [
 ];
 
 test('contrôle positif : un spécificateur .js écrit dans un .ts résout vers le .ts', () => {
-  assert.deepEqual(buildGraph(FILES).edges.get('netgain/src/d.ts'), ['netgain/src/e.ts']);
+  expect(buildGraph(FILES).edges.get('netgain/src/d.ts')).toEqual(['netgain/src/e.ts']);
 });
 
 test('contrôle positif : un cycle de trois fichiers est trouvé', () => {
   const { cycles } = analyseGraph(FILES);
-  assert.equal(cycles.length, 1);
-  assert.deepEqual([...cycles[0]].sort(), ['lib/a.js', 'lib/b.js', 'lib/c.js']);
+  expect(cycles.length).toBe(1);
+  expect([...cycles[0]!].sort()).toEqual(['lib/a.js', 'lib/b.js', 'lib/c.js']);
 });
 
 test('contrôle positif : un import d’I/O est recensé', () => {
-  assert.deepEqual(analyseGraph(FILES).importsDIO.find(i => i.path === 'lib/a.js').modules, ['node:fs']);
+  expect(analyseGraph(FILES).importsDIO.find(i => i.path === 'lib/a.js')!.modules).toEqual(['node:fs']);
 });
 
 test('contrôle positif : un import relatif NON RÉSOLU est publié, pas avalé', () => {
   const { nonResolus } = analyseGraph([
     { path: 'lib/a.js', zone: 'server', text: `const z = require('./inexistant.js');` },
   ]);
-  assert.deepEqual(nonResolus, [{ path: 'lib/a.js', spec: './inexistant.js' }]);
+  expect(nonResolus).toEqual([{ path: 'lib/a.js', spec: './inexistant.js' }]);
 });
 
 test('contrôle négatif : un graphe sans cycle n’en invente pas', () => {
-  assert.equal(analyseGraph(FILES.slice(3)).cycles.length, 0);
+  expect(analyseGraph(FILES.slice(3)).cycles.length).toBe(0);
 });
 
 test('contrôle négatif : un require écrit dans un commentaire ne crée ni arête ni cycle', () => {
-  const files = [
+  const files: SourceFile[] = [
     { path: 'lib/a.js', zone: 'server', text: `// exemple d’API :\n//   const x = require('./a.js');\nconst b = require('./b.js');` },
     { path: 'lib/b.js', zone: 'server', text: `module.exports = {};` },
   ];
-  assert.deepEqual(buildGraph(files).edges.get('lib/a.js'), ['lib/b.js']);
-  assert.equal(analyseGraph(files).cycles.length, 0);
+  expect(buildGraph(files).edges.get('lib/a.js')).toEqual(['lib/b.js']);
+  expect(analyseGraph(files).cycles.length).toBe(0);
 });
 
 test('contrôle négatif : un « // » dans une chaîne littérale n’efface pas la fin de la ligne', () => {
-  const files = [
+  const files: SourceFile[] = [
     { path: 'lib/a.js', zone: 'server', text: `const url = 'https://exemple.test'; const b = require('./b.js');` },
     { path: 'lib/b.js', zone: 'server', text: `module.exports = {};` },
   ];
-  assert.deepEqual(buildGraph(files).edges.get('lib/a.js'), ['lib/b.js']);
+  expect(buildGraph(files).edges.get('lib/a.js')).toEqual(['lib/b.js']);
 });
 
 test('contrôle négatif : une regex à guillemet ne fait plus échapper le commentaire qui la suit', () => {
-  const files = [
+  const files: SourceFile[] = [
     { path: 'lib/a.js', zone: 'server', text: `const re = /doesn't/;\n// exemple : require('./a.js')\nconst b = require('./b.js');` },
     { path: 'lib/b.js', zone: 'server', text: `module.exports = {};` },
   ];
-  assert.deepEqual(buildGraph(files).edges.get('lib/a.js'), ['lib/b.js']);
+  expect(buildGraph(files).edges.get('lib/a.js')).toEqual(['lib/b.js']);
 });

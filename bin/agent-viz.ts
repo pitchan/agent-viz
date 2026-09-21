@@ -29,11 +29,11 @@ const PKG_VERSION = pkg.version;
 // successes, hint=cyan for pointers/URLs, dim=gray for technical detail
 // (paths, pids, scopes), warn=yellow for soft warnings, err=red for errors.
 const c = {
-  ok:   (s) => styleText('green',  s),
-  hint: (s) => styleText('cyan',   s),
-  dim:  (s) => styleText('gray',   s),
-  warn: (s) => styleText('yellow', s),
-  err:  (s) => styleText('red',    s),
+  ok:   (s: string) => styleText('green',  s),
+  hint: (s: string) => styleText('cyan',   s),
+  dim:  (s: string) => styleText('gray',   s),
+  warn: (s: string) => styleText('yellow', s),
+  err:  (s: string) => styleText('red',    s),
 };
 
 // Copie de TARGETS du registre : l'analyse des options la vérifie avant de
@@ -71,7 +71,7 @@ Before changing or deleting a hooks file, agent-viz copies it to ~/.agent-viz/ba
 // Les options que chaque sous-commande accepte. `hook` n'y figure pas : Claude
 // Code bloque l'outil en cours sur un code 2, et hook.ts lit seul ses arguments.
 // parseArgs ignore la clé `choices` : parseCommandOptions la vérifie après lui.
-const COMMAND_OPTIONS = {
+const COMMAND_OPTIONS: Record<string, any> = {
   start: {
     port: { type: 'string' },
     foreground: { type: 'boolean' },
@@ -95,15 +95,15 @@ const COMMAND_OPTIONS = {
   },
 };
 
-function wantsHelp(argv) {
+function wantsHelp(argv: string[]) {
   return argv.includes('--help') || argv.includes('-h') || argv[0] === 'help';
 }
 
-function wantsVersion(argv) {
+function wantsVersion(argv: string[]) {
   return argv.includes('--version') || argv.includes('-v');
 }
 
-function refuseOption(cmd, reason) {
+function refuseOption(cmd: string, reason: string): never {
   console.error(`${c.err('✗')} ${cmd}: ${reason}`);
   console.error("  Run 'agent-viz --help' to list the options.");
   process.exit(2);
@@ -112,12 +112,12 @@ function refuseOption(cmd, reason) {
 // Une option non déclarée est refusée avant tout effet : ignorée, une faute de
 // frappe comme `stop --keep-hook` retirait les hooks sans un mot. Même refus pour
 // une valeur hors de `choices` : `--target=cloude` agirait sur les agents détectés.
-function parseCommandOptions(cmd, args) {
-  const options = COMMAND_OPTIONS[cmd];
-  let values;
+function parseCommandOptions(cmd: string, args: string[]) {
+  const options: Record<string, any> = COMMAND_OPTIONS[cmd];
+  let values: any;
   try {
     values = parseArgs({ args, options, strict: true, allowPositionals: false, allowNegative: true }).values;
-  } catch (e) {
+  } catch (e: any) {
     if (!String(e.code).startsWith('ERR_PARSE_ARGS_')) throw e;
     refuseOption(cmd, e.message.split('. ')[0]);
   }
@@ -133,9 +133,9 @@ function parseCommandOptions(cmd, args) {
 // Mtime le plus recent parmi les `.ts` sous `dir`, recursif. 0 si `dir`
 // n'existe pas ou ne contient aucun `.ts` — un plancher neutre pour la
 // comparaison de `ensureBuildIsFresh`, jamais lu comme une vraie date.
-function newestTsMtime(dir) {
+function newestTsMtime(dir: string): number {
   let max = 0;
-  let entries;
+  let entries: fs.Dirent[];
   try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return max; }
   for (const entry of entries) {
     const p = path.join(dir, entry.name);
@@ -168,7 +168,7 @@ const REQUIRED_DIST_FILES = [
 // Une seule garde avant le branchement : les commandes plus bas chargent dist/*.js.
 // Fichier compile absent = fatal, rien ne peut tourner. Source .ts plus recente que
 // le temoin de tsc -b = avertissement : la commande servirait l'ancien code sans un mot.
-function ensureBuildIsFresh(cmd) {
+function ensureBuildIsFresh(cmd: string) {
   const isDevRepo = fs.existsSync(path.join(PKG_ROOT, 'src', 'server'));
   const missing = REQUIRED_DIST_FILES.filter(f => !fs.existsSync(f));
   if (missing.length > 0) {
@@ -183,7 +183,7 @@ function ensureBuildIsFresh(cmd) {
   if (!isDevRepo || cmd === 'hook') return;
 
   const witness = path.join(PKG_ROOT, 'dist', 'tsconfig.build.tsbuildinfo');
-  let witnessMtime;
+  let witnessMtime: number;
   try {
     witnessMtime = fs.statSync(witness).mtimeMs;
   } catch {
@@ -207,7 +207,7 @@ function ensureBuildIsFresh(cmd) {
 // the first agent-viz invocation, persisted via a sentinel file in
 // ~/.agent-viz/. Skipped for the internal `hook` subcommand (would
 // pollute the event hot path); --help and --version never reach it.
-function showFirstRunWelcomeIfNeeded(argv) {
+function showFirstRunWelcomeIfNeeded(argv: string[]) {
   if (argv[0] === 'hook') return;
   const sentinelDir = path.join(os.homedir(), '.agent-viz');
   const sentinel = path.join(sentinelDir, '.welcomed');

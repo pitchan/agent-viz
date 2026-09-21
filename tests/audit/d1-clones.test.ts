@@ -1,6 +1,5 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
-import { findClones } from './d1-clones.mjs';
+import { expect, test } from 'vitest';
+import { findClones } from '../../docs/audit/scripts/d1-clones.ts';
 
 const CLONE = `
 function computeSomething(list, factor) {
@@ -19,10 +18,10 @@ test('contrôle positif : un bloc recopié dans deux fichiers est trouvé une se
     { path: 'a.js', zone: 'server', text: `const x = 1;\n${CLONE}` },
     { path: 'b.js', zone: 'web', text: `const y = 2;\n${CLONE}` },
   ]);
-  assert.equal(groups.length, 1, `fenêtres non fusionnées : ${groups.length} groupes`);
-  assert.deepEqual(groups[0].sites.map(s => s.path).sort(), ['a.js', 'b.js']);
-  assert.equal(groups[0].interZone, true);
-  assert.ok(groups[0].jetons > 60, 'le fragment fusionné dépasse une fenêtre');
+  expect(groups.length, `fenêtres non fusionnées : ${groups.length} groupes`).toBe(1);
+  expect(groups[0]!.sites.map(s => s.path).sort()).toEqual(['a.js', 'b.js']);
+  expect(groups[0]!.interZone).toBe(true);
+  expect(groups[0]!.jetons > 60, 'le fragment fusionné dépasse une fenêtre').toBeTruthy();
 });
 
 test('contrôle négatif : deux fichiers qui ne partagent que trois lignes ne sont pas groupés', () => {
@@ -31,11 +30,11 @@ test('contrôle négatif : deux fichiers qui ne partagent que trois lignes ne so
     { path: 'a.js', zone: 'server', text: petit },
     { path: 'b.js', zone: 'server', text: petit },
   ]);
-  assert.equal(groups.length, 0);
+  expect(groups.length).toBe(0);
 });
 
 test('contrôle négatif : un même fichier ne se clone pas avec lui-même', () => {
-  assert.equal(findClones([{ path: 'a.js', zone: 'server', text: CLONE }]).length, 0);
+  expect(findClones([{ path: 'a.js', zone: 'server', text: CLONE }]).length).toBe(0);
 });
 
 test('contrôle négatif : deux fragments de contenu différent ne sont jamais groupés', () => {
@@ -51,5 +50,5 @@ test('contrôle négatif : deux fragments de contenu différent ne sont jamais g
     { path: 'a.js', zone: 'server', text: a },
     { path: 'b.js', zone: 'server', text: b },
   ]);
-  assert.equal(groups.length, 0, 'contenus différents groupés à tort');
+  expect(groups.length, 'contenus différents groupés à tort').toBe(0);
 });

@@ -1,8 +1,8 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
-import { verifyMatrix } from './d7-boundary.mjs';
+import { expect, test } from 'vitest';
+import { verifyMatrix } from '../../docs/audit/scripts/d7-boundary.ts';
+import type { SourceFile } from '../../docs/audit/scripts/lib/source-files.ts';
 
-const FILES = [
+const FILES: SourceFile[] = [
   { path: 'lib/server/transcript.js', zone: 'server', text: `const lines = content.split('\\n');` },
   { path: 'netgain/src/core/jsonl.ts', zone: 'engine', text: `const lines = text.split('\\n');` },
 ];
@@ -13,9 +13,9 @@ test('contrôle positif : une matrice exacte est déclarée cohérente', () => {
     motif: /\.split\((['"`])\\n\1\)/,
     coteServeur: ['lib/server/transcript.js'], coteMoteur: ['netgain/src/core/jsonl.ts'],
   }]);
-  assert.equal(r.coherente, true);
-  assert.deepEqual(r.gestes[0].sitesManquants, []);
-  assert.deepEqual(r.gestes[0].sitesInattendus, []);
+  expect(r.coherente).toBe(true);
+  expect(r.gestes[0]!.sitesManquants).toEqual([]);
+  expect(r.gestes[0]!.sitesInattendus).toEqual([]);
 });
 
 test('contrôle négatif : un site déclaré qui n’existe plus fait ÉCHOUER la vérification', () => {
@@ -24,8 +24,8 @@ test('contrôle négatif : un site déclaré qui n’existe plus fait ÉCHOUER l
     motif: /\.split\((['"`])\\n\1\)/,
     coteServeur: ['lib/server/disparu.js'], coteMoteur: ['netgain/src/core/jsonl.ts'],
   }]);
-  assert.equal(r.coherente, false);
-  assert.deepEqual(r.gestes[0].sitesManquants, ['lib/server/disparu.js']);
+  expect(r.coherente).toBe(false);
+  expect(r.gestes[0]!.sitesManquants).toEqual(['lib/server/disparu.js']);
 });
 
 test('contrôle négatif : un site NON DÉCLARÉ qui correspond au motif est signalé', () => {
@@ -34,6 +34,6 @@ test('contrôle négatif : un site NON DÉCLARÉ qui correspond au motif est sig
     motif: /\.split\((['"`])\\n\1\)/,
     coteServeur: ['lib/server/transcript.js'], coteMoteur: ['netgain/src/core/jsonl.ts'],
   }]);
-  assert.equal(r.coherente, false);
-  assert.deepEqual(r.gestes[0].sitesInattendus, ['lib/server/nouveau.js']);
+  expect(r.coherente).toBe(false);
+  expect(r.gestes[0]!.sitesInattendus).toEqual(['lib/server/nouveau.js']);
 });

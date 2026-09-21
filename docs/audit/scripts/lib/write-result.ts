@@ -10,10 +10,10 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const git = (root, args) =>
+const git = (root: string, args: string[]): string =>
   execFileSync('git', ['-C', root, ...args], { encoding: 'utf8' }).trim();
 
-export function writeResult(root, name, payload) {
+export function writeResult(root: string, name: string, payload: object): string {
   const dir = join(root, 'docs', 'audit', 'resultats');
   mkdirSync(dir, { recursive: true });
   const file = join(dir, `${name}.json`);
@@ -32,4 +32,4 @@ export function writeResult(root, name, payload) {
 
 // Les clés que la comparaison de rejouabilité doit ignorer : elles changent à
 // chaque exécution sans que le constat change.
-export const CLES_VOLATILES = ['commitOutils', 'genereLe', 'node', 'nonSuivis'];
+export const CLES_VOLATILES: string[] = ['commitOutils', 'genereLe', 'node', 'nonSuivis'];

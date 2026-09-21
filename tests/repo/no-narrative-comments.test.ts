@@ -100,6 +100,16 @@ const LISTE_BLANCHE = [
     fragment: 'changes tariff on',
     raison: "le test compte les jetons au tarif de lancement puis au tarif catalogue : cette date sépare les deux",
   },
+  {
+    fichier: 'tests/audit/d1-clones.test.ts',
+    fragment: "l'étape 2 regroupe sur la séquence de jetons",
+    raison: "« étape 2 » nomme une étape de l'algorithme du détecteur de clones, pas une étape de chantier : c'est le mécanisme que ce test décrit",
+  },
+  {
+    fichier: 'tests/audit/verite-terrain.test.ts',
+    fragment: 'établis À LA MAIN le',
+    raison: "la date du relevé à la main est la donnée qui identifie le jeu de référence auquel ce test compare les détecteurs",
+  },
 ];
 
 function fichiersBalayes() {

@@ -27,7 +27,7 @@ export function isAgentName(v: string): v is AgentName {
 }
 
 // Les valeurs valides de `target` : un agent du registre, ou 'both' pour tous.
-// bin/agent-viz.js en garde une copie, qu'il valide avant de charger dist/ ;
+// bin/agent-viz.ts en garde une copie, qu'il valide avant de charger dist/ ;
 // ses tests la comparent à celle-ci.
 export const TARGETS: readonly Target[] = [...(Object.keys(INSTALLERS) as AgentName[]), 'both'];
 

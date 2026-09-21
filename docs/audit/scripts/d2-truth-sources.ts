@@ -32,17 +32,22 @@
 //      donc n'a plus qu'une seule définition, donc disparaît des candidats.
 //      Une omission ne laisse aucune trace dans le résultat — c'est la raison
 //      d'être de cette ligne.
-const EXTRACTEURS = [
+import type { SourceFile } from './lib/source-files.ts';
+
+type Extraction = { cle: string; valeur: string };
+type Extracteur = { categorie: string; extraire: (text: string) => Extraction[] };
+
+const EXTRACTEURS: Extracteur[] = [
   {
     categorie: 'tarif-de-modele',
     extraire(text) {
-      const out = [];
+      const out: Extraction[] = [];
       for (const m of text.matchAll(/['"`](claude-[a-z0-9.-]+)['"`]\s*:\s*\{([^{}]{0,400})\}/g)) {
-        const taux = {};
-        for (const r of m[2].matchAll(/\b(input|output|cacheCreate|cacheRead|maxInput)\s*:\s*([0-9._e+-]+)/g)) {
-          taux[r[1]] = r[2];
+        const taux: Record<string, string> = {};
+        for (const r of m[2]!.matchAll(/\b(input|output|cacheCreate|cacheRead|maxInput)\s*:\s*([0-9._e+-]+)/g)) {
+          taux[r[1]!] = r[2]!;
         }
-        if (Object.keys(taux).length >= 2) out.push({ cle: m[1], valeur: JSON.stringify(taux) });
+        if (Object.keys(taux).length >= 2) out.push({ cle: m[1]!, valeur: JSON.stringify(taux) });
       }
       return out;
     },
@@ -50,16 +55,16 @@ const EXTRACTEURS = [
   {
     categorie: 'seuil-de-regle',
     extraire(text) {
-      const out = [];
+      const out: Extraction[] = [];
       for (const m of text.matchAll(/\b(R[1-9])\s*:\s*(?:Object\.freeze\(\s*)?\{([^{}]{0,300})\}/g)) {
-        const seuils = {};
+        const seuils: Record<string, string> = {};
         // Le terminateur est une virgule OU la fin du fragment capturé : le
         // dernier seuil d'un objet n'est suivi d'aucune virgule, et exiger
         // `[,}]` le faisait disparaître — donc l'objet entier avec lui.
-        for (const r of m[2].matchAll(/\b([a-zA-Z]\w*)\s*:\s*([0-9._e*+ -]+?)\s*(?:,|$)/g)) {
-          seuils[r[1]] = r[2].trim();
+        for (const r of m[2]!.matchAll(/\b([a-zA-Z]\w*)\s*:\s*([0-9._e*+ -]+?)\s*(?:,|$)/g)) {
+          seuils[r[1]!] = r[2]!.trim();
         }
-        if (Object.keys(seuils).length >= 1) out.push({ cle: m[1], valeur: JSON.stringify(seuils) });
+        if (Object.keys(seuils).length >= 1) out.push({ cle: m[1]!, valeur: JSON.stringify(seuils) });
       }
       return out;
     },
@@ -67,9 +72,9 @@ const EXTRACTEURS = [
   {
     categorie: 'code-d-evenement',
     extraire(text) {
-      const out = [];
+      const out: Extraction[] = [];
       for (const m of text.matchAll(/(?:type|kind|event|ruleId)\s*===\s*['"]([\w.-]+)['"]|case\s+['"]([\w.-]+)['"]\s*:/g)) {
-        out.push({ cle: m[1] ?? m[2], valeur: 'branche' });
+        out.push({ cle: (m[1] ?? m[2])!, valeur: 'branche' });
       }
       return out;
     },
@@ -77,33 +82,41 @@ const EXTRACTEURS = [
   {
     categorie: 'chemin-litteral',
     extraire(text) {
-      const out = [];
+      const out: Extraction[] = [];
       for (const m of text.matchAll(/['"`](\.claude|\.claude\.json|\.agent-viz|\.copilot|projects|subagents)['"`]/g)) {
-        out.push({ cle: m[1], valeur: 'litteral' });
+        out.push({ cle: m[1]!, valeur: 'litteral' });
       }
       return out;
     },
   },
 ];
 
-export function findTruthSources(files) {
-  const index = new Map();
+type Candidat = {
+  categorie: string;
+  cle: string;
+  definitions: { path: string; valeur: string }[];
+  valeursDistinctes: number;
+  niveau: null;
+};
+
+export function findTruthSources(files: SourceFile[]): Candidat[] {
+  const index = new Map<string, Map<string, string>>();
   for (const file of files) {
     for (const { categorie, extraire } of EXTRACTEURS) {
       for (const { cle, valeur } of extraire(file.text)) {
         const k = `${categorie}\u0000${cle}`;
         if (!index.has(k)) index.set(k, new Map());
-        index.get(k).set(file.path, valeur);
+        index.get(k)!.set(file.path, valeur);
       }
     }
   }
-  const candidats = [];
+  const candidats: Candidat[] = [];
   for (const [k, parFichier] of index) {
     if (parFichier.size < 2) continue;
     const [categorie, cle] = k.split('\u0000');
     const definitions = [...parFichier].map(([path, valeur]) => ({ path, valeur })).sort((a, b) => a.path.localeCompare(b.path));
     candidats.push({
-      categorie, cle, definitions,
+      categorie: categorie!, cle: cle!, definitions,
       valeursDistinctes: new Set(definitions.map(d => d.valeur)).size,
       niveau: null,
     });

@@ -31,6 +31,7 @@ const EXCLUS = [
   // qu ils ont mesure. Les reecrire mentirait sur la mesure.
   'docs/audit-qualite-code.md',
   'docs/audit/',
+  'tests/audit/',
   // Plans et specs DATES, du meme genre — et git-ignores.
   'docs/superpowers/',
   // Ce fichier-ci : la liste blanche cite NECESSAIREMENT ce qu elle protege, et

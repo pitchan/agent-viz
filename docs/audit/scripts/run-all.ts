@@ -6,19 +6,19 @@
 // vérifiés pour la stabilité.
 //
 // Usage :
-//   node docs/audit/scripts/run-all.mjs             régénère
-//   node docs/audit/scripts/run-all.mjs --comparer  régénère puis compare aux
+//   node docs/audit/scripts/run-all.ts             régénère
+//   node docs/audit/scripts/run-all.ts --comparer  régénère puis compare aux
 //                                                   résultats déjà committés
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { CLES_VOLATILES } from './lib/write-result.mjs';
-import { DETECTORS, ROOT, runOne } from './run.mjs';
+import { CLES_VOLATILES } from './lib/write-result.ts';
+import { DETECTORS, ROOT, runOne } from './run.ts';
 
 const NOMS = Object.keys(DETECTORS);
-const chemin = (n) => resolve(ROOT, `docs/audit/resultats/${n}.json`);
+const chemin = (n: string) => resolve(ROOT, `docs/audit/resultats/${n}.json`);
 
-const stable = (obj) => {
+const stable = (obj: Record<string, unknown>): string => {
   const copie = { ...obj };
   for (const cle of CLES_VOLATILES) delete copie[cle];
   return JSON.stringify(copie);
@@ -26,7 +26,7 @@ const stable = (obj) => {
 
 const comparer = process.argv.includes('--comparer');
 const avant = comparer
-  ? new Map(NOMS.map(n => [n, stable(JSON.parse(readFileSync(chemin(n), 'utf8')))]))
+  ? new Map(NOMS.map((n): [string, string] => [n, stable(JSON.parse(readFileSync(chemin(n), 'utf8')))]))
   : null;
 
 process.stderr.write('couverture d’exécution…\n');
@@ -46,7 +46,7 @@ if (comparer) {
   let divergents = 0;
   for (const nom of NOMS) {
     const apres = stable(JSON.parse(readFileSync(chemin(nom), 'utf8')));
-    if (apres !== avant.get(nom)) { divergents++; process.stderr.write(`DIVERGENT : ${nom}\n`); }
+    if (apres !== avant!.get(nom)) { divergents++; process.stderr.write(`DIVERGENT : ${nom}\n`); }
   }
   process.stderr.write(divergents === 0 ? 'les sept résultats sont identiques\n' : `${divergents} détecteur(s) instables\n`);
   process.exit(divergents === 0 ? 0 : 1);

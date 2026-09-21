@@ -66,29 +66,30 @@
 // ce commit, et non reproductible par le rapporteur `lcov` de Node tant
 // qu'un chemin porte `LF:>0` (il émet alors toujours au moins une `DA:` par
 // bloc).
-import { buildGraph } from './d4-import-graph.mjs';
+import { buildGraph } from './d4-import-graph.ts';
+import type { SourceFile } from './lib/source-files.ts';
 
-export function parseLcov(text) {
-  const files = new Map();
-  let current = null;
+export function parseLcov(text: string): Map<string, { hit: number; found: number }> {
+  const files = new Map<string, { hit: number; found: number; lignes: Map<number, boolean> }>();
+  let current: string | null = null;
   for (const line of text.split('\n')) {
     if (line.startsWith('SF:')) {
       current = line.slice(3).trim().split('\\').join('/');
       if (!files.has(current)) files.set(current, { hit: 0, found: 0, lignes: new Map() });
     } else if (current && line.startsWith('LH:')) {
-      files.get(current).hit = Number(line.slice(3));
+      files.get(current)!.hit = Number(line.slice(3));
     } else if (current && line.startsWith('LF:')) {
-      files.get(current).found = Number(line.slice(3));
+      files.get(current)!.found = Number(line.slice(3));
     } else if (current && line.startsWith('DA:')) {
-      const [numero, compte] = line.slice(3).split(',').map(Number);
-      const lignes = files.get(current).lignes;
+      const [numero, compte] = line.slice(3).split(',').map(Number) as [number, number];
+      const lignes = files.get(current)!.lignes;
       // OU logique, commutatif et associatif : une ligne couverte par
       // N'IMPORTE LEQUEL des blocs du chemin reste couverte dans l'union,
       // quel que soit l'ordre dans lequel les blocs sont lus.
       lignes.set(numero, (lignes.get(numero) ?? false) || compte > 0);
     }
   }
-  const result = new Map();
+  const result = new Map<string, { hit: number; found: number }>();
   for (const [path, entry] of files) {
     if (entry.lignes.size > 0) {
       const hit = [...entry.lignes.values()].filter(Boolean).length;
@@ -100,10 +101,18 @@ export function parseLcov(text) {
   return result;
 }
 
-export function coverageReport(files, tests, lcovText) {
+export type CoverageReport = {
+  executee: { path: string; lignesCouvertes: number; lignesTotales: number }[];
+  sansPreuveDExecution: string[];
+  atteignableStatiquement: string[];
+  inatteignable: string[];
+  limites: string[];
+};
+
+export function coverageReport(files: SourceFile[], tests: SourceFile[], lcovText: string): CoverageReport {
   const lcov = parseLcov(lcovText);
-  const executee = [];
-  const sansPreuveDExecution = [];
+  const executee: { path: string; lignesCouvertes: number; lignesTotales: number }[] = [];
+  const sansPreuveDExecution: string[] = [];
   for (const file of files) {
     if (file.zone === 'engine') continue;
     const hit = lcov.get(file.path);
@@ -113,8 +122,8 @@ export function coverageReport(files, tests, lcovText) {
 
   const engine = files.filter(f => f.zone === 'engine');
   const { edges } = buildGraph([...engine, ...tests]);
-  const reachable = new Set();
-  const visit = (node) => {
+  const reachable = new Set<string>();
+  const visit = (node: string): void => {
     for (const next of edges.get(node) ?? []) {
       if (reachable.has(next)) continue;
       reachable.add(next);

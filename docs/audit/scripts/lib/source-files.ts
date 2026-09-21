@@ -5,13 +5,16 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { extname, join, relative, sep } from 'node:path';
 
-export const ZONES = [
+export type Zone = { name: string; roots: string[] };
+export type SourceFile = { path: string; zone: string; text: string };
+
+export const ZONES: Zone[] = [
   { name: 'server', roots: ['lib', 'bin'] },
   { name: 'web', roots: ['public'] },
   { name: 'engine', roots: ['netgain/src'] },
 ];
 
-export const TEST_ZONES = [
+export const TEST_ZONES: Zone[] = [
   { name: 'tests-server', roots: ['tests/unit'] },
   { name: 'tests-engine', roots: ['netgain/tests'] },
 ];
@@ -19,7 +22,7 @@ export const TEST_ZONES = [
 const EXTENSIONS = new Set(['.js', '.mjs', '.cjs', '.ts']);
 const IGNORED = new Set(['node_modules', 'dist', 'fixtures', '.git', 'docs']);
 
-function walk(dir, out) {
+function walk(dir: string, out: string[]): void {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (IGNORED.has(entry.name)) continue;
     const full = join(dir, entry.name);
@@ -28,13 +31,13 @@ function walk(dir, out) {
   }
 }
 
-function collect(root, zones) {
-  const files = [];
+function collect(root: string, zones: Zone[]): SourceFile[] {
+  const files: SourceFile[] = [];
   for (const zone of zones) {
     for (const relRoot of zone.roots) {
       const abs = join(root, relRoot);
       if (!existsSync(abs)) continue;
-      const found = [];
+      const found: string[] = [];
       walk(abs, found);
       for (const full of found) {
         files.push({
@@ -48,5 +51,5 @@ function collect(root, zones) {
   return files;
 }
 
-export const sources = (root) => collect(root, ZONES);
-export const testFiles = (root) => collect(root, TEST_ZONES);
+export const sources = (root: string): SourceFile[] => collect(root, ZONES);
+export const testFiles = (root: string): SourceFile[] => collect(root, TEST_ZONES);

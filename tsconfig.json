@@ -29,7 +29,7 @@
   // deplace). Ce projet n a pas de rootDir : N IMPORTE QUELLE entree hors src/engine
   // suffit a deplacer toutes les sorties (tests/** et vitest.config.mts l interdisent
   // ici ; rootDir vit dans tsconfig.build.json a la place).
-  "include": ["src/server/**/*.ts", "src/engine/**/*.ts", "src/web/**/*.ts", "tests/**/*.ts", "test-support/**/*.ts", "vitest.config.mts"],
+  "include": ["src/server/**/*.ts", "src/engine/**/*.ts", "src/web/**/*.ts", "tests/**/*.ts", "test-support/**/*.ts", "vitest.config.mts", "bin/agent-viz.ts", "docs/audit/scripts/**/*.ts"],
   // Un `exclude` explicite REMPLACE le defaut de tsc au lieu de s'y ajouter :
   // les trois dossiers par defaut et le outDir reviennent ici en dur, pour que
   // l'`include` elargi de la tache suivante ne les perde pas en silence.

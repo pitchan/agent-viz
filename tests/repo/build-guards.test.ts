@@ -202,9 +202,9 @@ test('dist/server/server.js manquant : la garde arrete, sans laisser voir « Can
 test('la liste du bac a sable est le miroir exact de REQUIRED_DIST_FILES', () => {
   // Arrange
   const source = fs.readFileSync(
-    path.join(import.meta.dirname, '..', '..', 'bin', 'agent-viz.js'), 'utf8');
+    path.join(import.meta.dirname, '..', '..', 'bin', 'agent-viz.ts'), 'utf8');
   const bloc = source.split('const REQUIRED_DIST_FILES = [')[1]?.split('].map(')[0];
-  expect(bloc, 'REQUIRED_DIST_FILES introuvable dans bin/agent-viz.js').toBeTruthy();
+  expect(bloc, 'REQUIRED_DIST_FILES introuvable dans bin/agent-viz.ts').toBeTruthy();
 
   // Act
   const declares = [...bloc!.matchAll(/\[([^\]]*)\]/g)]

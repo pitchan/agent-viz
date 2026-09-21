@@ -25,7 +25,9 @@
 // qu'il en soit une ou non (ex. un séparateur de fin de motif quelconque) ;
 // et un formatage monétaire écrit sans `$` ni `USD` reste invisible à cette
 // famille.
-export const PRIMITIVES = [
+import type { SourceFile } from './lib/source-files.ts';
+
+export const PRIMITIVES: { nom: string; re: RegExp }[] = [
   { nom: 'appel-http-client', re: /\bfetch\s*\(|\bhttps?\.(?:get|request)\s*\(/g },
   { nom: 'lecture-json-de-fichier', re: /JSON\.parse\s*\(/g },
   { nom: 'decodage-jsonl', re: /\.split\((['"`])\\n\1\)|createInterface\s*\(/g },
@@ -40,16 +42,19 @@ export const PRIMITIVES = [
   { nom: 'declaration-de-formateur', re: /\b(?:function\s+|const\s+)(format[A-Z]\w*)\s*[=(]/g },
 ];
 
-const lineOf = (text, index) => {
+const lineOf = (text: string, index: number): number => {
   let line = 1;
   for (let i = 0; i < index; i++) if (text[i] === '\n') line++;
   return line;
 };
 
-export function findManyPaths(files) {
-  const result = [];
+type Site = { path: string; zone: string; line: number };
+type ManyPaths = { primitive: string; sites: Site[]; fichiersDistincts: number };
+
+export function findManyPaths(files: SourceFile[]): ManyPaths[] {
+  const result: ManyPaths[] = [];
   for (const { nom, re } of PRIMITIVES) {
-    const sites = [];
+    const sites: Site[] = [];
     for (const file of files) {
       for (const match of file.text.matchAll(new RegExp(re.source, re.flags))) {
         sites.push({ path: file.path, zone: file.zone, line: lineOf(file.text, match.index) });

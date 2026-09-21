@@ -18,7 +18,8 @@
     "vitest": "^3.2.0"
   },
   "files": [
-    "bin/",
+    "bin/agent-viz.js",
+    "bin/agent-viz.js.map",
     "dist/server/",
     "src/web/",
     "src/engine/core/tool-subject.ts",
@@ -34,7 +35,7 @@
     "start": "node bin/agent-viz.js start --foreground",
     "stop": "node bin/agent-viz.js stop",
     "status": "node bin/agent-viz.js status",
-    "build": "node -e \"['dist/engine','dist/server'].forEach(d=>require('fs').rmSync(d,{recursive:true,force:true}))\" && tsc -b tsconfig.build.json",
+    "build": "node -e \"['dist/engine','dist/server','bin/agent-viz.js'].forEach(d=>require('fs').rmSync(d,{recursive:true,force:true}))\" && tsc -b tsconfig.build.json && tsc -p tsconfig.bin.json",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "prepare": "npm run build",

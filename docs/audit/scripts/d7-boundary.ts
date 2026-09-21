@@ -37,7 +37,18 @@
 //      seule la disparition d'un site déclaré (`sitesManquants`) est
 //      vérifiable. C'est le prix d'un fait qu'aucune expression rationnelle ne
 //      capture (« pousser transcript_path » n'est pas un motif textuel).
-export const MATRICE = [
+import type { SourceFile } from './lib/source-files.ts';
+
+export type MatriceEntry = {
+  geste: string;
+  verdict: string;
+  raison: string;
+  motif: RegExp | null;
+  coteServeur: string[];
+  coteMoteur: string[];
+};
+
+export const MATRICE: MatriceEntry[] = [
   {
     geste: 'decouverte-de-sessions',
     verdict: 'strategies-opposees',
@@ -154,7 +165,20 @@ export const MATRICE = [
   },
 ];
 
-export function verifyMatrix(files, matrice = MATRICE) {
+export type VerifyResult = {
+  gestes: {
+    geste: string;
+    verdict: string;
+    raison: string;
+    coteServeur: string[];
+    coteMoteur: string[];
+    sitesManquants: string[];
+    sitesInattendus: string[];
+  }[];
+  coherente: boolean;
+};
+
+export function verifyMatrix(files: SourceFile[], matrice: MatriceEntry[] = MATRICE): VerifyResult {
   const byPath = new Map(files.map(f => [f.path, f]));
   const gestes = matrice.map((entry) => {
     const declares = new Set([...entry.coteServeur, ...entry.coteMoteur]);
@@ -163,7 +187,7 @@ export function verifyMatrix(files, matrice = MATRICE) {
       ? files
         .filter(f => (f.zone === 'server' || f.zone === 'engine')
           && !declares.has(f.path)
-          && new RegExp(entry.motif.source, entry.motif.flags).test(f.text))
+          && new RegExp(entry.motif!.source, entry.motif!.flags).test(f.text))
         .map(f => f.path).sort()
       : [];
     return {

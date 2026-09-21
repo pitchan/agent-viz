@@ -95,8 +95,10 @@
 const PATTERN =
   /\/\*[\s\S]*?\*\/|\/\/[^\n]*|(?<!\)\s*|\]\s*|[0-9][0-9_]*(?:\.[0-9_]*)?\s*|\b(?!(?:return|typeof|instanceof|delete|void|throw|case|new|do|else|yield|await|in|default|extends)\b)[A-Za-z_$][\w$]*\s*)\/(?![*\/])(?:\\.|\[(?:\\.|[^\]\n])*\]|[^\/\\\n])+\/[dgimsuvy]*|`(?:\\[\s\S]|[^`\\])*`|'(?:\\[\s\S]|[^'\\])*'|"(?:\\[\s\S]|[^"\\])*"|[A-Za-z_$][\w$]*|\d[\d_]*(?:\.\d[\d_]*)?|\S/g;
 
-export function tokenize(text) {
-  const out = [];
+export type Token = { v: string; line: number };
+
+export function tokenize(text: string): Token[] {
+  const out: Token[] = [];
   let line = 1;
   let cursor = 0;
   for (const match of text.matchAll(PATTERN)) {

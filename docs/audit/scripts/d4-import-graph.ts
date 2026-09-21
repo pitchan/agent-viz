@@ -88,6 +88,8 @@
 // lib/source-files.mjs) ne résout jamais et finit dans `nonResolus` sans être
 // une faute de frappe. Constaté sur `lib/server/observatory/engine.js` →
 // `../../../package.json`.
+import type { SourceFile } from './lib/source-files.ts';
+
 const SPEC = /(?:^|[\s;{(])(?:import|export)\s[^'"()]*?from\s*['"]([^'"]+)['"]|(?:^|[\s;{(=])require\s*\(\s*['"]([^'"]+)['"]\s*\)|(?:^|[\s;{(=])import\s*\(\s*['"]([^'"]+)['"]\s*\)|(?:^|[\s;{(])import\s*['"]([^'"]+)['"]/g;
 
 const IO_MODULES = new Set([
@@ -96,10 +98,10 @@ const IO_MODULES = new Set([
   'child_process', 'node:child_process', 'net', 'node:net',
 ]);
 
-const dirOf = (p) => p.slice(0, p.lastIndexOf('/'));
+const dirOf = (p: string): string => p.slice(0, p.lastIndexOf('/'));
 
-function normalise(base, spec) {
-  const out = [];
+function normalise(base: string, spec: string): string {
+  const out: string[] = [];
   for (const part of `${base}/${spec}`.split('/')) {
     if (part === '.' || part === '') continue;
     if (part === '..') out.pop();
@@ -115,18 +117,24 @@ function normalise(base, spec) {
 const COMMENTAIRE_OU_CHAINE =
   /\/\*[\s\S]*?\*\/|\/\/[^\n]*|(?<!\)\s*|\]\s*|[0-9][0-9_]*(?:\.[0-9_]*)?\s*|\b(?!(?:return|typeof|instanceof|delete|void|throw|case|new|do|else|yield|await|in|default|extends)\b)[A-Za-z_$][\w$]*\s*)\/(?![*\/])(?:\\.|\[(?:\\.|[^\]\n])*\]|[^\/\\\n])+\/[dgimsuvy]*|`(?:\\[\s\S]|[^`\\])*`|'(?:\\[\s\S]|[^'\\])*'|"(?:\\[\s\S]|[^"\\])*"/g;
 
-const sansCommentaires = (text) =>
+const sansCommentaires = (text: string): string =>
   text.replace(COMMENTAIRE_OU_CHAINE, (m) =>
     (m.startsWith('//') || m.startsWith('/*')) ? m.replace(/[^\n]/g, ' ') : m);
 
-export function buildGraph(files) {
+export type GraphResult = {
+  edges: Map<string, string[]>;
+  external: Map<string, string[]>;
+  nonResolus: { path: string; spec: string }[];
+};
+
+export function buildGraph(files: SourceFile[]): GraphResult {
   const known = new Set(files.map(f => f.path));
-  const edges = new Map();
-  const external = new Map();
-  const nonResolus = [];
+  const edges = new Map<string, string[]>();
+  const external = new Map<string, string[]>();
+  const nonResolus: { path: string; spec: string }[] = [];
   for (const file of files) {
-    const internal = [];
-    const outside = [];
+    const internal: string[] = [];
+    const outside: string[] = [];
     for (const match of sansCommentaires(file.text).matchAll(SPEC)) {
       const spec = match[1] ?? match[2] ?? match[3] ?? match[4];
       if (!spec) continue;
@@ -147,11 +155,11 @@ export function buildGraph(files) {
   return { edges, external, nonResolus };
 }
 
-function findCycles(edges) {
-  const cycles = [];
-  const state = new Map();
-  const stack = [];
-  const visit = (node) => {
+function findCycles(edges: Map<string, string[]>): string[][] {
+  const cycles: string[][] = [];
+  const state = new Map<string, 'open' | 'done'>();
+  const stack: string[] = [];
+  const visit = (node: string): void => {
     state.set(node, 'open');
     stack.push(node);
     for (const next of edges.get(node) ?? []) {
@@ -165,17 +173,25 @@ function findCycles(edges) {
   return cycles;
 }
 
-export function analyseGraph(files) {
+export type AnalyseResult = {
+  fanIn: { path: string; count: number }[];
+  seuilP90: number;
+  cycles: string[][];
+  importsDIO: { path: string; zone: string; modules: string[] }[];
+  nonResolus: { path: string; spec: string }[];
+};
+
+export function analyseGraph(files: SourceFile[]): AnalyseResult {
   const { edges, external, nonResolus } = buildGraph(files);
-  const counts = new Map(files.map(f => [f.path, 0]));
+  const counts = new Map<string, number>(files.map(f => [f.path, 0]));
   for (const targets of edges.values()) {
     for (const t of targets) counts.set(t, (counts.get(t) ?? 0) + 1);
   }
   const fanIn = [...counts].map(([path, count]) => ({ path, count })).sort((a, b) => b.count - a.count);
   const sorted = fanIn.map(f => f.count).sort((a, b) => a - b);
-  const seuilP90 = sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.9))] : 0;
+  const seuilP90 = sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.9))]! : 0;
 
-  const importsDIO = [];
+  const importsDIO: { path: string; zone: string; modules: string[] }[] = [];
   for (const file of files) {
     const modules = (external.get(file.path) ?? []).filter(m => IO_MODULES.has(m));
     const usesFetch = /\bfetch\s*\(/.test(file.text);

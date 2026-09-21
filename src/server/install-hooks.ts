@@ -3,7 +3,7 @@
 // Façade du sous-système d'installation de hooks ; le corps vit dans
 // src/server/install-hooks/.
 //
-// Chemin et exports FIGÉS : bin/agent-viz.js importe dist/server/install-hooks.js
+// Chemin et exports FIGÉS : src/server/cli.ts importe dist/server/install-hooks.js
 // par un chemin écrit en dur, et les tests consomment _internals et EVENTS.
 //
 // Le bloc main garde le module exécutable en direct :

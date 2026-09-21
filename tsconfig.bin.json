@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "bin",
+    "outDir": "bin"
+  },
+  "include": ["bin/agent-viz.ts"]
+}

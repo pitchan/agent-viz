@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process';
 import { styleText } from 'node:util';
 import { pathToFileURL } from 'node:url';
 
-// Copie volontaire de la même table dans bin/agent-viz.js : ce module vit dans
+// Copie volontaire de la même table dans bin/agent-viz.ts : ce module vit dans
 // dist/, le shim ne peut rien lui importer avant d'avoir confirmé que dist/
 // existe — même raison que packageRoot, reçu en paramètre plutôt qu'importé.
 const c = {
