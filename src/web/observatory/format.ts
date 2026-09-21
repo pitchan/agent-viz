@@ -1,11 +1,11 @@
 // format.ts — display helpers for the observatory pages.
 //
 // Pure functions only, no DOM at import time, so they can be unit-tested.
-// formatTokens is NOT redefined here: viz-state.ts already owns it and is
-// importable under Node.
+// formatTokens and modelLabel are NOT redefined here: viz-state.ts already owns
+// them and is importable under Node.
 
-import { formatTokens } from '../viz-state.ts';
-export { formatTokens };
+import { formatTokens, modelLabel } from '../viz-state.ts';
+export { formatTokens, modelLabel };
 
 // Le detail d'evidence d'une recommandation — six bornes basses chiffrees
 // (une par regle R1/R5/R6/R7 en jetons, R3/R4 en octets), jamais toutes
@@ -277,15 +277,4 @@ export function formatShare(ratio: number) {
 export function formatUsdExact(n: number) {
   const s = formatUsd(n);
   return n > 0 && s === '0,00 $' ? '< 0,01 $' : s;
-}
-
-// Human label derived from the canonical id — same rule as viz-ui.ts
-// labelForModel, extended to single-digit Claude 5 families ("Opus 5",
-// "Fable 5"). No external data; callers keep the raw id in `title`.
-export function modelLabel(id: string | null | undefined) {
-  if (!id) return '';
-  const m = id.match(/^claude-(opus|sonnet|haiku|fable|mythos)-(\d+)(?:-(\d+))?$/);
-  if (!m) return id;
-  const family = `${m[1]![0]!.toUpperCase()}${m[1]!.slice(1)}`;
-  return m[3] !== undefined ? `${family} ${m[2]}.${m[3]}` : `${family} ${m[2]}`;
 }
