@@ -9,7 +9,7 @@
 import {
   COLORS, state, vis, markDirty, hexAlpha, esc,
   formatTokens, tokenTotal, tokenContext, formatCost, formatCostBound, costCompleteness, costReasons,
-  agentIdFromNode,
+  agentIdFromNode, modelLabel,
   type VizNode, type TokenBucket, type TimelineEntry,
 } from './viz-state.ts';
 import { countOrZero } from '../engine/core/usage.ts';
@@ -32,6 +32,7 @@ import {
   alertActorLine, alertDetailLines, notificationPayload, truncate,
 } from './viz-alert-format.ts';
 import { watchdogPresentation, errorsPresentation } from './viz-topbar-status.ts';
+import { budgetPresentation } from './viz-budget-format.ts';
 import { errorRow, errorsPanelTitle } from './viz-error-format.ts';
 import { getErrors, getErrorsSummary, onErrorsChanged } from './viz-errors.ts';
 import { formatDuration } from './viz-duration.ts';
@@ -180,7 +181,7 @@ export function showDetail(n: VizNode) {
 //
 // Drill-down cost lets the user verify the topbar total: clicking each
 // subagent should show a cost that, summed with the main thread's, equals
-// the topbar pill — useful when a session looks suspiciously expensive.
+// the TOTAL pill — useful when a session looks suspiciously expensive.
 function tokenCardsHTML(n: VizNode) {
   if (state.tokens.tokensSupported === false) {
     return `
@@ -194,7 +195,7 @@ function tokenCardsHTML(n: VizNode) {
   let bucket: TokenBucket | null | undefined = null;
   let contextSize = 0;
   let totalCost = 0;
-  let modelLabel = '';
+  let modelText = '';
   // La même réserve que la pastille : sans elle, le montant réservé de la barre du haut
   // et un montant sans réserve dans le panneau de détail cohabiteraient à un clic.
   let cout: ReturnType<typeof costCompleteness> = { complete: true, unknownModels: [], malformedUsageMessages: 0 };
@@ -218,15 +219,15 @@ function tokenCardsHTML(n: VizNode) {
     bucket = aid ? state.tokens.perAgent.get(aid) : null;
     contextSize = tokenContext(bucket);
     totalCost = (bucket && bucket.costUsd) || 0;
-    modelLabel = (bucket && bucket.lastModel) ? labelForModel(bucket.lastModel) : '';
+    modelText = (bucket && bucket.lastModel) ? modelLabel(bucket.lastModel) : '';
     cout = costCompleteness([bucket]);
   }
   if (!bucket || tokenTotal(bucket) === 0) return '';
   const ctxCard = contextSize > 0
     ? `<div class="meta-card"><div class="meta-label">Context (current)</div><div class="meta-value">${formatTokens(contextSize)}</div></div>`
     : '';
-  const modelCard = modelLabel
-    ? `<div class="meta-card"><div class="meta-label">Model</div><div class="meta-value">${esc(modelLabel)}</div></div>`
+  const modelCard = modelText
+    ? `<div class="meta-card"><div class="meta-label">Model</div><div class="meta-value">${esc(modelText)}</div></div>`
     : '';
   // La carte s'affiche AUSSI quand le montant est nul mais incomplet —
   // sinon une session dont aucun modèle n'est tarifé ferait disparaître la
@@ -256,21 +257,24 @@ document.getElementById('detail-close')!.addEventListener('click', () => {
   markDirty();
 });
 
-// ─── Budget pill (model · context% · cost) ───────────────────────────────
-// Driven by SSE `tokens` snapshots — see viz-network.ts. Reads only the main
-// thread bucket (matches what /context reports); subagent costs are folded in
-// for the cumulative dollar amount.
+// ─── Budget pills (model · context% · cost | TOTAL · net tokens · cost) ────
+// Driven by SSE `tokens` snapshots — see viz-network.ts. What each pill says is
+// decided in viz-budget-format.ts; this function only applies it.
 // Cache paresseux : `null` veut dire « pas encore cherche », pas « absent ».
-// Les trois champs interieurs sont des enfants de la pastille dans index.html,
-// donc la garde `if (!els.pill) return` ci-dessous les couvre tous les quatre.
+// Les champs interieurs sont des enfants de leur pastille dans index.html, donc
+// la garde `if (!els.pill || !els.total) return` ci-dessous les couvre tous.
 interface BudgetEls {
   pill: HTMLElement | null;
   model: HTMLElement | null;
   ctx: HTMLElement | null;
   cost: HTMLElement | null;
+  total: HTMLElement | null;
+  totalTokens: HTMLElement | null;
+  totalCost: HTMLElement | null;
 }
 const _budgetEls: BudgetEls = {
   pill: null, model: null, ctx: null, cost: null,
+  total: null, totalTokens: null, totalCost: null,
 };
 function _budgetDOM() {
   if (!_budgetEls.pill) {
@@ -278,101 +282,44 @@ function _budgetDOM() {
     _budgetEls.model = document.getElementById('budget-model');
     _budgetEls.ctx = document.getElementById('budget-ctx');
     _budgetEls.cost = document.getElementById('budget-cost');
+    _budgetEls.total = document.getElementById('budget-total-pill');
+    _budgetEls.totalTokens = document.getElementById('budget-total-tokens');
+    _budgetEls.totalCost = document.getElementById('budget-total-cost');
   }
   return _budgetEls;
 }
 
 export function updateBudget() {
   const els = _budgetDOM();
-  if (!els.pill) return;
+  if (!els.pill || !els.total) return;
+  const p = budgetPresentation(state.tokens);
 
-  // Adapter explicitly declared tokens unavailable for this provider.
-  if (state.tokens.tokensSupported === false) {
-    els.model!.textContent = '';
-    els.ctx!.textContent = 'Tokens N/A';
-    els.cost!.textContent = '';
-    els.ctx!.classList.remove('is-warn', 'is-crit');
-    els.pill.title = 'Token usage is not exposed by this provider (e.g. Copilot Chat).';
-    els.pill.hidden = false;
-    return;
-  }
-
-  // Token tracking is on (Claude) but the transcript file hasn't been located
-  // yet — surface it explicitly rather than leaving the pill blank.
-  if (state.tokens.transcriptMissing) {
-    els.model!.textContent = '';
-    els.ctx!.textContent = 'Transcript N/A';
-    els.cost!.textContent = '';
-    els.ctx!.classList.remove('is-warn', 'is-crit');
-    els.pill.title = 'Transcript file not located yet — token tracking starts as soon as it appears on disk.';
-    els.pill.hidden = false;
-    return;
-  }
-
-  const main = state.tokens.main;
-  // Hide while we have no model info yet — the pill flickering empty is worse
-  // than not appearing until the first assistant message lands.
-  //
-  // La condition porte sur `lastModel`, que le serveur pose aussi pour un modèle hors
-  // table, et non sur `contextMax` : le modèle et les jetons d'une telle session sont
-  // connus, seule la FENÊTRE manque.
-  if (!main || !main.lastModel) {
+  if (p.kind === 'hidden') {
     els.pill.hidden = true;
+    els.total.hidden = true;
     return;
   }
-  const ctxNow = tokenContext(main);
-  // `contextMax` manque quand le serveur ne connait pas la fenetre du modele.
-  // Partout ou `fenetreConnue` ouvre la branche, la valeur est la : c'est ce
-  // que disent les `!` qui suivent.
-  const fenetreConnue = main.contextMax !== undefined && main.contextMax > 0;
-  const ratio = fenetreConnue ? ctxNow / main.contextMax! : 0;
-  // Cumulative cost = main + every subagent bucket (each computed against its
-  // own model on the server side, so a multi-model session sums cleanly).
-  let totalCost = main.costUsd || 0;
-  for (const b of state.tokens.perAgent.values()) totalCost += b.costUsd || 0;
-  // La même somme porte sa réserve. Un seul seau incomplet suffit à
-  // rendre le total incomplet.
-  const cout = costCompleteness([main, ...state.tokens.perAgent.values()]);
-
-  els.model!.textContent = labelForModel(main.lastModel);
-  // Sans fenêtre connue, la taille absolue et RIEN d'autre : un pourcentage
-  // calculé contre une fenêtre inventée serait pire que pas de pourcentage.
-  els.ctx!.textContent = fenetreConnue
-    ? `${formatTokens(ctxNow)} / ${formatTokens(main.contextMax)} (${(ratio * 100).toFixed(1)}%)`
-    : formatTokens(ctxNow);
-  els.cost!.textContent = formatCostBound(totalCost, cout.complete);
-  els.ctx!.classList.toggle('is-warn', fenetreConnue && ratio >= 0.7 && ratio < 0.9);
-  els.ctx!.classList.toggle('is-crit', fenetreConnue && ratio >= 0.9);
-  els.pill.title = [
-    `Model: ${main.lastModel}`,
-    fenetreConnue
-      ? `Context: ${ctxNow.toLocaleString()} / ${main.contextMax!.toLocaleString()} tokens`
-      : `Context: ${ctxNow.toLocaleString()} tokens (fenêtre inconnue pour ce modèle)`,
-    `Cost (this session): ${formatCostBound(totalCost, cout.complete)}`,
-    ...(cout.complete ? [] : [
-      `${totalCost > 0 ? 'Coût PARTIEL' : 'Aucun message tarifé'} — ${costReasons(cout).join(' · ')}`,
-      // Un `usage` inexploitable touche aussi les jetons : « les jetons sont comptés »
-      // ne serait plus sûr dès qu'il y en a un.
-      cout.malformedUsageMessages > 0
-        ? 'Les jetons et le coût réels peuvent être plus élevés.'
-        : totalCost > 0
-          ? 'Le coût réel est supérieur.'
-          : 'Les jetons sont comptés ; le coût n’est pas calculable.',
-    ]),
-  ].join('\n');
+  if (p.kind === 'unavailable') {
+    els.model!.textContent = '';
+    els.ctx!.textContent = p.text;
+    els.cost!.textContent = '';
+    els.ctx!.classList.remove('is-warn', 'is-crit');
+    els.pill.title = p.title;
+    els.pill.hidden = false;
+    els.total.hidden = true;
+    return;
+  }
+  els.model!.textContent = p.main.model;
+  els.ctx!.textContent = p.main.ctx;
+  els.cost!.textContent = p.main.cost;
+  els.ctx!.classList.toggle('is-warn', p.main.ctxLevel === 'warn');
+  els.ctx!.classList.toggle('is-crit', p.main.ctxLevel === 'crit');
+  els.pill.title = p.main.title;
   els.pill.hidden = false;
-}
-
-
-// Cheap client-side label derivation — matches the server's deriveLabel() so
-// we don't have to ship the price map to the client just for display names.
-function labelForModel(id: string | null | undefined) {
-  if (!id) return '';
-  const m = id.match(/^claude-(opus|sonnet|haiku)-(\d+)-(\d+)/);
-  // Le motif porte trois groupes et le premier n'est pas vide : s'il a mordu,
-  // les trois sont la.
-  if (m) return `${m[1]![0]!.toUpperCase()}${m[1]!.slice(1)} ${m[2]}.${m[3]}`;
-  return id;
+  els.totalTokens!.textContent = p.total.tokens;
+  els.totalCost!.textContent = p.total.cost;
+  els.total.title = p.total.title;
+  els.total.hidden = false;
 }
 
 // ─── Narrator (live caption under topbar) ─────────────────────────────────

@@ -5,7 +5,7 @@
 // to viz-layout (processEvent, layout), and trigger viz-ui (renderFeed,
 // updateStats, fitView) via `scheduleRender` which coalesces bursts.
 
-import { state, vis, markDirty, esc, type TokenBucket } from './viz-state.ts';
+import { state, vis, markDirty, esc, tokensApplyTo, type TokenBucket } from './viz-state.ts';
 import { processEvent, layout, resetLayout } from './viz-layout.ts';
 import {
   renderFeed, updateStats, updateBudget, fitView, startDurationsTicker, stopDurationsTicker,
@@ -145,17 +145,13 @@ export function connectSSE() {
         return;
       }
       if (data.type === 'tokens') {
-        const target = currentSessionId || state._lastServerId;
-        if (!target || data.session === target) applyTokens(data);
+        if (tokensApplyTo(currentSessionId || state._lastServerId, data.session)) applyTokens(data);
         return;
       }
       if (data.type === 'event') {
         const target = currentSessionId || state._lastServerId;
         if (!target || data.session === target) {
-          if (!currentSessionId && !state._lastServerId) {
-            state._lastServerId = data.session;
-            updateTopbarPrompt();
-          }
+          if (!currentSessionId && !state._lastServerId) adoptLiveSession(data.session);
           state.eventSeq++;
           processEvent(data.event);
           if (state.autoFit && (firstBatch || state.nodes.size)) _pendingFitView = true;
@@ -195,6 +191,15 @@ function applyTokens(data: TokensSnapshot) {
   markDirty();
 }
 
+// La session affichée en mode direct vient d'être connue, ou a changé : ce qui en
+// dépend se rafraîchit maintenant. Les réponses de /sessions et le rejeu SSE des
+// jetons arrivent souvent AVANT, et ne la trouvaient pas.
+function adoptLiveSession(sid: string) {
+  state._lastServerId = sid;
+  updateTopbarPrompt();
+  fetchTokens(sid);
+}
+
 // Fetch a specific session's token snapshot. The SSE stream only pushes
 // `tokens` for the live/active session, so a session picked from the overlay
 // needs this one-shot fetch to populate the budget pill.
@@ -202,8 +207,8 @@ async function fetchTokens(sid: string) {
   try {
     const res = await fetch(`/tokens?session=${encodeURIComponent(sid)}`);
     const msg = await res.json();
-    // Drop if the user switched sessions while the request was in flight.
-    if (sid !== currentSessionId || !msg) return;
+    // Drop if the displayed session changed while the request was in flight.
+    if (sid !== (currentSessionId || state._lastServerId) || !msg) return;
     applyTokens(msg);
   } catch {}
 }
@@ -221,6 +226,7 @@ export async function poll(force?: boolean) {
     if (!currentSessionId && state._lastServerId && state._lastServerId !== serverId) {
       clearState(); firstBatch = true;
     }
+    if (!currentSessionId && state._lastServerId !== serverId) adoptLiveSession(serverId);
     state._lastServerId = serverId;
     state.offset = size;
     const lines = text.trim().split('\n');

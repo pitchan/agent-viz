@@ -76,8 +76,9 @@ body {
    deborderaient VERTICALEMENT une barre haute de 48 px. */
 .logo, #connection-status, #watchdog-pill, .sep, .stat { flex: none; white-space: nowrap; }
 /* L'invite absorbe la pression EN PREMIER : elle porte deja son ellipse, donc
-   elle se raccourcit sans rien perdre d'irremplacable. */
-#topbar-prompt { flex: 0 1 auto; min-width: 0; }
+   elle se raccourcit sans rien perdre d'irremplacable. Un retrait de 1 comme le
+   groupe ne suffirait pas : les deux se partageraient la pression au prorata. */
+#topbar-prompt { flex: 0 1000 auto; min-width: 0; }
 /* Ensuite les compteurs defilent DANS leur groupe. Les faire simplement
    deborder chasserait la boite de filtre hors de l'ecran, ou la ferait couper
    par l'`overflow` ci-dessus : elle deviendrait inutilisable sans que rien ne
@@ -295,7 +296,9 @@ body {
 .error-gone { font-size: 10px; color: var(--text-muted); margin-top: 4px; font-style: italic; }
 .errors-empty { padding: 16px; color: var(--text-muted); font-size: 12px; text-align: center; }
 
-.stat-group { display: flex; gap: 8px; margin-left: 8px; }
+/* Centrés : la pile des pastilles de budget est plus haute qu'un compteur, et
+   l'étirement par défaut en ferait de grands rectangles. */
+.stat-group { display: flex; align-items: center; gap: 8px; margin-left: 8px; }
 .stat {
   display: flex; align-items: center; gap: 6px;
   font-size: 12px; color: var(--text-dim);
@@ -322,8 +325,12 @@ body {
 .stat-val.has-errors-alarm { color: var(--error); }
 .stat-val.has-running { color: var(--notification); }
 
-/* Budget pill — model · context% · cost. Same shape as .stat. */
+/* Budget pills — model · context% · cost, then TOTAL. Same shape as .stat. */
 .budget-pill { gap: 8px; }
+/* L'une sous l'autre et compactes : 2 × 19 px + 2 px = 40 px tiennent dans les 48 px du
+   bandeau, et la pile ne prend que la largeur de la plus large des deux. */
+.budget-stack { display: flex; flex-direction: column; gap: 2px; flex: none; }
+.budget-stack .stat { padding: 1px 8px; font-size: 11px; }
 .budget-pill[hidden] { display: none; }
 .budget-model {
   font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;
@@ -338,7 +345,8 @@ body {
   background: rgba(102, 204, 255, 0.04);
   border: 1px solid var(--glass-border); border-radius: 8px;
   padding: 6px 12px; color: var(--text-primary); font-family: inherit; font-size: 12px;
-  width: 200px; outline: none; transition: all 0.2s;
+  /* 140 px et non 200 : ces 60 px reviennent à l'invite du bandeau, première à céder. */
+  width: 140px; outline: none; transition: all 0.2s;
 }
 #search-box:focus { border-color: var(--holo); background: rgba(102, 204, 255, 0.08); box-shadow: 0 0 12px rgba(102,204,255,0.1); }
 #search-box::placeholder { color: var(--text-muted); }

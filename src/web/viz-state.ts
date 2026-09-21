@@ -282,6 +282,14 @@ export function tokenTotal(t: TokenBucket | null | undefined) {
   return countOrZero(t.in) + countOrZero(t.out) + countOrZero(t.cacheCreate) + countOrZero(t.cacheRead);
 }
 
+// Jetons nets = input + cache_creation + output, cache_read EXCLU : la convention du
+// moteur (`netTokens`), que la page Observatoire affiche aussi. Le serveur ne sert pas
+// ce module du moteur au navigateur, d'où cette copie, que tests/unit/viz-state garde alignée.
+export function netTokens(t: TokenBucket | null | undefined) {
+  if (!t) return 0;
+  return countOrZero(t.in) + countOrZero(t.cacheCreate) + countOrZero(t.out);
+}
+
 // Context window size = last message's input + cache_creation + cache_read.
 // Matches Claude Code's /context semantics (not cumulative). Same guard as
 // tokenTotal; the engine has no equivalent to these three "last" fields.
@@ -354,6 +362,24 @@ export function formatCost(usd: number | null | undefined) {
 export function formatCostBound(usd: number | null | undefined, complete: boolean) {
   if (complete) return formatCost(usd);
   return usd && usd > 0 ? `au moins ${formatCost(usd)}` : 'coût indisponible';
+}
+
+// Human label derived from the canonical id ("Opus 4.6", "Opus 5", "Fable 5.1"),
+// without shipping the price map to the client. The server canonicalizes ids
+// (date and `[1m]` suffixes stripped), hence the `$` anchor. Anything else stays raw.
+export function modelLabel(id: string | null | undefined) {
+  if (!id) return '';
+  const m = id.match(/^claude-(opus|sonnet|haiku|fable|mythos)-(\d+)(?:-(\d+))?$/);
+  if (!m) return id;
+  const family = `${m[1]![0]!.toUpperCase()}${m[1]!.slice(1)}`;
+  return m[3] !== undefined ? `${family} ${m[2]}.${m[3]}` : `${family} ${m[2]}`;
+}
+
+// Un instantané `tokens` ne s'applique qu'à la session affichée, et à aucune tant qu'elle
+// est inconnue : à la connexion, le serveur rejoue ceux de TOUTES ses sessions, et le
+// dernier arrivé l'emporterait.
+export function tokensApplyTo(target: string | null, session: string) {
+  return target !== null && session === target;
 }
 
 // Extract the bare agent id from a node id of the form "a:<agentId>".
