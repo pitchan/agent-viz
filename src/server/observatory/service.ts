@@ -11,6 +11,7 @@ import { toAnalysedSessions } from './session-mapper.ts';
 import { mcpUsageBySession } from './mcp-usage.ts';
 import { computeSummary } from './summary.ts';
 import { computeModelCosts } from './model-costs.ts';
+import { computeSkillUsage } from './skill-usage.ts';
 import { buildProvenance } from './provenance.ts';
 import { cwdOfReport, displayPath, nameProjects } from './project-label.ts';
 import { evaluateAll, RULES } from './rules/registry.ts';
@@ -79,6 +80,18 @@ function createObservatoryService(deps: ServiceDeps) {
     rows as Parameters<typeof toAnalysedSessions>[0];
   const humanSessions = (from: string) =>
     toAnalysedSessions(toAnalysable(store.listSessions({ since: from, kinds: KINDS_HUMAN })));
+  // Every windowed read shares this: the sessions of the chosen period, the
+  // human/machine basis they were read on, and the period itself.
+  const readWindow = ({ days, includeMachine = false }: WindowOptions) => {
+    const d = clampDays(days);
+    const from = sinceOf(d);
+    const rows = includeMachine
+      ? store.listSessions({ since: from })
+      : store.listSessions({ since: from, kinds: KINDS_HUMAN });
+    const basis: WindowBasis = { counts: store.countByKind({ since: from }), includeMachine };
+    const period: WindowPeriod = { from, to: now().toISOString(), days: d };
+    return { sessions: toAnalysedSessions(toAnalysable(rows)), basis, period };
+  };
 
   return {
     async scan({ days }: ScanDaysOptions = {}): Promise<Awaited<ReturnType<typeof runIncrementalScan>>> {
@@ -120,33 +133,24 @@ function createObservatoryService(deps: ServiceDeps) {
       store.purge();
     },
 
-    async summary({ days, includeMachine = false }: WindowOptions = {}): Promise<ReturnType<typeof computeSummary>> {
+    async summary(opts: WindowOptions = {}): Promise<ReturnType<typeof computeSummary>> {
       const state = store.getScanState(claudeDir);
-      const d = clampDays(days);
-      const from = sinceOf(d);
-      const rows = includeMachine
-        ? store.listSessions({ since: from })
-        : store.listSessions({ since: from, kinds: KINDS_HUMAN });
-      return computeSummary(toAnalysedSessions(toAnalysable(rows)), {
-        lastScanAt: state ? state.lastScanAt : null,
-        basis: { counts: store.countByKind({ since: from }), includeMachine },
-        period: { from, to: now().toISOString(), days: d },
-      });
+      const { sessions, basis, period } = readWindow(opts);
+      return computeSummary(sessions, { lastScanAt: state ? state.lastScanAt : null, basis, period });
     },
 
     async modelCosts(
-      { days, includeMachine = false }: WindowOptions = {},
+      opts: WindowOptions = {},
     ): Promise<ReturnType<typeof computeModelCosts> & { basis: WindowBasis; period: WindowPeriod }> {
-      const d = clampDays(days);
-      const from = sinceOf(d);
-      const rows = includeMachine
-        ? store.listSessions({ since: from })
-        : store.listSessions({ since: from, kinds: KINDS_HUMAN });
-      return {
-        ...computeModelCosts(toAnalysedSessions(toAnalysable(rows))),
-        basis: { counts: store.countByKind({ since: from }), includeMachine },
-        period: { from, to: now().toISOString(), days: d },
-      };
+      const { sessions, basis, period } = readWindow(opts);
+      return { ...computeModelCosts(sessions), basis, period };
+    },
+
+    async skillUsage(
+      opts: WindowOptions = {},
+    ): Promise<ReturnType<typeof computeSkillUsage> & { basis: WindowBasis; period: WindowPeriod }> {
+      const { sessions, basis, period } = readWindow(opts);
+      return { ...computeSkillUsage(sessions), basis, period };
     },
 
     // Tariff sheet + provenance: independent of the window — they answer

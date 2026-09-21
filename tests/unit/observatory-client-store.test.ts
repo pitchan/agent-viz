@@ -2,7 +2,7 @@
 // so no server and no DOM are involved.
 import { expect, test } from 'vitest';
 import { getState, subscribe, loadAdvisor, loadAnalysis, loadSession, changeStatus, applyScanEvent, resetStore,
-  setPeriodDays, setIncludeMachine, loadPricing } from '../../src/web/observatory/store.ts';
+  setPeriodDays, setIncludeMachine, loadPricing, loadSkills } from '../../src/web/observatory/store.ts';
 import type { WindowOpts } from '../../src/web/observatory/api.ts';
 
 // Le client HTTP tel que les vues l'importent — même définition que celle,
@@ -148,4 +148,18 @@ test('loadPricing loads the windowed breakdown and the tariff sheet together', a
   expect(s.pricing).toEqual({ priceTable: { entries: [] } });
   expect(s.loading).toBe(false);
   expect(calls[0]).toEqual(['models', { days: 30, includeMachine: false }]);
+});
+
+test('loadSkills loads the per-skill usage on the current window', async () => {
+  // Arrange
+  resetStore();
+  const calls: unknown[] = [];
+  const api = {
+    fetchSkillUsage: async (opts: WindowOpts) => { calls.push(opts); return { skills: [] }; },
+  } as unknown as ApiClient;
+  // Act
+  await loadSkills(api);
+  // Assert
+  expect(getState().skillUsage).toEqual({ skills: [] });
+  expect(calls[0]).toEqual({ days: 30, includeMachine: false });
 });

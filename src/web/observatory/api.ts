@@ -84,6 +84,11 @@ export function fetchModelCosts(opts: WindowOpts = {}) {
   return getJson(`/analysis/models${q ? `?${q}` : ''}`);
 }
 
+export function fetchSkillUsage(opts: WindowOpts = {}) {
+  const q = windowParams(opts).toString();
+  return getJson(`/analysis/skills${q ? `?${q}` : ''}`);
+}
+
 export const fetchPricing = () => getJson('/pricing');
 
 // Le journal des pannes. Meme fenetre que les conseils : la page n'a qu'une

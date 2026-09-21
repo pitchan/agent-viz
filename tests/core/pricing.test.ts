@@ -70,6 +70,14 @@ describe('computeCost — famille Claude 5 (tarifs publics 2026, prix catalogue)
     expect(r.usd).toBeCloseTo(0.38, 12);
   });
 
+  test('claude-fable-5-1 : tarifs de fable-5, sauf la relecture de cache à 0,25 $/M', () => {
+    // 1000×1e-5 + 2000×5e-5 + 4000×1.25e-5 + 6000×(1e-5×2) + 100000×2.5e-7
+    // = 0.01 + 0.1 + 0.05 + 0.12 + 0.025 = 0.305
+    const r = computeCost(usage, 'claude-fable-5-1');
+    expect(r.known).toBe(true);
+    expect(r.usd).toBeCloseTo(0.305, 12);
+  });
+
   test('claude-mythos-5 : mêmes tarifs que fable-5', () => {
     const r = computeCost(usage, 'claude-mythos-5');
     expect(r.known).toBe(true);
@@ -180,12 +188,12 @@ describe('pricingKindOf — la contrepartie qualitative de computeCost', () => {
 });
 
 describe('priceTable — le barème réellement appliqué, exposé', () => {
-  test('source, unité, et les 11 modèles de la table courante', () => {
+  test('source, unité, et les 12 modèles de la table courante', () => {
     const t = priceTable();
     expect(t.source).toBe('netgain-table-embarquee');
     expect(t.unit).toBe('usd-par-jeton');
     expect(t.entries.map((e) => e.model).sort()).toEqual([
-      'claude-fable-5', 'claude-haiku-4-5', 'claude-mythos-5', 'claude-opus-4-5',
+      'claude-fable-5', 'claude-fable-5-1', 'claude-haiku-4-5', 'claude-mythos-5', 'claude-opus-4-5',
       'claude-opus-4-6', 'claude-opus-4-7', 'claude-opus-4-8', 'claude-opus-5',
       'claude-sonnet-4-5', 'claude-sonnet-4-6', 'claude-sonnet-5',
     ]);

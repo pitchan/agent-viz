@@ -77,6 +77,7 @@
       <button id="btn-advisor">Conseils <span class="shortcut">A</span></button>
       <button id="btn-analysis">Sessions analysées <span class="shortcut">N</span></button>
       <button id="btn-pricing">Jetons &amp; tarifs</button>
+      <button id="btn-skills">Skills</button>
       <button id="btn-fit">Fit <span class="shortcut">F</span></button>
       <button id="btn-clear">Clear <span class="shortcut">C</span></button>
       <button id="btn-autofit">Auto-fit: <span id="autofit-label">ON</span></button>
@@ -140,6 +141,17 @@
       <div id="pricing-body"></div>
     </div>
 
+    <!-- Skills overlay -->
+    <div id="skills-overlay" class="glass-panel">
+      <div id="skills-header">
+        <span id="skills-title">Skills</span>
+        <button type="button" class="obs-btn obs-btn--icon" id="skills-close" aria-label="Fermer">&times;</button>
+      </div>
+      <div id="skills-period" class="period-selector"></div>
+      <div id="skills-summary"></div>
+      <div id="skills-body"></div>
+    </div>
+
     <!-- Watchdog alerts popup -->
     <div id="alerts-popup" class="glass-panel">
       <div id="alerts-header">
@@ -178,10 +190,12 @@
   import { initAdvisor } from './src/web/observatory/advisor-view.ts';
   import { initAnalysis } from './src/web/observatory/analysis-view.ts';
   import { initPricing } from './src/web/observatory/pricing-view.ts';
+  import { initSkills } from './src/web/observatory/skills-view.ts';
 
   initAdvisor();
   initAnalysis();
   initPricing();
+  initSkills();
   loadSessions();
   connectSSE();
   poll();

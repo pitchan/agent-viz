@@ -153,3 +153,23 @@ test('sessions() exposes projectPath — the real path, or the slug when unknown
   const [unnamed] = await serviceOf(fakeDeps({ rows: [HUMAN_ROW] })).sessions();
   expect(unnamed!.projectPath).toBe('F--dvf');
 });
+
+test('skillUsage reads the chosen window on the human basis and attaches basis and period', async () => {
+  // Arrange
+  const deps = fakeDeps();
+  // Act
+  const out = await serviceOf(deps).skillUsage({ days: 7 });
+  // Assert
+  expect(deps.calls.listSessions[0]).toEqual({ since: daysAgo(7), kinds: ['interactive'] });
+  expect(out.period).toEqual({ from: daysAgo(7), to: NOW.toISOString(), days: 7 });
+  expect(out.basis.includeMachine).toBe(false);
+});
+
+test('skillUsage counts a stored row without skill facts as pending rescan', async () => {
+  // Arrange
+  const deps = fakeDeps({ rows: [HUMAN_ROW] });
+  // Act
+  const out = await serviceOf(deps).skillUsage();
+  // Assert
+  expect(out).toMatchObject({ sessionsCounted: 0, excludedPendingRescan: 1 });
+});

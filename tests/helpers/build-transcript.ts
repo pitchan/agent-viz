@@ -11,6 +11,7 @@ export interface LineOpts {
   isMeta?: boolean;
   promptSource?: string;
   origin?: Record<string, unknown>;
+  attributionSkill?: string;
 }
 
 function base(o: LineOpts): Record<string, unknown> {
@@ -24,6 +25,7 @@ function base(o: LineOpts): Record<string, unknown> {
   if (o.isMeta !== undefined) b['isMeta'] = o.isMeta;
   if (o.promptSource !== undefined) b['promptSource'] = o.promptSource;
   if (o.origin !== undefined) b['origin'] = o.origin;
+  if (o.attributionSkill !== undefined) b['attributionSkill'] = o.attributionSkill;
   return b;
 }
 
@@ -66,6 +68,10 @@ export function promptBlocksLine(text: string, o: LineOpts = {}): string {
 
 export function compactLine(trigger: 'auto' | 'manual', preTokens: number | null, o: LineOpts = {}): string {
   return JSON.stringify({ type: 'system', subtype: 'compact_boundary', compactMetadata: { trigger, preTokens }, ...base(o) });
+}
+
+export function skillListingLine(names: string[], o: LineOpts = {}): string {
+  return JSON.stringify({ type: 'attachment', attachment: { type: 'skill_listing', isInitial: true, names }, ...base(o) });
 }
 
 export interface SubagentSpec {

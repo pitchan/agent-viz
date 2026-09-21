@@ -34,6 +34,9 @@ export type NormalizedEvent =
       /** Type brut de message.diagnostics.cache_miss_reason (Claude Code ≥ ~2.1.220) :
        * l'attribution de première main d'une perte de cache. Absent des vieux journaux. */
       cacheMissReason?: string;
+      /** Skill actif au moment du message, posé par Claude Code sur le tour où il est lancé
+       * (sous-agents de ce tour compris). Absent hors skill et dans les vieux journaux. */
+      attributionSkill?: string;
       isSidechain: boolean;
     }
   | { kind: 'tool_result'; toolUseId: string; bytes: number; isError: boolean; contentHash: string | null; timestamp?: string }
@@ -46,6 +49,7 @@ export type NormalizedEvent =
       timestamp?: string;
     }
   | { kind: 'compact'; trigger: 'auto' | 'manual'; preTokens: number | null }
+  | { kind: 'skill_listing'; names: string[] }
   | { kind: 'meta' }
   | { kind: 'other'; topLevelType: string };
 
@@ -77,6 +81,7 @@ export function normalizeEvent(raw: unknown): NormalizedEvent[] {
   if (type === 'assistant') return [normalizeAssistant(line)];
   if (type === 'user') return normalizeUser(line);
   if (type === 'system' && line['subtype'] === 'compact_boundary') return [normalizeCompact(line)];
+  if (type === 'attachment') return [normalizeAttachment(line)];
   if (type === null) return [{ kind: 'other', topLevelType: 'unknown' }];
   return [{ kind: 'other', topLevelType: type }];
 }
@@ -102,6 +107,7 @@ function normalizeAssistant(line: Rec): NormalizedEvent {
   const diagnostics = asRec(message['diagnostics']);
   const missReason = diagnostics === null ? null : asRec(diagnostics['cache_miss_reason']);
   const cacheMissReason = missReason === null ? null : asStr(missReason['type']);
+  const attributionSkill = asStr(line['attributionSkill']);
   return {
     kind: 'assistant',
     msgId: asStr(message['id']),
@@ -113,8 +119,18 @@ function normalizeAssistant(line: Rec): NormalizedEvent {
     ...(timestamp !== null ? { timestamp } : {}),
     ...(agentId !== null ? { agentId } : {}),
     ...(cacheMissReason !== null ? { cacheMissReason } : {}),
+    ...(attributionSkill !== null && attributionSkill !== '' ? { attributionSkill } : {}),
     isSidechain: line['isSidechain'] === true,
   };
+}
+
+// Seule la liste des skills proposés est un fait utile au moteur ; les autres pièces
+// jointes restent comptées comme « other ».
+function normalizeAttachment(line: Rec): NormalizedEvent {
+  const attachment = asRec(line['attachment']);
+  if (attachment === null || attachment['type'] !== 'skill_listing') return { kind: 'other', topLevelType: 'attachment' };
+  const names = Array.isArray(attachment['names']) ? attachment['names'] : [];
+  return { kind: 'skill_listing', names: names.filter((n): n is string => typeof n === 'string' && n !== '') };
 }
 
 function normalizeUser(line: Rec): NormalizedEvent[] {

@@ -2,7 +2,7 @@
 // so the query strings it builds (project, days, includeMachine) are checked
 // without a real server.
 import { expect, test } from 'vitest';
-import { fetchSummary, fetchSessions, requestScan, requestPurge, fetchModelCosts, fetchPricing, acknowledgeAlert, setRecommendationStatus } from '../../src/web/observatory/api.ts';
+import { fetchSummary, fetchSessions, requestScan, requestPurge, fetchModelCosts, fetchSkillUsage, fetchPricing, acknowledgeAlert, setRecommendationStatus } from '../../src/web/observatory/api.ts';
 
 // Chaque appel capturé garde url + opts tels que passés à fetch — `opts` reste
 // `any` : c'est un stub de test, pas une implémentation de RequestInit.
@@ -153,6 +153,21 @@ test('requestScan et requestPurge continuent de poster SANS corps', async () => 
       expect(opts.body).toBe(undefined);
       expect(opts.headers).toBe(undefined);
     }
+  } finally {
+    restore();
+  }
+});
+
+test('fetchSkillUsage forwards the window; no window means no query string', async () => {
+  // Arrange
+  const { calls, restore } = stubFetch({ skills: [] });
+  try {
+    // Act
+    await fetchSkillUsage({ days: 7, includeMachine: true });
+    await fetchSkillUsage();
+    // Assert
+    expect(calls[0]!.url).toBe('/analysis/skills?days=7&includeMachine=1');
+    expect(calls[1]!.url).toBe('/analysis/skills');
   } finally {
     restore();
   }

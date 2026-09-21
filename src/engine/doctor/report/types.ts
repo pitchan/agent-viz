@@ -2,6 +2,7 @@ import type { ContextStats } from '../aggregators/context.ts';
 import type { PromptsStats } from '../aggregators/prompts.ts';
 import type { ReadStats } from '../aggregators/reads.ts';
 import type { SessionKind } from '../aggregators/session-kind.ts';
+import type { SkillStats } from '../aggregators/skills.ts';
 import type { SubagentStats } from '../aggregators/subagents.ts';
 import type { TokensResult } from '../aggregators/tokens.ts';
 import type { ToolResultStats } from '../aggregators/tool-results.ts';
@@ -30,6 +31,8 @@ export interface SessionReport {
   prompts: PromptsStats;
   /** Queue non vérifiée : dernière vérification de la session et ce qui l'a suivie. */
   verification: VerificationStats;
+  /** Skills listés dans la session et appels de l'outil Skill — faits bruts. */
+  skills: SkillStats;
   events: number;
   parseErrors: number;
   otherEventTypes: Record<string, number>;

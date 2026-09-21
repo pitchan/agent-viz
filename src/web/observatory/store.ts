@@ -5,7 +5,7 @@
 // role as viz-state.ts for the canvas view, scoped to the observatory.
 
 // Les payloads serveur (summary, recommendations, sessions, modelCosts,
-// pricing) restent `unknown` : ce fichier les fait circuler sans jamais lire
+// pricing, skillUsage) restent `unknown` : ce fichier les fait circuler sans jamais lire
 // leur forme interne — c'est l'affaire des vues qui les affichent.
 export interface ObservatoryState {
   summary: unknown;
@@ -20,6 +20,7 @@ export interface ObservatoryState {
   includeMachine: boolean;
   modelCosts: unknown;
   pricing: unknown;
+  skillUsage: unknown;
 }
 
 const EMPTY = (): ObservatoryState => ({
@@ -35,6 +36,7 @@ const EMPTY = (): ObservatoryState => ({
   includeMachine: false,
   modelCosts: null,
   pricing: null,
+  skillUsage: null,
 });
 
 // Le client HTTP tel que les vues l'importent (`import * as api from './api.ts'`) —
@@ -118,6 +120,11 @@ export const loadPricing = (api: ApiClient) => run(async () => {
     api.fetchPricing(),
   ]);
   return { modelCosts, pricing };
+});
+
+export const loadSkills = (api: ApiClient) => run(async () => {
+  const { periodDays, includeMachine } = getState();
+  return { skillUsage: await api.fetchSkillUsage({ days: periodDays, includeMachine }) };
 });
 
 // After a status change the server decides what the list becomes — the page

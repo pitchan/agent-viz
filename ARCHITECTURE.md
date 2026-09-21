@@ -121,8 +121,8 @@ find src/web -type f ! -name "*.ts"   → src/web/viz.css
 
 ```
 src/web/               viz-state · viz-canvas · viz-layout · viz-ui · viz-network
-src/web/observatory/   les trois vues d'analyse : conseils, sessions, tarifs
-                       (trois vues d'un seul document — il n'y a qu'un `.html`)
+src/web/observatory/   les quatre vues d'analyse : conseils, sessions, tarifs, skills
+                       (quatre vues d'un seul document — il n'y a qu'un `.html`)
 ```
 
 **L'URL suit le disque** : la racine statique est `src/web/` (`staticHandler`)
@@ -137,7 +137,7 @@ Il ne parle au serveur que par le réseau, et depuis **trois fichiers** :
 | Fichier | Ce qu'il ouvre |
 |---|---|
 | `src/web/viz-network.ts` | le flux SSE `/stream` (`connectSSE`) et les appels du temps réel |
-| `src/web/observatory/api.ts` | le client HTTP des trois vues d'analyse |
+| `src/web/observatory/api.ts` | le client HTTP des quatre vues d'analyse |
 | `src/web/viz-watchdog-client.ts` | les alertes de surveillance |
 
 Aucun autre module n'ouvre le réseau. **Cette frontière-là piège la mesure trois
@@ -419,7 +419,7 @@ ne ralentit pas la session de l'utilisateur.
         └─ le serveur range le résultat dans
            ~/.agent-viz/observatory.db               (observatory/index.ts : DB_PATH)
               └─ servi en JSON par HTTP
-                    └─ les trois pages d'analyse     (src/web/observatory/)
+                    └─ les quatre pages d'analyse    (src/web/observatory/)
 ```
 
 Froid, rejoué au démarrage puis toutes les heures (`runAnalysisScan`, programmé
@@ -556,15 +556,15 @@ ligne : un ancrage `fichier:ligne` qui a glissé reste vert.
 
 ## 9. La plomberie de test
 
-**Un seul exécuteur, un seul arbre de tests dans 139 fichiers.**
+**Un seul exécuteur, un seul arbre de tests dans 142 fichiers.**
 
 ```
-find tests -name "*.test.ts" | wc -l   → 139
-npx vitest run                          → tous passés, 139 fichiers
+find tests -name "*.test.ts" | wc -l   → 142
+npx vitest run                          → tous passés, 142 fichiers
 ```
 
 vitest est le seul exécuteur (`include: tests/**/*.test.ts` de
-`vitest.config.mts`), et 139 `.test.ts` en sont l'unique dialecte : tous
+`vitest.config.mts`), et 142 `.test.ts` en sont l'unique dialecte : tous
 écrivent l'API de vitest (`import { test, expect } from 'vitest'`). Aucun
 pont, aucun second exécuteur. `tests/repo/architecture-test-counts.test.ts`
 compare ces nombres au disque et nomme l'écart s'il diverge.

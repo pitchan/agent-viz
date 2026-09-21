@@ -15,6 +15,8 @@ export interface ModelPrices {
 const PRICES: Record<string, ModelPrices> = {
   // Famille Claude 5 (2026).
   'claude-fable-5': { input: 1e-5, output: 5e-5, cacheCreate: 1.25e-5, cacheRead: 1e-6 },
+  // Même palier que Fable 5, sauf la relecture de cache : 0,25 $/M, soit 0,025 × l'entrée.
+  'claude-fable-5-1': { input: 1e-5, output: 5e-5, cacheCreate: 1.25e-5, cacheRead: 2.5e-7 },
   'claude-mythos-5': { input: 1e-5, output: 5e-5, cacheCreate: 1.25e-5, cacheRead: 1e-6 },
   'claude-opus-5': { input: 5e-6, output: 2.5e-5, cacheCreate: 6.25e-6, cacheRead: 5e-7 },
   'claude-sonnet-5': { input: 3e-6, output: 1.5e-5, cacheCreate: 3.75e-6, cacheRead: 3e-7 },
@@ -58,6 +60,7 @@ const ZERO_COST: Record<string, string> = {
 // les sert tels quels (src/server/pricing.ts).
 const MODEL_INFO: Record<string, { label: string; maxInput: number }> = {
   'claude-fable-5': { label: 'Fable 5', maxInput: 1_000_000 },
+  'claude-fable-5-1': { label: 'Fable 5.1', maxInput: 1_000_000 },
   'claude-mythos-5': { label: 'Mythos 5', maxInput: 1_000_000 },
   'claude-opus-5': { label: 'Opus 5', maxInput: 1_000_000 },
   'claude-sonnet-5': { label: 'Sonnet 5', maxInput: 1_000_000 },

@@ -24,6 +24,13 @@ export interface ModelCost {
   pricing: PricingKind;
 }
 
+export interface SkillCost {
+  /** Jetons des messages marqués attributionSkill, sous-agents compris. */
+  tokens: TokenBucket;
+  /** null dès qu'un de ces messages a un tarif inconnu : jamais un zéro silencieux. */
+  usd: number | null;
+}
+
 export interface TokensResult {
   main: TokenBucket;
   perAgent: Record<string, TokenBucket>;
@@ -41,6 +48,9 @@ export interface TokensResult {
   /** Dollars par modèle. Mêmes clés que perModel. La somme des `usd` non nuls
    *  vaut costUsd, au centime. */
   costByModel: Record<string, ModelCost>;
+  /** Coût attribué par skill (attribution de Claude Code). La somme des `usd` non nuls
+   *  ne dépasse jamais costUsd : ce sont des messages déjà comptés dans le total. */
+  costBySkill: Record<string, SkillCost>;
 }
 
 /**
@@ -54,6 +64,7 @@ export class TokensAggregator {
   private readonly perAgent: Record<string, TokenBucket> = {};
   private readonly perModel: Record<string, TokenBucket> = {};
   private readonly costByModel: Record<string, ModelCost> = {};
+  private readonly costBySkill: Record<string, SkillCost> = {};
   private cost = 0;
   private readonly unknown = new Set<string>();
   private malformed = 0;
@@ -90,6 +101,11 @@ export class TokensAggregator {
     } else {
       this.unknown.add(modelKey);
     }
+    if (evt.attributionSkill !== undefined) {
+      const sc = (this.costBySkill[evt.attributionSkill] ??= { tokens: emptyBucket(), usd: 0 });
+      addUsage(sc.tokens, evt.usage);
+      sc.usd = known && usd !== null && sc.usd !== null ? sc.usd + usd : null;
+    }
   }
 
   result(): TokensResult {
@@ -106,6 +122,7 @@ export class TokensAggregator {
       unknownModels: [...this.unknown].sort(),
       malformedUsageMessages: this.malformed,
       costByModel: this.costByModel,
+      costBySkill: this.costBySkill,
     };
   }
 }

@@ -9,6 +9,7 @@ function assistant(over: {
   usage?: Record<string, number>;
   usageVerdict?: UsageVerdict;
   timestamp?: string;
+  attributionSkill?: string;
 }): Extract<NormalizedEvent, { kind: 'assistant' }> {
   return {
     kind: 'assistant',
@@ -19,6 +20,7 @@ function assistant(over: {
     toolUses: [],
     textChars: 0,
     ...(over.timestamp !== undefined ? { timestamp: over.timestamp } : {}),
+    ...(over.attributionSkill !== undefined ? { attributionSkill: over.attributionSkill } : {}),
     isSidechain: false,
   };
 }
@@ -313,5 +315,61 @@ describe('TokensAggregator — coût par modèle (costByModel)', () => {
     expect(r.costComplete).toBe(false);
     expect(r.malformedUsageMessages).toBe(1);
     expect(r.unknownModels).toEqual([]);
+  });
+});
+
+describe('TokensAggregator — coût attribué par skill', () => {
+  test('un message attribué compte une fois pour son skill, même répété par bloc', () => {
+    // Arrange
+    const agg = new TokensAggregator();
+    const evt = assistant({ msgId: 'm1', attributionSkill: 'pptx', usage: { input_tokens: 100, output_tokens: 50 } });
+    // Act
+    agg.addAssistant(evt, 'main');
+    agg.addAssistant(evt, 'main');
+    // Assert
+    expect(agg.result().costBySkill['pptx']?.tokens.in).toBe(100);
+  });
+
+  test('un message sans attribution ne compte pour aucun skill', () => {
+    // Arrange
+    const agg = new TokensAggregator();
+    // Act
+    agg.addAssistant(assistant({ msgId: 'm1' }), 'main');
+    // Assert
+    expect(agg.result().costBySkill).toEqual({});
+  });
+
+  test("le message attribué d'un sous-agent compte pour le skill", () => {
+    // Arrange
+    const agg = new TokensAggregator();
+    // Act
+    agg.addAssistant(assistant({ msgId: 'a1', attributionSkill: 'pptx', usage: { input_tokens: 7, output_tokens: 0 } }), 'agent-x');
+    // Assert
+    expect(agg.result().costBySkill['pptx']?.tokens.in).toBe(7);
+  });
+
+  test('les dollars du skill sont ceux de ses messages, au même tarif que le total', () => {
+    // Arrange
+    const withSkill = assistant({ msgId: 'm1', attributionSkill: 'pptx', usage: { input_tokens: 1000, output_tokens: 2000 } });
+    const alsoSkill = assistant({ msgId: 'm2', attributionSkill: 'pptx', model: 'claude-haiku-4-5', usage: { input_tokens: 500, output_tokens: 100 } });
+    const plain = assistant({ msgId: 'm3', usage: { input_tokens: 9000, output_tokens: 9000 } });
+    const onlySkill = new TokensAggregator();
+    onlySkill.addAssistant(withSkill, 'main');
+    onlySkill.addAssistant(alsoSkill, 'main');
+    const all = new TokensAggregator();
+    // Act
+    for (const e of [withSkill, alsoSkill, plain]) all.addAssistant(e, 'main');
+    // Assert
+    expect(all.result().costBySkill['pptx']?.usd).toBeCloseTo(onlySkill.result().costUsd, 12);
+  });
+
+  test('un tarif inconnu rend le coût du skill null, jamais un zéro', () => {
+    // Arrange
+    const agg = new TokensAggregator();
+    // Act
+    agg.addAssistant(assistant({ msgId: 'm1', attributionSkill: 'pptx' }), 'main');
+    agg.addAssistant(assistant({ msgId: 'm2', attributionSkill: 'pptx', model: 'modele-inconnu-x' }), 'main');
+    // Assert
+    expect(agg.result().costBySkill['pptx']?.usd).toBe(null);
   });
 });

@@ -7,6 +7,7 @@ import { SessionClock } from './aggregators/clock.ts';
 import { PromptsAggregator } from './aggregators/prompts.ts';
 import { ReadsAggregator } from './aggregators/reads.ts';
 import { SessionKindAggregator } from './aggregators/session-kind.ts';
+import { SkillsAggregator } from './aggregators/skills.ts';
 import { SubagentsAggregator } from './aggregators/subagents.ts';
 import { netTokens, TokensAggregator } from './aggregators/tokens.ts';
 import { ToolResultsAggregator } from './aggregators/tool-results.ts';
@@ -25,6 +26,7 @@ export async function scanSession(ref: SessionRef, maxPrompts: number): Promise<
   const context = new ContextAggregator();
   const prompts = new PromptsAggregator(maxPrompts);
   const verification = new VerificationAggregator();
+  const skills = new SkillsAggregator();
   const spawnSeen = new Set<string>();
   let events = 0;
   let parseErrors = 0;
@@ -56,6 +58,7 @@ export async function scanSession(ref: SessionRef, maxPrompts: number): Promise<
             for (const tu of evt.toolUses) {
               toolResults.registerToolUse(tu);
               reads.registerToolUse(tu);
+              skills.addToolUse(tu);
               // La même ligne assistant est répétée par content block : dédup des spawns par id.
               if (agentKey === 'main' && !spawnSeen.has(tu.id)) {
                 spawnSeen.add(tu.id);
@@ -80,6 +83,9 @@ export async function scanSession(ref: SessionRef, maxPrompts: number): Promise<
             break;
           case 'compact':
             context.addCompact(evt, agentKey);
+            break;
+          case 'skill_listing':
+            skills.addListing(evt);
             break;
           case 'meta':
             break;
@@ -135,6 +141,7 @@ export async function scanSession(ref: SessionRef, maxPrompts: number): Promise<
     context: context.result(),
     prompts: prompts.result(),
     verification: verification.result(),
+    skills: skills.result(),
     events,
     parseErrors,
     otherEventTypes,

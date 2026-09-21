@@ -508,8 +508,8 @@ canvas { display: block; width: 100%; height: 100%; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(102,204,255,0.12); border-radius: 2px; }
 
-/* ─── Observatory panels (Conseils / Sessions analysées / Jetons & tarifs) ─── */
-#advisor-overlay, #analysis-overlay, #pricing-overlay {
+/* ─── Observatory panels (Conseils / Sessions analysées / Jetons & tarifs / Skills) ─── */
+#advisor-overlay, #analysis-overlay, #pricing-overlay, #skills-overlay {
   display: none;
   position: absolute; top: 24px; left: 24px; right: 24px; bottom: 24px;
   /* Above the activity feed and the toolbar (50) and the sessions overlay
@@ -517,10 +517,10 @@ canvas { display: block; width: 100%; height: 100%; }
      of them would hide a column of the table. */
   padding: 16px; z-index: 70;
 }
-#advisor-overlay.visible, #analysis-overlay.visible, #pricing-overlay.visible {
+#advisor-overlay.visible, #analysis-overlay.visible, #pricing-overlay.visible, #skills-overlay.visible {
   display: flex; flex-direction: column; animation: slide-up 0.2s ease-out;
 }
-#advisor-header, #analysis-header, #pricing-header {
+#advisor-header, #analysis-header, #pricing-header, #skills-header {
   display: flex; align-items: center; gap: 12px; margin-bottom: 8px;
   padding-bottom: 8px; border-bottom: 1px solid var(--glass-border);
   font-size: 12px; font-weight: 600; color: var(--holo-bright);
@@ -568,7 +568,7 @@ canvas { display: block; width: 100%; height: 100%; }
 }
 #advisor-rescan { margin-left: auto; }
 .advisor-scan-progress { color: var(--holo); margin-top: 4px; }
-#advisor-summary, #analysis-summary, #pricing-summary {
+#advisor-summary, #analysis-summary, #pricing-summary, #skills-summary {
   font-size: 11px; color: var(--text-dim); margin-bottom: 12px;
   font-variant-numeric: tabular-nums;
 }
@@ -578,15 +578,15 @@ canvas { display: block; width: 100%; height: 100%; }
    header — and its close button — stays reachable at any scroll depth.
    min-height: 0 lets a flex child shrink below its content height; without
    it the zone never scrolls. */
-#advisor-header, #analysis-header, #pricing-header,
-#advisor-period, #analysis-controls, #pricing-period,
-#advisor-summary, #analysis-summary, #pricing-summary,
+#advisor-header, #analysis-header, #pricing-header, #skills-header,
+#advisor-period, #analysis-controls, #pricing-period, #skills-period,
+#advisor-summary, #analysis-summary, #pricing-summary, #skills-summary,
 #advisor-footer { flex-shrink: 0; }
 /* Conseils a DEUX blocs de contenu — les pannes puis les recommandations — et
    un seul ascenseur pour les deux : si seul #advisor-list defilait, deplier un
    groupe de pannes pousserait les recommandations ET le pied de page hors du
    panneau, sans ascenseur pour les rattraper. */
-#advisor-body, #analysis-list, #pricing-body {
+#advisor-body, #analysis-list, #pricing-body, #skills-body {
   flex: 1; min-height: 0; overflow-y: auto;
 }
 #advisor-body { padding-right: 6px; }
@@ -679,6 +679,9 @@ canvas { display: block; width: 100%; height: 100%; }
 .pricing-notice-meta { font-size: 11px; color: var(--text-muted); margin-top: 12px; font-variant-numeric: tabular-nums; }
 .pricing-zero-cost { font-size: 11px; color: var(--text-dim); margin: 6px 0 0 16px; }
 .pricing-note { font-size: 11px; color: var(--text-dim); margin: 6px 0; }
+.skills-unused { margin: 10px 0; }
+.skills-unused summary { cursor: pointer; font-size: 11px; color: var(--text-dim); }
+.skills-unused td { color: var(--text-muted); }
 
 /* Bloc « Pannes » — en tete du tiroir Conseils, la seule surface du produit
    ou une panne survit a la session qui l'a produite. */

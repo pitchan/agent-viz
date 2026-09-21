@@ -1,4 +1,4 @@
-// The ten analysis endpoints: response shapes, guards, and the answer to a
+// The eleven analysis endpoints: response shapes, guards, and the answer to a
 // failing service. The service is injected, so no SQLite file and no engine
 // are needed.
 
@@ -39,6 +39,10 @@ const SERVICE = {
     totals: { netTokens: 10, costUsd: 1, costComplete: true, cacheReadTokens: 0 },
     unknownModels: [], excludedPendingRescan: 0, basis: null, period: null,
   }),
+  skillUsage: async () => ({
+    skills: [{ skill: 'pptx', offeredSessions: 2, usedSessions: 1, usedShare: 0.5, calls: 1, netTokens: 10, usd: 1, shareOfCost: 0.5 }],
+    sessionsCounted: 2, excludedPendingRescan: 0, basis: null, period: null,
+  }),
   pricing: async () => ({
     priceTable: { source: 'netgain-table-embarquee', unit: 'usd-par-jeton', entries: [], zeroCost: [] },
     provenance: { scanVersion: 6, engineVersion: '0.13.0', priceSource: 'netgain-table-embarquee', sections: [] },
@@ -59,12 +63,12 @@ function router(service = SERVICE) {
   };
 }
 
-test('the ten analysis routes are declared with their methods', () => {
+test('the eleven analysis routes are declared with their methods', () => {
   const declared = createObservatoryRoutes(() => SERVICE)
     .map(r => `${r.method} ${r.path || r.prefix}`).sort();
   expect(declared).toEqual([
     'GET /analysis/models', 'GET /analysis/session/', 'GET /analysis/sessions',
-    'GET /analysis/summary', 'GET /config/audit', 'GET /pricing', 'GET /recommendations',
+    'GET /analysis/skills', 'GET /analysis/summary', 'GET /config/audit', 'GET /pricing', 'GET /recommendations',
     'POST /analysis/purge', 'POST /analysis/scan', 'POST /recommendations/',
   ]);
 });
@@ -263,6 +267,28 @@ test('GET /analysis/models forwards days and includeMachine to the service', asy
   let got;
   const spy = { ...SERVICE, modelCosts: async (opts: any) => { got = opts; return {}; } } as unknown as Service;
   await router(spy)('GET', '/analysis/models?days=7&includeMachine=1');
+  expect(got).toEqual({ days: 7, includeMachine: true });
+});
+
+test('GET /analysis/skills returns the per-skill usage and names its price source', async () => {
+  // Arrange
+  const call = router();
+  // Act
+  const res = await call('GET', '/analysis/skills');
+  // Assert
+  expect(res.statusCode).toBe(200);
+  const body = JSON.parse(res.body);
+  expect(body.skills[0].skill).toBe('pptx');
+  expect(body.priceSource).toBe('netgain-table-embarquee');
+});
+
+test('GET /analysis/skills forwards days and includeMachine to the service', async () => {
+  // Arrange
+  let got;
+  const spy = { ...SERVICE, skillUsage: async (opts: any) => { got = opts; return {}; } } as unknown as Service;
+  // Act
+  await router(spy)('GET', '/analysis/skills?days=7&includeMachine=1');
+  // Assert
   expect(got).toEqual({ days: 7, includeMachine: true });
 });
 

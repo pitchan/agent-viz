@@ -31,6 +31,17 @@ export interface TokenBucket {
   cacheCreate5m: number;
 }
 
+// Faits de SCAN_VERSION 11 : un rapport stocké avant ne les porte pas, et skill-usage.ts
+// écarte la session en la comptant, comme model-costs.ts pour costByModel.
+export interface SkillFacts {
+  listed: string[];
+  calls: Record<string, number>;
+}
+export interface SkillCost {
+  tokens: TokenBucket;
+  usd: number | null;
+}
+
 export interface SessionReport {
   // Le moteur le rend null quand aucune ligne du transcript ne porte
   // meta.cwd (src/engine/doctor/report/types.ts:14, scan-session.ts l.32,
@@ -76,6 +87,7 @@ export interface SessionReport {
     total: TokenBucket;
     unknownModels: string[];
     costByModel?: Record<string, { usd: number | null; pricing: string }>;
+    costBySkill?: Record<string, SkillCost>;
   };
   // Fait de SCAN_VERSION 8 : un rapport stocké avant ne le porte pas, et R7 écarte la session
   // plutôt que de lui prêter une forme (comme costByModel). Vue restreinte de VerificationStats
@@ -89,6 +101,7 @@ export interface SessionReport {
     filesAfterLastVerificationTotal: number;
     tokensAfterLastVerification: number;
   };
+  skills?: SkillFacts;
 }
 
 export interface Session {
