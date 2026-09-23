@@ -9,7 +9,7 @@
 import * as api from './api.ts';
 import { getState, subscribe, loadPricing } from './store.ts';
 import {
-  formatTokens, formatUsdExact, formatUsdPerMTok, formatShare, modelLabel,
+  formatTokens, formatUsdExact, formatUsdPerMTok, formatShare, modelLabel, adoptionNote,
   basisLabel, periodHeader, type Period, type SummaryBasis,
 } from './format.ts';
 import { initPeriodSelector } from './period-selector.ts';
@@ -53,6 +53,7 @@ interface TariffEntry {
   current: { input: number; output: number; cacheCreate: number; cacheRead: number };
   maxInput: number;
   history: TariffPeriod[];
+  adopted: { source: string; adoptedAt: string; from: string | null } | null;
 }
 
 interface ZeroCostEntry {
@@ -148,7 +149,7 @@ function buildTariffTable(priceTable: PriceTable) {
   table.appendChild(headerRow(TARIFF_HEADERS));
   for (const e of priceTable.entries) {
     table.appendChild(cellRow([
-      e.label,
+      e.adopted ? `${e.label} (${adoptionNote(e.adopted)})` : e.label,
       formatUsdPerMTok(e.current.input), formatUsdPerMTok(e.current.output),
       formatUsdPerMTok(e.current.cacheCreate), formatUsdPerMTok(e.current.cacheRead),
       formatTokens(e.maxInput),

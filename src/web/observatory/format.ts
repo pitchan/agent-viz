@@ -278,3 +278,8 @@ export function formatUsdExact(n: number) {
   const s = formatUsd(n);
   return n > 0 && s === '0,00 $' ? '< 0,01 $' : s;
 }
+
+// La date seule suffit : l'heure d'un clic n'aide pas à juger un tarif.
+export function adoptionNote(mark: { source: string; adoptedAt: string; from: string | null } | null): string {
+  return mark === null ? '' : `LiteLLM, adopté le ${mark.adoptedAt.slice(0, 10)}`;
+}
