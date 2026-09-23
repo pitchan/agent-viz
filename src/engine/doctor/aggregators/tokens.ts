@@ -78,8 +78,8 @@ export class TokensAggregator {
     const bucket = agentKey === 'main' ? this.main : (this.perAgent[agentKey] ??= emptyBucket());
     addUsage(bucket, evt.usage);
 
-    // Le tarif appliqué est celui en vigueur à la date du message (les barèmes
-    // changent — ex. Sonnet 5 lancement→catalogue au 2026-09-01).
+    // Le tarif appliqué est celui en vigueur à la date du message : un changement
+    // de prix adopté ne réécrit pas les messages d'avant.
     const { usd, known, model } = this.pricing.computeCost(evt.usage, evt.model, evt.timestamp);
     const modelKey = model ?? '(inconnu)';
     addUsage((this.perModel[modelKey] ??= emptyBucket()), evt.usage);

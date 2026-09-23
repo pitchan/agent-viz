@@ -6,9 +6,14 @@
 //   - the inline subagent bucket creation uses the full newBucket() shape so
 //     pricing fields (costUsd, lastModel, contextMax) don't end up undefined
 
-import { expect, test } from 'vitest';
+import { afterEach, expect, test } from 'vitest';
 import { _internals } from '../../src/server/transcript.ts';
 import { ensureTokens } from '../../src/server/tokens.ts';
+import { applyAdoptedPrices } from '../../src/server/pricing-state.ts';
+import { HAUSSE_SONNET_5 } from '../helpers/tariff-change.ts';
+
+// Le barème du serveur est un état de module : chaque test repart de la table embarquée.
+afterEach(() => applyAdoptedPrices({}));
 import type { SessionRecord } from '../../src/server/session-index.ts';
 
 const { parseTranscriptEvent } = _internals;
@@ -46,9 +51,10 @@ test('main-thread assistant line populates main bucket with model + cost', () =>
 });
 
 test('main-thread line is billed at the tariff in effect at its timestamp', () => {
-  // The transcript line carries `timestamp`; it must travel down to pricing so
-  // a September sonnet-5 message costs sticker rate (3e-6/token input) even if
-  // the transcript is (re)parsed during the intro-price window.
+  // The transcript line carries `timestamp`; it must travel down to pricing so,
+  // with the fictional sonnet-5 raise adopted, a message dated after it costs
+  // the new rate (3e-6/token input) whenever the transcript is (re)parsed.
+  applyAdoptedPrices(HAUSSE_SONNET_5);
   const rec = freshRec();
   const line = JSON.stringify({
     type: 'assistant',
@@ -63,7 +69,7 @@ test('main-thread line is billed at the tariff in effect at its timestamp', () =
     },
   });
   expect(parseTranscriptEvent(line, rec)).toBe(true);
-  expect(Math.abs(rec.tokens.main.costUsd - 0.003) < 1e-12, `got ${rec.tokens.main.costUsd}, expected 0.003 (sticker rate at message date)`).toBeTruthy();
+  expect(Math.abs(rec.tokens.main.costUsd - 0.003) < 1e-12, `got ${rec.tokens.main.costUsd}, expected 0.003 (rate at message date)`).toBeTruthy();
 });
 
 test('subagent agent_progress line populates perAgent bucket with model + cost', () => {

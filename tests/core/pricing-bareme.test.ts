@@ -40,11 +40,10 @@ test('claude-opus-5 : mêmes tarifs qu’opus-4-8 (5 $/M, 25 $/M)', () => {
   expect(r.usd).toBeCloseTo(0.19, 12);
 });
 
-test('claude-sonnet-5 après le 2026-09-01 : prix catalogue 3 $/M entrée, 15 $/M sortie', () => {
-  // 0.003 + 0.03 + 4000×3.75e-6 + 6000×6e-6 + 0.03 = 0.114
-  const r = computeCost(usage, 'claude-sonnet-5', '2026-09-01T00:00:00.000Z');
+test('claude-sonnet-5 en septembre 2026 : toujours 2 $/M entrée, 10 $/M sortie (hausse annoncée annulée)', () => {
+  const r = computeCost(usage, 'claude-sonnet-5', '2026-09-15T00:00:00.000Z');
   expect(r.known).toBe(true);
-  expect(r.usd).toBeCloseTo(0.114, 12);
+  expect(r.usd).toBeCloseTo(0.076, 12);
 });
 
 test('contre-preuve carte observatoire : 1,2 M jetons cache 1h sur fable-5 = 24 $', () => {
@@ -58,7 +57,7 @@ test('contre-preuve carte observatoire : 1,2 M jetons cache 1h sur fable-5 = 24 
   expect(r.usd).toBeCloseTo(24.0, 9);
 });
 
-test('claude-sonnet-5 daté d’août 2026 : tarif de lancement 2 $/M entrée, 10 $/M sortie', () => {
+test('claude-sonnet-5 en août 2026 : 2 $/M entrée, 10 $/M sortie', () => {
   // 1000×2e-6 + 2000×1e-5 + 4000×2.5e-6 + 6000×(2e-6×2) + 100000×2e-7
   // = 0.002 + 0.02 + 0.01 + 0.024 + 0.02 = 0.076
   const r = computeCost(usage, 'claude-sonnet-5', '2026-08-15T12:00:00.000Z');
@@ -66,12 +65,6 @@ test('claude-sonnet-5 daté d’août 2026 : tarif de lancement 2 $/M entrée, 1
   expect(r.usd).toBeCloseTo(0.076, 12);
 });
 
-test('la frontière est exclusive : dernier instant du 31/08 = lancement, minuit du 01/09 = catalogue', () => {
-  const avant = computeCost(usage, 'claude-sonnet-5', '2026-08-31T23:59:59.999Z');
-  const apres = computeCost(usage, 'claude-sonnet-5', '2026-09-01T00:00:00.000Z');
-  expect(avant.usd).toBeCloseTo(0.076, 12);
-  expect(apres.usd).toBeCloseTo(0.114, 12);
-});
 
 test('un modèle sans changement de tarif ignore la date (fable-5 identique à toute date)', () => {
   expect(computeCost(usage, 'claude-fable-5', '2026-08-15T12:00:00.000Z').usd).toBeCloseTo(0.38, 12);

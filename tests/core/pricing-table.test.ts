@@ -3,25 +3,22 @@
 import { expect, test } from 'vitest';
 import { computeCost, priceTable } from '../../src/engine/core/pricing.ts';
 
-test('source, unité, et les 12 modèles de la table courante', () => {
+test('source, unité, et les 14 modèles de la table courante', () => {
   const t = priceTable();
   expect(t.source).toBe('netgain-table-embarquee');
   expect(t.unit).toBe('usd-par-jeton');
   expect(t.entries.map((e) => e.model).sort()).toEqual([
-    'claude-fable-5', 'claude-fable-5-1', 'claude-haiku-4-5', 'claude-mythos-5', 'claude-opus-4-5',
-    'claude-opus-4-6', 'claude-opus-4-7', 'claude-opus-4-8', 'claude-opus-5',
+    'claude-fable-5', 'claude-fable-5-1', 'claude-haiku-4-5', 'claude-mythos-5', 'claude-mythos-5-1', 'claude-opus-4-5',
+    'claude-opus-4-6', 'claude-opus-4-7', 'claude-opus-4-8', 'claude-opus-5', 'claude-opus-5-5',
     'claude-sonnet-4-5', 'claude-sonnet-4-6', 'claude-sonnet-5',
   ]);
 });
 
-test('sonnet-5 porte sa période datée ; un modèle sans histoire a une liste vide', () => {
+test('sonnet-5 est au tarif 2/10 sans période datée : la hausse annoncée n’a pas eu lieu', () => {
   const t = priceTable();
   const sonnet = t.entries.find((e) => e.model === 'claude-sonnet-5');
-  expect(sonnet?.current.input).toBe(3e-6);
-  expect(sonnet?.history).toEqual([
-    { until: '2026-09-01', prices: { input: 2e-6, output: 1e-5, cacheCreate: 2.5e-6, cacheRead: 2e-7 } },
-  ]);
-  expect(t.entries.find((e) => e.model === 'claude-fable-5')?.history).toEqual([]);
+  expect(sonnet?.current).toEqual({ input: 2e-6, output: 1e-5, cacheCreate: 2.5e-6, cacheRead: 2e-7 });
+  expect(sonnet?.history).toEqual([]);
 });
 
 test('zeroCost liste les modèles à zéro voulu AVEC leurs raisons', () => {

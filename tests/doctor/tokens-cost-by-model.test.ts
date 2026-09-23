@@ -4,6 +4,7 @@ import { expect, test } from 'vitest';
 import { embeddedPricing } from '../../src/engine/core/pricing.ts';
 import { TokensAggregator } from '../../src/engine/doctor/aggregators/tokens.ts';
 import { assistant } from '../helpers/tokens-events.ts';
+import { pricingAvecHausse } from '../helpers/tariff-change.ts';
 
 test('invariant au centime : la somme des usd non nuls vaut costUsd', () => {
   const agg = new TokensAggregator(embeddedPricing);
@@ -21,11 +22,11 @@ test('invariant au centime : la somme des usd non nuls vaut costUsd', () => {
 test('tarif daté PAR MODÈLE : les deux barèmes sonnet-5 s’additionnent, pas 2× le courant', () => {
   // C'est le test qui justifie de modifier le moteur plutôt que de recalculer
   // en aval : un seau agrégé ne sait plus dater ses messages.
-  const agg = new TokensAggregator(embeddedPricing);
+  const agg = new TokensAggregator(pricingAvecHausse);
   agg.addAssistant(assistant({ msgId: 'd1', model: 'claude-sonnet-5', usage: { input_tokens: 1000, output_tokens: 0 }, timestamp: '2026-08-15T10:00:00.000Z' }), 'main');
   agg.addAssistant(assistant({ msgId: 'd2', model: 'claude-sonnet-5', usage: { input_tokens: 1000, output_tokens: 0 }, timestamp: '2026-09-15T10:00:00.000Z' }), 'main');
   const r = agg.result();
-  // 1000×2e-6 (lancement) + 1000×3e-6 (catalogue) = 0.005 — ni 0.004 ni 0.006.
+  // 1000×2e-6 (avant) + 1000×3e-6 (après) = 0.005 — ni 0.004 ni 0.006.
   expect(r.costByModel['claude-sonnet-5']?.usd).toBeCloseTo(0.005, 12);
   expect(r.costByModel['claude-sonnet-5']?.pricing).toBe('tarife');
 });

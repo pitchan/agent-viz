@@ -66,41 +66,6 @@ export function blocsTropLongs(lignes: string[], limite = LIMITE_BLOC) {
 // ligne : un numéro se périme au premier ajout au-dessus.
 const LISTE_BLANCHE = [
   {
-    fichier: 'src/engine/core/pricing.ts',
-    fragment: 'tarif de lancement',
-    raison: "la table des prix porte la date de fin du tarif de lancement de Sonnet 5, et `getPrice` compare la date du message à cette donnée",
-  },
-  {
-    fichier: 'src/engine/doctor/aggregators/tokens.ts',
-    fragment: 'lancement→catalogue',
-    raison: "la date de bascule du tarif de Sonnet 5 est la donnée qui explique deux coûts différents pour le même modèle",
-  },
-  {
-    fichier: 'tests/doctor/tokens.test.ts',
-    fragment: 'change de tarif le',
-    raison: "le test épingle le coût de part et d'autre de la bascule de tarif : cette date est la donnée sous test",
-  },
-  {
-    fichier: 'tests/unit/pricing.test.ts',
-    fragment: 'an explicit post-2026-09-01 date pins',
-    raison: "le test fixe la date du message pour choisir le tarif catalogue : cette date est la donnée sous test",
-  },
-  {
-    fichier: 'tests/unit/pricing.test.ts',
-    fragment: 'From 2026-09-01 the embedded table',
-    raison: "la date de bascule dit quel tarif la table embarquée rend : elle est la donnée sous test",
-  },
-  {
-    fichier: 'tests/unit/pricing.test.ts',
-    fragment: 'dated intro period',
-    raison: "la date de fin du tarif de lancement est la donnée que ce test fait franchir à `getPrice`",
-  },
-  {
-    fichier: 'tests/unit/tokens.test.ts',
-    fragment: 'changes tariff on',
-    raison: "le test compte les jetons au tarif de lancement puis au tarif catalogue : cette date sépare les deux",
-  },
-  {
     fichier: 'tests/audit/d1-clones.test.ts',
     fragment: "l'étape 2 regroupe sur la séquence de jetons",
     raison: "« étape 2 » nomme une étape de l'algorithme du détecteur de clones, pas une étape de chantier : c'est le mécanisme que ce test décrit",

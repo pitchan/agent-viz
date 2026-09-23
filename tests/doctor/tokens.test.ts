@@ -2,6 +2,7 @@ import { expect, test } from 'vitest';
 import { embeddedPricing } from '../../src/engine/core/pricing.ts';
 import { netTokens, TokensAggregator } from '../../src/engine/doctor/aggregators/tokens.ts';
 import { assistant } from '../helpers/tokens-events.ts';
+import { pricingAvecHausse } from '../helpers/tariff-change.ts';
 
 test('déduplique par message.id : une ligne par content block, un seul comptage', () => {
   const agg = new TokensAggregator(embeddedPricing);
@@ -84,10 +85,9 @@ test('modèle inconnu : tokens comptés, coût incomplet signalé, jamais un zé
 });
 
 test('le coût est calculé au tarif en vigueur à la date du message, pas à la date du scan', () => {
-  // sonnet-5 change de tarif le 2026-09-01 (2→3 $/M en entrée). Un message
-  // horodaté septembre doit être facturé au catalogue même si le scan tourne
-  // pendant la fenêtre de lancement.
-  const agg = new TokensAggregator(embeddedPricing);
+  // Avec la hausse fictive de sonnet-5 (2→3 $/M en entrée), un message horodaté
+  // après la hausse est facturé au nouveau tarif, quelle que soit la date du scan.
+  const agg = new TokensAggregator(pricingAvecHausse);
   agg.addAssistant(
     assistant({
       msgId: 'm1',

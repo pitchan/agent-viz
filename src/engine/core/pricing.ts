@@ -17,9 +17,14 @@ const PRICES: Record<string, ModelPrices> = {
   'claude-fable-5': { input: 1e-5, output: 5e-5, cacheCreate: 1.25e-5, cacheRead: 1e-6 },
   // Même palier que Fable 5, sauf la relecture de cache : 0,25 $/M, soit 0,025 × l'entrée.
   'claude-fable-5-1': { input: 1e-5, output: 5e-5, cacheCreate: 1.25e-5, cacheRead: 2.5e-7 },
+  'claude-mythos-5-1': { input: 1e-5, output: 5e-5, cacheCreate: 1.25e-5, cacheRead: 2.5e-7 },
   'claude-mythos-5': { input: 1e-5, output: 5e-5, cacheCreate: 1.25e-5, cacheRead: 1e-6 },
+  // Relecture de cache à 0,05 × l'entrée, et non 0,1 × comme les autres Opus.
+  'claude-opus-5-5': { input: 4e-6, output: 2e-5, cacheCreate: 5e-6, cacheRead: 2e-7 },
   'claude-opus-5': { input: 5e-6, output: 2.5e-5, cacheCreate: 6.25e-6, cacheRead: 5e-7 },
-  'claude-sonnet-5': { input: 3e-6, output: 1.5e-5, cacheCreate: 3.75e-6, cacheRead: 3e-7 },
+  // Le tarif de lancement est devenu le tarif normal : la hausse à 3/15 annoncée
+  // n'a pas eu lieu (page des tarifs d'Anthropic).
+  'claude-sonnet-5': { input: 2e-6, output: 1e-5, cacheCreate: 2.5e-6, cacheRead: 2e-7 },
   'claude-opus-4-8': { input: 5e-6, output: 2.5e-5, cacheCreate: 6.25e-6, cacheRead: 5e-7 },
   'claude-opus-4-7': { input: 5e-6, output: 2.5e-5, cacheCreate: 6.25e-6, cacheRead: 5e-7 },
   'claude-opus-4-6': { input: 5e-6, output: 2.5e-5, cacheCreate: 6.25e-6, cacheRead: 5e-7 },
@@ -38,13 +43,7 @@ export interface PricePeriod {
   until: string;
   prices: ModelPrices;
 }
-const PRICE_HISTORY: Record<string, PricePeriod[]> = {
-  // Sonnet 5 : tarif de lancement 2/10 $ le MTok jusqu'au 2026-08-31 inclus
-  // (annonce Anthropic), catalogue 3/15 ensuite.
-  'claude-sonnet-5': [
-    { until: '2026-09-01', prices: { input: 2e-6, output: 1e-5, cacheCreate: 2.5e-6, cacheRead: 2e-7 } },
-  ],
-};
+const PRICE_HISTORY: Record<string, PricePeriod[]> = {};
 
 // Zéro VOULU : modèles non facturables PAR NATURE — un 0 $ inscrit ici et commenté,
 // jamais un tarif qu'on ignore. La règle « jamais de zéro silencieux » porte
@@ -62,6 +61,8 @@ const MODEL_INFO: Record<string, { label: string; maxInput: number }> = {
   'claude-fable-5': { label: 'Fable 5', maxInput: 1_000_000 },
   'claude-fable-5-1': { label: 'Fable 5.1', maxInput: 1_000_000 },
   'claude-mythos-5': { label: 'Mythos 5', maxInput: 1_000_000 },
+  'claude-mythos-5-1': { label: 'Mythos 5.1', maxInput: 1_000_000 },
+  'claude-opus-5-5': { label: 'Opus 5.5', maxInput: 1_000_000 },
   'claude-opus-5': { label: 'Opus 5', maxInput: 1_000_000 },
   'claude-sonnet-5': { label: 'Sonnet 5', maxInput: 1_000_000 },
   'claude-opus-4-8': { label: 'Opus 4.8', maxInput: 1_000_000 },

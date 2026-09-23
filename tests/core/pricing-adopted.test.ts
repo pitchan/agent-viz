@@ -17,13 +17,13 @@ function adoption(over: Partial<AdoptedPrice> = {}): AdoptedPrice {
 
 test('un modèle nouveau adopté est tarifé pour tout message', () => {
   // Arrange
-  const pricing = createPricing({ 'claude-opus-5-5': [adoption()] });
+  const pricing = createPricing({ 'claude-opus-6': [adoption()] });
 
   // Act
-  const r = pricing.computeCost(usage, 'claude-opus-5-5', '2020-01-01T00:00:00.000Z');
+  const r = pricing.computeCost(usage, 'claude-opus-6', '2020-01-01T00:00:00.000Z');
 
   // Assert
-  expect(r).toMatchObject({ known: true, model: 'claude-opus-5-5' });
+  expect(r).toMatchObject({ known: true, model: 'claude-opus-6' });
   expect(r.usd).toBeCloseTo(4, 12);
 });
 
@@ -74,14 +74,14 @@ test('un tarif différent est ignoré quand le tarif embarqué n’est plus celu
 
 test('priceTable liste le modèle adopté, marqué, avec un libellé lisible', () => {
   // Arrange
-  const pricing = createPricing({ 'claude-opus-5-5': [adoption()] });
+  const pricing = createPricing({ 'claude-opus-6': [adoption()] });
 
   // Act
-  const e = pricing.priceTable().entries.find((x) => x.model === 'claude-opus-5-5');
+  const e = pricing.priceTable().entries.find((x) => x.model === 'claude-opus-6');
 
   // Assert
   expect(e).toMatchObject({
-    label: 'Opus 5.5', maxInput: 1_000_000, history: [],
+    label: 'Opus 6', maxInput: 1_000_000, history: [],
     adopted: { source: 'litellm', adoptedAt: '2026-09-23T10:00:00.000Z', from: null },
   });
 });
@@ -118,4 +118,15 @@ test('un id qui est une propriété héritée d’objet reste inconnu', () => {
 
   // Assert
   expect(r).toMatchObject({ usd: null, known: false });
+});
+
+test('la frontière `from` est inclusive : un message à l’instant même prend le nouveau tarif', () => {
+  // Arrange
+  const pricing = createPricing({ 'claude-opus-5': [adoption({ from: '2026-09-20T00:00:00.000Z', replaces: OPUS_5 })] });
+
+  // Act
+  const r = pricing.computeCost(usage, 'claude-opus-5', '2026-09-20T00:00:00.000Z');
+
+  // Assert
+  expect(r.usd).toBeCloseTo(4, 12);
 });

@@ -123,8 +123,7 @@ interface Drift {
 // tariff on a known model, or a new canonical Claude model we do not carry.
 // It never writes into the price map itself: a price enters only through the
 // user's adoption (price-adoption.ts). `at` (tests) defaults to "now": the
-// comparison is against the rate in effect at that instant, which is exactly
-// why sonnet-5's intro-rate representation in LiteLLM is not a false alarm.
+// comparison is against the rate in effect at that instant.
 //
 // "New model" rule: a canonical id ABSENT from the table is reported ONLY when
 // its version is ABOVE the family's known max. Taken literally, "absent from

@@ -1,7 +1,12 @@
 // Smoke test for the cumulative + last-wins logic in src/server/tokens.ts.
 
-import { expect, test } from 'vitest';
+import { afterEach, expect, test } from 'vitest';
 import { newBucket, accumulateUsage, ensureTokens, tokensSnapshot, tokensMessage } from '../../src/server/tokens.ts';
+import { applyAdoptedPrices } from '../../src/server/pricing-state.ts';
+import { HAUSSE_SONNET_5 } from '../helpers/tariff-change.ts';
+
+// Le barème du serveur est un état de module : chaque test repart de la table embarquée.
+afterEach(() => applyAdoptedPrices({}));
 
 test('accumulateUsage cumulates totals AND tracks the last message values', () => {
   const b = newBucket();
@@ -33,12 +38,12 @@ test('accumulateUsage cumulates totals AND tracks the last message values', () =
 });
 
 test('accumulateUsage prices each message at its own timestamp, not at scan time', () => {
-  // sonnet-5 changes tariff on 2026-09-01 (intro 2 $/M -> sticker 3 $/M input).
-  // A September-dated message must be billed at the sticker rate even when the
-  // accumulation runs during the intro window.
+  // With the fictional sonnet-5 raise adopted (2 -> 3 $/M input), a message dated
+  // after the raise is billed at the new rate, whenever the accumulation runs.
+  applyAdoptedPrices(HAUSSE_SONNET_5);
   const b = newBucket();
   accumulateUsage(b, { input_tokens: 1000 }, 'claude-sonnet-5', 'm1', '2026-09-15T10:00:00.000Z');
-  expect(Math.abs(b.costUsd - 0.003) < 1e-12, `got ${b.costUsd}, expected 0.003 (sticker)`).toBeTruthy();
+  expect(Math.abs(b.costUsd - 0.003) < 1e-12, `got ${b.costUsd}, expected 0.003 (after the raise)`).toBeTruthy();
 });
 
 test('newBucket exposes pricing fields zeroed out', () => {

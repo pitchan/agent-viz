@@ -2,12 +2,17 @@
 // No network in these tests: the server's price map is built from the engine's
 // embedded table when the module loads.
 
-import { expect, test, vi } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 import { getPrice, _internals } from '../../src/server/pricing.ts';
 // `computeCost` et `normalizeModel` n'ont qu'une définition, celle du moteur :
 // ces filets l'importent de src/engine/core/pricing.ts, et src/server/pricing.ts
 // n'en porte pas de copie.
 import { computeCost, normalizeModel, priceTable } from '../../src/engine/core/pricing.ts';
+import { applyAdoptedPrices } from '../../src/server/pricing-state.ts';
+import { HAUSSE_SONNET_5, pricingAvecHausse } from '../helpers/tariff-change.ts';
+
+// Le barème du serveur est un état de module : chaque test repart de la table embarquée.
+afterEach(() => applyAdoptedPrices({}));
 
 test('normalizeModel strips provider prefixes and date/version suffixes', () => {
   expect(normalizeModel('claude-opus-4-7')).toBe('claude-opus-4-7');
@@ -196,12 +201,11 @@ test('the price map covers the Claude 5 family and Opus 4.8 (2026 rate card)', (
   expect(opus5.output).toBe(2.5e-5);
   expect(opus5.label).toBe('Opus 5');
 
-  // Sonnet 5 current (sticker) rates — an explicit post-2026-09-01 date pins
-  // the assertion; the intro period is covered by the dated-tariff tests.
-  const sonnet5 = getPrice('claude-sonnet-5', '2026-09-01T00:00:00.000Z')!;
+  // Sonnet 5: the launch rate became the standard rate, the announced raise never happened.
+  const sonnet5 = getPrice('claude-sonnet-5')!;
   expect(sonnet5, 'sonnet-5 must resolve').toBeTruthy();
-  expect(sonnet5.input).toBe(3e-6);
-  expect(sonnet5.output).toBe(1.5e-5);
+  expect(sonnet5.input).toBe(2e-6);
+  expect(sonnet5.output).toBe(1e-5);
   expect(sonnet5.label).toBe('Sonnet 5');
 
   const opus48 = getPrice('claude-opus-4-8')!;
@@ -226,11 +230,12 @@ test('normalizeModel strips the [1m] context-window suffix', () => {
   expect(normalizeModel('claude-opus-4-8[1m]')).toBe('claude-opus-4-8');
 });
 
-test('getPrice resolves the tariff in effect at the given date (sonnet-5 intro until 2026-08-31)', () => {
+test('getPrice resolves the tariff in effect at the given date (adopted sonnet-5 raise)', () => {
   // Tariffs change over time; the price map keeps a dated history so a message
   // is billed at the rate in effect when it was produced, not at scan time.
+  applyAdoptedPrices(HAUSSE_SONNET_5);
   const aug = getPrice('claude-sonnet-5', '2026-08-15T00:00:00.000Z')!;
-  expect(aug.input, 'August = intro rate 2 $/M').toBe(2e-6);
+  expect(aug.input, 'before the raise = 2 $/M').toBe(2e-6);
   expect(aug.output).toBe(1e-5);
   expect(aug.cacheCreate).toBe(2.5e-6);
   expect(aug.cacheRead).toBe(2e-7);
@@ -239,7 +244,7 @@ test('getPrice resolves the tariff in effect at the given date (sonnet-5 intro u
   expect(aug.maxInput).toBe(1_000_000);
 
   const sept = getPrice('claude-sonnet-5', '2026-09-01T00:00:00.000Z')!;
-  expect(sept.input, 'from 2026-09-01 = sticker rate 3 $/M').toBe(3e-6);
+  expect(sept.input, 'after the raise = 3 $/M').toBe(3e-6);
   expect(sept.output).toBe(1.5e-5);
 
   // A model with no tariff change ignores the date entirely.
@@ -253,10 +258,10 @@ test('getPrice without a date means "now" (same result as an explicit current ti
 
 test('computeCost with a model string honors the message date', () => {
   const usage = { input_tokens: 1000, output_tokens: 0 };
-  const aug = computeCost(usage, 'claude-sonnet-5', '2026-08-15T00:00:00.000Z').usd!;
-  const sept = computeCost(usage, 'claude-sonnet-5', '2026-09-15T00:00:00.000Z').usd!;
-  expect(Math.abs(aug - 0.002) < 1e-12, `got ${aug} (intro rate expected)`).toBeTruthy();
-  expect(Math.abs(sept - 0.003) < 1e-12, `got ${sept} (sticker rate expected)`).toBeTruthy();
+  const aug = pricingAvecHausse.computeCost(usage, 'claude-sonnet-5', '2026-08-15T00:00:00.000Z').usd!;
+  const sept = pricingAvecHausse.computeCost(usage, 'claude-sonnet-5', '2026-09-15T00:00:00.000Z').usd!;
+  expect(Math.abs(aug - 0.002) < 1e-12, `got ${aug} (rate before the raise expected)`).toBeTruthy();
+  expect(Math.abs(sept - 0.003) < 1e-12, `got ${sept} (rate after the raise expected)`).toBeTruthy();
 });
 
 test('a changed upstream tariff is REPORTED as drift, never applied to the map', () => {
@@ -320,41 +325,6 @@ test('a new canonical Claude model absent from the embedded table is reported', 
   expect(drifts[0]!.model).toBe('claude-opus-6');
   expect(drifts[0]!.kind).toBe('modele-nouveau');
   expect(drifts[0]!.embedded).toBe(null);
-});
-
-test('sonnet-5 at the intro rate is NOT a drift during the launch window, IS one after', () => {
-  // LiteLLM stores the intro rate as "current": during the launch window the billing
-  // is the same, only the representation differs. From 2026-09-01 the embedded table
-  // switches to the sticker rate, and a stale feed becomes a drift.
-  const feed = {
-    'claude-sonnet-5': {
-      input_cost_per_token: 2e-6, output_cost_per_token: 1e-5,
-      cache_creation_input_token_cost: 2.5e-6, cache_read_input_token_cost: 2e-7,
-      max_input_tokens: 1_000_000,
-    },
-  };
-  expect(_internals.litellmDrift(feed, '2026-08-15T00:00:00.000Z')).toEqual([]);
-  const after = _internals.litellmDrift(feed, '2026-09-02T00:00:00.000Z');
-  expect(after.length).toBe(1);
-  expect(after[0]!.kind).toBe('tarif-different');
-});
-
-test('a vigil pass never touches the price map: the dated period survives', () => {
-  // Anti-regression lock: no code path writes the price map from LiteLLM. A sticker
-  // feed for sonnet-5 is a drift by construction during the launch window, and the
-  // dated intro period (valid until 2026-09-01) still comes out of getPrice after it.
-  const feed = {
-    'claude-sonnet-5': {
-      input_cost_per_token: 3e-6, output_cost_per_token: 1.5e-5,
-      cache_creation_input_token_cost: 3.75e-6, cache_read_input_token_cost: 3e-7,
-      max_input_tokens: 1_000_000,
-    },
-  };
-  const drifts = _internals.litellmDrift(feed, '2026-08-15T00:00:00.000Z');
-  expect(getPrice('claude-sonnet-5', '2026-08-15T00:00:00.000Z')!.input).toBe(2e-6);
-  expect(drifts.length).toBe(1);
-  expect(drifts[0]!.model).toBe('claude-sonnet-5');
-  expect(drifts[0]!.kind).toBe('tarif-different');
 });
 
 test('historical models and regional variants never alert', () => {
