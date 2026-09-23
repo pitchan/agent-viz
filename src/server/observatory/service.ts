@@ -22,6 +22,7 @@ import type { Engine } from './engine.ts';
 import type { ConfigItem, SessionKind, SessionReport } from './rules/types.ts';
 import type { PriceTable } from '../../engine/core/pricing.ts';
 import type { Adopted } from '../price-adoption.ts';
+import type { DriftSnapshot } from '../pricing.ts';
 
 // Two windows, deliberately distinct. WINDOW_DAYS is what the user can pick
 // for reading and advice; scanSinceDays (90, the widest offered) is what
@@ -37,6 +38,8 @@ interface ServiceDeps {
   broadcast: (message: AnalysisScanMessage | PricingAdoptedMessage) => void;
   /** Écrit et applique le prix LiteLLM relevé pour ce modèle ; null sans dérive connue. */
   adoptPrice: (model: string) => Promise<Adopted | null>;
+  /** La vigie LiteLLM : ce qu'elle a vu, et un passage à la demande (false = LiteLLM injoignable). */
+  vigie: { snapshot: () => DriftSnapshot; refresh: () => Promise<boolean> };
   now: () => Date;
   claudeDir: string;
   sinceDays: number;
@@ -64,7 +67,7 @@ type SessionListRow = Omit<SessionRow, 'reportJson'> & { projectPath: string | n
 type SessionDetail = Omit<SessionRow, 'reportJson'> & { report: SessionReport | null };
 
 function createObservatoryService(deps: ServiceDeps) {
-  const { store, engine, collectConfig, broadcast, adoptPrice, now, claudeDir, sinceDays, scanSinceDays } = deps;
+  const { store, engine, collectConfig, broadcast, adoptPrice, vigie, now, claudeDir, sinceDays, scanSinceDays } = deps;
 
   const clampDays = (days: number | undefined): number =>
     (days !== undefined && WINDOW_DAYS.includes(days) ? days : sinceDays);
@@ -164,6 +167,7 @@ function createObservatoryService(deps: ServiceDeps) {
       provenance: ReturnType<typeof buildProvenance>;
       engineVersion: string;
       scanVersion: number;
+      updates: DriftSnapshot;
     }> {
       const table = engine.priceTable();
       return {
@@ -171,7 +175,15 @@ function createObservatoryService(deps: ServiceDeps) {
         provenance: buildProvenance({ engineVersion: engine.version, priceSource: table.source }),
         engineVersion: engine.version,
         scanVersion: SCAN_VERSION,
+        updates: vigie.snapshot(),
       };
+    },
+
+    // Un passage de la vigie à la demande : le panneau n'attend pas le suivant.
+    // Injoignable ne vide rien, les dérives déjà relevées restent adoptables.
+    async checkPrices(): Promise<DriftSnapshot & { reachable: boolean }> {
+      const reachable = await vigie.refresh();
+      return { reachable, ...vigie.snapshot() };
     },
 
     async sessions({ project, days, includeMachine = false }: SessionsOptions = {}): Promise<SessionListRow[]> {

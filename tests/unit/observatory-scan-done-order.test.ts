@@ -28,6 +28,7 @@ test("scan broadcasts 'done' only after recommendations are stored", async () =>
     broadcast: m => sequence.push(`broadcast-${'phase' in m ? m.phase : m.type}`),
     now: () => new Date('2026-08-04T10:00:00.000Z'),
     adoptPrice: async () => null,
+    vigie: { snapshot: () => ({ checkedAt: null, drifts: [] }), refresh: async () => true },
     claudeDir: 'C:\\x\\.claude', sinceDays: 30, scanSinceDays: 90,
   });
 

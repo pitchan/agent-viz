@@ -23,6 +23,7 @@ function makeService(listed: any[]) {
     broadcast: () => {},
     now: () => new Date('2026-08-05T12:00:00.000Z'),
     adoptPrice: async () => null,
+    vigie: { snapshot: () => ({ checkedAt: null, drifts: [] }), refresh: async () => true },
     claudeDir: 'C:/x', sinceDays: 30, scanSinceDays: 90,
   });
 }

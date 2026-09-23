@@ -14,7 +14,7 @@ import { collectConfigItems } from './config-audit.ts';
 import { createObservatoryService } from './service.ts';
 import { broadcastSSE } from '../sse.ts';
 import { applyAdoptedPrices } from '../pricing-state.ts';
-import { driftFor, forgetDrift } from '../pricing.ts';
+import { driftFor, driftSnapshot, forgetDrift, loadPricing } from '../pricing.ts';
 import { createPriceAdoption } from '../price-adoption.ts';
 import { adoptedPricesPath, readAdoptedPrices } from '../../engine/core/adopted-prices.ts';
 
@@ -51,6 +51,7 @@ function getObservatoryService(): ReturnType<typeof createObservatoryService> {
       apply: applyAdoptedPrices,
       now: () => new Date(),
     }).adopt,
+    vigie: { snapshot: driftSnapshot, refresh: loadPricing },
     now: () => new Date(),
     claudeDir,
     sinceDays: DEFAULT_SINCE_DAYS,

@@ -100,6 +100,12 @@ function createObservatoryRoutes(getService: () => Service): Route[] {
       }),
     },
     {
+      method: 'POST', path: '/pricing/check', sameOrigin: true,
+      handler: bind(async (_req, res, _url, service) => {
+        sendJson(res, 200, await service.checkPrices());
+      }),
+    },
+    {
       method: 'GET', path: '/analysis/sessions',
       handler: bind(async (_req, res, url, service) => {
         sendJson(res, 200, await service.sessions({

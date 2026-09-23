@@ -200,6 +200,7 @@ interface KnownDrift extends Drift { firstSeenAt: string }
 // Le dernier rapport fait foi : une dérive qu'il ne porte plus est réglée.
 // Une dérive revue à l'identique garde sa première date ; d'autres prix la redatent.
 const knownDrifts = new Map<string, KnownDrift>();
+let lastCheckedAt: string | null = null;
 
 function recordDrifts(report: DriftReport): void {
   const next = new Map<string, KnownDrift>();
@@ -211,10 +212,15 @@ function recordDrifts(report: DriftReport): void {
   }
   knownDrifts.clear();
   for (const [m, d] of next) knownDrifts.set(m, d);
+  lastCheckedAt = report.checkedAt;
 }
 
 function driftFor(model: string): KnownDrift | null { return knownDrifts.get(model) ?? null; }
 function forgetDrift(model: string): void { knownDrifts.delete(model); }
+
+/** Ce que la vigie sait à cet instant : son dernier passage (null avant le premier) et les dérives en cours. */
+interface DriftSnapshot { checkedAt: string | null; drifts: KnownDrift[] }
+function driftSnapshot(): DriftSnapshot { return { checkedAt: lastCheckedAt, drifts: [...knownDrifts.values()] }; }
 
 // Drift consumer registration — server.ts plugs the SSE broadcast in here, so
 // this module keeps zero I/O of its own.
@@ -286,10 +292,10 @@ export {
   getPrice,
   loadPricing, startPricingRefresh,
   onPricingDrift,
-  recordDrifts, driftFor, forgetDrift,
+  recordDrifts, driftFor, forgetDrift, driftSnapshot,
   _internals,
 };
 
 // L'onglet fabrique l'alerte de la vigie sur cette forme
 // (src/web/viz-pricing-drift-alert.ts), par un import de type que le service efface.
-export type { Drift, KnownDrift };
+export type { Drift, KnownDrift, DriftSnapshot };

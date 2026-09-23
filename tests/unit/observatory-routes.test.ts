@@ -1,4 +1,4 @@
-// The twelve analysis endpoints: response shapes, guards, and the answer to a
+// The thirteen analysis endpoints: response shapes, guards, and the answer to a
 // failing service. The service is injected, so no SQLite file and no engine
 // are needed.
 
@@ -64,20 +64,20 @@ function router(service = SERVICE) {
   };
 }
 
-test('the twelve analysis routes are declared with their methods', () => {
+test('the thirteen analysis routes are declared with their methods', () => {
   const declared = createObservatoryRoutes(() => SERVICE)
     .map(r => `${r.method} ${r.path || r.prefix}`).sort();
   expect(declared).toEqual([
     'GET /analysis/models', 'GET /analysis/session/', 'GET /analysis/sessions',
     'GET /analysis/skills', 'GET /analysis/summary', 'GET /config/audit', 'GET /pricing', 'GET /recommendations',
-    'POST /analysis/purge', 'POST /analysis/scan', 'POST /pricing/adopt', 'POST /recommendations/',
+    'POST /analysis/purge', 'POST /analysis/scan', 'POST /pricing/adopt', 'POST /pricing/check', 'POST /recommendations/',
   ]);
 });
 
 test('mutating routes are guarded by sameOrigin', () => {
   const guarded = createObservatoryRoutes(() => SERVICE)
     .filter(r => r.sameOrigin).map(r => r.path || r.prefix).sort();
-  expect(guarded).toEqual(['/analysis/purge', '/analysis/scan', '/pricing/adopt', '/recommendations/']);
+  expect(guarded).toEqual(['/analysis/purge', '/analysis/scan', '/pricing/adopt', '/pricing/check', '/recommendations/']);
 });
 
 test('GET /analysis/summary returns the period totals and names its price source', async () => {
@@ -347,4 +347,17 @@ test('POST /pricing/adopt sans modèle rend 400', async () => {
 
   // Assert
   expect(res.statusCode).toBe(400);
+});
+
+test('POST /pricing/check rend ce que la vigie a vu', async () => {
+  // Arrange
+  const vu = { reachable: true, checkedAt: '2026-09-23T12:00:00.000Z', drifts: [] };
+  const call = router({ ...SERVICE, checkPrices: async () => vu } as unknown as Service);
+
+  // Act
+  const res = await call('POST', '/pricing/check');
+
+  // Assert
+  expect(res.statusCode).toBe(200);
+  expect(JSON.parse(res.body)).toEqual(vu);
 });
