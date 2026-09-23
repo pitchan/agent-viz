@@ -13,7 +13,7 @@ import {
 import {
   pauseTick, resumeTick, markNarratorDirty,
 } from './viz-narrator.ts';
-import { raiseExternalAlert, applyServerAlert, refreshAlerts } from './viz-watchdog-client.ts';
+import { raiseExternalAlert, applyServerAlert, refreshAlerts, acknowledgeAlert } from './viz-watchdog-client.ts';
 import { readAlert } from './viz-alert-shape.ts';
 import { pricingDriftAlert } from './viz-pricing-drift-alert.ts';
 import { connectionPresentation } from './viz-topbar-status.ts';
@@ -138,6 +138,12 @@ export function connectSSE() {
       }
       if (data.type === 'pricingDrift') {
         for (const d of data.drifts) raiseExternalAlert(pricingDriftAlert(d, Date.now()));
+        return;
+      }
+      // Un prix adopté, depuis cet onglet ou un autre : l'alerte de sa dérive est réglée.
+      // Pour une alerte externe, l'acquittement ne lit que l'id.
+      if (data.type === 'pricingAdopted') {
+        acknowledgeAlert(`pricingDrift:${data.model}`, Number.NaN);
         return;
       }
       if (data.type === 'sessionsChanged') {

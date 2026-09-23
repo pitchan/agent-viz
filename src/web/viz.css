@@ -221,12 +221,14 @@ body {
 .alert-type { font-size: 9px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--error); font-weight: 700; margin-bottom: 2px; }
 .alert-msg { font-size: 12px; color: var(--text-primary); margin-bottom: 2px; }
 .alert-meta { font-size: 10px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
-.alert-ack {
+.alert-ack, .alert-adopt {
   background: rgba(102, 204, 255, 0.06); border: 1px solid var(--glass-border);
   color: var(--text-primary); padding: 5px 10px; border-radius: 6px;
   font-family: inherit; font-size: 11px; cursor: pointer; transition: all 0.15s;
 }
-.alert-ack:hover { background: var(--glass-hover); border-color: var(--holo-dim); }
+.alert-ack:hover, .alert-adopt:hover { background: var(--glass-hover); border-color: var(--holo-dim); }
+.alert-adopt { margin-right: 6px; }
+.alert-adopt:disabled { cursor: wait; opacity: 0.6; }
 .alerts-empty { padding: 16px; color: var(--text-muted); font-size: 12px; text-align: center; }
 
 /* Tool errors popup — same shape as the alerts popup it is modelled on, one

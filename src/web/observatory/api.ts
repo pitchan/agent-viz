@@ -93,6 +93,14 @@ export function fetchSkillUsage({ project, ...opts }: WindowOpts & { project?: s
 
 export const fetchPricing = () => getJson('/pricing');
 
+// Adopter le tarif LiteLLM d'un modèle : le serveur reprend le prix de sa vigie, jamais d'ici.
+export async function adoptPrice(model: string) {
+  const res = await fetch(`/pricing/adopt?model=${encodeURIComponent(model)}`, { method: 'POST' });
+  const body = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(body && body.error ? body.error : `${res.status} sur /pricing/adopt`);
+  return body;
+}
+
 // Le journal des pannes. Meme fenetre que les conseils : la page n'a qu'une
 // seule notion de periode, et le serveur retombe seul sur son defaut hors de la
 // table 7/30/90.

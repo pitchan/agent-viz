@@ -20,6 +20,7 @@
 
 import { expect, test } from 'vitest';
 import { pricingDriftAlert } from '../../src/web/viz-pricing-drift-alert.ts';
+import { driftOf } from '../helpers/pricing-drift.ts';
 import type { LiveAlert } from '../../src/web/viz-watchdog-client.ts';
 
 const T = 1_700_000_000_000;
@@ -38,7 +39,7 @@ const stuck = (createdAt: number, id: string): LiveAlert => evt(createdAt, id, {
   type: 'stuck', toolName: '', standing: true, message: 'No event since 16:22',
 });
 // The pricing vigil's alert, built by the same factory as the tab's.
-const drift = (model: string) => pricingDriftAlert({ model, kind: 'tarif-different' }, 1);
+const drift = (model: string) => pricingDriftAlert(driftOf(model, 'tarif-different'), 1);
 
 // One module instance per test: the reader's state is a module singleton.
 // The journal object stays mutable so a test can change what the next
@@ -99,7 +100,7 @@ test('une alerte externe vieille de dix minutes reste affichée : ni l\'âge ni 
   // le serveur ne compte aucune alerte vive
   const { mod } = await freshClient({});
   // Act
-  mod.raiseExternalAlert(pricingDriftAlert({ model: 'x', kind: 'modele-nouveau' }, T - 10 * 60_000));
+  mod.raiseExternalAlert(pricingDriftAlert(driftOf('x', 'modele-nouveau'), T - 10 * 60_000));
   // Assert
   expect(ids(mod.getActiveAlerts())).toEqual(['pricingDrift:x']);
 });

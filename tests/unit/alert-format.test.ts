@@ -9,6 +9,7 @@
 import { expect, test } from 'vitest';
 import { alertActor, alertActorLine, alertDetailLines, notificationPayload } from '../../src/web/viz-alert-format.ts';
 import { pricingDriftAlert } from '../../src/web/viz-pricing-drift-alert.ts';
+import { driftOf } from '../helpers/pricing-drift.ts';
 import { clockTime } from '../../src/engine/core/clock-time.ts';
 
 // Built from local-time components so the expectation holds in any timezone.
@@ -172,13 +173,13 @@ test('notification body of a stuck alert says what is in flight', () => {
 
 test('la notification d\'une alerte hors session ne nomme aucun acteur', () => {
   // Arrange
-  const derive = pricingDriftAlert({ model: 'claude-opus-6', kind: 'modele-nouveau' }, at(14, 3, 24));
+  const derive = pricingDriftAlert(driftOf('claude-opus-6', 'modele-nouveau'), at(14, 3, 24));
 
   // Act
   const { body } = notificationPayload(derive);
 
   // Assert
-  expect(body).toBe(derive.message);
+  expect(body).toBe(`${derive.message}\n${derive.subject}`);
 });
 
 test('an oversized command is cut, so one alert cannot flood the panel', () => {

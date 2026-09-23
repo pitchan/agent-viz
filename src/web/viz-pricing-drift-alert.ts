@@ -16,15 +16,23 @@ const WORDING: Record<Drift['kind'], (model: string) => string> = {
   'tarif-different': m => `Vigie tarifaire : le tarif de ${m} diffère entre LiteLLM et la table embarquée`,
 };
 
+// Les quatre prix se lisent avant le clic « Adopter » : c'est ce clic qui les rend comptables.
+const perMTok = (usdPerToken: number) => (usdPerToken * 1e6).toFixed(2).replace('.', ',');
+const rates = (p: Drift['litellm']) =>
+  `entrée ${perMTok(p.input)} · sortie ${perMTok(p.output)} · `
+  + `écriture cache ${perMTok(p.cacheCreate)} · relecture cache ${perMTok(p.cacheRead)}`;
+
 // L'id est stable par modèle : la déduplication du registre externe (même id
 // actif, pas de nouvelle sonnerie) repose dessus. Les chaînes vides sont celles
 // que le détecteur pose pour « rien » : aucun agent, commande, projet ni motif.
-export function pricingDriftAlert(d: Pick<Drift, 'model' | 'kind'>, receivedAt: number): LiveAlert {
+export function pricingDriftAlert(d: Pick<Drift, 'model' | 'kind' | 'litellm' | 'embedded'>, receivedAt: number): LiveAlert {
   return {
     id: `pricingDrift:${d.model}`,
     type: 'pricingDrift',
     sessionId: '', agentId: '', agentType: '', cwd: '',
-    toolName: d.model, subject: '', patternId: '',
+    toolName: d.model,
+    subject: `LiteLLM, $ par million : ${rates(d.litellm)}${d.embedded ? ` — embarqué : ${rates(d.embedded)}` : ''}`,
+    patternId: '',
     count: 1,
     // L'instant où l'onglet a reçu le rapport : le serveur le diffuse dans
     // l'instruction même de son contrôle.

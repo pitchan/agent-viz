@@ -6,8 +6,9 @@ import {
   raiseExternalAlert, getActiveAlerts, acknowledgeAlert, onAlertsChanged,
 } from '../../src/web/viz-watchdog-client.ts';
 import { pricingDriftAlert } from '../../src/web/viz-pricing-drift-alert.ts';
+import { driftOf } from '../helpers/pricing-drift.ts';
 
-const drift = (model: string) => pricingDriftAlert({ model, kind: 'tarif-different' }, 1);
+const drift = (model: string) => pricingDriftAlert(driftOf(model, 'tarif-different'), 1);
 
 test('a raised external alert becomes active and notifies listeners', () => {
   const seen = [];
