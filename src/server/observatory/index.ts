@@ -14,7 +14,7 @@ import { collectConfigItems } from './config-audit.ts';
 import { createObservatoryService } from './service.ts';
 import { broadcastSSE } from '../sse.ts';
 import { applyAdoptedPrices } from '../pricing-state.ts';
-import { driftFor, driftSnapshot, forgetDrift, loadPricing } from '../pricing.ts';
+import { driftSnapshot, forgetDrift, loadPricing } from '../pricing.ts';
 import { createPriceAdoption } from '../price-adoption.ts';
 import { adoptedPricesPath, readAdoptedPrices } from '../../engine/core/adopted-prices.ts';
 
@@ -42,7 +42,7 @@ function getObservatoryService(): ReturnType<typeof createObservatoryService> {
       { claudeDir, claudeJsonPath: resolveClaudeJsonPath() }),
     broadcast: broadcastSSE,
     adoptPrice: createPriceAdoption({
-      driftFor, forgetDrift,
+      forgetDrift,
       read: () => readAdoptedPrices(PRICES_PATH, fsp.readFile),
       write: async (adopted) => {
         await fsp.mkdir(path.dirname(PRICES_PATH), { recursive: true });

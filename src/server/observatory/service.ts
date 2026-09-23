@@ -10,7 +10,7 @@ import type { AnalysisScanMessage } from './scan.ts';
 import { toAnalysedSessions } from './session-mapper.ts';
 import { mcpUsageBySession } from './mcp-usage.ts';
 import { computeSummary } from './summary.ts';
-import { computeModelCosts } from './model-costs.ts';
+import { computeModelCosts, modelsSeen } from './model-costs.ts';
 import { computeSkillUsage } from './skill-usage.ts';
 import { buildProvenance } from './provenance.ts';
 import { cwdOfReport, displayPath, nameProjects } from './project-label.ts';
@@ -21,7 +21,8 @@ import type { Store, SessionRow } from './store.ts';
 import type { Engine } from './engine.ts';
 import type { ConfigItem, SessionKind, SessionReport } from './rules/types.ts';
 import type { PriceTable } from '../../engine/core/pricing.ts';
-import type { Adopted } from '../price-adoption.ts';
+import { isApplicable } from '../price-adoption.ts';
+import type { Adopted, ApplicableDrift } from '../price-adoption.ts';
 import type { DriftSnapshot } from '../pricing.ts';
 
 // Two windows, deliberately distinct. WINDOW_DAYS is what the user can pick
@@ -36,8 +37,8 @@ interface ServiceDeps {
   engine: Engine;
   collectConfig: () => Promise<ConfigItem[]>;
   broadcast: (message: AnalysisScanMessage | PricingAdoptedMessage) => void;
-  /** Écrit et applique le tarif relevé par la vigie pour ce modèle ; null sans dérive connue. */
-  adoptPrice: (model: string) => Promise<Adopted | null>;
+  /** Écrit et applique le tarif relevé par la vigie pour ce modèle. */
+  adoptPrice: (drift: ApplicableDrift) => Promise<Adopted>;
   /** La vigie des tarifs : ce qu'elle a vu, et un passage (null = abouti, sinon la cause de l'échec). */
   vigie: { snapshot: () => DriftSnapshot; refresh: () => Promise<string | null> };
   now: () => Date;
@@ -105,16 +106,22 @@ function createObservatoryService(deps: ServiceDeps) {
     return { sessions: toAnalysedSessions(toAnalysable(rows)), basis, period };
   };
 
+  // Les modèles des transcripts scannés : un tarif ne s'affiche, ni dans le panneau
+  // ni en alerte, que pour un modèle réellement appelé.
+  const modelsInTranscripts = () =>
+    modelsSeen(toAnalysedSessions(toAnalysable(store.listSessions({ since: sinceOf(scanSinceDays) }))));
+
   // Adopter touche des coûts déjà rangés : on relit les sessions incomplètes, et pour
   // un tarif différent celles finies depuis `from`, que leur fichier ait bougé ou non.
-  const applyAdoption = async (model: string): Promise<Adopted | null> => {
-    const adopted = await adoptPrice(model);
-    if (adopted === null) return null;
-    const { from } = adopted;
+  const applyAdoption = async (drift: ApplicableDrift): Promise<Adopted> => {
+    const adopted = await adoptPrice(drift);
+    const { model, from } = adopted;
     const forceIds = new Set(store.listSessions({})
       .filter(r => !r.costComplete || (from !== null && r.endedAt !== null && r.endedAt >= from))
       .map(r => r.id));
-    broadcast({ type: 'pricingAdopted', model, kind: adopted.kind, prices: adopted.prices });
+    if (modelsInTranscripts().has(model)) {
+      broadcast({ type: 'pricingAdopted', model, kind: adopted.kind, prices: adopted.prices });
+    }
     await service.scan({ forceIds });
     return adopted;
   };
@@ -125,11 +132,9 @@ function createObservatoryService(deps: ServiceDeps) {
     const failure = await vigie.refresh();
     const adopted: Adopted[] = [];
     const errors: PriceCheck['errors'] = [];
-    for (const d of vigie.snapshot().drifts) {
-      if (d.maxInput === null) continue;
+    for (const d of vigie.snapshot().drifts.filter(isApplicable)) {
       try {
-        const a = await applyAdoption(d.model);
-        if (a !== null) adopted.push(a);
+        adopted.push(await applyAdoption(d));
       } catch (err) {
         errors.push({ model: d.model, message: err instanceof Error ? err.message : String(err) });
       }
@@ -199,7 +204,8 @@ function createObservatoryService(deps: ServiceDeps) {
     },
 
     // Tariff sheet + provenance: independent of the window — they answer
-    // "how are the numbers made", not "what happened lately".
+    // "how are the numbers made", not "what happened lately". Tariffs and pending
+    // updates are limited to models the scanned transcripts actually call.
     async pricing(): Promise<{
       priceTable: PriceTable;
       provenance: ReturnType<typeof buildProvenance>;
@@ -208,12 +214,18 @@ function createObservatoryService(deps: ServiceDeps) {
       updates: DriftSnapshot;
     }> {
       const table = engine.priceTable();
+      const seen = modelsInTranscripts();
+      const updates = vigie.snapshot();
       return {
-        priceTable: table,
+        priceTable: {
+          ...table,
+          entries: table.entries.filter(e => seen.has(e.model)),
+          zeroCost: table.zeroCost.filter(z => seen.has(z.model)),
+        },
         provenance: buildProvenance({ engineVersion: engine.version, priceSource: table.source }),
         engineVersion: engine.version,
         scanVersion: SCAN_VERSION,
-        updates: vigie.snapshot(),
+        updates: { ...updates, drifts: updates.drifts.filter(d => seen.has(d.model)) },
       };
     },
 

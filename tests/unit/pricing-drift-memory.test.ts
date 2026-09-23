@@ -1,12 +1,14 @@
 // La vigie se souvient de chaque dérive et de sa PREMIÈRE détection : c'est la date
 // à partir de laquelle un tarif différent adopté s'applique.
 import { afterEach, expect, test } from 'vitest';
-import { driftFor, driftSnapshot, forgetDrift, recordDrifts } from '../../src/server/pricing.ts';
+import { driftSnapshot, forgetDrift, recordDrifts } from '../../src/server/pricing.ts';
 import type { Drift } from '../../src/server/pricing.ts';
 
 const P = { input: 4e-6, output: 2e-5, cacheCreate: 5e-6, cacheRead: 2e-7 };
 const drift = (over: Partial<Drift> = {}): Drift =>
   ({ model: 'claude-opus-5-5', kind: 'modele-nouveau', official: P, embedded: null, maxInput: 1_000_000, ...over });
+
+const driftFor = (model: string) => driftSnapshot().drifts.find(d => d.model === model) ?? null;
 
 afterEach(() => forgetDrift('claude-opus-5-5'));
 

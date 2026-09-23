@@ -15,6 +15,14 @@ export function fakeReport(id: string, over: Record<string, unknown> = {}) {
   } as unknown as SessionReport;
 }
 
+// Une ligne du magasin dont le rapport n'appelle que ces modèles : ce que le service
+// relit pour savoir quels modèles les transcripts utilisent.
+export const storedRowUsing = (id: string, models: string[]) => ({
+  id, project: 'F--proj', startedAt: '2026-09-01T10:00:00.000Z', endedAt: '2026-09-01T10:20:00.000Z',
+  sessionKind: 'interactive', netTokens: 0, costUsd: 0, costComplete: true,
+  reportJson: JSON.stringify({ tokens: { perModel: Object.fromEntries(models.map(m => [m, {}])) } }),
+});
+
 export const fakeRef = (id: string, { mtime = 1000, size = 2048 } = {}) => ({
   sessionId: id, projectSlug: 'F--proj', mainPath: `F:\\p\\${id}.jsonl`,
   subagents: [], mtime: new Date(mtime), sizeBytes: size } as unknown as SessionRef);

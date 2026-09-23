@@ -708,7 +708,6 @@ canvas { display: block; width: 100%; height: 100%; }
 /* One pending Anthropic tariff per row: prices, then why it waits. */
 .pricing-updates { margin-bottom: 10px; }
 .pricing-update {
-  display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center;
   padding: 8px 10px; margin-top: 6px; border-radius: 6px;
   border: 1px solid var(--glass-border); font-size: 12px;
 }

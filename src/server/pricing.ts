@@ -172,7 +172,6 @@ function recordDrifts(report: DriftReport): void {
   lastCheckedAt = report.checkedAt;
 }
 
-function driftFor(model: string): KnownDrift | null { return knownDrifts.get(model) ?? null; }
 function forgetDrift(model: string): void { knownDrifts.delete(model); }
 
 /** Ce que la vigie sait à cet instant : son dernier passage (null avant le premier) et les dérives en cours. */
@@ -223,7 +222,7 @@ const _internals = { officialDrift };
 export {
   getPrice,
   loadPricing,
-  recordDrifts, driftFor, forgetDrift, driftSnapshot,
+  recordDrifts, forgetDrift, driftSnapshot,
   _internals,
 };
 

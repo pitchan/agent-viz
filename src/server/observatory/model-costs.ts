@@ -103,4 +103,10 @@ function computeModelCosts(sessions: Session[]): ModelCostsResult {
   };
 }
 
-export { computeModelCosts };
+// Les modèles qu'au moins une session a appelés, sous l'id normalisé que porte le
+// barème : le panneau Tarifs ne parle que de ceux-là.
+function modelsSeen(sessions: Session[]): Set<string> {
+  return new Set(sessions.flatMap(s => Object.keys(s.report.tokens.perModel)));
+}
+
+export { computeModelCosts, modelsSeen };

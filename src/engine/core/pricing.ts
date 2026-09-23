@@ -11,7 +11,7 @@ export interface ModelPrices {
 // Table statique embarquée (local-only : jamais de fetch).
 // Contre-vérifiée au centime sur des sessions réelles via l'API /tokens
 // d'agent-viz. USD par token.
-// PRICES = tarif COURANT ; les barèmes antérieurs vivent dans PRICE_HISTORY.
+// PRICES = tarif COURANT ; un barème antérieur naît d'une adoption datée (mergeAdopted).
 const PRICES: Record<string, ModelPrices> = {
   // Famille Claude 5 (2026).
   'claude-fable-5': { input: 1e-5, output: 5e-5, cacheCreate: 1.25e-5, cacheRead: 1e-6 },
@@ -34,21 +34,18 @@ const PRICES: Record<string, ModelPrices> = {
   'claude-haiku-4-5': { input: 1e-6, output: 5e-6, cacheCreate: 1.25e-6, cacheRead: 1e-7 },
 };
 
-// Mémoire des changements de tarif : périodes datées ANTÉRIEURES au tarif
-// courant de PRICES, triées par `until` croissant. Une période s'applique aux
-// messages horodatés STRICTEMENT avant son `until` (ISO UTC, comparaison
-// lexicographique — les deux formats sont zéro-paddés). Un modèle absent d'ici
-// n'a jamais changé de tarif.
+// Les périodes datées ANTÉRIEURES au tarif courant, triées par `until` croissant. Chacune
+// s'applique aux messages horodatés STRICTEMENT avant son `until` (ISO UTC, comparaison
+// lexicographique — les deux formats sont zéro-paddés).
 export interface PricePeriod {
   until: string;
   prices: ModelPrices;
 }
-const PRICE_HISTORY: Record<string, PricePeriod[]> = {};
 
 // Zéro VOULU : modèles non facturables PAR NATURE — un 0 $ inscrit ici et commenté,
 // jamais un tarif qu'on ignore. La règle « jamais de zéro silencieux » porte
 // sur les modèles INCONNUS ; ceux-ci sont connus, à 0 $. Un nouveau modèle
-// local = une ligne ici (même philosophie que PRICE_HISTORY).
+// local = une ligne ici.
 const ZERO_COST: Record<string, string> = {
   '<synthetic>': 'artefact du harnais Claude Code — aucun appel API',
   'ministral-3:latest': 'modèle local Ollama — inférence locale, 0 $ API',
@@ -239,7 +236,6 @@ interface Bareme {
 function mergeAdopted(adopted: AdoptedPrices): Bareme {
   const prices: Record<string, ModelPrices> = { ...PRICES };
   const history: Record<string, PricePeriod[]> = {};
-  for (const [m, h] of Object.entries(PRICE_HISTORY)) history[m] = [...h];
   const info = { ...MODEL_INFO };
   const marks: Record<string, AdoptionMark> = {};
   for (const [model, list] of Object.entries(adopted)) {

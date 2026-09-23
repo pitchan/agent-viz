@@ -7,7 +7,6 @@ import type { AdoptedPrice, AdoptedPrices, ModelPrices } from '../engine/core/pr
 import type { KnownDrift } from './pricing.ts';
 
 interface AdoptionDeps {
-  driftFor: (model: string) => KnownDrift | null;
   forgetDrift: (model: string) => void;
   read: () => Promise<AdoptedPrices>;
   write: (adopted: AdoptedPrices) => Promise<void>;
@@ -15,15 +14,16 @@ interface AdoptionDeps {
   now: () => Date;
 }
 
+/** Une dérive dont la fenêtre de contexte est connue : sans elle, la jauge de la pastille serait fausse. */
+type ApplicableDrift = KnownDrift & { maxInput: number };
+const isApplicable = (d: KnownDrift): d is ApplicableDrift => d.maxInput !== null;
+
 interface Adopted { model: string; kind: KnownDrift['kind']; from: string | null; prices: ModelPrices }
 
 function createPriceAdoption(deps: AdoptionDeps) {
   return {
-    async adopt(model: string): Promise<Adopted | null> {
-      const drift = deps.driftFor(model);
-      if (drift === null) return null;
-      // Sans fenêtre de contexte, la jauge de la pastille serait fausse : le modèle attend.
-      if (drift.maxInput === null) throw new Error(`fenêtre de contexte de ${model} absente de la page des modèles d'Anthropic : tarif non appliqué`);
+    async adopt(drift: ApplicableDrift): Promise<Adopted> {
+      const { model } = drift;
       const nouveau = drift.kind === 'modele-nouveau';
       const entry: AdoptedPrice = {
         prices: { ...drift.official },
@@ -43,5 +43,5 @@ function createPriceAdoption(deps: AdoptionDeps) {
   };
 }
 
-export { createPriceAdoption };
-export type { Adopted, AdoptionDeps };
+export { createPriceAdoption, isApplicable };
+export type { Adopted, AdoptionDeps, ApplicableDrift };
