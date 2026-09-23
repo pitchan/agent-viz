@@ -147,44 +147,6 @@ test('partiel sans aucune part connue : l’absence s’avoue', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Les jetons nets côté navigateur : la même convention que le moteur, que le
-// navigateur ne peut pas importer (le serveur ne lui sert pas ce module).
-// ---------------------------------------------------------------------------
-import { netTokens } from '../../src/web/viz-state.ts';
-import { netTokens as netTokensMoteur } from '../../src/engine/doctor/aggregators/tokens.ts';
-import { emptyUsageBucket } from '../../src/engine/core/usage.ts';
-
-test('jetons nets : entrée + écriture cache + sortie, la relecture de cache exclue', () => {
-  // Arrange
-  const seau = { in: 1000, out: 500, cacheCreate: 20000, cacheRead: 900000 };
-  // Act
-  const n = netTokens(seau);
-  // Assert — 1000 + 500 + 20000 ; y ajouter la relecture donnerait 921500
-  expect(n).toBe(21500);
-});
-
-test('jetons nets : le navigateur et le moteur rendent le même chiffre sur le même seau', () => {
-  // Arrange — le moteur exige les six champs bruts, le navigateur n'en lit que quatre
-  const seau = { ...emptyUsageBucket(), in: 1000, out: 500, cacheCreate: 20000, cacheRead: 900000 };
-  // Act
-  const navigateur = netTokens(seau);
-  const moteur = netTokensMoteur(seau);
-  // Assert — deux définitions d'une même convention : un écart ici ferait
-  // afficher deux totaux différents par la pastille et la page Observatoire
-  expect(navigateur).toBe(21500);
-  expect(moteur).toBe(21500);
-});
-
-test('jetons nets : un champ absent du seau vaut zéro', () => {
-  // Arrange — l'enveloppe SSE rend les compteurs facultatifs
-  const seau = { in: 10 };
-  // Act
-  const n = netTokens(seau);
-  // Assert
-  expect(n).toBe(10);
-});
-
-// ---------------------------------------------------------------------------
 // À quelle session un instantané `tokens` s'applique. À la connexion, le serveur
 // rejoue ceux de TOUTES ses sessions, souvent avant que /events ait dit laquelle
 // est affichée.

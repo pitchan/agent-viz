@@ -282,14 +282,6 @@ export function tokenTotal(t: TokenBucket | null | undefined) {
   return countOrZero(t.in) + countOrZero(t.out) + countOrZero(t.cacheCreate) + countOrZero(t.cacheRead);
 }
 
-// Jetons nets = input + cache_creation + output, cache_read EXCLU : la convention du
-// moteur (`netTokens`), que la page Observatoire affiche aussi. Le serveur ne sert pas
-// ce module du moteur au navigateur, d'où cette copie, que tests/unit/viz-state garde alignée.
-export function netTokens(t: TokenBucket | null | undefined) {
-  if (!t) return 0;
-  return countOrZero(t.in) + countOrZero(t.cacheCreate) + countOrZero(t.out);
-}
-
 // Context window size = last message's input + cache_creation + cache_read.
 // Matches Claude Code's /context semantics (not cumulative). Same guard as
 // tokenTotal; the engine has no equivalent to these three "last" fields.
@@ -373,6 +365,17 @@ export function modelLabel(id: string | null | undefined) {
   if (!m) return id;
   const family = `${m[1]![0]!.toUpperCase()}${m[1]!.slice(1)}`;
   return m[3] !== undefined ? `${family} ${m[2]}.${m[3]}` : `${family} ${m[2]}`;
+}
+
+// Le modèle écrit sous le titre d'un nœud Session ou Agent. Lu dans les seaux de jetons,
+// qui arrivent après la création du nœud par les hooks : '' tant qu'il est inconnu.
+export function nodeModelLabel(
+  n: Pick<VizNode, 'id' | 'type'>,
+  tokens: { main: TokenBucket | null; perAgent: Map<string, TokenBucket> },
+) {
+  const aid = agentIdFromNode(n.id);
+  const bucket = n.type === 'session' ? tokens.main : aid ? tokens.perAgent.get(aid) : null;
+  return modelLabel(bucket?.lastModel);
 }
 
 // Un instantané `tokens` ne s'applique qu'à la session affichée, et à aucune tant qu'elle

@@ -14,7 +14,7 @@ import {
   COLORS, AGENT_R, SESSION_R, TOOL_W, TOOL_H, SKILL_R, MCP_R,
   state, vis,
   hexAlpha, roundRect, traceHexagon, traceDiamond, truncate, esc,
-  formatTokens, tokenContext, agentIdFromNode,
+  formatTokens, tokenContext, agentIdFromNode, nodeModelLabel,
   type VizNode, type VisNode,
 } from './viz-state.ts';
 
@@ -100,7 +100,7 @@ export function drawSessionNode(ctx: CanvasRenderingContext2D, n: VizNode, vn: V
 
   ctx.fillStyle = hexAlpha(n.color, 0.7);
   ctx.font = '10px -apple-system, system-ui, sans-serif';
-  ctx.fillText(n.sub, vn.x, vn.y + 9);
+  ctx.fillText(nodeModelLabel(n, state.tokens), vn.x, vn.y + 9);
 
   if (n.duration) {
     ctx.fillStyle = hexAlpha('#ffffff', 0.4);
@@ -185,7 +185,7 @@ export function drawAgentNode(ctx: CanvasRenderingContext2D, n: VizNode, vn: Vis
 
   ctx.fillStyle = hexAlpha(n.color, 0.6);
   ctx.font = '9px -apple-system, system-ui, sans-serif';
-  ctx.fillText(truncate(n.sub, 18), vn.x, vn.y + 8);
+  ctx.fillText(truncate(nodeModelLabel(n, state.tokens), 18), vn.x, vn.y + 8);
 
   const toolCount = n.children.length;
   if (toolCount > 0) {

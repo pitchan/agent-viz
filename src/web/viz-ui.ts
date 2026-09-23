@@ -257,68 +257,43 @@ document.getElementById('detail-close')!.addEventListener('click', () => {
   markDirty();
 });
 
-// ─── Budget pills (model · context% · cost | TOTAL · net tokens · cost) ────
-// Driven by SSE `tokens` snapshots — see viz-network.ts. What each pill says is
+// ─── Budget pill (TOTAL · conversation sizes · cost) ──────────────────────
+// Driven by SSE `tokens` snapshots — see viz-network.ts. What the pill says is
 // decided in viz-budget-format.ts; this function only applies it.
 // Cache paresseux : `null` veut dire « pas encore cherche », pas « absent ».
-// Les champs interieurs sont des enfants de leur pastille dans index.html, donc
-// la garde `if (!els.pill || !els.total) return` ci-dessous les couvre tous.
+// Les champs interieurs sont des enfants de la pastille dans index.html, donc
+// la garde `if (!els.total) return` ci-dessous les couvre tous.
 interface BudgetEls {
-  pill: HTMLElement | null;
-  model: HTMLElement | null;
-  ctx: HTMLElement | null;
-  cost: HTMLElement | null;
   total: HTMLElement | null;
-  totalTokens: HTMLElement | null;
-  totalCost: HTMLElement | null;
+  tokens: HTMLElement | null;
+  costPart: HTMLElement | null;
+  cost: HTMLElement | null;
 }
-const _budgetEls: BudgetEls = {
-  pill: null, model: null, ctx: null, cost: null,
-  total: null, totalTokens: null, totalCost: null,
-};
+const _budgetEls: BudgetEls = { total: null, tokens: null, costPart: null, cost: null };
 function _budgetDOM() {
-  if (!_budgetEls.pill) {
-    _budgetEls.pill = document.getElementById('budget-pill');
-    _budgetEls.model = document.getElementById('budget-model');
-    _budgetEls.ctx = document.getElementById('budget-ctx');
-    _budgetEls.cost = document.getElementById('budget-cost');
+  if (!_budgetEls.total) {
     _budgetEls.total = document.getElementById('budget-total-pill');
-    _budgetEls.totalTokens = document.getElementById('budget-total-tokens');
-    _budgetEls.totalCost = document.getElementById('budget-total-cost');
+    _budgetEls.tokens = document.getElementById('budget-total-tokens');
+    _budgetEls.costPart = document.getElementById('budget-total-cost-part');
+    _budgetEls.cost = document.getElementById('budget-total-cost');
   }
   return _budgetEls;
 }
 
 export function updateBudget() {
   const els = _budgetDOM();
-  if (!els.pill || !els.total) return;
+  if (!els.total) return;
   const p = budgetPresentation(state.tokens);
 
   if (p.kind === 'hidden') {
-    els.pill.hidden = true;
     els.total.hidden = true;
     return;
   }
-  if (p.kind === 'unavailable') {
-    els.model!.textContent = '';
-    els.ctx!.textContent = p.text;
-    els.cost!.textContent = '';
-    els.ctx!.classList.remove('is-warn', 'is-crit');
-    els.pill.title = p.title;
-    els.pill.hidden = false;
-    els.total.hidden = true;
-    return;
-  }
-  els.model!.textContent = p.main.model;
-  els.ctx!.textContent = p.main.ctx;
-  els.cost!.textContent = p.main.cost;
-  els.ctx!.classList.toggle('is-warn', p.main.ctxLevel === 'warn');
-  els.ctx!.classList.toggle('is-crit', p.main.ctxLevel === 'crit');
-  els.pill.title = p.main.title;
-  els.pill.hidden = false;
-  els.totalTokens!.textContent = p.total.tokens;
-  els.totalCost!.textContent = p.total.cost;
-  els.total.title = p.total.title;
+  const measured = p.kind === 'measured';
+  els.tokens!.textContent = measured ? p.tokens : p.text;
+  els.cost!.textContent = measured ? p.cost : '';
+  els.costPart!.hidden = !measured;
+  els.total.title = p.title;
   els.total.hidden = false;
 }
 

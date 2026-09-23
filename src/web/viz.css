@@ -296,8 +296,7 @@ body {
 .error-gone { font-size: 10px; color: var(--text-muted); margin-top: 4px; font-style: italic; }
 .errors-empty { padding: 16px; color: var(--text-muted); font-size: 12px; text-align: center; }
 
-/* Centrés : la pile des pastilles de budget est plus haute qu'un compteur, et
-   l'étirement par défaut en ferait de grands rectangles. */
+/* Centrés : l'étirement par défaut ferait des compteurs de grands rectangles. */
 .stat-group { display: flex; align-items: center; gap: 8px; margin-left: 8px; }
 .stat {
   display: flex; align-items: center; gap: 6px;
@@ -325,20 +324,14 @@ body {
 .stat-val.has-errors-alarm { color: var(--error); }
 .stat-val.has-running { color: var(--notification); }
 
-/* Budget pills — model · context% · cost, then TOTAL. Same shape as .stat. */
-.budget-pill { gap: 8px; }
-/* L'une sous l'autre et compactes : 2 × 19 px + 2 px = 40 px tiennent dans les 48 px du
-   bandeau, et la pile ne prend que la largeur de la plus large des deux. */
-.budget-stack { display: flex; flex-direction: column; gap: 2px; flex: none; }
-.budget-stack .stat { padding: 1px 8px; font-size: 11px; }
+/* Budget pill — TOTAL · tokens · cost. Same shape as .stat. */
+.budget-pill { display: flex; align-items: center; gap: 8px; }
 .budget-pill[hidden] { display: none; }
 .budget-model {
   font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;
   color: var(--holo-bright); font-weight: 600;
 }
 .budget-sep { color: var(--text-muted); }
-#budget-ctx.is-warn { color: var(--notification); }
-#budget-ctx.is-crit { color: var(--error); }
 
 .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
 #search-box {
