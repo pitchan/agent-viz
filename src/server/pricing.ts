@@ -1,6 +1,7 @@
 'use strict';
-// Anthropic model pricing: the engine's embedded table (priceTable) prices the whole
-// product, read once when this module loads. LiteLLM only reports drift (see litellmDrift).
+// Anthropic model pricing: the server's current tariff (embedded table + adopted
+// prices, see pricing-state.ts) prices the whole product. LiteLLM reports drift
+// (see litellmDrift); one of its prices counts only once the user adopts it.
 //
 // SRP: this module's only job is `model id -> { input, output, cacheCreate,
 // cacheRead, maxInput, label, history }`. No I/O leakage to consumers — they
@@ -11,8 +12,9 @@
 // the server owns: the price map, display metadata and the LiteLLM watchdog.
 
 import https from 'node:https';
-import { normalizeModel, priceTable } from '../engine/core/pricing.ts';
-import type { ModelPrices, PricePeriod } from '../engine/core/pricing.ts';
+import { normalizeModel } from '../engine/core/pricing.ts';
+import type { ModelPrices, PricePeriod, Pricing } from '../engine/core/pricing.ts';
+import { currentPricing } from './pricing-state.ts';
 
 const LITELLM_URL = 'https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json';
 const REFRESH_MS = 24 * 60 * 60 * 1000;
@@ -38,12 +40,19 @@ interface PriceEntry extends ModelPrices {
 // La liste des zéros voulus (`<synthetic>`, modèles locaux) vit dans `src/engine/core/pricing.ts`
 // seulement ; `known: true` sur un résultat à 0 $ distingue un zéro VOULU d'un tarif inconnu.
 
-// Built once from the engine's table. A Map, not an object: a model id read
-// from a third-party transcript never matches an inherited property such as
-// `constructor`.
-const PRICES: ReadonlyMap<string, PriceEntry> = new Map(
-  priceTable().entries.map(e => [e.model, { ...e.current, maxInput: e.maxInput, label: e.label, history: e.history }]),
-);
+// Rebuilt when the current tariff changes, not on every read: getPrice runs on
+// every message of the pill. A Map, not an object: a model id read from a
+// third-party transcript never matches an inherited property such as `constructor`.
+const maps = new WeakMap<Pricing, ReadonlyMap<string, PriceEntry>>();
+function priceMap(): ReadonlyMap<string, PriceEntry> {
+  const pricing = currentPricing();
+  let map = maps.get(pricing);
+  if (!map) {
+    map = new Map(pricing.priceTable().entries.map(e => [e.model, { ...e.current, maxInput: e.maxInput, label: e.label, history: e.history }]));
+    maps.set(pricing, map);
+  }
+  return map;
+}
 let lastFetched = 0;
 let refreshTimer: NodeJS.Timeout | null = null;
 
@@ -52,7 +61,7 @@ let refreshTimer: NodeJS.Timeout | null = null;
 // rates go back in time — label and maxInput stay from the current entry.
 function getPrice(id: string | null | undefined, at?: string): PriceEntry | null {
   if (!id) return null;
-  const current = PRICES.get(id) ?? PRICES.get(normalizeModel(id) ?? '');
+  const current = priceMap().get(id) ?? priceMap().get(normalizeModel(id) ?? '');
   if (!current) return null;
   const ts = at || new Date().toISOString();
   for (const period of current.history) {
@@ -84,10 +93,10 @@ function familyVersionOf(canonical: string): FamilyVersion | null {
 }
 
 // Highest [major, minor] tuple on file for a family, read from the price map —
-// so the "new model" bar rises automatically as the engine table grows.
+// so the "new model" bar rises as the table grows or a model is adopted.
 function familyMaxVersion(family: string): readonly [number, number] | null {
   let max: readonly [number, number] | null = null;
-  for (const key of PRICES.keys()) {
+  for (const key of priceMap().keys()) {
     const fv = familyVersionOf(key);
     if (!fv || fv.family !== family) continue;
     if (!max || fv.version[0] > max[0] || (fv.version[0] === max[0] && fv.version[1] > max[1])) {
@@ -110,7 +119,8 @@ interface Drift {
 // LiteLLM is a WATCHDOG (vigie), not a price source: the daily fetch compares
 // the public feed against the embedded table and reports drift — a different
 // tariff on a known model, or a new canonical Claude model we do not carry.
-// It NEVER writes into the price map. `at` (tests) defaults to "now": the
+// It never writes into the price map itself: a price enters only through the
+// user's adoption (price-adoption.ts). `at` (tests) defaults to "now": the
 // comparison is against the rate in effect at that instant, which is exactly
 // why sonnet-5's intro-rate representation in LiteLLM is not a false alarm.
 //

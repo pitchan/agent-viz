@@ -17,7 +17,8 @@
 
 import { broadcastSSE } from './sse.ts';
 import { getPrice } from './pricing.ts';
-import { computeCost, normalizeModel, pricingKindOf } from '../engine/core/pricing.ts';
+import { normalizeModel } from '../engine/core/pricing.ts';
+import { currentPricing } from './pricing-state.ts';
 import { addUsage, countOrZero, emptyUsageBucket, isDedupableMsgId, usageVerdict } from '../engine/core/usage.ts';
 import type { UsageBucket } from '../engine/core/usage.ts';
 import type { RawUsage } from '../engine/core/events.ts';
@@ -153,7 +154,8 @@ function accumulateUsage(
   // jeton coûte 0 $) ni `getPrice`, réservé aux métadonnées d'affichage, ne la disent.
   if (model) {
     const canonique = normalizeModel(model);
-    const nature = pricingKindOf(model, at ?? undefined);
+    const pricing = currentPricing();
+    const nature = pricing.pricingKindOf(model, at ?? undefined);
     // Inconnu : on NOMME le modèle et marque le total incomplet ; `lastModel` garde la pastille.
     if (nature === 'inconnu') {
       if (canonique !== null) {
@@ -165,7 +167,7 @@ function accumulateUsage(
       // Tarifé ou zéro voulu (`<synthetic>`, Ollama local) : le montant compte, le total reste complet.
       // `usd` est fini (chaque champ passe par `countOrZero`) et `null` seulement pour un tarif
       // inconnu, écarté ci-dessus : `?? 0` ne traite que ce cas.
-      const cost = computeCost(raw, model, at ?? undefined).usd;
+      const cost = pricing.computeCost(raw, model, at ?? undefined).usd;
       bucket.costUsd += cost ?? 0;
       // Seul un modèle tarifé devient celui de la pastille : `<synthetic>` est un artefact du harnais.
       if (nature === 'tarife') {

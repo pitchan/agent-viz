@@ -11,6 +11,7 @@
 
 import http from 'node:http';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
 import {
@@ -23,6 +24,8 @@ import { watchSession, liveHandoffOffset } from './event-reader.ts';
 import { housekeep, scanAndWatch } from './housekeep.ts';
 import { dispatch, setServer } from './routes.ts';
 import { startPricingRefresh, onPricingDrift } from './pricing.ts';
+import { applyAdoptedPrices } from './pricing-state.ts';
+import { adoptedPricesPath, readAdoptedPrices } from '../engine/core/adopted-prices.ts';
 import { getObservatoryService } from './observatory/index.ts';
 import { startWatchdog } from './watchdog/index.ts';
 import { bindPort, portInUseMessage } from './bind-port.ts';
@@ -68,6 +71,8 @@ async function startServer(): Promise<void> {
 }
 
 async function boot(): Promise<void> {
+  // Les prix adoptés précèdent tout calcul de coût : pastille, vigie et observatoire.
+  applyAdoptedPrices(await readAdoptedPrices(adoptedPricesPath(os.homedir()), fs.promises.readFile));
   // LiteLLM is a watchdog: drift reports surface on the SSE stream and in
   // the alerts popup; it never writes prices.
   onPricingDrift(report => broadcastSSE({ type: 'pricingDrift', drifts: report.drifts }));

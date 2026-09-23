@@ -9,18 +9,27 @@
 // The imports below are static: a missing compiled engine file stops this module
 // from loading, so no caller ever holds an absent engine.
 
-import { discoverSessions, parseSince, priceTable } from '../../engine/core/index.ts';
+import { discoverSessions, parseSince } from '../../engine/core/index.ts';
+import type { PriceTable, SessionRef } from '../../engine/core/index.ts';
 import { scanSession, netTokens } from '../../engine/doctor/index.ts';
+import type { SessionReport } from '../../engine/doctor/index.ts';
 import { PRODUCT_VERSION } from '../../engine/version.ts';
+import { currentPricing } from '../pricing-state.ts';
 
 export interface Engine {
   discoverSessions: typeof discoverSessions;
   parseSince: typeof parseSince;
-  scanSession: typeof scanSession;
+  // Le barème est celui du serveur au moment de l'appel : une adoption vaut pour le scan suivant.
+  scanSession: (ref: SessionRef, maxPrompts: number) => Promise<SessionReport>;
   netTokens: typeof netTokens;
-  priceTable: typeof priceTable;
+  priceTable: () => PriceTable;
   // The product's own version: the engine ships inside it and has none of its own.
   version: string;
 }
 
-export const engine: Engine = { discoverSessions, parseSince, scanSession, netTokens, priceTable, version: PRODUCT_VERSION };
+export const engine: Engine = {
+  discoverSessions, parseSince, netTokens,
+  scanSession: (ref, maxPrompts) => scanSession(ref, maxPrompts, currentPricing()),
+  priceTable: () => currentPricing().priceTable(),
+  version: PRODUCT_VERSION,
+};
