@@ -1,7 +1,8 @@
+// runDoctorCli scanne la racine qu'on lui donne, jamais celle de la machine.
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterAll, afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { runDoctorCli } from '../../src/engine/doctor/index.ts';
 import { promptLine, writeSessionTree } from '../helpers/build-transcript.ts';
 
@@ -48,32 +49,30 @@ afterEach(() => {
   }
 });
 
-describe('runDoctorCli — la racine scannee', () => {
-  test('CLAUDE_CONFIG_DIR deplace la racine du moteur', async () => {
-    process.env['CLAUDE_CONFIG_DIR'] = racine;
-    expect(await runDoctorCli({ json: false, list: true })).toBe(0);
-    expect(sorties.join('')).toContain(`1 session(s) découverte(s) sous ${racine}`);
-  });
+test('CLAUDE_CONFIG_DIR deplace la racine du moteur', async () => {
+  process.env['CLAUDE_CONFIG_DIR'] = racine;
+  expect(await runDoctorCli({ json: false, list: true })).toBe(0);
+  expect(sorties.join('')).toContain(`1 session(s) découverte(s) sous ${racine}`);
+});
 
-  // Temoin negatif : si le moteur lisait encore NETGAIN_CLAUDE_DIR, la session posee sous
-  // `racine` serait decouverte ici.
-  test('NETGAIN_CLAUDE_DIR ne deplace pas le dossier lu', async () => {
-    process.env['NETGAIN_CLAUDE_DIR'] = racine;
-    expect(await runDoctorCli({ json: false, list: true })).toBe(0);
-    expect(sorties.join('')).toContain(`0 session(s) découverte(s) sous ${path.join(home, '.claude')}`);
-  });
+// Temoin negatif : si le moteur lisait encore NETGAIN_CLAUDE_DIR, la session posee sous
+// `racine` serait decouverte ici.
+test('NETGAIN_CLAUDE_DIR ne deplace pas le dossier lu', async () => {
+  process.env['NETGAIN_CLAUDE_DIR'] = racine;
+  expect(await runDoctorCli({ json: false, list: true })).toBe(0);
+  expect(sorties.join('')).toContain(`0 session(s) découverte(s) sous ${path.join(home, '.claude')}`);
+});
 
-  test('--claude-dir l\'emporte toujours sur la variable', async () => {
-    process.env['CLAUDE_CONFIG_DIR'] = path.join(home, '.claude');
-    expect(await runDoctorCli({ json: false, list: true, claudeDir: racine })).toBe(0);
-    expect(sorties.join('')).toContain(`1 session(s) découverte(s) sous ${racine}`);
-  });
+test('--claude-dir l\'emporte toujours sur la variable', async () => {
+  process.env['CLAUDE_CONFIG_DIR'] = path.join(home, '.claude');
+  expect(await runDoctorCli({ json: false, list: true, claudeDir: racine })).toBe(0);
+  expect(sorties.join('')).toContain(`1 session(s) découverte(s) sous ${racine}`);
+});
 
-  // Lue avec `??`, une variable posee mais vide faisait scanner la chaine vide et annoncer
-  // « 0 session(s) découverte(s) sous  » : un utilisateur y lit « je n'ai pas de sessions ».
-  test('une variable VIDE retombe sur le home, jamais sur la chaine vide', async () => {
-    process.env['CLAUDE_CONFIG_DIR'] = '';
-    expect(await runDoctorCli({ json: false, list: true })).toBe(0);
-    expect(sorties.join('')).toContain(`0 session(s) découverte(s) sous ${path.join(home, '.claude')}`);
-  });
+// Lue avec `??`, une variable posee mais vide faisait scanner la chaine vide et annoncer
+// « 0 session(s) découverte(s) sous  » : un utilisateur y lit « je n'ai pas de sessions ».
+test('une variable VIDE retombe sur le home, jamais sur la chaine vide', async () => {
+  process.env['CLAUDE_CONFIG_DIR'] = '';
+  expect(await runDoctorCli({ json: false, list: true })).toBe(0);
+  expect(sorties.join('')).toContain(`0 session(s) découverte(s) sous ${path.join(home, '.claude')}`);
 });

@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterAll, describe, expect, test } from 'vitest';
+import { afterAll, expect, test } from 'vitest';
 import { runDoctor } from '../../src/engine/doctor/index.ts';
 import { renderReport } from '../../src/engine/doctor/report/terminal.ts';
 import { assistantLine, compactLine, promptLine, toolResultLine, toolUse, writeSessionTree } from '../helpers/build-transcript.ts';
@@ -73,115 +73,81 @@ writeSessionTree(
   ],
 );
 
-describe('runDoctor bout-en-bout sur fixture', () => {
-  test('produit le rapport complet attendu', async () => {
-    const report = await runDoctor({ claudeDir });
+test('produit le rapport complet attendu', async () => {
+  const report = await runDoctor({ claudeDir });
 
-    // scan : les échecs sont VISIBLES, jamais silencieux
-    expect(report.scan.sessions).toBe(1);
-    expect(report.scan.parseErrors).toBe(1);
-    expect(report.scan.otherEventTypes).toEqual({ 'queue-operation': 1 });
-    expect(report.scan.unknownModels).toEqual(['claude-futur-9']);
-    expect(report.scan.malformedUsageMessages).toBe(1);
-    expect(report.scan.clientVersions).toEqual(['2.1.201']);
+  // scan : les échecs sont VISIBLES, jamais silencieux
+  expect(report.scan.sessions).toBe(1);
+  expect(report.scan.parseErrors).toBe(1);
+  expect(report.scan.otherEventTypes).toEqual({ 'queue-operation': 1 });
+  expect(report.scan.unknownModels).toEqual(['claude-futur-9']);
+  expect(report.scan.malformedUsageMessages).toBe(1);
+  expect(report.scan.clientVersions).toEqual(['2.1.201']);
 
-    const proj = report.projects[0];
-    const sess = proj?.sessions[0];
-    expect(proj?.projectSlug).toBe('F--test-proj');
-    expect(sess?.cwd).toBe('F:\\test-proj');
-    expect(sess?.gitBranch).toBe('main');
-    expect(sess?.startedAt).toBe('2026-07-09T09:00:00.000Z');
+  const proj = report.projects[0];
+  const sess = proj?.sessions[0];
+  expect(proj?.projectSlug).toBe('F--test-proj');
+  expect(sess?.cwd).toBe('F:\\test-proj');
+  expect(sess?.gitBranch).toBe('main');
+  expect(sess?.startedAt).toBe('2026-07-09T09:00:00.000Z');
 
-    // métrique 1 : dédup msg_1, buckets main + agent, coût partie connue
-    expect(sess?.tokens.main).toMatchObject({ in: 151, out: 16, cacheCreate: 20500, cacheRead: 20000 });
-    expect(sess?.tokens.perAgent['agent-aaa']).toMatchObject({ in: 10, out: 2 });
-    expect(sess?.netTokens).toBe(161 + 20500 + 18);
-    // opus msg_1 0.12575 + opus msg_2 0.0135 + haiku 0.00002 = 0.13927 ; futur-9 exclu (inconnu)
-    expect(sess?.tokens.costUsd).toBeCloseTo(0.13927, 6);
-    expect(sess?.tokens.costComplete).toBe(false);
-    // msg_a2 du sous-agent : un message au usage inexploitable, compté à part
-    expect(sess?.tokens.malformedUsageMessages).toBe(1);
+  // métrique 1 : dédup msg_1, buckets main + agent, coût partie connue
+  expect(sess?.tokens.main).toMatchObject({ in: 151, out: 16, cacheCreate: 20500, cacheRead: 20000 });
+  expect(sess?.tokens.perAgent['agent-aaa']).toMatchObject({ in: 10, out: 2 });
+  expect(sess?.netTokens).toBe(161 + 20500 + 18);
+  // opus msg_1 0.12575 + opus msg_2 0.0135 + haiku 0.00002 = 0.13927 ; futur-9 exclu (inconnu)
+  expect(sess?.tokens.costUsd).toBeCloseTo(0.13927, 6);
+  expect(sess?.tokens.costComplete).toBe(false);
+  // msg_a2 du sous-agent : un message au usage inexploitable, compté à part
+  expect(sess?.tokens.malformedUsageMessages).toBe(1);
 
-    // métrique 2 : bande 2–30 Ko, recognizer vitest
-    expect(sess?.toolResults.bySize.band).toEqual({ count: 1, bytes: 5000 });
-    expect(sess?.toolResults.byRecognizer['vitest']).toEqual({ count: 1, bytes: 5000, bandBytes: 5000 });
+  // métrique 2 : bande 2–30 Ko, recognizer vitest
+  expect(sess?.toolResults.bySize.band).toEqual({ count: 1, bytes: 5000 });
+  expect(sess?.toolResults.byRecognizer['vitest']).toEqual({ count: 1, bytes: 5000, bandBytes: 5000 });
 
-    // métrique 3 : side-car typé + spawn tool_use (dédupliqué malgré la ligne double)
-    expect(sess?.subagents).toEqual({ sidecarCount: 1, spawnToolUses: 1, byType: { Explore: 1 } });
+  // métrique 3 : side-car typé + spawn tool_use (dédupliqué malgré la ligne double)
+  expect(sess?.subagents).toEqual({ sidecarCount: 1, spawnToolUses: 1, byType: { Explore: 1 } });
 
-    // métrique 4 : compaction visible, pas de churn (1er tour exempté, msg_2 sous le seuil)
-    expect(sess?.context.compactions).toEqual([{ trigger: 'auto', preTokens: 12345 }]);
-    expect(sess?.context.cacheChurnEvents).toBe(0);
+  // métrique 4 : compaction visible, pas de churn (1er tour exempté, msg_2 sous le seuil)
+  expect(sess?.context.compactions).toEqual([{ trigger: 'auto', preTokens: 12345 }]);
+  expect(sess?.context.cacheChurnEvents).toBe(0);
 
-    // métrique 5 : corpus forme carte
-    expect(sess?.prompts.totalPrompts).toBe(1);
-    expect(sess?.prompts.mapShapedCount).toBe(1);
-    expect(sess?.prompts.corpus).toEqual([{ text: 'Où est définie la route des communes ?', category: 'where' }]);
+  // métrique 5 : corpus forme carte
+  expect(sess?.prompts.totalPrompts).toBe(1);
+  expect(sess?.prompts.mapShapedCount).toBe(1);
+  expect(sess?.prompts.corpus).toEqual([{ text: 'Où est définie la route des communes ?', category: 'where' }]);
 
-    // totaux
-    expect(report.totals.sessions).toBe(1);
-    expect(report.totals.costComplete).toBe(false);
-    expect(report.totals.costUsd).toBeCloseTo(0.13927, 6);
-  });
-
-  test('le rendu terminal expose les faits qui fâchent (parse errors, coût partiel)', async () => {
-    const report = await runDoctor({ claudeDir });
-    const text = renderReport(report);
-    expect(text).toContain('netgain doctor');
-    expect(text).toContain('2–30 Ko');
-    expect(text).toContain('1 ligne(s) illisible(s)');
-    expect(text).toContain('claude-futur-9');
-    expect(text).toContain('partiel');
-    expect(text).toContain('1 message(s) au champ usage inexploitable');
-    expect(text).not.toContain('saved'); // jamais de compteur « saved »
-  });
+  // totaux
+  expect(report.totals.sessions).toBe(1);
+  expect(report.totals.costComplete).toBe(false);
+  expect(report.totals.costUsd).toBeCloseTo(0.13927, 6);
 });
 
-describe('conseil « préfixe modifié » dans le rendu terminal', () => {
-  const adviceDir = mkdtempSync(path.join(tmpdir(), 'netgain-e2e-advice-'));
-  afterAll(() => rmSync(adviceDir, { recursive: true, force: true }));
-
-  test('un churn prefixChange dominant fait apparaître le conseil étiqueté labo', async () => {
-    // 2 tours rapprochés, même modèle : perte de cache > tolérance sans pause ni
-    // compaction → prefixChange (sans marqueur), seule cause réelle → gate ouvert.
-    writeSessionTree(adviceDir, 'F--conseil-proj', 'sess-c1', [
-      promptLine('continue le refactor', { timestamp: '2026-07-09T10:00:00.000Z', cwd: 'F:\\conseil-proj' }),
-      assistantLine({
-        msgId: 'msg_c1',
-        model: 'claude-opus-4-8',
-        usage: { input_tokens: 100, output_tokens: 10, cache_creation_input_tokens: 30000, cache_read_input_tokens: 0 },
-        timestamp: '2026-07-09T10:00:05.000Z',
-      }),
-      assistantLine({
-        msgId: 'msg_c2',
-        model: 'claude-opus-4-8',
-        usage: { input_tokens: 100, output_tokens: 10, cache_creation_input_tokens: 25000, cache_read_input_tokens: 2000 },
-        timestamp: '2026-07-09T10:00:30.000Z',
-      }),
-    ]);
-    const text = renderReport(await runDoctor({ claudeDir: adviceDir }));
-    expect(text).toContain('préfixe modifié — marqueurs : sans marqueur ×1');
-    expect(text).toContain('conseil (mécanismes mesurés en laboratoire, pas déduits de ces journaux)');
-    expect(text).toContain('ne pas changer de modèle en cours de session');
-    expect(text).toContain('l’enveloppe est rebâtie à la reprise');
-  });
+test('le rendu terminal expose les faits qui fâchent (parse errors, coût partiel)', async () => {
+  const report = await runDoctor({ claudeDir });
+  const text = renderReport(report);
+  expect(text).toContain('netgain doctor');
+  expect(text).toContain('2–30 Ko');
+  expect(text).toContain('1 ligne(s) illisible(s)');
+  expect(text).toContain('claude-futur-9');
+  expect(text).toContain('partiel');
+  expect(text).toContain('1 message(s) au champ usage inexploitable');
+  expect(text).not.toContain('saved'); // jamais de compteur « saved »
 });
 
-describe('CLI bout-en-bout', () => {
-  test('netgain doctor --json écrit un rapport JSON valide sur stdout, exit 0', () => {
-    const netgainRoot = path.resolve(import.meta.dirname, '..', '..');
-    // Résolu par NOM et non par chemin figé : `tsx` est trouvé là où npm l'a
-    // installé. Le sous-chemin `tsx/dist/cli.mjs` n'est pas exporté, d'où le
-    // détour par le `package.json` de `tsx`, qui l'est.
-    const requireFromHere = createRequire(import.meta.url);
-    const tsxCli = path.join(path.dirname(requireFromHere.resolve('tsx/package.json')), 'dist', 'cli.mjs');
-    const out = execFileSync(
-      process.execPath,
-      [tsxCli, path.join(netgainRoot, 'src', 'engine', 'cli.ts'), 'doctor', '--json', '--claude-dir', claudeDir],
-      { encoding: 'utf8', cwd: netgainRoot },
-    );
-    const parsed = JSON.parse(out) as { scan: { sessions: number }; totals: { costComplete: boolean } };
-    expect(parsed.scan.sessions).toBe(1);
-    expect(parsed.totals.costComplete).toBe(false);
-  });
+test('netgain doctor --json écrit un rapport JSON valide sur stdout, exit 0', () => {
+  const netgainRoot = path.resolve(import.meta.dirname, '..', '..');
+  // Résolu par NOM et non par chemin figé : `tsx` est trouvé là où npm l'a
+  // installé. Le sous-chemin `tsx/dist/cli.mjs` n'est pas exporté, d'où le
+  // détour par le `package.json` de `tsx`, qui l'est.
+  const requireFromHere = createRequire(import.meta.url);
+  const tsxCli = path.join(path.dirname(requireFromHere.resolve('tsx/package.json')), 'dist', 'cli.mjs');
+  const out = execFileSync(
+    process.execPath,
+    [tsxCli, path.join(netgainRoot, 'src', 'engine', 'cli.ts'), 'doctor', '--json', '--claude-dir', claudeDir],
+    { encoding: 'utf8', cwd: netgainRoot },
+  );
+  const parsed = JSON.parse(out) as { scan: { sessions: number }; totals: { costComplete: boolean } };
+  expect(parsed.scan.sessions).toBe(1);
+  expect(parsed.totals.costComplete).toBe(false);
 });

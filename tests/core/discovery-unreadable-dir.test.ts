@@ -1,7 +1,9 @@
+// discoverSubagents face à un dossier illisible : l'erreur de lecture ne fait pas
+// tomber le balayage, elle rend une liste vide.
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterAll, describe, expect, test, vi } from 'vitest';
+import { afterAll, expect, test, vi } from 'vitest';
 import { discoverSessions } from '../../src/engine/core/discovery.ts';
 
 // Un sous-dossier illisible ne coûte que lui-même : un readdir({recursive:true}) unique
@@ -36,14 +38,12 @@ touch('projects/F--DEV-proj-a/sess-new.jsonl', '{"type":"user"}\n');
 touch('projects/F--DEV-proj-a/sess-new/subagents/agent-abc.jsonl', '{"type":"assistant"}\n');
 touch('projects/F--DEV-proj-a/sess-new/subagents/blocked-by-mock/agent-xyz.jsonl', '{"type":"assistant"}\n');
 
-describe('discoverSubagents — dossier illisible', () => {
-  test('un sous-dossier dont le readdir échoue coûte CE dossier, pas la session entière', async () => {
-    const sessions = await discoverSessions(claudeDir, {});
-    const sess = sessions.find((s) => s.sessionId === 'sess-new');
-    const ids = sess?.subagents.map((a) => a.agentId) ?? [];
-    // Le sous-agent ordinaire du même parent survit : l'échec reste localisé au dossier fautif.
-    expect(ids).toContain('abc');
-    // Celui du dossier bloqué est simplement absent : aucune erreur ne remonte jusqu'ici.
-    expect(ids).not.toContain('xyz');
-  });
+test('un sous-dossier dont le readdir échoue coûte CE dossier, pas la session entière', async () => {
+  const sessions = await discoverSessions(claudeDir, {});
+  const sess = sessions.find((s) => s.sessionId === 'sess-new');
+  const ids = sess?.subagents.map((a) => a.agentId) ?? [];
+  // Le sous-agent ordinaire du même parent survit : l'échec reste localisé au dossier fautif.
+  expect(ids).toContain('abc');
+  // Celui du dossier bloqué est simplement absent : aucune erreur ne remonte jusqu'ici.
+  expect(ids).not.toContain('xyz');
 });

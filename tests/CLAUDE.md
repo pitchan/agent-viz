@@ -14,6 +14,14 @@ Chaque test = trois blocs, dans cet ordre, marqués `// Arrange`, `// Act`, `// 
 
 Seule forme compacte tolérée : la vérification d'une fonction pure sans préparation, où Arrange est vide et Act/Assert tiennent sur la même ligne (`assert.equal(scoreOf(rec(1)), 10)`). Dès qu'il y a un `const` à préparer, les trois commentaires reviennent.
 
+**Pas de `describe` décoratif — un fichier = une facette testée.** Le chemin du fichier groupe déjà : le rapport comme l'échec affichent `tests/unit/observatory-ranking.test.ts > nom du test`. Un `describe('scoreOf')` redit ce que `ranking.test.ts` dit, et nomme la fonction là où le § 2 demande le comportement. Un fichier qui couvre deux facettes se scinde en deux fichiers ; il ne se subdivise pas en deux `describe`.
+
+Deuxième raison, celle qui se voit à la scission : **un `describe` cadre les `const` de son groupe, et masque ainsi qu'ils sont dupliqués d'un groupe à l'autre**. Une fois les groupes mis en fichiers, le doublon devient une redéclaration que le transpileur nomme, et la fabrique partagée par plusieurs facettes se voit — elle part dans `tests/helpers/`.
+
+**Ce n'est pas une optimisation.** Mesuré sur `tests/core` + `tests/doctor` : 23 fichiers en 0,87 s, les mêmes tests en 56 fichiers en 1,63 s. Vitest parallélise bien par fichier, mais le démarrage d'un worker coûte plus que le parallélisme ne rapporte quand un test dure quelques millisecondes. On scinde pour la portée et la lisibilité, jamais pour le temps.
+
+Seul emploi admis de `describe` : cadrer un `beforeEach`/`afterEach` qui ne vaut que pour **une partie** du fichier. Un hook qui vaut pour tout le fichier se pose au niveau du fichier, sans enveloppe. Un `describe` qui ne contient aucun hook n'a pas de raison d'être. Filet : `tests/repo/no-decorative-describe.test.ts` rougit sur tout `describe` dont le bloc ne pose pas directement un hook.
+
 ## 2. Résistance au changement
 
 Un test ne doit casser que si **le comportement** change. S'il casse sur un refactor qui n'a rien changé pour l'appelant, c'est le test qui est en tort.
