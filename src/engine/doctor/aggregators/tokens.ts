@@ -1,6 +1,5 @@
 import type { NormalizedEvent } from '../../core/events.ts';
-import { computeCost, pricingKindOf } from '../../core/pricing.ts';
-import type { PricingKind } from '../../core/pricing.ts';
+import type { Pricing, PricingKind } from '../../core/pricing.ts';
 import { addUsage, emptyUsageBucket, isDedupableMsgId, sumUsageInto } from '../../core/usage.ts';
 import type { UsageBucket } from '../../core/usage.ts';
 
@@ -49,6 +48,10 @@ export interface TokensResult {
  * la déduplication par message.id est obligatoire.
  */
 export class TokensAggregator {
+  // Le barème arrive de l'appelant : la CLI et le serveur y mettent les prix adoptés.
+  private readonly pricing: Pricing;
+  constructor(pricing: Pricing) { this.pricing = pricing; }
+
   private readonly seen = new Set<string>();
   private readonly main = emptyBucket();
   private readonly perAgent: Record<string, TokenBucket> = {};
@@ -77,13 +80,13 @@ export class TokensAggregator {
 
     // Le tarif appliqué est celui en vigueur à la date du message (les barèmes
     // changent — ex. Sonnet 5 lancement→catalogue au 2026-09-01).
-    const { usd, known, model } = computeCost(evt.usage, evt.model, evt.timestamp);
+    const { usd, known, model } = this.pricing.computeCost(evt.usage, evt.model, evt.timestamp);
     const modelKey = model ?? '(inconnu)';
     addUsage((this.perModel[modelKey] ??= emptyBucket()), evt.usage);
     // Dollars par modèle, cumulés au même instant et au même tarif que le coût
     // total — jamais recalculés depuis les seaux (le tarif daté et la part
     // cache 5 min / 1 h d'un message ne se reconstituent pas depuis un agrégat).
-    const mc = (this.costByModel[modelKey] ??= { usd: null, pricing: pricingKindOf(evt.model, evt.timestamp) });
+    const mc = (this.costByModel[modelKey] ??= { usd: null, pricing: this.pricing.pricingKindOf(evt.model, evt.timestamp) });
     if (known && usd !== null) {
       mc.usd = (mc.usd ?? 0) + usd;
       this.cost += usd;

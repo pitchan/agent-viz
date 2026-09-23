@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, expect, test } from 'vitest';
+import { embeddedPricing } from '../../src/engine/core/pricing.ts';
 import { discoverSessions } from '../../src/engine/core/discovery.ts';
 import { scanSession } from '../../src/engine/doctor/scan-session.ts';
 import { assistantLine, promptLine, toolResultLine, toolUse, writeSessionTree } from '../helpers/build-transcript.ts';
@@ -27,7 +28,7 @@ test('startedAt = 1er horodatage main, endedAt = dernier, y compris un tool_resu
   const refs = await discoverSessions(claudeDir, { project: 'clock-proj' });
   const ref = refs.find((r) => r.sessionId === 'sess-clock');
   expect(ref).toBeDefined();
-  const report = await scanSession(ref!, 100);
+  const report = await scanSession(ref!, 100, embeddedPricing);
 
   expect(report.startedAt).toBe('2026-07-01T10:00:00.000Z');
   expect(report.endedAt).toBe('2026-07-01T10:03:30.000Z');
@@ -40,7 +41,7 @@ test('une session sans aucun horodatage expose startedAt et endedAt à null', as
   ]);
 
   const refs = await discoverSessions(claudeDir, { project: 'clock-nots' });
-  const report = await scanSession(refs.find((r) => r.sessionId === 'sess-nots')!, 100);
+  const report = await scanSession(refs.find((r) => r.sessionId === 'sess-nots')!, 100, embeddedPricing);
 
   expect(report.startedAt).toBeNull();
   expect(report.endedAt).toBeNull();

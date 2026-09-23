@@ -1,6 +1,11 @@
+import { readFile } from 'node:fs/promises';
+import os from 'node:os';
 import type { DoctorCliOptions } from '../cli-args.ts';
+import { adoptedPricesPath, readAdoptedPrices } from '../core/adopted-prices.ts';
 import { resolveClaudeDir } from '../core/claude-dir.ts';
 import { discoverSessions, parseSince } from '../core/discovery.ts';
+import { createPricing } from '../core/pricing.ts';
+import type { Pricing } from '../core/pricing.ts';
 import { findClaudeMdFiles } from './aggregators/context.ts';
 import { stableStringify } from './report/json.ts';
 import { renderReport } from './report/terminal.ts';
@@ -9,6 +14,7 @@ import { scanSession } from './scan-session.ts';
 
 export interface DoctorOptions {
   claudeDir: string;
+  pricing: Pricing;
   project?: string;
   since?: Date;
   last?: number;
@@ -26,7 +32,7 @@ export async function runDoctor(opts: DoctorOptions): Promise<DoctorReport> {
 
   const byProject = new Map<string, SessionReport[]>();
   for (const ref of refs) {
-    const report = await scanSession(ref, opts.maxPrompts ?? DEFAULT_MAX_PROMPTS);
+    const report = await scanSession(ref, opts.maxPrompts ?? DEFAULT_MAX_PROMPTS, opts.pricing);
     const list = byProject.get(ref.projectSlug) ?? [];
     list.push(report);
     byProject.set(ref.projectSlug, list);
@@ -125,8 +131,10 @@ export async function runDoctorCli(cli: DoctorCliOptions): Promise<number> {
     return 0;
   }
 
+  const pricing = createPricing(await readAdoptedPrices(adoptedPricesPath(os.homedir()), readFile));
   const report = await runDoctor({
     claudeDir,
+    pricing,
     ...common,
     ...(cli.maxPrompts !== undefined ? { maxPrompts: cli.maxPrompts } : {}),
   });

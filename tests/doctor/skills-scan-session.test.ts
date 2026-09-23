@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, expect, test } from 'vitest';
+import { embeddedPricing } from '../../src/engine/core/pricing.ts';
 import { discoverSessions } from '../../src/engine/core/discovery.ts';
 import { scanSession } from '../../src/engine/doctor/scan-session.ts';
 import { assistantLine, promptLine, skillListingLine, toolResultLine, toolUse, writeSessionTree } from '../helpers/build-transcript.ts';
@@ -29,7 +30,7 @@ test("listing, appel, et skill marqué dans le principal et un sous-agent — au
   ] }]);
   const refs = await discoverSessions(claudeDir, { project: 'F--skills' });
   // Act
-  const r = await scanSession(refs[0]!, 100);
+  const r = await scanSession(refs[0]!, 100, embeddedPricing);
   // Assert
   expect(r.skills).toEqual({ listed: ['docx', 'pptx'], calls: { pptx: 1 }, attributed: ['pptx'] });
   expect(r.tokens).not.toHaveProperty('costBySkill');

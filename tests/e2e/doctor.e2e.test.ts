@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, expect, test } from 'vitest';
+import { embeddedPricing } from '../../src/engine/core/pricing.ts';
 import { runDoctor } from '../../src/engine/doctor/index.ts';
 import { renderReport } from '../../src/engine/doctor/report/terminal.ts';
 import { assistantLine, compactLine, promptLine, toolResultLine, toolUse, writeSessionTree } from '../helpers/build-transcript.ts';
@@ -74,7 +75,7 @@ writeSessionTree(
 );
 
 test('produit le rapport complet attendu', async () => {
-  const report = await runDoctor({ claudeDir });
+  const report = await runDoctor({ claudeDir, pricing: embeddedPricing });
 
   // scan : les échecs sont VISIBLES, jamais silencieux
   expect(report.scan.sessions).toBe(1);
@@ -124,7 +125,7 @@ test('produit le rapport complet attendu', async () => {
 });
 
 test('le rendu terminal expose les faits qui fâchent (parse errors, coût partiel)', async () => {
-  const report = await runDoctor({ claudeDir });
+  const report = await runDoctor({ claudeDir, pricing: embeddedPricing });
   const text = renderReport(report);
   expect(text).toContain('netgain doctor');
   expect(text).toContain('2–30 Ko');
@@ -142,11 +143,18 @@ test('netgain doctor --json écrit un rapport JSON valide sur stdout, exit 0', (
   // détour par le `package.json` de `tsx`, qui l'est.
   const requireFromHere = createRequire(import.meta.url);
   const tsxCli = path.join(path.dirname(requireFromHere.resolve('tsx/package.json')), 'dist', 'cli.mjs');
-  const out = execFileSync(
-    process.execPath,
-    [tsxCli, path.join(netgainRoot, 'src', 'engine', 'cli.ts'), 'doctor', '--json', '--claude-dir', claudeDir],
-    { encoding: 'utf8', cwd: netgainRoot },
-  );
+  // La CLI lit ~/.agent-viz/prices.json : un home vide la garde loin des adoptions de l'utilisateur.
+  const emptyHome = mkdtempSync(path.join(tmpdir(), 'netgain-home-'));
+  let out: string;
+  try {
+    out = execFileSync(
+      process.execPath,
+      [tsxCli, path.join(netgainRoot, 'src', 'engine', 'cli.ts'), 'doctor', '--json', '--claude-dir', claudeDir],
+      { encoding: 'utf8', cwd: netgainRoot, env: { ...process.env, HOME: emptyHome, USERPROFILE: emptyHome } },
+    );
+  } finally {
+    rmSync(emptyHome, { recursive: true, force: true });
+  }
   const parsed = JSON.parse(out) as { scan: { sessions: number }; totals: { costComplete: boolean } };
   expect(parsed.scan.sessions).toBe(1);
   expect(parsed.totals.costComplete).toBe(false);

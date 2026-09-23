@@ -1,11 +1,12 @@
 // costByModel ventile le coût par modèle : un même transcript peut mêler plusieurs
 // modèles, et le tarif appliqué dépend de la date du message.
 import { expect, test } from 'vitest';
+import { embeddedPricing } from '../../src/engine/core/pricing.ts';
 import { TokensAggregator } from '../../src/engine/doctor/aggregators/tokens.ts';
 import { assistant } from '../helpers/tokens-events.ts';
 
 test('invariant au centime : la somme des usd non nuls vaut costUsd', () => {
-  const agg = new TokensAggregator();
+  const agg = new TokensAggregator(embeddedPricing);
   agg.addAssistant(assistant({ msgId: 'c1', model: 'claude-opus-4-8', usage: { input_tokens: 1000, output_tokens: 2000 } }), 'main');
   agg.addAssistant(assistant({ msgId: 'c2', model: 'claude-haiku-4-5', usage: { input_tokens: 1000, output_tokens: 2000 } }), 'agent-x');
   agg.addAssistant(assistant({ msgId: 'c3', model: 'claude-futur-9', usage: { input_tokens: 500 } }), 'main');
@@ -20,7 +21,7 @@ test('invariant au centime : la somme des usd non nuls vaut costUsd', () => {
 test('tarif daté PAR MODÈLE : les deux barèmes sonnet-5 s’additionnent, pas 2× le courant', () => {
   // C'est le test qui justifie de modifier le moteur plutôt que de recalculer
   // en aval : un seau agrégé ne sait plus dater ses messages.
-  const agg = new TokensAggregator();
+  const agg = new TokensAggregator(embeddedPricing);
   agg.addAssistant(assistant({ msgId: 'd1', model: 'claude-sonnet-5', usage: { input_tokens: 1000, output_tokens: 0 }, timestamp: '2026-08-15T10:00:00.000Z' }), 'main');
   agg.addAssistant(assistant({ msgId: 'd2', model: 'claude-sonnet-5', usage: { input_tokens: 1000, output_tokens: 0 }, timestamp: '2026-09-15T10:00:00.000Z' }), 'main');
   const r = agg.result();
@@ -30,13 +31,13 @@ test('tarif daté PAR MODÈLE : les deux barèmes sonnet-5 s’additionnent, pas
 });
 
 test('zéro voulu : usd 0, pricing zero-voulu', () => {
-  const agg = new TokensAggregator();
+  const agg = new TokensAggregator(embeddedPricing);
   agg.addAssistant(assistant({ msgId: 'z1', model: '<synthetic>', usage: { input_tokens: 50 } }), 'main');
   expect(agg.result().costByModel['<synthetic>']).toEqual({ usd: 0, pricing: 'zero-voulu' });
 });
 
 test('modèle inconnu : usd null, pricing inconnu, PRÉSENT dans costByModel', () => {
-  const agg = new TokensAggregator();
+  const agg = new TokensAggregator(embeddedPricing);
   agg.addAssistant(assistant({ msgId: 'u1', model: 'claude-futur-9', usage: { input_tokens: 500 } }), 'main');
   const r = agg.result();
   expect(r.costByModel['claude-futur-9']).toEqual({ usd: null, pricing: 'inconnu' });
@@ -45,7 +46,7 @@ test('modèle inconnu : usd null, pricing inconnu, PRÉSENT dans costByModel', (
 });
 
 test('non-régression : costByModel a exactement les clés de perModel', () => {
-  const agg = new TokensAggregator();
+  const agg = new TokensAggregator(embeddedPricing);
   agg.addAssistant(assistant({ msgId: 'n1', model: 'claude-opus-4-8' }), 'main');
   agg.addAssistant(assistant({ msgId: 'n2', model: 'claude-futur-9' }), 'main');
   const r = agg.result();
@@ -56,7 +57,7 @@ test('non-régression : costByModel a exactement les clés de perModel', () => {
 // costByModel pour le reste de la session : les deux restent finis. costComplete
 // devient faux, parce que ce message n'est pas tarifé, sans nommer aucun modèle inconnu.
 test('un message malformé (input_tokens: 1e999) entre deux sains ne poisonne ni costUsd ni costByModel', () => {
-  const agg = new TokensAggregator();
+  const agg = new TokensAggregator(embeddedPricing);
   const sain = { input_tokens: 1000, output_tokens: 2000 };
   agg.addAssistant(assistant({ msgId: 'm1', model: 'claude-opus-4-8', usage: sain }), 'main');
   const coutUnSain = agg.result().costUsd;

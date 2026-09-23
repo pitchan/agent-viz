@@ -1,9 +1,10 @@
 import { expect, test } from 'vitest';
+import { embeddedPricing } from '../../src/engine/core/pricing.ts';
 import { netTokens, TokensAggregator } from '../../src/engine/doctor/aggregators/tokens.ts';
 import { assistant } from '../helpers/tokens-events.ts';
 
 test('déduplique par message.id : une ligne par content block, un seul comptage', () => {
-  const agg = new TokensAggregator();
+  const agg = new TokensAggregator(embeddedPricing);
   const evt = assistant({ msgId: 'msg_dup', usage: { input_tokens: 100, output_tokens: 50 } });
   agg.addAssistant(evt, 'main');
   agg.addAssistant(evt, 'main');
@@ -14,7 +15,7 @@ test('déduplique par message.id : une ligne par content block, un seul comptage
 });
 
 test('accumule des messages distincts, ventilés par modèle', () => {
-  const agg = new TokensAggregator();
+  const agg = new TokensAggregator(embeddedPricing);
   agg.addAssistant(assistant({ msgId: 'm1', model: 'claude-opus-4-8', usage: { input_tokens: 10, output_tokens: 1 } }), 'main');
   agg.addAssistant(assistant({ msgId: 'm2', model: 'claude-haiku-4-5', usage: { input_tokens: 20, output_tokens: 2 } }), 'main');
   const r = agg.result();
@@ -24,7 +25,7 @@ test('accumule des messages distincts, ventilés par modèle', () => {
 });
 
 test('buckets sous-agents séparés du main, total = main + agents', () => {
-  const agg = new TokensAggregator();
+  const agg = new TokensAggregator(embeddedPricing);
   agg.addAssistant(assistant({ msgId: 'm1', usage: { input_tokens: 10, output_tokens: 0 } }), 'main');
   agg.addAssistant(assistant({ msgId: 'a1', usage: { input_tokens: 7, output_tokens: 0 } }), 'agent-abc');
   const r = agg.result();
@@ -34,7 +35,7 @@ test('buckets sous-agents séparés du main, total = main + agents', () => {
 });
 
 test('netTokens = input + cache_creation + output, cache_read EXCLU', () => {
-  const agg = new TokensAggregator();
+  const agg = new TokensAggregator(embeddedPricing);
   agg.addAssistant(
     assistant({
       msgId: 'm1',
@@ -48,7 +49,7 @@ test('netTokens = input + cache_creation + output, cache_read EXCLU', () => {
 });
 
 test('coût : somme au prix du modèle réel de chaque message', () => {
-  const agg = new TokensAggregator();
+  const agg = new TokensAggregator(embeddedPricing);
   agg.addAssistant(
     assistant({ msgId: 'm1', model: 'claude-opus-4-8', usage: { input_tokens: 1000, output_tokens: 2000 } }),
     'main',
@@ -66,7 +67,7 @@ test('coût : somme au prix du modèle réel de chaque message', () => {
 });
 
 test('modèle inconnu : tokens comptés, coût incomplet signalé, jamais un zéro silencieux', () => {
-  const agg = new TokensAggregator();
+  const agg = new TokensAggregator(embeddedPricing);
   agg.addAssistant(
     assistant({ msgId: 'm1', model: 'claude-opus-4-8', usage: { input_tokens: 1000, output_tokens: 2000 } }),
     'main',
@@ -86,7 +87,7 @@ test('le coût est calculé au tarif en vigueur à la date du message, pas à la
   // sonnet-5 change de tarif le 2026-09-01 (2→3 $/M en entrée). Un message
   // horodaté septembre doit être facturé au catalogue même si le scan tourne
   // pendant la fenêtre de lancement.
-  const agg = new TokensAggregator();
+  const agg = new TokensAggregator(embeddedPricing);
   agg.addAssistant(
     assistant({
       msgId: 'm1',
@@ -100,7 +101,7 @@ test('le coût est calculé au tarif en vigueur à la date du message, pas à la
 });
 
 test('usage null ou msgId null : compté sans dédup, sans throw', () => {
-  const agg = new TokensAggregator();
+  const agg = new TokensAggregator(embeddedPricing);
   agg.addAssistant(assistant({ msgId: null, usage: { input_tokens: 1, output_tokens: 0 } }), 'main');
   agg.addAssistant(assistant({ msgId: null, usage: { input_tokens: 1, output_tokens: 0 } }), 'main');
   const noUsage = assistant({ msgId: 'm9' });
@@ -111,7 +112,7 @@ test('usage null ou msgId null : compté sans dédup, sans throw', () => {
 
 test('usage non objet (normalisé en null) : aucun jeton ni aucun dollar compté', () => {
   // Arrange
-  const agg = new TokensAggregator();
+  const agg = new TokensAggregator(embeddedPricing);
   const nonObjet = assistant({ msgId: 'mx', usageVerdict: 'malforme' });
   nonObjet.usage = null;
 
@@ -127,7 +128,7 @@ test('usage non objet (normalisé en null) : aucun jeton ni aucun dollar compté
 
 test('un compte négatif ne retranche rien : les champs valides du même message restent comptés', () => {
   // Arrange
-  const agg = new TokensAggregator();
+  const agg = new TokensAggregator(embeddedPricing);
   const evt = assistant({
     msgId: 'mn',
     model: 'claude-opus-4-8',
@@ -147,7 +148,7 @@ test('un compte négatif ne retranche rien : les champs valides du même message
 
 test('un usage non objet rend jetons et coût partiels et se compte à part, sans nommer de modèle', () => {
   // Arrange
-  const agg = new TokensAggregator();
+  const agg = new TokensAggregator(embeddedPricing);
   const nonObjet = assistant({ msgId: 'mx', usageVerdict: 'malforme' });
   nonObjet.usage = null;
 
@@ -163,7 +164,7 @@ test('un usage non objet rend jetons et coût partiels et se compte à part, san
 
 test('un message malformé écrit sur plusieurs lignes n’est compté qu’une fois', () => {
   // Arrange
-  const agg = new TokensAggregator();
+  const agg = new TokensAggregator(embeddedPricing);
   const evt = assistant({ msgId: 'md', usage: { input_tokens: -1, output_tokens: 5 }, usageVerdict: 'malforme' });
   agg.addAssistant(evt, 'main');
 
@@ -177,7 +178,7 @@ test('un message malformé écrit sur plusieurs lignes n’est compté qu’une 
 
 test('une ligne sans usage ne rend pas la session partielle', () => {
   // Arrange
-  const agg = new TokensAggregator();
+  const agg = new TokensAggregator(embeddedPricing);
   const sansUsage = assistant({ msgId: 'ma', usageVerdict: 'absent' });
   sansUsage.usage = null;
 
@@ -191,7 +192,7 @@ test('une ligne sans usage ne rend pas la session partielle', () => {
 });
 
 test('un modèle à zéro voulu ne rend pas le coût partiel', () => {
-  const agg = new TokensAggregator();
+  const agg = new TokensAggregator(embeddedPricing);
   agg.addAssistant(
     assistant({
       msgId: 'zc1',

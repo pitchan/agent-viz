@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, expect, test } from 'vitest';
+import { embeddedPricing } from '../../src/engine/core/pricing.ts';
 import { runDoctor } from '../../src/engine/doctor/index.ts';
 import { renderReport } from '../../src/engine/doctor/report/terminal.ts';
 import { assistantLine, promptLine, writeSessionTree } from '../helpers/build-transcript.ts';
@@ -29,7 +30,7 @@ test('un churn prefixChange dominant fait apparaître le conseil étiqueté labo
       timestamp: '2026-07-09T10:00:30.000Z',
     }),
   ]);
-  const text = renderReport(await runDoctor({ claudeDir: adviceDir }));
+  const text = renderReport(await runDoctor({ claudeDir: adviceDir, pricing: embeddedPricing }));
   expect(text).toContain('préfixe modifié — marqueurs : sans marqueur ×1');
   expect(text).toContain('conseil (mécanismes mesurés en laboratoire, pas déduits de ces journaux)');
   expect(text).toContain('ne pas changer de modèle en cours de session');

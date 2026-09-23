@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, expect, test } from 'vitest';
+import { embeddedPricing } from '../../src/engine/core/pricing.ts';
 import { discoverSessions } from '../../src/engine/core/discovery.ts';
 import { scanSession } from '../../src/engine/doctor/scan-session.ts';
 import { assistantLine, promptBlocksLine, promptLine, writeSessionTree } from '../helpers/build-transcript.ts';
@@ -15,7 +16,7 @@ async function reportOf(project: string, sessionId: string) {
   const refs = await discoverSessions(claudeDir, { project });
   const ref = refs.find((r) => r.sessionId === sessionId);
   expect(ref).toBeDefined();
-  return scanSession(ref!, 100);
+  return scanSession(ref!, 100, embeddedPricing);
 }
 
 test('prompts en blocs → interactive', async () => {

@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import type { SessionRef } from '../core/discovery.ts';
+import type { Pricing } from '../core/pricing.ts';
 import { extractLineMeta, normalizeEvent } from '../core/events.ts';
 import { iterJsonlLines } from '../core/jsonl.ts';
 import { ContextAggregator } from './aggregators/context.ts';
@@ -18,8 +19,8 @@ import type { SessionReport } from './report/types.ts';
  * Une passe streaming sur le transcript principal + une par sous-agent.
  * Mémoire O(1 ligne) ; toute anomalie est comptée et remontée, jamais fatale.
  */
-export async function scanSession(ref: SessionRef, maxPrompts: number): Promise<SessionReport> {
-  const tokens = new TokensAggregator();
+export async function scanSession(ref: SessionRef, maxPrompts: number, pricing: Pricing): Promise<SessionReport> {
+  const tokens = new TokensAggregator(pricing);
   const toolResults = new ToolResultsAggregator();
   const reads = new ReadsAggregator();
   const subagents = new SubagentsAggregator();

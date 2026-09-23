@@ -35,7 +35,7 @@ test('découverte puis scan par les seuls barillets produisent un rapport comple
 
   const refs = await core.discoverSessions(claudeDir, { project: 'exports-proj' });
   expect(refs).toHaveLength(1);
-  const report = await doctor.scanSession(refs[0]!, 100);
+  const report = await doctor.scanSession(refs[0]!, 100, core.embeddedPricing);
 
   expect(report.sessionId).toBe('sess-exp');
   expect(report.endedAt).toBe('2026-07-01T10:00:04.000Z');
