@@ -10,6 +10,7 @@ import * as api from './api.ts';
 import { getState, subscribe, loadPricing } from './store.ts';
 import {
   formatTokens, formatUsdExact, formatUsdPerMTok, formatShare, modelLabel, adoptionNote,
+  driftTitle, ratesPerMTok, vigieStatus,
   basisLabel, periodHeader, type Period, type SummaryBasis,
 } from './format.ts';
 import { initPeriodSelector } from './period-selector.ts';
@@ -79,10 +80,19 @@ interface Provenance {
   priceSource: string;
 }
 
+// Une dérive relevée par la vigie LiteLLM (KnownDrift côté serveur).
+interface PriceUpdate {
+  model: string;
+  kind: 'modele-nouveau' | 'tarif-different';
+  litellm: { input: number; output: number; cacheCreate: number; cacheRead: number };
+  embedded: { input: number; output: number; cacheCreate: number; cacheRead: number } | null;
+}
+
 // GET /pricing.
 interface PricingPayload {
   priceTable: PriceTable;
   provenance: Provenance;
+  updates: { checkedAt: string | null; drifts: PriceUpdate[] };
 }
 
 const COST_HEADERS = ['Modèle', 'Entrée', 'Sortie', 'Création de cache',
@@ -189,6 +199,49 @@ function buildProvenanceBlock(provenance: Provenance) {
   return wrap;
 }
 
+// Un bouton qui lance une action serveur puis recharge le panneau : désactivé
+// pendant l'appel, et c'est son libellé qui dit l'échec, avec la cause du serveur.
+function actionButton(label: string, action: () => Promise<unknown>) {
+  const btn = document.createElement('button');
+  btn.className = 'obs-btn';
+  btn.textContent = label;
+  btn.addEventListener('click', () => {
+    btn.disabled = true;
+    action()
+      .then(() => loadPricing(api))
+      .catch((err: unknown) => {
+        btn.disabled = false;
+        btn.textContent = `Échec : ${err instanceof Error ? err.message : String(err)}`;
+      });
+  });
+  return btn;
+}
+
+// Les prix se lisent avant le clic : c'est l'adoption qui les rend comptables.
+function buildUpdatesBlock(updates: PricingPayload['updates']) {
+  const wrap = document.createElement('div');
+  wrap.className = 'pricing-updates';
+  const status = document.createElement('p');
+  status.className = 'pricing-note';
+  status.textContent = vigieStatus(updates.checkedAt, updates.drifts.length);
+  wrap.append(status, actionButton('Vérifier maintenant', () => api.checkPrices()));
+  for (const d of updates.drifts) {
+    const row = document.createElement('div');
+    row.className = 'pricing-update';
+    const text = document.createElement('div');
+    const title = document.createElement('div');
+    title.className = 'pricing-notice-title';
+    title.textContent = driftTitle(d);
+    const rates = document.createElement('div');
+    rates.textContent = `LiteLLM, $ par million : ${ratesPerMTok(d.litellm)}`
+      + (d.embedded ? ` — actuel : ${ratesPerMTok(d.embedded)}` : '');
+    text.append(title, rates);
+    row.append(text, actionButton('Adopter', () => api.adoptPrice(d.model)));
+    wrap.appendChild(row);
+  }
+  return wrap;
+}
+
 const blockTitle = (text: string) => {
   const div = document.createElement('div');
   div.className = 'advisor-basis-title';
@@ -218,6 +271,8 @@ function render() {
 
   body.textContent = '';
   body.append(
+    blockTitle('Mises à jour des tarifs (LiteLLM)'),
+    buildUpdatesBlock(pricing.updates),
     blockTitle('Ventilation par modèle — la somme des lignes vaut le total, au centime'),
     buildCostTable(modelCosts.models));
   if (modelCosts.excludedPendingRescan > 0) {

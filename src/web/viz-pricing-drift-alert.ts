@@ -8,6 +8,7 @@
 // navigateur ne demande jamais src/server/pricing.ts.
 import type { Drift } from '../server/pricing.ts';
 import type { LiveAlert } from './viz-watchdog-client.ts';
+import { ratesPerMTok } from './observatory/format.ts';
 
 // Une phrase par nature de dérive. Un `kind` ajouté côté serveur sans sa
 // phrase ici ne compile pas.
@@ -15,12 +16,6 @@ const WORDING: Record<Drift['kind'], (model: string) => string> = {
   'modele-nouveau': m => `Vigie tarifaire : ${m} existe chez LiteLLM mais pas dans la table embarquée`,
   'tarif-different': m => `Vigie tarifaire : le tarif de ${m} diffère entre LiteLLM et la table embarquée`,
 };
-
-// Les quatre prix se lisent avant le clic « Adopter » : c'est ce clic qui les rend comptables.
-const perMTok = (usdPerToken: number) => (usdPerToken * 1e6).toFixed(2).replace('.', ',');
-const rates = (p: Drift['litellm']) =>
-  `entrée ${perMTok(p.input)} · sortie ${perMTok(p.output)} · `
-  + `écriture cache ${perMTok(p.cacheCreate)} · relecture cache ${perMTok(p.cacheRead)}`;
 
 // L'id est stable par modèle : la déduplication du registre externe (même id
 // actif, pas de nouvelle sonnerie) repose dessus. Les chaînes vides sont celles
@@ -31,7 +26,8 @@ export function pricingDriftAlert(d: Pick<Drift, 'model' | 'kind' | 'litellm' | 
     type: 'pricingDrift',
     sessionId: '', agentId: '', agentType: '', cwd: '',
     toolName: d.model,
-    subject: `LiteLLM, $ par million : ${rates(d.litellm)}${d.embedded ? ` — embarqué : ${rates(d.embedded)}` : ''}`,
+    // Les quatre prix se lisent avant le clic « Adopter » : c'est ce clic qui les rend comptables.
+    subject: `LiteLLM, $ par million : ${ratesPerMTok(d.litellm)}${d.embedded ? ` — embarqué : ${ratesPerMTok(d.embedded)}` : ''}`,
     patternId: '',
     count: 1,
     // L'instant où l'onglet a reçu le rapport : le serveur le diffuse dans

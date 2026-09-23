@@ -283,3 +283,21 @@ export function formatUsdExact(n: number) {
 export function adoptionNote(mark: { source: string; adoptedAt: string; from: string | null } | null): string {
   return mark === null ? '' : `LiteLLM, adopté le ${mark.adoptedAt.slice(0, 10)}`;
 }
+
+// Les quatre prix d'un tarif, en dollars par million de jetons : l'unité se dit
+// une fois dans la phrase qui les porte, pas quatre.
+export function ratesPerMTok(p: { input: number; output: number; cacheCreate: number; cacheRead: number }): string {
+  const n = (usdPerToken: number) => (usdPerToken * 1e6).toFixed(2).replace('.', ',');
+  return `entrée ${n(p.input)} · sortie ${n(p.output)} · écriture cache ${n(p.cacheCreate)} · relecture cache ${n(p.cacheRead)}`;
+}
+
+export function driftTitle(d: { model: string; kind: 'modele-nouveau' | 'tarif-different' }): string {
+  return `${d.kind === 'modele-nouveau' ? 'Nouveau modèle' : 'Tarif changé'} : ${modelLabel(d.model)}`;
+}
+
+// En UTC : l'heure du serveur et celle de l'onglet peuvent différer, l'instant non.
+export function vigieStatus(checkedAt: string | null, pending: number): string {
+  if (checkedAt === null) return 'LiteLLM pas encore consulté depuis le démarrage du serveur.';
+  const when = `${checkedAt.slice(0, 10)} ${checkedAt.slice(11, 16)} UTC`;
+  return `Dernière vérification LiteLLM : ${when} — ${pending === 0 ? 'barème à jour.' : `${pending} mise(s) à jour disponible(s).`}`;
+}

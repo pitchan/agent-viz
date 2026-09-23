@@ -708,6 +708,13 @@ canvas { display: block; width: 100%; height: 100%; }
 .pricing-notice-meta { font-size: 11px; color: var(--text-muted); margin-top: 12px; font-variant-numeric: tabular-nums; }
 .pricing-zero-cost { font-size: 11px; color: var(--text-dim); margin: 6px 0 0 16px; }
 .pricing-note { font-size: 11px; color: var(--text-dim); margin: 6px 0; }
+/* One LiteLLM update per row: prices on the left, its Adopt button on the right. */
+.pricing-updates { margin-bottom: 10px; }
+.pricing-update {
+  display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center;
+  padding: 8px 10px; margin-top: 6px; border-radius: 6px;
+  border: 1px solid var(--glass-border); font-size: 12px;
+}
 .skills-unused { margin: 10px 0; }
 .skills-unused summary { cursor: pointer; font-size: 11px; color: var(--text-dim); }
 .skills-unused td { color: var(--text-muted); }
