@@ -114,6 +114,8 @@ interface Drift {
   kind: 'modele-nouveau' | 'tarif-different';
   litellm: ModelPrices;
   embedded: ModelPrices | null;
+  /** Fenêtre de contexte que LiteLLM publie : un modèle adopté la reprend. */
+  maxInput: number;
 }
 
 // LiteLLM is a WATCHDOG (vigie), not a price source: the daily fetch compares
@@ -169,7 +171,7 @@ function litellmDrift(json: Record<string, unknown>, at?: string): Drift[] {
         && (fv.version[0] > max[0] || (fv.version[0] === max[0] && fv.version[1] > max[1])));
       if (isNew) {
         reportedNewModels.add(canonical);
-        drifts.push({ model: canonical, kind: 'modele-nouveau', litellm: upstream, embedded: null });
+        drifts.push({ model: canonical, kind: 'modele-nouveau', litellm: upstream, embedded: null, maxInput: rec.max_input_tokens });
       }
       continue;
     }
@@ -178,7 +180,7 @@ function litellmDrift(json: Record<string, unknown>, at?: string): Drift[] {
       .some(f => Math.abs(local[f] - upstream[f]) > Math.abs(local[f]) * 1e-9);
     if (differs) {
       drifts.push({
-        model: canonical, kind: 'tarif-different', litellm: upstream,
+        model: canonical, kind: 'tarif-different', litellm: upstream, maxInput: rec.max_input_tokens,
         embedded: { input: local.input, output: local.output, cacheCreate: local.cacheCreate, cacheRead: local.cacheRead },
       });
     }
@@ -191,6 +193,28 @@ interface DriftReport {
   checkedAt: string;
   drifts: Drift[];
 }
+
+/** Une dérive vue par la vigie, datée de sa première détection. */
+interface KnownDrift extends Drift { firstSeenAt: string }
+
+// Le dernier rapport fait foi : une dérive qu'il ne porte plus est réglée.
+// Une dérive revue à l'identique garde sa première date ; d'autres prix la redatent.
+const knownDrifts = new Map<string, KnownDrift>();
+
+function recordDrifts(report: DriftReport): void {
+  const next = new Map<string, KnownDrift>();
+  for (const d of report.drifts) {
+    const seen = knownDrifts.get(d.model);
+    const same = seen !== undefined && seen.kind === d.kind
+      && (['input', 'output', 'cacheCreate', 'cacheRead'] as const).every(f => seen.litellm[f] === d.litellm[f]);
+    next.set(d.model, { ...d, firstSeenAt: same ? seen.firstSeenAt : report.checkedAt });
+  }
+  knownDrifts.clear();
+  for (const [m, d] of next) knownDrifts.set(m, d);
+}
+
+function driftFor(model: string): KnownDrift | null { return knownDrifts.get(model) ?? null; }
+function forgetDrift(model: string): void { knownDrifts.delete(model); }
 
 // Drift consumer registration — server.ts plugs the SSE broadcast in here, so
 // this module keeps zero I/O of its own.
@@ -226,9 +250,10 @@ function loadPricing(): Promise<boolean> {
       res.on('end', () => {
         if (aborted) return;
         try {
-          const drifts = litellmDrift(JSON.parse(chunks.join('')));
+          const report = { checkedAt: new Date().toISOString(), drifts: litellmDrift(JSON.parse(chunks.join(''))) };
           lastFetched = Date.now();
-          if (drifts.length && _onDrift) _onDrift({ checkedAt: new Date().toISOString(), drifts });
+          recordDrifts(report);
+          if (report.drifts.length && _onDrift) _onDrift(report);
           resolve(true);
         } catch { resolve(false); }
       });
@@ -261,9 +286,10 @@ export {
   getPrice,
   loadPricing, startPricingRefresh,
   onPricingDrift,
+  recordDrifts, driftFor, forgetDrift,
   _internals,
 };
 
 // L'onglet fabrique l'alerte de la vigie sur cette forme
 // (src/web/viz-pricing-drift-alert.ts), par un import de type que le service efface.
-export type { Drift };
+export type { Drift, KnownDrift };

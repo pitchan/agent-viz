@@ -556,15 +556,15 @@ ligne : un ancrage `fichier:ligne` qui a glissé reste vert.
 
 ## 9. La plomberie de test
 
-**Un seul exécuteur, un seul arbre de tests dans 185 fichiers.**
+**Un seul exécuteur, un seul arbre de tests dans 186 fichiers.**
 
 ```
-find tests -name "*.test.ts" | wc -l   → 185
-npx vitest run                          → tous passés, 185 fichiers
+find tests -name "*.test.ts" | wc -l   → 186
+npx vitest run                          → tous passés, 186 fichiers
 ```
 
 vitest est le seul exécuteur (`include: tests/**/*.test.ts` de
-`vitest.config.mts`), et 185 `.test.ts` en sont l'unique dialecte : tous
+`vitest.config.mts`), et 186 `.test.ts` en sont l'unique dialecte : tous
 écrivent l'API de vitest (`import { test, expect } from 'vitest'`). Aucun
 pont, aucun second exécuteur. `tests/repo/architecture-test-counts.test.ts`
 compare ces nombres au disque et nomme l'écart s'il diverge.
