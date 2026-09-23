@@ -31,6 +31,6 @@ test('the notice states the exact conventions the engine applies', () => {
   expect(all).toMatch(/tarif 5 minutes/);
   expect(all).toMatch(/jamais un zéro silencieux/);
   expect(all).toMatch(/pastille/);
-  expect(all).toMatch(/LiteLLM/);
+  expect(all).toMatch(/page des tarifs d’Anthropic/);
   expect(all).toMatch(/paliers/);
 });

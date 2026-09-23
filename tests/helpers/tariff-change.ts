@@ -11,7 +11,7 @@ export const HAUSSE_SONNET_5: AdoptedPrices = {
     from: '2026-09-01T00:00:00.000Z',
     replaces: { input: 2e-6, output: 1e-5, cacheCreate: 2.5e-6, cacheRead: 2e-7 },
     adoptedAt: '2026-09-01T00:00:00.000Z',
-    source: 'litellm',
+    source: 'anthropic',
   }],
 };
 

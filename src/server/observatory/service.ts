@@ -36,17 +36,22 @@ interface ServiceDeps {
   engine: Engine;
   collectConfig: () => Promise<ConfigItem[]>;
   broadcast: (message: AnalysisScanMessage | PricingAdoptedMessage) => void;
-  /** Écrit et applique le prix LiteLLM relevé pour ce modèle ; null sans dérive connue. */
+  /** Écrit et applique le tarif relevé par la vigie pour ce modèle ; null sans dérive connue. */
   adoptPrice: (model: string) => Promise<Adopted | null>;
-  /** La vigie LiteLLM : ce qu'elle a vu, et un passage à la demande (false = LiteLLM injoignable). */
-  vigie: { snapshot: () => DriftSnapshot; refresh: () => Promise<boolean> };
+  /** La vigie des tarifs : ce qu'elle a vu, et un passage (null = abouti, sinon la cause de l'échec). */
+  vigie: { snapshot: () => DriftSnapshot; refresh: () => Promise<string | null> };
   now: () => Date;
   claudeDir: string;
   sinceDays: number;
   scanSinceDays: number;
 }
 
-interface PricingAdoptedMessage { type: 'pricingAdopted'; model: string }
+interface PricingAdoptedMessage { type: 'pricingAdopted'; model: string; kind: Adopted['kind']; prices: Adopted['prices'] }
+interface PriceCheck extends DriftSnapshot {
+  failure: string | null;
+  adopted: Adopted[];
+  errors: { model: string; message: string }[];
+}
 interface ScanDaysOptions { days?: number; forceIds?: ReadonlySet<string> }
 interface WindowOptions { days?: number; includeMachine?: boolean }
 interface SessionsOptions { project?: string; days?: number; includeMachine?: boolean }
@@ -99,6 +104,39 @@ function createObservatoryService(deps: ServiceDeps) {
     const period: WindowPeriod = { from, to: now().toISOString(), days: d };
     return { sessions: toAnalysedSessions(toAnalysable(rows)), basis, period };
   };
+
+  // Adopter touche des coûts déjà rangés : on relit les sessions incomplètes, et pour
+  // un tarif différent celles finies depuis `from`, que leur fichier ait bougé ou non.
+  const applyAdoption = async (model: string): Promise<Adopted | null> => {
+    const adopted = await adoptPrice(model);
+    if (adopted === null) return null;
+    const { from } = adopted;
+    const forceIds = new Set(store.listSessions({})
+      .filter(r => !r.costComplete || (from !== null && r.endedAt !== null && r.endedAt >= from))
+      .map(r => r.id));
+    broadcast({ type: 'pricingAdopted', model, kind: adopted.kind, prices: adopted.prices });
+    await service.scan({ forceIds });
+    return adopted;
+  };
+
+  // Un échec de la vigie ne vide rien : les dérives déjà relevées restent tentées. Un
+  // modèle sans fenêtre de contexte connue attend, la page des modèles doit le porter.
+  const checkPricesNow = async (): Promise<PriceCheck> => {
+    const failure = await vigie.refresh();
+    const adopted: Adopted[] = [];
+    const errors: PriceCheck['errors'] = [];
+    for (const d of vigie.snapshot().drifts) {
+      if (d.maxInput === null) continue;
+      try {
+        const a = await applyAdoption(d.model);
+        if (a !== null) adopted.push(a);
+      } catch (err) {
+        errors.push({ model: d.model, message: err instanceof Error ? err.message : String(err) });
+      }
+    }
+    return { failure, adopted, errors, ...vigie.snapshot() };
+  };
+  let checkQueue: Promise<void> = Promise.resolve();
 
   const service = {
     async scan({ days, forceIds }: ScanDaysOptions = {}): Promise<Awaited<ReturnType<typeof runIncrementalScan>>> {
@@ -179,11 +217,13 @@ function createObservatoryService(deps: ServiceDeps) {
       };
     },
 
-    // Un passage de la vigie à la demande : le panneau n'attend pas le suivant.
-    // Injoignable ne vide rien, les dérives déjà relevées restent adoptables.
-    async checkPrices(): Promise<DriftSnapshot & { reachable: boolean }> {
-      const reachable = await vigie.refresh();
-      return { reachable, ...vigie.snapshot() };
+    // Un passage de la vigie, puis l'application de chaque tarif relevé : au démarrage,
+    // chaque jour, et à la demande du panneau. En file, jamais deux à la fois : deux
+    // adoptions concurrentes réécriraient prices.json l'une par-dessus l'autre.
+    checkPrices(): Promise<PriceCheck> {
+      const run = checkQueue.then(checkPricesNow);
+      checkQueue = run.then(() => undefined, () => undefined);
+      return run;
     },
 
     async sessions({ project, days, includeMachine = false }: SessionsOptions = {}): Promise<SessionListRow[]> {
@@ -229,19 +269,6 @@ function createObservatoryService(deps: ServiceDeps) {
       return store.setRecommendationStatus(id, status, now().toISOString(), reason);
     },
 
-    // Adopter touche des coûts déjà rangés : on relit les sessions incomplètes, et pour
-    // un tarif différent celles finies depuis `from`, que leur fichier ait bougé ou non.
-    async adoptPrice(model: string): Promise<Adopted | null> {
-      const adopted = await adoptPrice(model);
-      if (adopted === null) return null;
-      const { from } = adopted;
-      const forceIds = new Set(store.listSessions({})
-        .filter(r => !r.costComplete || (from !== null && r.endedAt !== null && r.endedAt >= from))
-        .map(r => r.id));
-      broadcast({ type: 'pricingAdopted', model });
-      await service.scan({ forceIds });
-      return adopted;
-    },
   };
   return service;
 }

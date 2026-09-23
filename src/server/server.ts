@@ -23,7 +23,6 @@ import { broadcastSessionsChanged, broadcastSSE } from './sse.ts';
 import { watchSession, liveHandoffOffset } from './event-reader.ts';
 import { housekeep, scanAndWatch } from './housekeep.ts';
 import { dispatch, setServer } from './routes.ts';
-import { startPricingRefresh, onPricingDrift } from './pricing.ts';
 import { applyAdoptedPrices } from './pricing-state.ts';
 import { adoptedPricesPath, readAdoptedPrices } from '../engine/core/adopted-prices.ts';
 import { getObservatoryService } from './observatory/index.ts';
@@ -73,10 +72,6 @@ async function startServer(): Promise<void> {
 async function boot(): Promise<void> {
   // Les prix adoptés précèdent tout calcul de coût : pastille, vigie et observatoire.
   applyAdoptedPrices(await readAdoptedPrices(adoptedPricesPath(os.homedir()), fs.promises.readFile));
-  // LiteLLM is a watchdog: drift reports surface on the SSE stream and in
-  // the alerts popup; it never writes prices.
-  onPricingDrift(report => broadcastSSE({ type: 'pricingDrift', drifts: report.drifts }));
-  startPricingRefresh();
   await scanAndWatch();
   // Purge old/empty sessions + compact large files on boot.
   await housekeep();
@@ -84,7 +79,17 @@ async function boot(): Promise<void> {
   // dashboard, and a failed scan is logged without stopping the server.
   const runAnalysisScan = () => getObservatoryService().scan()
     .catch(err => console.error('[observatory] scan failed:', err.message));
-  runAnalysisScan();
+  // La vigie des tarifs passe avant le premier scan : un tarif qu'elle applique
+  // chiffre déjà ce scan. Hors ligne, la cause est journalisée et rien ne change.
+  const checkPrices = () => getObservatoryService().checkPrices()
+    .then(r => {
+      if (r.failure) console.log('[pricing] vigie :', r.failure);
+      for (const a of r.adopted) console.log('[pricing] tarif Anthropic appliqué :', a.model);
+      for (const e of r.errors) console.error('[pricing] tarif non appliqué :', e.model, e.message);
+    })
+    .catch(err => console.error('[pricing] vigie :', err.message));
+  checkPrices().finally(runAnalysisScan);
+  setInterval(checkPrices, 24 * 3600_000);
   // Re-run every hour.
   setInterval(() => housekeep().catch(err => console.error('[housekeep] hourly run failed:', err.message)), 3600_000);
   setInterval(runAnalysisScan, 3600_000);

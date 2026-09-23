@@ -1,4 +1,4 @@
-// Le panneau Tarifs lit les mises à jour LiteLLM en cours, et peut demander un
+// Le panneau Tarifs lit les mises à jour des tarifs en cours, et peut demander un
 // passage de la vigie sur-le-champ plutôt qu'attendre le suivant.
 import { expect, test } from 'vitest';
 import { createObservatoryService } from '../../src/server/observatory/service.ts';
@@ -8,10 +8,10 @@ import type { KnownDrift } from '../../src/server/pricing.ts';
 
 const DRIFT: KnownDrift = {
   model: 'claude-opus-5-5', kind: 'modele-nouveau', embedded: null, maxInput: 1_000_000,
-  litellm: { input: 4e-6, output: 2e-5, cacheCreate: 5e-6, cacheRead: 2e-7 }, firstSeenAt: '2026-09-23T00:00:00.000Z',
+  official: { input: 4e-6, output: 2e-5, cacheCreate: 5e-6, cacheRead: 2e-7 }, firstSeenAt: '2026-09-23T00:00:00.000Z',
 };
 
-function makeService(reachable: boolean) {
+function makeService(failure: string | null) {
   const calls: string[] = [];
   const service = createObservatoryService({
     store: { getScanState: () => null } as unknown as Store,
@@ -25,16 +25,16 @@ function makeService(reachable: boolean) {
     adoptPrice: async () => null,
     vigie: {
       snapshot: () => ({ checkedAt: '2026-09-23T12:00:00.000Z', drifts: [DRIFT] }),
-      refresh: async () => { calls.push('refresh'); return reachable; },
+      refresh: async () => { calls.push('refresh'); return failure; },
     },
     claudeDir: 'C:/x', sinceDays: 30, scanSinceDays: 90,
   });
   return { service, calls };
 }
 
-test('pricing() porte les mises à jour LiteLLM en cours', async () => {
+test('pricing() porte les mises à jour des tarifs en cours', async () => {
   // Arrange
-  const { service } = makeService(true);
+  const { service } = makeService(null);
 
   // Act
   const r = await service.pricing();
@@ -45,23 +45,23 @@ test('pricing() porte les mises à jour LiteLLM en cours', async () => {
 
 test('vérifier maintenant fait passer la vigie puis rend ce qu’elle a vu', async () => {
   // Arrange
-  const { service, calls } = makeService(true);
+  const { service, calls } = makeService(null);
 
   // Act
   const r = await service.checkPrices();
 
   // Assert
   expect(calls).toEqual(['refresh']);
-  expect(r).toMatchObject({ reachable: true, drifts: [DRIFT] });
+  expect(r).toMatchObject({ failure: null, drifts: [DRIFT] });
 });
 
-test('LiteLLM injoignable se dit, sans masquer les dérives déjà connues', async () => {
+test('un échec de la vigie se dit avec sa cause, sans masquer les dérives déjà connues', async () => {
   // Arrange
-  const { service } = makeService(false);
+  const { service } = makeService('page des tarifs injoignable');
 
   // Act
   const r = await service.checkPrices();
 
   // Assert
-  expect(r).toMatchObject({ reachable: false, drifts: [DRIFT] });
+  expect(r).toMatchObject({ failure: 'page des tarifs injoignable', drifts: [DRIFT] });
 });

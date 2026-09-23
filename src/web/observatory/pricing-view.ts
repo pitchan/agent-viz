@@ -10,7 +10,7 @@ import * as api from './api.ts';
 import { getState, subscribe, loadPricing } from './store.ts';
 import {
   formatTokens, formatUsdExact, formatUsdPerMTok, formatShare, modelLabel, adoptionNote,
-  driftTitle, ratesPerMTok, vigieStatus,
+  driftTitle, ratesPerMTok, vigieStatus, pendingReason, checkOutcome,
   basisLabel, periodHeader, type Period, type SummaryBasis,
 } from './format.ts';
 import { initPeriodSelector } from './period-selector.ts';
@@ -80,12 +80,13 @@ interface Provenance {
   priceSource: string;
 }
 
-// Une dérive relevée par la vigie LiteLLM (KnownDrift côté serveur).
+// Un tarif relevé par la vigie et pas encore appliqué (KnownDrift côté serveur).
 interface PriceUpdate {
   model: string;
   kind: 'modele-nouveau' | 'tarif-different';
-  litellm: { input: number; output: number; cacheCreate: number; cacheRead: number };
+  official: { input: number; output: number; cacheCreate: number; cacheRead: number };
   embedded: { input: number; output: number; cacheCreate: number; cacheRead: number } | null;
+  maxInput: number | null;
 }
 
 // GET /pricing.
@@ -199,16 +200,20 @@ function buildProvenanceBlock(provenance: Provenance) {
   return wrap;
 }
 
-// Un bouton qui lance une action serveur puis recharge le panneau : désactivé
-// pendant l'appel, et c'est son libellé qui dit l'échec, avec la cause du serveur.
-function actionButton(label: string, action: () => Promise<unknown>) {
+// Ce que la dernière vérification demandée a rencontré : le rechargement du panneau
+// ne le porte pas, il vit le temps de la page.
+let lastCheckNote: string | null = null;
+
+// « Vérifier maintenant » : désactivé pendant l'appel, puis le panneau se recharge avec
+// les tarifs appliqués ; un échec réseau se lit sur le bouton, avec la cause du serveur.
+function checkButton() {
   const btn = document.createElement('button');
   btn.className = 'obs-btn';
-  btn.textContent = label;
+  btn.textContent = 'Vérifier maintenant';
   btn.addEventListener('click', () => {
     btn.disabled = true;
-    action()
-      .then(() => loadPricing(api))
+    api.checkPrices()
+      .then(r => { lastCheckNote = checkOutcome(r); return loadPricing(api); })
       .catch((err: unknown) => {
         btn.disabled = false;
         btn.textContent = `Échec : ${err instanceof Error ? err.message : String(err)}`;
@@ -217,14 +222,20 @@ function actionButton(label: string, action: () => Promise<unknown>) {
   return btn;
 }
 
-// Les prix se lisent avant le clic : c'est l'adoption qui les rend comptables.
+// Chaque tarif relevé et pas appliqué se lit avec la raison de son attente.
 function buildUpdatesBlock(updates: PricingPayload['updates']) {
   const wrap = document.createElement('div');
   wrap.className = 'pricing-updates';
   const status = document.createElement('p');
   status.className = 'pricing-note';
   status.textContent = vigieStatus(updates.checkedAt, updates.drifts.length);
-  wrap.append(status, actionButton('Vérifier maintenant', () => api.checkPrices()));
+  wrap.append(status, checkButton());
+  if (lastCheckNote !== null) {
+    const note = document.createElement('p');
+    note.className = 'pricing-note';
+    note.textContent = lastCheckNote;
+    wrap.appendChild(note);
+  }
   for (const d of updates.drifts) {
     const row = document.createElement('div');
     row.className = 'pricing-update';
@@ -233,10 +244,12 @@ function buildUpdatesBlock(updates: PricingPayload['updates']) {
     title.className = 'pricing-notice-title';
     title.textContent = driftTitle(d);
     const rates = document.createElement('div');
-    rates.textContent = `LiteLLM, $ par million : ${ratesPerMTok(d.litellm)}`
+    rates.textContent = `Anthropic, $ par million : ${ratesPerMTok(d.official)}`
       + (d.embedded ? ` — actuel : ${ratesPerMTok(d.embedded)}` : '');
-    text.append(title, rates);
-    row.append(text, actionButton('Adopter', () => api.adoptPrice(d.model)));
+    const reason = document.createElement('div');
+    reason.textContent = pendingReason(d);
+    text.append(title, rates, reason);
+    row.appendChild(text);
     wrap.appendChild(row);
   }
   return wrap;
@@ -271,7 +284,7 @@ function render() {
 
   body.textContent = '';
   body.append(
-    blockTitle('Mises à jour des tarifs (LiteLLM)'),
+    blockTitle('Tarifs Anthropic'),
     buildUpdatesBlock(pricing.updates),
     blockTitle('Ventilation par modèle — la somme des lignes vaut le total, au centime'),
     buildCostTable(modelCosts.models));

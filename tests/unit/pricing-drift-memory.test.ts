@@ -6,7 +6,7 @@ import type { Drift } from '../../src/server/pricing.ts';
 
 const P = { input: 4e-6, output: 2e-5, cacheCreate: 5e-6, cacheRead: 2e-7 };
 const drift = (over: Partial<Drift> = {}): Drift =>
-  ({ model: 'claude-opus-5-5', kind: 'modele-nouveau', litellm: P, embedded: null, maxInput: 1_000_000, ...over });
+  ({ model: 'claude-opus-5-5', kind: 'modele-nouveau', official: P, embedded: null, maxInput: 1_000_000, ...over });
 
 afterEach(() => forgetDrift('claude-opus-5-5'));
 
@@ -25,13 +25,13 @@ test('une dérive revue garde sa date de première détection', () => {
 test('une dérive revue avec d’autres prix repart de sa nouvelle détection', () => {
   // Arrange
   recordDrifts({ checkedAt: '2026-09-22T00:00:00.000Z', drifts: [drift()] });
-  recordDrifts({ checkedAt: '2026-09-23T00:00:00.000Z', drifts: [drift({ litellm: { ...P, input: 3e-6 } })] });
+  recordDrifts({ checkedAt: '2026-09-23T00:00:00.000Z', drifts: [drift({ official: { ...P, input: 3e-6 } })] });
 
   // Act
   const d = driftFor('claude-opus-5-5');
 
   // Assert
-  expect(d).toMatchObject({ firstSeenAt: '2026-09-23T00:00:00.000Z', litellm: { input: 3e-6 } });
+  expect(d).toMatchObject({ firstSeenAt: '2026-09-23T00:00:00.000Z', official: { input: 3e-6 } });
 });
 
 test('une dérive absente du dernier rapport est oubliée', () => {

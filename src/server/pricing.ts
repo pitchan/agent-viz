@@ -1,32 +1,29 @@
 'use strict';
 // Anthropic model pricing: the server's current tariff (embedded table + adopted
-// prices, see pricing-state.ts) prices the whole product. LiteLLM reports drift
-// (see litellmDrift); one of its prices counts only once the user adopts it.
+// prices, see pricing-state.ts) prices the whole product. The watchdog (vigie)
+// reads Anthropic's own pricing page and reports every gap with that tariff.
 //
 // SRP: this module's only job is `model id -> { input, output, cacheCreate,
-// cacheRead, maxInput, label, history }`. No I/O leakage to consumers — they
-// call getPrice() and don't know the source.
+// cacheRead, maxInput, label, history }` and the gaps with Anthropic's page. No
+// I/O leakage to consumers — they call getPrice() and don't know the source.
 //
 // The COST FORMULA and the model-id NORMALIZATION live in the engine and are
 // imported from it: two copies diverge silently. What remains here is what only
-// the server owns: the price map, display metadata and the LiteLLM watchdog.
+// the server owns: the price map, display metadata and the watchdog.
 
 import https from 'node:https';
 import { normalizeModel } from '../engine/core/pricing.ts';
 import type { ModelPrices, PricePeriod, Pricing } from '../engine/core/pricing.ts';
 import { currentPricing } from './pricing-state.ts';
+import { parseModelsPage, parsePricingPage } from './official-pricing.ts';
 
-const LITELLM_URL = 'https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json';
-const REFRESH_MS = 24 * 60 * 60 * 1000;
-// Hard cap on the response body size so a malicious mirror or MITM can't
-// exhaust memory by streaming an unbounded payload. The real file is ~1.5 MB
-// at time of writing; 5 MB leaves headroom for growth.
-const MAX_BODY_BYTES = 5 * 1024 * 1024;
-// Reserved property names — set on a plain object literal would mutate the
-// prototype chain or shadow built-ins. Skipped during ingest as defence in
-// depth; the regex filter above already excludes anything not matching
-// claude-(opus|sonnet|haiku)-X-Y.
-const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+// Les deux pages officielles, dans leur version Markdown : les tarifs, et la fenêtre
+// de contexte que la page des tarifs ne porte pas.
+const PRICING_URL = 'https://platform.claude.com/docs/en/about-claude/pricing.md';
+const MODELS_URL = 'https://platform.claude.com/docs/en/models/overview.md';
+// Hard cap on the response body size so a malicious mirror or MITM can't exhaust
+// memory by streaming an unbounded payload. Each page weighs about 50 KB.
+const MAX_BODY_BYTES = 2 * 1024 * 1024;
 
 /** Une entrée de la carte de prix — les quatre tarifs (hérités du moteur,
  *  `ModelPrices`) plus les métadonnées d'affichage, et les barèmes antérieurs
@@ -53,8 +50,6 @@ function priceMap(): ReadonlyMap<string, PriceEntry> {
   }
   return map;
 }
-let lastFetched = 0;
-let refreshTimer: NodeJS.Timeout | null = null;
 
 // `at` (optional, ISO UTC timestamp) selects the tariff in effect at that
 // instant; omitted means "now". Dated periods travel WITH the entry; only the
@@ -106,80 +101,43 @@ function familyMaxVersion(family: string): readonly [number, number] | null {
   return max;
 }
 
-/** Un écart entre le barème embarqué et le flux LiteLLM — deux natures :
- *  un modèle canonique jamais vu (`modele-nouveau`, `embedded` alors `null`),
- *  ou un tarif différent sur un modèle déjà connu (`tarif-different`). */
+/** Un écart entre le barème du serveur et la page des tarifs d'Anthropic — deux natures :
+ *  un modèle jamais vu (`modele-nouveau`, `embedded` alors `null`), ou un tarif
+ *  différent sur un modèle déjà connu (`tarif-different`). */
 interface Drift {
   model: string;
   kind: 'modele-nouveau' | 'tarif-different';
-  litellm: ModelPrices;
+  official: ModelPrices;
   embedded: ModelPrices | null;
-  /** Fenêtre de contexte que LiteLLM publie : un modèle adopté la reprend. */
-  maxInput: number;
+  /** Fenêtre de contexte à retenir ; null quand la page des modèles ne porte pas ce
+   *  modèle nouveau — il ne peut alors pas être adopté. */
+  maxInput: number | null;
 }
 
-// LiteLLM is a WATCHDOG (vigie), not a price source: the daily fetch compares
-// the public feed against the embedded table and reports drift — a different
-// tariff on a known model, or a new canonical Claude model we do not carry.
-// It never writes into the price map itself: a price enters only through the
-// user's adoption (price-adoption.ts). `at` (tests) defaults to "now": the
-// comparison is against the rate in effect at that instant.
-//
-// "New model" rule: a canonical id ABSENT from the table is reported ONLY when
-// its version is ABOVE the family's known max. Taken literally, "absent from
-// the table" would drown the real signal — historical ids (claude-opus-4-1,
-// claude-opus-4) and un-normalized regional routing variants are also
-// "absent" but are not news. Known models keep the exact tariff comparison
-// below.
-//
-// "Base tariff only" rule: the embedded table represents the BASE (direct-API)
-// tariff. On the live feed, the us./eu./au.anthropic.* regional endpoints carry
-// a uniform premium on all four fields over that base — a different SKU,
-// not a drift of the canonical model. So tariff comparison is restricted to
-// feed keys that are ALREADY canonical (normalizeModel(k) === k, i.e. the bare
-// id LiteLLM also carries for every model) — every prefixed transport or
-// regional variant (anthropic., vertex_ai/, bedrock/, global./us./eu./au.)
-// is excluded from the tariff check. Those variants still feed the
-// "new model" detection above (a new version can appear regional-first) but
-// are deduplicated by canonical id — 3 variants of one new model is one
-// alert, not three.
-function litellmDrift(json: Record<string, unknown>, at?: string): Drift[] {
+const FIELDS = ['input', 'output', 'cacheCreate', 'cacheRead'] as const;
+
+// "New model" rule: a model ABSENT from the tariff is reported ONLY when its
+// version is ABOVE its family's known max. The page also lists retired models
+// (claude-opus-4-1, claude-haiku-3-5) that the table never carried: they are not
+// news. `at` (tests) defaults to "now": a known model is compared against the
+// rate in effect at that instant.
+function officialDrift(
+  official: ReadonlyMap<string, ModelPrices>, windows: ReadonlyMap<string, number>, at?: string,
+): Drift[] {
   const drifts: Drift[] = [];
-  const reportedNewModels = new Set<string>();
-  for (const [k, v] of Object.entries(json)) {
-    if (!v || typeof v !== 'object') continue;
-    const rec = v as Record<string, unknown>;
-    if (typeof rec.input_cost_per_token !== 'number') continue;
-    if (typeof rec.output_cost_per_token !== 'number') continue;
-    if (typeof rec.cache_creation_input_token_cost !== 'number') continue;
-    if (typeof rec.cache_read_input_token_cost !== 'number') continue;
-    if (typeof rec.max_input_tokens !== 'number') continue;
-    if (!/(^|\.|\/)claude-(opus|sonnet|haiku|fable|mythos)-/.test(k)) continue;
-    const canonical = normalizeModel(k);
-    if (!canonical || FORBIDDEN_KEYS.has(canonical)) continue;
-    const upstream: ModelPrices = {
-      input: rec.input_cost_per_token, output: rec.output_cost_per_token,
-      cacheCreate: rec.cache_creation_input_token_cost, cacheRead: rec.cache_read_input_token_cost,
-    };
-    const local = getPrice(canonical, at);
+  for (const [model, upstream] of official) {
+    const local = getPrice(model, at);
     if (!local) {
-      if (reportedNewModels.has(canonical)) continue;
-      const fv = familyVersionOf(canonical);
+      const fv = familyVersionOf(model);
       const max = fv && familyMaxVersion(fv.family);
       const isNew = !!(fv && max
         && (fv.version[0] > max[0] || (fv.version[0] === max[0] && fv.version[1] > max[1])));
-      if (isNew) {
-        reportedNewModels.add(canonical);
-        drifts.push({ model: canonical, kind: 'modele-nouveau', litellm: upstream, embedded: null, maxInput: rec.max_input_tokens });
-      }
+      if (isNew) drifts.push({ model, kind: 'modele-nouveau', official: upstream, embedded: null, maxInput: windows.get(model) ?? null });
       continue;
     }
-    if (k !== canonical) continue; // regional/transport variant — different SKU, not compared
-    const differs = (['input', 'output', 'cacheCreate', 'cacheRead'] as const)
-      .some(f => Math.abs(local[f] - upstream[f]) > Math.abs(local[f]) * 1e-9);
-    if (differs) {
+    if (FIELDS.some(f => Math.abs(local[f] - upstream[f]) > Math.abs(local[f]) * 1e-9)) {
       drifts.push({
-        model: canonical, kind: 'tarif-different', litellm: upstream, maxInput: rec.max_input_tokens,
+        model, kind: 'tarif-different', official: upstream, maxInput: local.maxInput,
         embedded: { input: local.input, output: local.output, cacheCreate: local.cacheCreate, cacheRead: local.cacheRead },
       });
     }
@@ -187,7 +145,7 @@ function litellmDrift(json: Record<string, unknown>, at?: string): Drift[] {
   return drifts;
 }
 
-/** Enveloppe portée à l'abonné, une seule fois par cycle de rafraîchissement. */
+/** Le relevé d'un passage de la vigie. */
 interface DriftReport {
   checkedAt: string;
   drifts: Drift[];
@@ -206,7 +164,7 @@ function recordDrifts(report: DriftReport): void {
   for (const d of report.drifts) {
     const seen = knownDrifts.get(d.model);
     const same = seen !== undefined && seen.kind === d.kind
-      && (['input', 'output', 'cacheCreate', 'cacheRead'] as const).every(f => seen.litellm[f] === d.litellm[f]);
+      && FIELDS.every(f => seen.official[f] === d.official[f]);
     next.set(d.model, { ...d, firstSeenAt: same ? seen.firstSeenAt : report.checkedAt });
   }
   knownDrifts.clear();
@@ -221,80 +179,52 @@ function forgetDrift(model: string): void { knownDrifts.delete(model); }
 interface DriftSnapshot { checkedAt: string | null; drifts: KnownDrift[] }
 function driftSnapshot(): DriftSnapshot { return { checkedAt: lastCheckedAt, drifts: [...knownDrifts.values()] }; }
 
-// Drift consumer registration — server.ts plugs the SSE broadcast in here, so
-// this module keeps zero I/O of its own.
-let _onDrift: ((report: DriftReport) => void) | null = null;
-function onPricingDrift(fn: (report: DriftReport) => void): void { _onDrift = fn; }
-
-// One-shot fetch with no retries: a failure only means no drift report this
-// cycle. Resolves to a boolean for callers who want to log success.
-//
-// Body is buffered as a list of chunks then joined once at the end; this
-// avoids the quadratic string concat that `body += chunk` would produce on
-// large payloads. A hard MAX_BODY_BYTES cap aborts the stream if the server
-// tries to feed us an unbounded response.
-function loadPricing(): Promise<boolean> {
-  return new Promise(resolve => {
-    const req = https.get(LITELLM_URL, { timeout: 10_000 }, res => {
-      if (res.statusCode !== 200) { res.resume(); return resolve(false); }
+// Body is buffered as a list of chunks then joined once at the end, which avoids
+// the quadratic `body += chunk`. The MAX_BODY_BYTES cap aborts an unbounded response.
+function fetchText(url: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, { timeout: 10_000 }, res => {
+      if (res.statusCode !== 200) { res.resume(); return reject(new Error(`${url} a répondu ${res.statusCode}`)); }
       const chunks: string[] = [];
       let received = 0;
-      let aborted = false;
       res.setEncoding('utf8');
       res.on('data', (c: string) => {
-        if (aborted) return;
         received += c.length;
-        if (received > MAX_BODY_BYTES) {
-          aborted = true;
-          req.destroy();
-          console.error(`[pricing] response exceeded ${MAX_BODY_BYTES} bytes — aborted`);
-          return resolve(false);
-        }
+        if (received > MAX_BODY_BYTES) { req.destroy(); reject(new Error(`${url} dépasse ${MAX_BODY_BYTES} octets`)); return; }
         chunks.push(c);
       });
-      res.on('end', () => {
-        if (aborted) return;
-        try {
-          const report = { checkedAt: new Date().toISOString(), drifts: litellmDrift(JSON.parse(chunks.join(''))) };
-          lastFetched = Date.now();
-          recordDrifts(report);
-          if (report.drifts.length && _onDrift) _onDrift(report);
-          resolve(true);
-        } catch { resolve(false); }
-      });
+      res.on('end', () => resolve(chunks.join('')));
     });
-    req.on('error', () => resolve(false));
-    req.on('timeout', () => { req.destroy(); resolve(false); });
+    req.on('error', err => reject(new Error(`${url} injoignable (${err.message})`)));
+    req.on('timeout', () => { req.destroy(); reject(new Error(`${url} n'a pas répondu en 10 s`)); });
   });
 }
 
-// Fire-and-forget kickoff used at server boot: one fetch now, then one every 24h
-// whatever the outcome. Idempotent — the timer guard short-circuits BEFORE the
-// initial fetch so a second call doesn't trigger a duplicate HTTPS round-trip.
-function startPricingRefresh(): void {
-  if (refreshTimer) return;
-  loadPricing().then(ok => {
-    if (ok) console.log('[pricing] vigie: LiteLLM feed compared against the embedded table');
-    else console.log('[pricing] vigie: LiteLLM unreachable — silence (offline is a normal state)');
-  });
-  refreshTimer = setInterval(() => loadPricing().catch((err: unknown) => console.error('[pricing] refresh failed:', err instanceof Error ? err.message : String(err))), REFRESH_MS);
-  refreshTimer.unref();
+// Un passage de la vigie, sans nouvelle tentative. Rend null quand il a abouti, sinon
+// la cause : page injoignable, ou page dont la forme a changé et qui ne se lit plus.
+// Un échec ne touche pas aux dérives déjà relevées.
+async function loadPricing(): Promise<string | null> {
+  try {
+    const [pricingPage, modelsPage] = await Promise.all([fetchText(PRICING_URL), fetchText(MODELS_URL)]);
+    const drifts = officialDrift(parsePricingPage(pricingPage), parseModelsPage(modelsPage));
+    recordDrifts({ checkedAt: new Date().toISOString(), drifts });
+    return null;
+  } catch (err) {
+    return err instanceof Error ? err.message : String(err);
+  }
 }
 
 // Ni `computeCost` ni `normalizeModel` ne sortent d'ici : la formule et la
 // normalisation ont UNE définition, dans le moteur, et qui en a besoin l'importe
 // sous son nom du moteur.
 // Exposed for tests:
-const _internals = { litellmDrift, FORBIDDEN_KEYS, MAX_BODY_BYTES };
+const _internals = { officialDrift };
 
 export {
   getPrice,
-  loadPricing, startPricingRefresh,
-  onPricingDrift,
+  loadPricing,
   recordDrifts, driftFor, forgetDrift, driftSnapshot,
   _internals,
 };
 
-// L'onglet fabrique l'alerte de la vigie sur cette forme
-// (src/web/viz-pricing-drift-alert.ts), par un import de type que le service efface.
 export type { Drift, KnownDrift, DriftSnapshot };

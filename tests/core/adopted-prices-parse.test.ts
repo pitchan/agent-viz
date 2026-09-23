@@ -6,7 +6,7 @@ import { parseAdoptedPrices } from '../../src/engine/core/adopted-prices.ts';
 const P = { input: 4e-6, output: 2e-5, cacheCreate: 5e-6, cacheRead: 2e-7 };
 const entree = (over: Record<string, unknown> = {}) => ({
   prices: P, maxInput: 1_000_000, from: null, replaces: null,
-  adoptedAt: '2026-09-23T10:00:00.000Z', source: 'litellm', ...over,
+  adoptedAt: '2026-09-23T10:00:00.000Z', source: 'anthropic', ...over,
 });
 
 test('un fichier bien formé est rendu tel quel', () => {

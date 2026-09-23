@@ -3,7 +3,7 @@
 // embedded table when the module loads.
 
 import { afterEach, expect, test, vi } from 'vitest';
-import { getPrice, _internals } from '../../src/server/pricing.ts';
+import { getPrice } from '../../src/server/pricing.ts';
 // `computeCost` et `normalizeModel` n'ont qu'une définition, celle du moteur :
 // ces filets l'importent de src/engine/core/pricing.ts, et src/server/pricing.ts
 // n'en porte pas de copie.
@@ -26,9 +26,9 @@ test('normalizeModel strips provider prefixes and date/version suffixes', () => 
 });
 
 test('normalizeModel strips regional routing prefixes and single-digit version suffixes', () => {
-  // LiteLLM carries per-region routing ids (global./us./eu./au.anthropic.): left
-  // un-normalized, each raises a false "modele-nouveau" alert, and a regional id
-  // reads as unpriced. The normalization lives in the engine only.
+  // Cloud transcripts carry per-region routing ids (global./us./eu./au.anthropic.):
+  // left un-normalized, a regional id reads as unpriced. The normalization lives in
+  // the engine only.
   expect(normalizeModel('us.anthropic.claude-opus-4-7')).toBe('claude-opus-4-7');
   expect(normalizeModel('global.anthropic.claude-fable-5')).toBe('claude-fable-5');
   expect(normalizeModel('claude-opus-4-6-v1')).toBe('claude-opus-4-6');
@@ -157,29 +157,6 @@ test('computeCost reports an unknown model as unpriced, never as a zero', () => 
 // un objet contournerait la branche « modèle inconnu », et le total se lirait
 // complet sans l'être.
 
-test('litellmDrift rejects __proto__ / constructor / prototype keys and never pollutes', () => {
-  const Object_proto_before = Object.prototype.toString;
-  const malicious = {
-    'claude-opus-4-7': {
-      input_cost_per_token: 5e-6, output_cost_per_token: 2.5e-5,
-      cache_creation_input_token_cost: 6.25e-6, cache_read_input_token_cost: 5e-7,
-      max_input_tokens: 1_000_000,
-    },
-    'claude-opus-4-7.__proto__': { input_cost_per_token: 1, output_cost_per_token: 1 },
-  };
-  const drifts = _internals.litellmDrift(malicious, '2026-08-15T00:00:00.000Z');
-  expect(Object.prototype.toString).toBe(Object_proto_before);
-  expect(({} as Record<string, unknown>).polluted).toBe(undefined);
-  // The legit, identical entry produces no drift; the malicious key is skipped.
-  expect(drifts).toEqual([]);
-});
-
-test('FORBIDDEN_KEYS contains the dangerous property names', () => {
-  expect(_internals.FORBIDDEN_KEYS.has('__proto__')).toBeTruthy();
-  expect(_internals.FORBIDDEN_KEYS.has('constructor')).toBeTruthy();
-  expect(_internals.FORBIDDEN_KEYS.has('prototype')).toBeTruthy();
-});
-
 test('the price map covers the Claude 5 family and Opus 4.8 (2026 rate card)', () => {
   // A missing entry made the observatory report ~$24 of 1h-cache rewrite on
   // Fable 5 as $0.02 — the server map must price the current family.
@@ -264,23 +241,6 @@ test('computeCost with a model string honors the message date', () => {
   expect(Math.abs(sept - 0.003) < 1e-12, `got ${sept} (rate after the raise expected)`).toBeTruthy();
 });
 
-test('a changed upstream tariff is REPORTED as drift, never applied to the map', () => {
-  const entry = {
-    output_cost_per_token: 6e-5, cache_creation_input_token_cost: 2.5e-5,
-    cache_read_input_token_cost: 2e-6, max_input_tokens: 1_000_000,
-  };
-  const drifts = _internals.litellmDrift({
-    'claude-fable-5': { ...entry, input_cost_per_token: 2e-5 },
-  }, '2026-08-15T00:00:00.000Z');
-  expect(drifts.length).toBe(1);
-  expect(drifts[0]!.model).toBe('claude-fable-5');
-  expect(drifts[0]!.kind).toBe('tarif-different');
-  expect(drifts[0]!.litellm.input).toBe(2e-5);
-  expect(drifts[0]!.embedded!.input).toBe(1e-5);
-  // The price map is untouched: the embedded table still bills fable at 1e-5.
-  expect(getPrice('claude-fable-5')!.input).toBe(1e-5);
-});
-
 // Ce qui distingue un zéro VOULU d'un tarif inconnu est le champ `known` du
 // contrat, qui voyage jusqu'à l'écran, et non une trace dans le journal du démon.
 test('un zéro VOULU est connu, et ne rend pas le total incomplet', () => {
@@ -301,121 +261,3 @@ test('un modèle hors de la liste des zéros voulus est inconnu, sans rien journ
   expect(spy).toHaveBeenCalledTimes(0);
 });
 
-test('an identical LiteLLM feed produces zero drift', () => {
-  const feed = {
-    'claude-opus-4-8': {
-      input_cost_per_token: 5e-6, output_cost_per_token: 2.5e-5,
-      cache_creation_input_token_cost: 6.25e-6, cache_read_input_token_cost: 5e-7,
-      max_input_tokens: 1_000_000,
-    },
-  };
-  expect(_internals.litellmDrift(feed, '2026-08-15T00:00:00.000Z')).toEqual([]);
-});
-
-test('a new canonical Claude model absent from the embedded table is reported', () => {
-  const feed = {
-    'claude-opus-6': {
-      input_cost_per_token: 7e-6, output_cost_per_token: 3.5e-5,
-      cache_creation_input_token_cost: 8.75e-6, cache_read_input_token_cost: 7e-7,
-      max_input_tokens: 1_000_000,
-    },
-  };
-  const drifts = _internals.litellmDrift(feed, '2026-08-15T00:00:00.000Z');
-  expect(drifts.length).toBe(1);
-  expect(drifts[0]!.model).toBe('claude-opus-6');
-  expect(drifts[0]!.kind).toBe('modele-nouveau');
-  expect(drifts[0]!.embedded).toBe(null);
-});
-
-test('historical models and regional variants never alert', () => {
-  // "Absent from the table" alone is not "new" —
-  // historical ids (claude-opus-4-1) and un-normalized regional routing
-  // variants (us./global.anthropic.) are also absent, but are not news.
-  const at = '2026-08-15T00:00:00.000Z';
-  const feed = {
-    'us.anthropic.claude-opus-4-7': {
-      input_cost_per_token: 5e-6, output_cost_per_token: 2.5e-5,
-      cache_creation_input_token_cost: 6.25e-6, cache_read_input_token_cost: 5e-7,
-      max_input_tokens: 1_000_000,
-    },
-    'claude-opus-4-1': {
-      input_cost_per_token: 4e-6, output_cost_per_token: 2e-5,
-      cache_creation_input_token_cost: 5e-6, cache_read_input_token_cost: 4e-7,
-      max_input_tokens: 200_000,
-    },
-    'global.anthropic.claude-fable-5': {
-      input_cost_per_token: 1e-5, output_cost_per_token: 5e-5,
-      cache_creation_input_token_cost: 1.25e-5, cache_read_input_token_cost: 1e-6,
-      max_input_tokens: 1_000_000,
-    },
-  };
-  expect(_internals.litellmDrift(feed, at)).toEqual([]);
-});
-
-test('a version above the family max alerts as modele-nouveau', () => {
-  const feed = {
-    'claude-haiku-5': {
-      input_cost_per_token: 1e-6, output_cost_per_token: 5e-6,
-      cache_creation_input_token_cost: 1.25e-6, cache_read_input_token_cost: 1e-7,
-      max_input_tokens: 1_000_000,
-    },
-  };
-  const drifts = _internals.litellmDrift(feed, '2026-08-15T00:00:00.000Z');
-  expect(drifts.length).toBe(1);
-  expect(drifts[0]!.model).toBe('claude-haiku-5');
-  expect(drifts[0]!.kind).toBe('modele-nouveau');
-});
-
-test('regional premium endpoints are different SKUs, not tariff drift', () => {
-  // On the real feed, us./eu./au.anthropic.* carry a uniform +10% premium over the
-  // base (direct-API) tariff the embedded table represents: a different SKU, not a
-  // drift of the canonical model — the bare key is the only one compared.
-  const base = {
-    input_cost_per_token: 5e-6, output_cost_per_token: 2.5e-5,
-    cache_creation_input_token_cost: 6.25e-6, cache_read_input_token_cost: 5e-7,
-    max_input_tokens: 1_000_000,
-  };
-  const premium = {
-    input_cost_per_token: 5.5e-6, output_cost_per_token: 2.75e-5,
-    cache_creation_input_token_cost: 6.875e-6, cache_read_input_token_cost: 5.5e-7,
-    max_input_tokens: 1_000_000,
-  };
-  const feed = {
-    'claude-opus-4-7': base,
-    'us.anthropic.claude-opus-4-7': premium,
-    'eu.anthropic.claude-opus-4-7': premium,
-    'au.anthropic.claude-opus-4-7': premium,
-  };
-  expect(_internals.litellmDrift(feed, '2026-08-15T00:00:00.000Z')).toEqual([]);
-});
-
-test('a base-rate change on the bare key still reports drift', () => {
-  const feed = {
-    'claude-opus-4-7': {
-      input_cost_per_token: 9e-6, output_cost_per_token: 2.5e-5,
-      cache_creation_input_token_cost: 6.25e-6, cache_read_input_token_cost: 5e-7,
-      max_input_tokens: 1_000_000,
-    },
-  };
-  const drifts = _internals.litellmDrift(feed, '2026-08-15T00:00:00.000Z');
-  expect(drifts.length).toBe(1);
-  expect(drifts[0]!.model).toBe('claude-opus-4-7');
-  expect(drifts[0]!.kind).toBe('tarif-different');
-});
-
-test('a new model under several regional variants alerts exactly once', () => {
-  const entry = {
-    input_cost_per_token: 1e-6, output_cost_per_token: 5e-6,
-    cache_creation_input_token_cost: 1.25e-6, cache_read_input_token_cost: 1e-7,
-    max_input_tokens: 1_000_000,
-  };
-  const feed = {
-    'claude-haiku-5': entry,
-    'us.anthropic.claude-haiku-5': entry,
-    'eu.anthropic.claude-haiku-5': entry,
-  };
-  const drifts = _internals.litellmDrift(feed, '2026-08-15T00:00:00.000Z');
-  expect(drifts.length).toBe(1);
-  expect(drifts[0]!.model).toBe('claude-haiku-5');
-  expect(drifts[0]!.kind).toBe('modele-nouveau');
-});

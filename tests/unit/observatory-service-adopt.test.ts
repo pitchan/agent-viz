@@ -1,19 +1,26 @@
-// Adopter un prix touche des coûts déjà rangés : le service relit les sessions dont
-// le coût change, et prévient les onglets.
+// Appliquer un tarif touche des coûts déjà rangés : après un passage de la vigie, le
+// service relit les sessions dont le coût change, et prévient les onglets.
 import { expect, test } from 'vitest';
 import { createObservatoryService } from '../../src/server/observatory/service.ts';
 import type { Store } from '../../src/server/observatory/store.ts';
 import type { Engine } from '../../src/server/observatory/engine.ts';
 import type { Adopted } from '../../src/server/price-adoption.ts';
+import type { KnownDrift } from '../../src/server/pricing.ts';
 import { fakeReport, fakeRef } from '../helpers/observatory-fakes.ts';
 
+const P = { input: 4e-6, output: 2e-5, cacheCreate: 5e-6, cacheRead: 2e-7 };
 const ROWS = [
   { id: 'incomplete', costComplete: false, endedAt: '2026-09-10T00:00:00.000Z' },
   { id: 'avant', costComplete: true, endedAt: '2026-09-19T00:00:00.000Z' },
   { id: 'apres', costComplete: true, endedAt: '2026-09-21T00:00:00.000Z' },
 ];
 
-function harness(adopted: Adopted | null) {
+const drift = (over: Partial<KnownDrift> = {}): KnownDrift => ({
+  model: 'claude-opus-6', kind: 'modele-nouveau', official: P, embedded: null,
+  maxInput: 1_000_000, firstSeenAt: '2026-09-20T00:00:00.000Z', ...over,
+});
+
+function harness(drifts: KnownDrift[], adopt: (model: string) => Promise<Adopted | null>) {
   const scanned: string[] = [];
   const messages: unknown[] = [];
   const store = {
@@ -30,56 +37,88 @@ function harness(adopted: Adopted | null) {
     engine, store,
     collectConfig: async () => [],
     broadcast: m => { messages.push(m); },
-    adoptPrice: async () => adopted,
-    vigie: { snapshot: () => ({ checkedAt: null, drifts: [] }), refresh: async () => true },
+    adoptPrice: adopt,
+    vigie: { snapshot: () => ({ checkedAt: '2026-09-23T12:00:00.000Z', drifts }), refresh: async () => null },
     now: () => new Date('2026-09-23T12:00:00.000Z'),
     claudeDir: 'C:\\x\\.claude', sinceDays: 30, scanSinceDays: 90,
   });
   return { service, scanned, messages };
 }
 
-test('adopter un modèle nouveau relit les sessions au coût incomplet', async () => {
+test('un modèle nouveau appliqué fait relire les sessions au coût incomplet', async () => {
   // Arrange
-  const h = harness({ model: 'claude-opus-5-5', kind: 'modele-nouveau', from: null });
+  const h = harness([drift()], async m => ({ model: m, kind: 'modele-nouveau', from: null, prices: P }));
 
   // Act
-  await h.service.adoptPrice('claude-opus-5-5');
+  await h.service.checkPrices();
 
   // Assert
   expect(h.scanned).toEqual(['incomplete']);
 });
 
-test('adopter un tarif différent relit aussi les sessions finies après `from`', async () => {
+test('un tarif changé appliqué fait aussi relire les sessions finies après `from`', async () => {
   // Arrange
-  const h = harness({ model: 'claude-opus-5', kind: 'tarif-different', from: '2026-09-20T00:00:00.000Z' });
+  const h = harness([drift({ model: 'claude-opus-5', kind: 'tarif-different' })],
+    async m => ({ model: m, kind: 'tarif-different', from: '2026-09-20T00:00:00.000Z', prices: P }));
 
   // Act
-  await h.service.adoptPrice('claude-opus-5');
+  await h.service.checkPrices();
 
   // Assert
   expect(h.scanned.sort()).toEqual(['apres', 'incomplete']);
 });
 
-test('adopter diffuse pricingAdopted avec le modèle', async () => {
+test('un tarif appliqué est diffusé aux onglets, avec ses prix', async () => {
   // Arrange
-  const h = harness({ model: 'claude-opus-5-5', kind: 'modele-nouveau', from: null });
+  const h = harness([drift()], async m => ({ model: m, kind: 'modele-nouveau', from: null, prices: P }));
 
   // Act
-  await h.service.adoptPrice('claude-opus-5-5');
+  await h.service.checkPrices();
 
   // Assert
-  expect(h.messages).toContainEqual({ type: 'pricingAdopted', model: 'claude-opus-5-5' });
+  expect(h.messages).toContainEqual({ type: 'pricingAdopted', model: 'claude-opus-6', kind: 'modele-nouveau', prices: P });
 });
 
-test('un modèle sans dérive rend null, ne relit rien, ne diffuse rien', async () => {
+test('un modèle à la fenêtre de contexte inconnue n’est pas tenté', async () => {
   // Arrange
-  const h = harness(null);
+  const tentes: string[] = [];
+  const h = harness([drift({ maxInput: null })], async m => { tentes.push(m); return null; });
 
   // Act
-  const r = await h.service.adoptPrice('claude-opus-5-5');
+  await h.service.checkPrices();
 
   // Assert
-  expect(r).toBeNull();
-  expect(h.scanned).toEqual([]);
-  expect(h.messages).toEqual([]);
+  expect(tentes).toEqual([]);
+});
+
+test('une adoption qui échoue est rendue avec sa cause, les autres continuent', async () => {
+  // Arrange
+  const h = harness([drift({ model: 'claude-opus-6' }), drift({ model: 'claude-sonnet-6' })], async m => {
+    if (m === 'claude-opus-6') throw new Error('disque plein');
+    return { model: m, kind: 'modele-nouveau', from: null, prices: P };
+  });
+
+  // Act
+  const r = await h.service.checkPrices();
+
+  // Assert
+  expect(r.errors).toEqual([{ model: 'claude-opus-6', message: 'disque plein' }]);
+  expect(r.adopted.map(a => a.model)).toEqual(['claude-sonnet-6']);
+});
+
+test('deux vérifications demandées ensemble passent l’une après l’autre', async () => {
+  // Arrange
+  const journal: string[] = [];
+  const h = harness([drift()], async m => {
+    journal.push('debut');
+    await new Promise(r => setImmediate(r));
+    journal.push('fin');
+    return { model: m, kind: 'modele-nouveau', from: null, prices: P };
+  });
+
+  // Act
+  await Promise.all([h.service.checkPrices(), h.service.checkPrices()]);
+
+  // Assert
+  expect(journal).toEqual(['debut', 'fin', 'debut', 'fin']);
 });

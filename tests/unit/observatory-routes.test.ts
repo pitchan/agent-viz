@@ -1,4 +1,4 @@
-// The thirteen analysis endpoints: response shapes, guards, and the answer to a
+// The twelve analysis endpoints: response shapes, guards, and the answer to a
 // failing service. The service is injected, so no SQLite file and no engine
 // are needed.
 
@@ -64,20 +64,20 @@ function router(service = SERVICE) {
   };
 }
 
-test('the thirteen analysis routes are declared with their methods', () => {
+test('the twelve analysis routes are declared with their methods', () => {
   const declared = createObservatoryRoutes(() => SERVICE)
     .map(r => `${r.method} ${r.path || r.prefix}`).sort();
   expect(declared).toEqual([
     'GET /analysis/models', 'GET /analysis/session/', 'GET /analysis/sessions',
     'GET /analysis/skills', 'GET /analysis/summary', 'GET /config/audit', 'GET /pricing', 'GET /recommendations',
-    'POST /analysis/purge', 'POST /analysis/scan', 'POST /pricing/adopt', 'POST /pricing/check', 'POST /recommendations/',
+    'POST /analysis/purge', 'POST /analysis/scan', 'POST /pricing/check', 'POST /recommendations/',
   ]);
 });
 
 test('mutating routes are guarded by sameOrigin', () => {
   const guarded = createObservatoryRoutes(() => SERVICE)
     .filter(r => r.sameOrigin).map(r => r.path || r.prefix).sort();
-  expect(guarded).toEqual(['/analysis/purge', '/analysis/scan', '/pricing/adopt', '/pricing/check', '/recommendations/']);
+  expect(guarded).toEqual(['/analysis/purge', '/analysis/scan', '/pricing/check', '/recommendations/']);
 });
 
 test('GET /analysis/summary returns the period totals and names its price source', async () => {
@@ -314,44 +314,9 @@ test('GET /pricing returns the tariff sheet, the provenance and the versions', a
   expect(body.priceSource).toBe('netgain-table-embarquee');
 });
 
-test('POST /pricing/adopt rend 200 et ce qui a été adopté', async () => {
-  // Arrange
-  const call = router({ ...SERVICE, adoptPrice: async (m: string) => ({ model: m, kind: 'modele-nouveau', from: null }) } as unknown as Service);
-
-  // Act
-  const res = await call('POST', '/pricing/adopt?model=claude-opus-5-5');
-
-  // Assert
-  expect(res.statusCode).toBe(200);
-  expect(JSON.parse(res.body)).toEqual({ model: 'claude-opus-5-5', kind: 'modele-nouveau', from: null });
-});
-
-test('POST /pricing/adopt sur un modèle sans dérive connue rend 404 avec la cause', async () => {
-  // Arrange
-  const call = router({ ...SERVICE, adoptPrice: async () => null } as unknown as Service);
-
-  // Act
-  const res = await call('POST', '/pricing/adopt?model=claude-x-1');
-
-  // Assert
-  expect(res.statusCode).toBe(404);
-  expect(JSON.parse(res.body).error).toContain('claude-x-1');
-});
-
-test('POST /pricing/adopt sans modèle rend 400', async () => {
-  // Arrange
-  const call = router();
-
-  // Act
-  const res = await call('POST', '/pricing/adopt');
-
-  // Assert
-  expect(res.statusCode).toBe(400);
-});
-
 test('POST /pricing/check rend ce que la vigie a vu', async () => {
   // Arrange
-  const vu = { reachable: true, checkedAt: '2026-09-23T12:00:00.000Z', drifts: [] };
+  const vu = { failure: null, checkedAt: '2026-09-23T12:00:00.000Z', drifts: [], adopted: [], errors: [] };
   const call = router({ ...SERVICE, checkPrices: async () => vu } as unknown as Service);
 
   // Act

@@ -99,7 +99,7 @@ test('un type qu aucun detecteur ne leve, ou un tableau hors forme, est refuse',
   // Arrange
   const alerte = boucleDuDetecteur();
   const abimees = {
-    'type de la vigie tarifaire': { ...alerte, type: 'pricingDrift' },
+    'type d un tarif applique': { ...alerte, type: 'pricingAdopted' },
     'type de demain': { ...alerte, type: 'unTypeDeDemain' },
     'occurrences nulles': { ...alerte, occurrences: null },
     'occurrence vide': { ...alerte, occurrences: [{}] },

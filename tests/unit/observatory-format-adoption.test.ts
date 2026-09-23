@@ -2,7 +2,7 @@
 import { expect, test } from 'vitest';
 import { adoptionNote } from '../../src/web/observatory/format.ts';
 
-test('un tarif adopté nomme LiteLLM et le jour', () =>
-  expect(adoptionNote({ source: 'litellm', adoptedAt: '2026-09-23T12:00:00.000Z', from: null })).toBe('LiteLLM, adopté le 2026-09-23'));
+test('un tarif appliqué nomme Anthropic et le jour', () =>
+  expect(adoptionNote({ source: 'anthropic', adoptedAt: '2026-09-23T12:00:00.000Z', from: null })).toBe('tarif Anthropic appliqué le 2026-09-23'));
 
 test('un tarif embarqué n’a pas de mention', () => expect(adoptionNote(null)).toBe(''));

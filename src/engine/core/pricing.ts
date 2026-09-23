@@ -86,8 +86,7 @@ const MODEL_INFO: Record<string, { label: string; maxInput: number }> = {
  * une seule fois n'en retirait qu'un et laissait l'identifiant inconnu. D'où
  * une substitution par préfixe, dans l'ordre du plus externe au plus interne.
  * Le routeur régional passe AVANT `anthropic.` nu, sinon `us.anthropic.X`
- * tomberait à travers — c'est la cause d'origine des 109 fausses alertes
- * « modèle nouveau » relevées sur le flux LiteLLM réel.
+ * tomberait à travers et resterait un modèle au tarif inconnu.
  */
 export function normalizeModel(mid: string | null | undefined): string | null {
   if (mid === null || mid === undefined) return null;
@@ -112,7 +111,7 @@ export interface CostResult {
   model: string | null;
 }
 
-/** Un prix repris de LiteLLM par l'utilisateur, lu dans ~/.agent-viz/prices.json. */
+/** Un prix repris de la page des tarifs d'Anthropic par la vigie, lu dans ~/.agent-viz/prices.json. */
 export interface AdoptedPrice {
   prices: ModelPrices;
   maxInput: number;
@@ -121,10 +120,10 @@ export interface AdoptedPrice {
   /** Le tarif courant que l'adoption remplace ; null pour un modèle nouveau. */
   replaces: ModelPrices | null;
   adoptedAt: string;
-  source: 'litellm';
+  source: 'anthropic';
 }
 export type AdoptedPrices = Readonly<Record<string, readonly AdoptedPrice[]>>;
-export interface AdoptionMark { source: 'litellm'; adoptedAt: string; from: string | null }
+export interface AdoptionMark { source: 'anthropic'; adoptedAt: string; from: string | null }
 
 export interface Pricing {
   computeCost(usage: RawUsage, model: string | null | undefined, at?: string): CostResult;
@@ -216,7 +215,7 @@ export interface PriceTableEntry {
   maxInput: number;
   current: ModelPrices;
   history: PricePeriod[];
-  /** Présent quand le tarif courant vient d'une adoption LiteLLM. */
+  /** Présent quand le tarif courant vient de la page des tarifs d'Anthropic. */
   adopted: AdoptionMark | null;
 }
 

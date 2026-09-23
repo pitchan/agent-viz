@@ -40,3 +40,16 @@ valeurs neutres, cohérentes entre elles (`transcript_path` dérive bien du
 des champs. C'est cela, le contrat — ne pas le « nettoyer ».
 
 Lecteur : `tests/unit/watchdog-loop-outcomes.test.ts`.
+
+## `anthropic-pricing/`
+
+Extraits des deux pages officielles d'Anthropic que lit la vigie des tarifs,
+relevés le 2026-09-23 dans leur version Markdown :
+
+- `pricing.md` : la section « Model pricing » de
+  `platform.claude.com/docs/en/about-claude/pricing.md`, suivie du tableau
+  « Batch processing » de la même page. Ce second tableau commence lui aussi
+  par des lignes `| Claude …` : il prouve que le lecteur s'arrête au premier.
+- `models-overview.md` : le tableau « Compare models » de
+  `platform.claude.com/docs/en/models/overview.md`, seule source de la fenêtre
+  de contexte. Il ne couvre que les modèles les plus récents.

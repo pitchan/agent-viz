@@ -76,7 +76,7 @@ function serviceOf(deps: ReturnType<typeof fakeDeps>) {
     collectConfig: async () => [],
     broadcast: () => {}, now: () => NOW,
     adoptPrice: async () => null,
-    vigie: { snapshot: () => ({ checkedAt: null, drifts: [] }), refresh: async () => true },
+    vigie: { snapshot: () => ({ checkedAt: null, drifts: [] }), refresh: async () => null },
     claudeDir: 'C:\\Users\\x\\.claude', sinceDays: 30, scanSinceDays: 90,
   });
 }

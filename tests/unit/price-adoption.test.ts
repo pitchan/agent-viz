@@ -10,7 +10,7 @@ const OPUS_5 = { input: 5e-6, output: 2.5e-5, cacheCreate: 6.25e-6, cacheRead: 5
 const NOW = new Date('2026-09-23T12:00:00.000Z');
 
 const nouveau = (): KnownDrift => ({
-  model: 'claude-opus-5-5', kind: 'modele-nouveau', litellm: P, embedded: null,
+  model: 'claude-opus-5-5', kind: 'modele-nouveau', official: P, embedded: null,
   maxInput: 1_000_000, firstSeenAt: '2026-09-22T00:00:00.000Z',
 });
 
@@ -41,7 +41,7 @@ test('un modèle nouveau est écrit sans date de départ ni tarif remplacé', as
   // Assert
   expect(d.ecrit[0]?.['claude-opus-5-5']).toEqual([{
     prices: P, maxInput: 1_000_000, from: null, replaces: null,
-    adoptedAt: '2026-09-23T12:00:00.000Z', source: 'litellm',
+    adoptedAt: '2026-09-23T12:00:00.000Z', source: 'anthropic',
   }]);
 });
 
@@ -53,13 +53,13 @@ test('un tarif différent part de la première détection et nomme le tarif remp
   const r = await d.adoption.adopt('claude-opus-5');
 
   // Assert
-  expect(r).toEqual({ model: 'claude-opus-5', kind: 'tarif-different', from: '2026-09-22T00:00:00.000Z' });
+  expect(r).toEqual({ model: 'claude-opus-5', kind: 'tarif-different', from: '2026-09-22T00:00:00.000Z', prices: P });
   expect(d.ecrit[0]?.['claude-opus-5']?.[0]).toMatchObject({ from: '2026-09-22T00:00:00.000Z', replaces: OPUS_5 });
 });
 
 test('l’adoption s’ajoute aux entrées déjà présentes dans le fichier', async () => {
   // Arrange
-  const existant: AdoptedPrices = { 'claude-x-1': [{ prices: P, maxInput: 1, from: null, replaces: null, adoptedAt: '2026-01-01T00:00:00.000Z', source: 'litellm' }] };
+  const existant: AdoptedPrices = { 'claude-x-1': [{ prices: P, maxInput: 1, from: null, replaces: null, adoptedAt: '2026-01-01T00:00:00.000Z', source: 'anthropic' }] };
   const d = deps(nouveau(), existant);
 
   // Act
@@ -91,4 +91,15 @@ test('un modèle sans dérive connue rend null et n’écrit rien', async () => 
   // Assert
   expect(r).toBeNull();
   expect(d.ecrit).toEqual([]);
+});
+
+test('un modèle nouveau à la fenêtre de contexte inconnue n’est pas adopté, et la cause le dit', async () => {
+  // Arrange
+  const d = deps({ ...nouveau(), maxInput: null });
+
+  // Act
+  const act = d.adoption.adopt('claude-opus-5-5');
+
+  // Assert
+  await expect(act).rejects.toThrow(/fenêtre de contexte/);
 });

@@ -74,11 +74,11 @@ function buildProvenance({ engineVersion, priceSource }: ProvenanceOptions): Pro
       },
       {
         titre: 'Une seule table pour tout le produit',
-        corps: 'La pastille temps réel de la barre du haut est tarifée par la MÊME table embarquée '
-          + 'que ce panneau. Une vigie compare chaque jour cette table '
-          + 'au dépôt public LiteLLM : toute dérive (tarif changé en amont, nouveau modèle) '
-          + 'déclenche une alerte visible au lieu d’un écart silencieux. Réseau injoignable = '
-          + 'silence normal, jamais une erreur.',
+        corps: 'La pastille temps réel de la barre du haut est tarifée par la MÊME table que ce '
+          + 'panneau. Une vigie lit la page des tarifs d’Anthropic au démarrage, chaque jour et à '
+          + 'la demande : un nouveau modèle ou un tarif changé y est appliqué aussitôt, daté du '
+          + 'jour où il a été vu. Page injoignable ou illisible : le barème ne bouge pas, et la '
+          + 'cause s’affiche dans ce panneau.',
       },
       {
         titre: 'Limites honnêtes',

@@ -51,8 +51,8 @@ function entryOf(v: unknown, where: string): AdoptedPrice {
   if ((from === null) !== (replaces === null)) fail('from et replaces sont tous deux null (modèle nouveau) ou tous deux renseignés');
   const adoptedAt = v.adoptedAt;
   if (!isIso(adoptedAt)) return fail('adoptedAt : date ISO attendue');
-  if (v.source !== 'litellm') fail('source : « litellm » attendu');
-  return { prices, maxInput, from, replaces, adoptedAt, source: 'litellm' };
+  if (v.source !== 'anthropic') fail('source : « anthropic » attendue');
+  return { prices, maxInput, from, replaces, adoptedAt, source: 'anthropic' };
 }
 
 export function parseAdoptedPrices(json: unknown, origin: string): AdoptedPrices {

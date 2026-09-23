@@ -281,7 +281,7 @@ export function formatUsdExact(n: number) {
 
 // La date seule suffit : l'heure d'un clic n'aide pas à juger un tarif.
 export function adoptionNote(mark: { source: string; adoptedAt: string; from: string | null } | null): string {
-  return mark === null ? '' : `LiteLLM, adopté le ${mark.adoptedAt.slice(0, 10)}`;
+  return mark === null ? '' : `tarif Anthropic appliqué le ${mark.adoptedAt.slice(0, 10)}`;
 }
 
 // Les quatre prix d'un tarif, en dollars par million de jetons : l'unité se dit
@@ -297,7 +297,22 @@ export function driftTitle(d: { model: string; kind: 'modele-nouveau' | 'tarif-d
 
 // En UTC : l'heure du serveur et celle de l'onglet peuvent différer, l'instant non.
 export function vigieStatus(checkedAt: string | null, pending: number): string {
-  if (checkedAt === null) return 'LiteLLM pas encore consulté depuis le démarrage du serveur.';
+  if (checkedAt === null) return 'Tarifs Anthropic pas encore vérifiés depuis le démarrage du serveur.';
   const when = `${checkedAt.slice(0, 10)} ${checkedAt.slice(11, 16)} UTC`;
-  return `Dernière vérification LiteLLM : ${when} — ${pending === 0 ? 'barème à jour.' : `${pending} mise(s) à jour disponible(s).`}`;
+  return `Tarifs Anthropic vérifiés le ${when} — ${pending === 0 ? 'barème à jour.' : `${pending} tarif(s) en attente.`}`;
+}
+
+// Un tarif relevé et pas appliqué dit pourquoi : la fenêtre de contexte manque, ou
+// l'application a échoué et le journal du serveur en porte la cause.
+export function pendingReason(d: { maxInput: number | null }): string {
+  return d.maxInput === null
+    ? 'Fenêtre de contexte absente de la page des modèles d’Anthropic : tarif non appliqué.'
+    : 'Pas encore appliqué : la cause est dans le journal du serveur.';
+}
+
+// Ce que « Vérifier maintenant » a rencontré, ou null quand tout a abouti.
+export function checkOutcome(r: { failure: string | null; errors: { model: string; message: string }[] }): string | null {
+  if (r.failure !== null) return `Vérification impossible : ${r.failure}`;
+  if (r.errors.length === 0) return null;
+  return r.errors.map(e => `${modelLabel(e.model)} non appliqué : ${e.message}`).join(' ; ');
 }

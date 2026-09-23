@@ -89,17 +89,6 @@ function createObservatoryRoutes(getService: () => Service): Route[] {
       }),
     },
     {
-      // Only the model name crosses the wire: the price is the one the watchdog recorded.
-      method: 'POST', path: '/pricing/adopt', sameOrigin: true,
-      handler: bind(async (_req, res, url, service) => {
-        const model = url.searchParams.get('model');
-        if (!model) { sendJson(res, 400, { error: 'paramètre model manquant' }); return; }
-        const adopted = await service.adoptPrice(model);
-        if (!adopted) { sendJson(res, 404, { error: `aucune dérive LiteLLM en cours pour ${model}` }); return; }
-        sendJson(res, 200, adopted);
-      }),
-    },
-    {
       method: 'POST', path: '/pricing/check', sameOrigin: true,
       handler: bind(async (_req, res, _url, service) => {
         sendJson(res, 200, await service.checkPrices());

@@ -93,19 +93,11 @@ export function fetchSkillUsage({ project, ...opts }: WindowOpts & { project?: s
 
 export const fetchPricing = () => getJson('/pricing');
 
-// Faire passer la vigie LiteLLM tout de suite ; rend ce qu'elle a vu.
+// Faire passer la vigie des tarifs tout de suite : elle applique ce qu'elle relève, et rend ce qu'elle a vu.
 export async function checkPrices() {
   const res = await fetch('/pricing/check', { method: 'POST' });
   const body = await res.json().catch(() => null);
   if (!res.ok) throw new Error(body && body.error ? body.error : `${res.status} sur /pricing/check`);
-  return body;
-}
-
-// Adopter le tarif LiteLLM d'un modèle : le serveur reprend le prix de sa vigie, jamais d'ici.
-export async function adoptPrice(model: string) {
-  const res = await fetch(`/pricing/adopt?model=${encodeURIComponent(model)}`, { method: 'POST' });
-  const body = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(body && body.error ? body.error : `${res.status} sur /pricing/adopt`);
   return body;
 }
 

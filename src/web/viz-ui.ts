@@ -36,7 +36,6 @@ import { budgetPresentation } from './viz-budget-format.ts';
 import { errorRow, errorsPanelTitle } from './viz-error-format.ts';
 import { getErrors, getErrorsSummary, onErrorsChanged } from './viz-errors.ts';
 import { formatDuration } from './viz-duration.ts';
-import { adoptPrice } from './observatory/api.ts';
 
 // Tout identifiant lu ici est declare dans index.html, et le script de module
 // qui charge ce fichier vient apres eux : `getElementById` rend l'element,
@@ -515,8 +514,6 @@ function alertItemHTML(a: LiveAlert) {
     a.sessionId ? `session ${a.sessionId.slice(0, 8)}` : a.toolName || '',
     alertActorLine(a),
   ].filter(Boolean).join(' · ');
-  const adopt = a.type === 'pricingDrift'
-    ? `<button class="alert-adopt" data-model="${esc(a.toolName)}">Adopter ce tarif</button>` : '';
   return `<div class="alert-item">
     <div class="alert-info">
       <div class="alert-type">${esc(a.type)}</div>
@@ -525,9 +522,7 @@ function alertItemHTML(a: LiveAlert) {
       ${details}
       <div class="alert-meta">${esc(meta)}</div>
     </div>
-    <div class="alert-actions">
-      ${adopt}<button class="alert-ack" data-id="${esc(a.id)}" data-created="${esc(String(a.createdAt ?? ''))}">Ack</button>
-    </div>
+    <button class="alert-ack" data-id="${esc(a.id)}" data-created="${esc(String(a.createdAt ?? ''))}">Ack</button>
   </div>`;
 }
 
@@ -569,16 +564,6 @@ document.getElementById('alerts-close')!.addEventListener('click', () => {
 });
 
 document.getElementById('alerts-list')!.addEventListener('click', (e) => {
-  const adoptBtn = (e.target as HTMLElement).closest<HTMLButtonElement>('.alert-adopt');
-  if (adoptBtn) {
-    adoptBtn.disabled = true;
-    // L'alerte se retire sur le message pricingAdopted du serveur, dans tous les onglets.
-    adoptPrice(adoptBtn.dataset.model!).catch((err: unknown) => {
-      adoptBtn.disabled = false;
-      adoptBtn.textContent = `Échec : ${err instanceof Error ? err.message : String(err)}`;
-    });
-    return;
-  }
   const btn = (e.target as HTMLElement).closest<HTMLElement>('.alert-ack');
   if (!btn) return;
   // Both halves of the key: the same id at another time is another incident.
