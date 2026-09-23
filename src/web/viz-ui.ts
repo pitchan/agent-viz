@@ -525,7 +525,9 @@ function alertItemHTML(a: LiveAlert) {
       ${details}
       <div class="alert-meta">${esc(meta)}</div>
     </div>
-    ${adopt}<button class="alert-ack" data-id="${esc(a.id)}" data-created="${esc(String(a.createdAt ?? ''))}">Ack</button>
+    <div class="alert-actions">
+      ${adopt}<button class="alert-ack" data-id="${esc(a.id)}" data-created="${esc(String(a.createdAt ?? ''))}">Ack</button>
+    </div>
   </div>`;
 }
 

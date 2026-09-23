@@ -227,7 +227,8 @@ body {
   font-family: inherit; font-size: 11px; cursor: pointer; transition: all 0.15s;
 }
 .alert-ack:hover, .alert-adopt:hover { background: var(--glass-hover); border-color: var(--holo-dim); }
-.alert-adopt { margin-right: 6px; }
+/* The item grid has two columns: both buttons share the second one, stacked. */
+.alert-actions { display: flex; flex-direction: column; gap: 6px; }
 .alert-adopt:disabled { cursor: wait; opacity: 0.6; }
 .alerts-empty { padding: 16px; color: var(--text-muted); font-size: 12px; text-align: center; }
 
