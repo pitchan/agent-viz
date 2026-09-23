@@ -25,8 +25,9 @@ test("scan broadcasts 'done' only after recommendations are stored", async () =>
   const service = createObservatoryService({
     engine, store,
     collectConfig: async () => [],
-    broadcast: m => sequence.push(`broadcast-${m.phase}`),
+    broadcast: m => sequence.push(`broadcast-${'phase' in m ? m.phase : m.type}`),
     now: () => new Date('2026-08-04T10:00:00.000Z'),
+    adoptPrice: async () => null,
     claudeDir: 'C:\\x\\.claude', sinceDays: 30, scanSinceDays: 90,
   });
 

@@ -13,8 +13,13 @@ import { engine } from './engine.ts';
 import { collectConfigItems } from './config-audit.ts';
 import { createObservatoryService } from './service.ts';
 import { broadcastSSE } from '../sse.ts';
+import { applyAdoptedPrices } from '../pricing-state.ts';
+import { driftFor, forgetDrift } from '../pricing.ts';
+import { createPriceAdoption } from '../price-adoption.ts';
+import { adoptedPricesPath, readAdoptedPrices } from '../../engine/core/adopted-prices.ts';
 
 const DB_PATH = path.join(os.homedir(), '.agent-viz', 'observatory.db');
+const PRICES_PATH = adoptedPricesPath(os.homedir());
 const DEFAULT_SINCE_DAYS = 30;
 const SCAN_SINCE_DAYS = 90; // widest offered window — persistence always covers it
 
@@ -36,6 +41,16 @@ function getObservatoryService(): ReturnType<typeof createObservatoryService> {
       // Vérifié en exécutant Claude Code 2.1.226 sur les deux branches.
       { claudeDir, claudeJsonPath: resolveClaudeJsonPath() }),
     broadcast: broadcastSSE,
+    adoptPrice: createPriceAdoption({
+      driftFor, forgetDrift,
+      read: () => readAdoptedPrices(PRICES_PATH, fsp.readFile),
+      write: async (adopted) => {
+        await fsp.mkdir(path.dirname(PRICES_PATH), { recursive: true });
+        await fsp.writeFile(PRICES_PATH, `${JSON.stringify(adopted, null, 2)}\n`, 'utf8');
+      },
+      apply: applyAdoptedPrices,
+      now: () => new Date(),
+    }).adopt,
     now: () => new Date(),
     claudeDir,
     sinceDays: DEFAULT_SINCE_DAYS,

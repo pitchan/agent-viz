@@ -22,6 +22,7 @@ function makeService(listed: any[]) {
     collectConfig: async () => [],
     broadcast: () => {},
     now: () => new Date('2026-08-05T12:00:00.000Z'),
+    adoptPrice: async () => null,
     claudeDir: 'C:/x', sinceDays: 30, scanSinceDays: 90,
   });
 }

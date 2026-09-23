@@ -51,6 +51,8 @@ interface ScanOptions {
   sinceDays?: number;
   maxPrompts?: number;
   scanVersion?: number;
+  /** Sessions relues même inchangées : un prix adopté change leur coût, pas leur fichier. */
+  forceIds?: ReadonlySet<string>;
 }
 
 interface ScanOutcome {
@@ -64,7 +66,7 @@ interface ScanOutcome {
 
 async function runIncrementalScan(deps: ScanDeps, options: ScanOptions): Promise<ScanOutcome> {
   const { engine, store, broadcast, now } = deps;
-  const { claudeDir, sinceDays = 30, maxPrompts = 100, scanVersion = SCAN_VERSION } = options;
+  const { claudeDir, sinceDays = 30, maxPrompts = 100, scanVersion = SCAN_VERSION, forceIds } = options;
 
   const startedAt = now().toISOString();
   const since = new Date(now().getTime() - sinceDays * 24 * 3600 * 1000);
@@ -74,7 +76,7 @@ async function runIncrementalScan(deps: ScanDeps, options: ScanOptions): Promise
   broadcast({ type: 'analysisScan', phase: 'start', total: refs.length, scanned: 0, skipped: 0, failed: 0 });
 
   for (const ref of refs) {
-    if (!store.needsScan(ref, scanVersion)) {
+    if (!forceIds?.has(ref.sessionId) && !store.needsScan(ref, scanVersion)) {
       outcome.skipped++;
       continue;
     }

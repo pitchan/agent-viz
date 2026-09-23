@@ -12,21 +12,7 @@ import { openStore } from '../../src/server/observatory/store.ts';
 import { SCAN_VERSION } from '../../src/server/observatory/scan-version.ts';
 import type { SessionRef } from '../../src/engine/core/discovery.ts';
 import type { SessionReport } from '../../src/engine/doctor/report/types.ts';
-
-function fakeReport(id: string, over: Record<string, unknown> = {}) {
-  return {
-    sessionId: id, projectSlug: 'F--proj', cwd: 'F:\\proj',
-    startedAt: '2026-07-01T10:00:00.000Z', endedAt: '2026-07-01T10:20:00.000Z',
-    sessionKind: 'interactive',
-    tokens: { perModel: { 'claude-opus-4-8': { in: 100, out: 50, cacheCreate: 850, cacheRead: 4000 } },
-      costUsd: 0.5, costComplete: true },
-    netTokens: 1000, events: 10, parseErrors: 0,
-    ...over,
-  } as unknown as SessionReport;
-}
-const fakeRef = (id: string, { mtime = 1000, size = 2048 } = {}) => ({
-  sessionId: id, projectSlug: 'F--proj', mainPath: `F:\\p\\${id}.jsonl`,
-  subagents: [], mtime: new Date(mtime), sizeBytes: size } as unknown as SessionRef);
+import { fakeReport, fakeRef } from '../helpers/observatory-fakes.ts';
 
 function harness(refs: SessionRef[], scan: (ref: SessionRef) => Promise<SessionReport>) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'obs-scan-'));

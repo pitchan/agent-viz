@@ -21,6 +21,7 @@ import type { Store, SessionRow } from './store.ts';
 import type { Engine } from './engine.ts';
 import type { ConfigItem, SessionKind, SessionReport } from './rules/types.ts';
 import type { PriceTable } from '../../engine/core/pricing.ts';
+import type { Adopted } from '../price-adoption.ts';
 
 // Two windows, deliberately distinct. WINDOW_DAYS is what the user can pick
 // for reading and advice; scanSinceDays (90, the widest offered) is what
@@ -33,14 +34,17 @@ interface ServiceDeps {
   store: Store;
   engine: Engine;
   collectConfig: () => Promise<ConfigItem[]>;
-  broadcast: (message: AnalysisScanMessage) => void;
+  broadcast: (message: AnalysisScanMessage | PricingAdoptedMessage) => void;
+  /** Écrit et applique le prix LiteLLM relevé pour ce modèle ; null sans dérive connue. */
+  adoptPrice: (model: string) => Promise<Adopted | null>;
   now: () => Date;
   claudeDir: string;
   sinceDays: number;
   scanSinceDays: number;
 }
 
-interface ScanDaysOptions { days?: number }
+interface PricingAdoptedMessage { type: 'pricingAdopted'; model: string }
+interface ScanDaysOptions { days?: number; forceIds?: ReadonlySet<string> }
 interface WindowOptions { days?: number; includeMachine?: boolean }
 interface SessionsOptions { project?: string; days?: number; includeMachine?: boolean }
 
@@ -60,7 +64,7 @@ type SessionListRow = Omit<SessionRow, 'reportJson'> & { projectPath: string | n
 type SessionDetail = Omit<SessionRow, 'reportJson'> & { report: SessionReport | null };
 
 function createObservatoryService(deps: ServiceDeps) {
-  const { store, engine, collectConfig, broadcast, now, claudeDir, sinceDays, scanSinceDays } = deps;
+  const { store, engine, collectConfig, broadcast, adoptPrice, now, claudeDir, sinceDays, scanSinceDays } = deps;
 
   const clampDays = (days: number | undefined): number =>
     (days !== undefined && WINDOW_DAYS.includes(days) ? days : sinceDays);
@@ -93,11 +97,11 @@ function createObservatoryService(deps: ServiceDeps) {
     return { sessions: toAnalysedSessions(toAnalysable(rows)), basis, period };
   };
 
-  return {
-    async scan({ days }: ScanDaysOptions = {}): Promise<Awaited<ReturnType<typeof runIncrementalScan>>> {
+  const service = {
+    async scan({ days, forceIds }: ScanDaysOptions = {}): Promise<Awaited<ReturnType<typeof runIncrementalScan>>> {
       const outcome = await runIncrementalScan(
         { engine, store, broadcast, now },
-        { claudeDir, sinceDays: scanSinceDays, scanVersion: SCAN_VERSION });
+        { claudeDir, sinceDays: scanSinceDays, scanVersion: SCAN_VERSION, forceIds });
 
       const takenAt = now().toISOString();
       store.replaceConfigItems(takenAt, await collectConfig());
@@ -212,7 +216,22 @@ function createObservatoryService(deps: ServiceDeps) {
     async setRecommendationStatus(id: number, status: string, reason: string | null = null): Promise<boolean> {
       return store.setRecommendationStatus(id, status, now().toISOString(), reason);
     },
+
+    // Adopter touche des coûts déjà rangés : on relit les sessions incomplètes, et pour
+    // un tarif différent celles finies depuis `from`, que leur fichier ait bougé ou non.
+    async adoptPrice(model: string): Promise<Adopted | null> {
+      const adopted = await adoptPrice(model);
+      if (adopted === null) return null;
+      const { from } = adopted;
+      const forceIds = new Set(store.listSessions({})
+        .filter(r => !r.costComplete || (from !== null && r.endedAt !== null && r.endedAt >= from))
+        .map(r => r.id));
+      broadcast({ type: 'pricingAdopted', model });
+      await service.scan({ forceIds });
+      return adopted;
+    },
   };
+  return service;
 }
 
 export { createObservatoryService, WINDOW_DAYS };
