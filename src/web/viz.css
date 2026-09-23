@@ -569,8 +569,26 @@ canvas { display: block; width: 100%; height: 100%; }
   color: #100305; background: var(--error); border-color: var(--error); font-weight: 600;
 }
 .obs-btn--icon { min-width: 26px; padding: 4px 8px; font-size: 15px; line-height: 1; }
+/* Meme raison que .obs-btn : un <select> sans classe retombe sur le widget natif
+   de Windows — aplat blanc, fleche grise — au milieu d'un panneau sombre. La
+   fleche est redessinee ici parce que `appearance: none` retire celle de l'OS. */
+.obs-select {
+  appearance: none;
+  min-height: 26px; max-width: 320px; padding: 4px 28px 4px 10px;
+  font-family: inherit; font-size: 11px; line-height: 1.2;
+  color: var(--text-primary);
+  background-color: rgba(102, 204, 255, 0.07);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2366ccff' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center; background-size: 9px 6px;
+  border: 1px solid rgba(102, 204, 255, 0.28);
+  border-radius: 6px; cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+}
+.obs-select:hover { background-color: rgba(102, 204, 255, 0.16); border-color: var(--holo-dim); color: var(--holo-bright); }
+/* La liste ouverte reste dessinee par l'OS : ces deux proprietes-la seules la suivent. */
+.obs-select option { background: var(--void-light); color: var(--text-primary); }
 /* Le clavier doit VOIR ou il est. */
-.obs-btn:focus-visible, .period-btn:focus-visible,
+.obs-btn:focus-visible, .period-btn:focus-visible, .obs-select:focus-visible,
 .failure-cmd:focus-visible, .failure-group-head:focus-visible {
   outline: 2px solid var(--holo-bright); outline-offset: 2px;
 }
@@ -587,7 +605,7 @@ canvas { display: block; width: 100%; height: 100%; }
    min-height: 0 lets a flex child shrink below its content height; without
    it the zone never scrolls. */
 #advisor-header, #analysis-header, #pricing-header, #skills-header,
-#advisor-period, #analysis-controls, #pricing-period, #skills-period,
+#advisor-period, #analysis-controls, #pricing-period, #skills-period, #skills-project,
 #advisor-summary, #analysis-summary, #pricing-summary, #skills-summary,
 #advisor-footer { flex-shrink: 0; }
 /* Conseils a DEUX blocs de contenu — les pannes puis les recommandations — et
@@ -690,6 +708,8 @@ canvas { display: block; width: 100%; height: 100%; }
 .skills-unused { margin: 10px 0; }
 .skills-unused summary { cursor: pointer; font-size: 11px; color: var(--text-dim); }
 .skills-unused td { color: var(--text-muted); }
+#skills-project { display: flex; align-items: center; gap: 8px; margin: 6px 0 2px; }
+.obs-field-label { font-size: 11px; color: var(--text-dim); }
 
 /* Bloc « Pannes » — en tete du tiroir Conseils, la seule surface du produit
    ou une panne survit a la session qui l'a produite. */

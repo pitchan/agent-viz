@@ -172,3 +172,18 @@ test('fetchSkillUsage forwards the window; no window means no query string', asy
     restore();
   }
 });
+
+test('fetchSkillUsage ajoute le projet à la requête, et rien quand il est absent', async () => {
+  // Arrange
+  const { calls, restore } = stubFetch({ skills: [] });
+  try {
+    // Act
+    await fetchSkillUsage({ days: 30, project: 'f--DEV-agent-viz' });
+    await fetchSkillUsage({ days: 30 });
+    // Assert
+    expect(calls[0]!.url).toBe('/analysis/skills?days=30&project=f--DEV-agent-viz');
+    expect(calls[1]!.url).toBe('/analysis/skills?days=30');
+  } finally {
+    restore();
+  }
+});

@@ -21,6 +21,7 @@ export interface ObservatoryState {
   modelCosts: unknown;
   pricing: unknown;
   skillUsage: unknown;
+  skillsProject: string | null;
 }
 
 const EMPTY = (): ObservatoryState => ({
@@ -37,6 +38,7 @@ const EMPTY = (): ObservatoryState => ({
   modelCosts: null,
   pricing: null,
   skillUsage: null,
+  skillsProject: null,
 });
 
 // Le client HTTP tel que les vues l'importent (`import * as api from './api.ts'`) —
@@ -89,6 +91,10 @@ async function run(work: () => Promise<Partial<ObservatoryState>>) {
 export const setPeriodDays = (days: number) => patch({ periodDays: days });
 export const setIncludeMachine = (flag: boolean) => patch({ includeMachine: flag });
 
+// Le projet du panneau Skills, à lui seul : aucun autre panneau ne filtre par
+// projet, et la fenêtre reste, elle, commune à tous.
+export const setSkillsProject = (project: string | null) => patch({ skillsProject: project });
+
 export const loadAdvisor = (api: ApiClient) => run(async () => {
   const { periodDays, includeMachine } = getState();
   const [summary, recommendations] = await Promise.all([
@@ -122,9 +128,16 @@ export const loadPricing = (api: ApiClient) => run(async () => {
   return { modelCosts, pricing };
 });
 
+// Le panneau Skills ne lit jamais au-delà : Claude Code efface les transcripts
+// après 30 jours (cleanupPeriodDays), et sans transcript une session n'a aucun
+// fait de skills. Les autres panneaux gardent les trois fenêtres.
+export const SKILLS_MAX_DAYS = 30;
+
 export const loadSkills = (api: ApiClient) => run(async () => {
-  const { periodDays, includeMachine } = getState();
-  return { skillUsage: await api.fetchSkillUsage({ days: periodDays, includeMachine }) };
+  const { periodDays, includeMachine, skillsProject } = getState();
+  return { skillUsage: await api.fetchSkillUsage({
+    days: Math.min(periodDays, SKILLS_MAX_DAYS), includeMachine, project: skillsProject ?? undefined,
+  }) };
 });
 
 // After a status change the server decides what the list becomes — the page

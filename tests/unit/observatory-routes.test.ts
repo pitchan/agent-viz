@@ -40,8 +40,9 @@ const SERVICE = {
     unknownModels: [], excludedPendingRescan: 0, basis: null, period: null,
   }),
   skillUsage: async () => ({
-    skills: [{ skill: 'pptx', offeredSessions: 2, usedSessions: 1, usedShare: 0.5, calls: 1, netTokens: 10, usd: 1, shareOfCost: 0.5 }],
+    skills: [{ skill: 'pptx', offeredSessions: 2, usedSessions: 1, usedShare: 0.5 }],
     sessionsCounted: 2, excludedPendingRescan: 0, basis: null, period: null,
+    projects: [{ project: 'F--dvf', label: 'F:/DEV/dvf', sessions: 2 }],
   }),
   pricing: async () => ({
     priceTable: { source: 'netgain-table-embarquee', unit: 'usd-par-jeton', entries: [], zeroCost: [] },
@@ -270,7 +271,7 @@ test('GET /analysis/models forwards days and includeMachine to the service', asy
   expect(got).toEqual({ days: 7, includeMachine: true });
 });
 
-test('GET /analysis/skills returns the per-skill usage and names its price source', async () => {
+test('GET /analysis/skills returns the per-skill usage, with no price source: it carries no cost', async () => {
   // Arrange
   const call = router();
   // Act
@@ -279,7 +280,7 @@ test('GET /analysis/skills returns the per-skill usage and names its price sourc
   expect(res.statusCode).toBe(200);
   const body = JSON.parse(res.body);
   expect(body.skills[0].skill).toBe('pptx');
-  expect(body.priceSource).toBe('netgain-table-embarquee');
+  expect(body).not.toHaveProperty('priceSource');
 });
 
 test('GET /analysis/skills forwards days and includeMachine to the service', async () => {
@@ -290,6 +291,16 @@ test('GET /analysis/skills forwards days and includeMachine to the service', asy
   await router(spy)('GET', '/analysis/skills?days=7&includeMachine=1');
   // Assert
   expect(got).toEqual({ days: 7, includeMachine: true });
+});
+
+test('GET /analysis/skills forwards the project filter to the service', async () => {
+  // Arrange
+  let got;
+  const spy = { ...SERVICE, skillUsage: async (opts: any) => { got = opts; return {}; } } as unknown as Service;
+  // Act
+  await router(spy)('GET', '/analysis/skills?project=F--dvf');
+  // Assert
+  expect(got).toEqual({ days: undefined, includeMachine: false, project: 'F--dvf' });
 });
 
 test('GET /pricing returns the tariff sheet, the provenance and the versions', async () => {

@@ -1,69 +1,49 @@
 'use strict';
-// Per-skill usage and attributed cost for the « Skills » panel — the twin of
-// model-costs.ts. A skill that served was available: offered is the union of
-// listed, called and attributed. Dollars come from report.tokens.costBySkill.
+// Usage par skill pour le panneau « Skills » : usage seul. Un skill qui a servi
+// était forcément proposé, donc proposé = listés ∪ utilisés, et utilisé =
+// appelés ∪ marqués par Claude Code.
 
-import { netOf } from './session-mapper.ts';
-import type { Session, SkillCost, SkillFacts, TokenBucket } from './rules/types.ts';
+import type { Session, SkillFacts } from './rules/types.ts';
+import { projectResolver } from './project-label.ts';
 
-type SkillSession = Session & {
-  report: Session['report'] & {
-    skills: SkillFacts;
-    tokens: Session['report']['tokens'] & { costBySkill: Record<string, SkillCost> };
-  };
-};
-const hasSkills = (s: Session): s is SkillSession =>
-  s.report.skills !== undefined && s.report.tokens.costBySkill !== undefined;
-
-interface SkillAgg {
-  skill: string;
-  offeredSessions: number;
-  usedSessions: number;
-  calls: number;
-  bucket: TokenBucket;
-  usd: number | null;
-}
+type SkillSession = Session & { report: Session['report'] & { skills: SkillFacts } };
+const hasSkills = (s: Session): s is SkillSession => s.report.skills !== undefined;
 
 interface SkillUsageRow {
   skill: string;
   offeredSessions: number;
   usedSessions: number;
   usedShare: number;
-  calls: number;
-  netTokens: number;
-  usd: number | null;
-  shareOfCost: number | null;
+}
+
+interface ProjectOption {
+  project: string;
+  label: string;
+  sessions: number;
 }
 
 interface SkillUsageResult {
   skills: SkillUsageRow[];
   sessionsCounted: number;
   excludedPendingRescan: number;
+  projects: ProjectOption[];
 }
 
-const emptyBucket = (): TokenBucket =>
-  ({ in: 0, out: 0, cacheCreate: 0, cacheRead: 0, cacheCreate1h: 0, cacheCreate5m: 0 });
+type SkillCount = Omit<SkillUsageRow, 'usedShare'>;
 
-function aggregate(sessions: SkillSession[]): SkillAgg[] {
-  const bySkill = new Map<string, SkillAgg>();
+function count(sessions: SkillSession[]): SkillCount[] {
+  const bySkill = new Map<string, SkillCount>();
   for (const s of sessions) {
-    const { listed, calls } = s.report.skills;
-    const cost = s.report.tokens.costBySkill;
-    const used = new Set([...Object.keys(calls), ...Object.keys(cost)]);
+    const { listed, calls, attributed } = s.report.skills;
+    const used = new Set([...Object.keys(calls), ...attributed]);
     for (const skill of new Set([...listed, ...used])) {
-      let agg = bySkill.get(skill);
-      if (!agg) {
-        agg = { skill, offeredSessions: 0, usedSessions: 0, calls: 0, bucket: emptyBucket(), usd: 0 };
-        bySkill.set(skill, agg);
+      let c = bySkill.get(skill);
+      if (!c) {
+        c = { skill, offeredSessions: 0, usedSessions: 0 };
+        bySkill.set(skill, c);
       }
-      agg.offeredSessions += 1;
-      if (used.has(skill)) agg.usedSessions += 1;
-      agg.calls += calls[skill] ?? 0;
-      const c = cost[skill];
-      if (c) {
-        for (const k of Object.keys(agg.bucket) as (keyof TokenBucket)[]) agg.bucket[k] += c.tokens[k];
-        agg.usd = agg.usd === null || c.usd === null ? null : agg.usd + c.usd;
-      }
+      c.offeredSessions += 1;
+      if (used.has(skill)) c.usedSessions += 1;
     }
   }
   return [...bySkill.values()];
@@ -71,33 +51,43 @@ function aggregate(sessions: SkillSession[]): SkillAgg[] {
 
 const byName = (a: { skill: string }, b: { skill: string }) => a.skill.localeCompare(b.skill);
 
-function computeSkillUsage(sessions: Session[]): SkillUsageResult {
-  const ready = sessions.filter(hasSkills);
-  const totalCost = ready.reduce((acc, s) => acc + s.costUsd, 0);
-  const aggs = aggregate(ready);
+// Le menu ne promet que ce que le tableau peut montrer : il compte les sessions
+// LUES. Le projet choisi y reste même à zéro, sinon une fenêtre plus courte
+// ferait disparaître la ligne sélectionnée sous le curseur. Le libellé, lui,
+// vient du résolveur bâti sur TOUTE la fenêtre (project-label.ts) : il ne
+// dépend pas de l'ordre des sessions et rend le slug plutôt qu'un demi-vrai
+// quand deux dossiers réels s'aplatissent sur le même slug.
+function projectsOf(all: Session[], ready: SkillSession[], selected: string | undefined): ProjectOption[] {
+  const pathOf = projectResolver(all);
+  const byProject = new Map<string, ProjectOption>();
+  for (const s of ready) {
+    const found = byProject.get(s.project);
+    if (found) { found.sessions += 1; continue; }
+    byProject.set(s.project, { project: s.project, label: pathOf(s.project), sessions: 1 });
+  }
+  const list = [...byProject.values()].sort((a, b) => b.sessions - a.sessions || a.label.localeCompare(b.label));
+  if (selected !== undefined && !byProject.has(selected)) list.push({ project: selected, label: pathOf(selected), sessions: 0 });
+  return list;
+}
 
-  const rows: SkillUsageRow[] = aggs.map(a => ({
-    skill: a.skill,
-    offeredSessions: a.offeredSessions,
-    usedSessions: a.usedSessions,
-    usedShare: a.usedSessions / a.offeredSessions,
-    calls: a.calls,
-    netTokens: netOf(a.bucket),
-    usd: a.usd,
-    // An unknown tariff has no cost share — null, never a fake 0.
-    shareOfCost: a.usd !== null && totalCost > 0 ? a.usd / totalCost : null,
-  }));
-  // The panel reads as a usage ranking, unused skills included: at equal share
-  // the skill seen in more sessions weighs more — for the 0 % rows, the most offered.
+function computeSkillUsage(sessions: Session[], project?: string): SkillUsageResult {
+  const ready = sessions.filter(hasSkills);
+  const scope = project === undefined ? ready : ready.filter(s => s.project === project);
+  const inScope = project === undefined ? sessions : sessions.filter(s => s.project === project);
+  const rows: SkillUsageRow[] = count(scope).map(c => ({ ...c, usedShare: c.usedSessions / c.offeredSessions }));
+  // Le panneau se lit comme un classement d'usage, skills jamais utilisés compris :
+  // à pourcentage égal, le skill vu dans le plus de sessions pèse plus lourd — et
+  // pour les lignes à 0 %, celui qui a été le plus proposé.
   rows.sort((a, b) => b.usedShare - a.usedShare || b.usedSessions - a.usedSessions
     || b.offeredSessions - a.offeredSessions || byName(a, b));
 
   return {
     skills: rows,
-    sessionsCounted: ready.length,
-    excludedPendingRescan: sessions.length - ready.length,
+    sessionsCounted: scope.length,
+    excludedPendingRescan: inScope.length - scope.length,
+    projects: projectsOf(sessions, ready, project),
   };
 }
 
 export { computeSkillUsage };
-export type { SkillUsageRow, SkillUsageResult };
+export type { ProjectOption, SkillUsageRow, SkillUsageResult };

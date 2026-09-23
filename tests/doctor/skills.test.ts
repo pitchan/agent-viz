@@ -51,7 +51,19 @@ describe('SkillsAggregator', () => {
     // Act
     agg.addToolUse(skillCall('tu1', 'pptx'));
     // Assert
-    expect(agg.result()).toEqual({ listed: [], calls: { pptx: 1 } });
+    expect(agg.result()).toEqual({ listed: [], calls: { pptx: 1 }, attributed: [] });
+  });
+
+  test('les skills que Claude Code marque sur les messages sont réunis, sans doublon, triés', () => {
+    // Arrange
+    const agg = new SkillsAggregator();
+    // Act
+    agg.addAssistant({ attributionSkill: 'pptx' });
+    agg.addAssistant({ attributionSkill: 'pptx' });
+    agg.addAssistant({ attributionSkill: 'docx' });
+    agg.addAssistant({});
+    // Assert
+    expect(agg.result().attributed).toEqual(['docx', 'pptx']);
   });
 });
 
@@ -61,7 +73,7 @@ describe('scanSession — les faits de skills', () => {
   const claudeDir = mkdtempSync(path.join(tmpdir(), 'netgain-skills-'));
   afterAll(() => rmSync(claudeDir, { recursive: true, force: true }));
 
-  test("listing, appel, et messages attribués du principal et d'un sous-agent", async () => {
+  test("listing, appel, et skill marqué dans le principal et un sous-agent — aucun coût par skill", async () => {
     // Arrange
     writeSessionTree(claudeDir, 'F--skills', 'sess-skills', [
       skillListingLine(['pptx', 'docx']),
@@ -79,7 +91,7 @@ describe('scanSession — les faits de skills', () => {
     // Act
     const r = await scanSession(refs[0]!, 100);
     // Assert
-    expect(r.skills).toEqual({ listed: ['docx', 'pptx'], calls: { pptx: 1 } });
-    expect(r.tokens.costBySkill['pptx']?.tokens.in).toBe(20);
+    expect(r.skills).toEqual({ listed: ['docx', 'pptx'], calls: { pptx: 1 }, attributed: ['pptx'] });
+    expect(r.tokens).not.toHaveProperty('costBySkill');
   });
 });

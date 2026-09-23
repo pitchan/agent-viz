@@ -1,12 +1,10 @@
-// skills-view.ts — « Skills » page: an indicative reading of how often each
-// skill served when it was offered, with the cost Claude Code attributes to it.
-//
-// Rendering only, on the pricing-view.ts model: state comes from store.ts,
-// data from api.ts.
+// skills-view.ts — « Skills » page: how often each skill served when it was offered.
+// Usage only, never a cost: Claude Code marks one skill per message, so a turn that
+// launches two skills, or a skill launched by a sub-agent, has no separable cost.
 
 import * as api from './api.ts';
-import { getState, subscribe, loadSkills } from './store.ts';
-import { formatUsdExact, basisLabel, periodHeader, type Period, type SummaryBasis } from './format.ts';
+import { getState, subscribe, loadSkills, setSkillsProject, SKILLS_MAX_DAYS } from './store.ts';
+import { basisLabel, periodHeader, type Period, type SummaryBasis } from './format.ts';
 import { initPeriodSelector } from './period-selector.ts';
 
 // Les champs de GET /analysis/skills que ce panneau lit (SkillUsageRow,
@@ -16,23 +14,24 @@ interface SkillUsageRow {
   offeredSessions: number;
   usedSessions: number;
   usedShare: number;
-  usd: number | null;
+}
+
+interface ProjectOption {
+  project: string;
+  label: string;
+  sessions: number;
 }
 
 interface SkillUsagePayload {
   skills: SkillUsageRow[];
   sessionsCounted: number;
   excludedPendingRescan: number;
+  projects: ProjectOption[];
   period?: Period | null;
   basis?: SummaryBasis | null;
 }
 
-const HEADERS = ['Skill', 'Usage', 'Coût attribué'];
-
-// La définition affichée sous le tableau : c'est l'attribution de Claude Code,
-// reprise telle quelle, avec ce qu'elle ne couvre pas.
-const COST_DEFINITION = 'Coût attribué : le tour où le skill est lancé et les sous-agents de ce tour, '
-  + 'tels que Claude Code les marque (attributionSkill). Les tours suivants ne lui sont pas comptés.';
+const HEADERS = ['Skill', 'Usage'];
 
 // « 0 % » est réservé au skill jamais utilisé : un skill qui a servi et qui
 // s'arrondirait à 0 se lit « < 1 % ».
@@ -43,12 +42,7 @@ export function usageCellOf(row: Pick<SkillUsageRow, 'usedShare'>) {
 }
 
 export function usageTitleOf(row: Pick<SkillUsageRow, 'usedSessions' | 'offeredSessions'>) {
-  return `${row.usedSessions} sessions sur ${row.offeredSessions} où il était proposé`;
-}
-
-export function skillCostCellOf(row: Pick<SkillUsageRow, 'usedSessions' | 'usd'>) {
-  if (row.usedSessions === 0) return '—';
-  return row.usd === null ? 'tarif inconnu' : formatUsdExact(row.usd);
+  return `${row.usedSessions} session(s) sur ${row.offeredSessions} où il était proposé`;
 }
 
 export function splitByUse<T extends Pick<SkillUsageRow, 'usedSessions'>>(rows: T[]) {
@@ -57,6 +51,32 @@ export function splitByUse<T extends Pick<SkillUsageRow, 'usedSessions'>>(rows: 
 
 export function unusedTitle(count: number) {
   return `Jamais utilisés (${count})`;
+}
+
+// Le fait certain, et lui seul : ces rapports n'ont pas les faits de skills. Une
+// ré-analyse les rendrait — encore faut-il que le transcript existe toujours, et
+// Claude Code l'efface après 30 jours. Rien ici ne promet donc qu'elle aura lieu.
+export function excludedNote(count: number) {
+  return `${count} session(s) de la période n'ont pas de données Skills `
+    + '(analysées par une version antérieure) — exclues du tableau.';
+}
+
+// Le nombre de sessions lues colle au libellé : un projet à 3 sessions ne se lit
+// pas comme un projet à 72, et le pourcentage du tableau en dépend.
+export function projectOptionsOf(projects: ProjectOption[], selected: string | null) {
+  return [
+    { value: '', label: 'Tous les projets', selected: selected === null },
+    ...projects.map(p => ({ value: p.project, label: `${p.label} (${p.sessions})`, selected: p.project === selected })),
+  ];
+}
+
+// Le nombre lu doit dire ce qu'il compte : sans ça, il se lit à côté de la base
+// de la fenêtre (qui décrit toute la période, pas le projet choisi) et invite
+// une soustraction fausse entre les deux.
+export function readCountLabel(sessionsCounted: number, project: string | null) {
+  return project === null
+    ? `${sessionsCounted} session(s) lue(s)`
+    : `${sessionsCounted} session(s) lue(s) pour ce projet`;
 }
 
 function headerRow() {
@@ -75,7 +95,7 @@ function buildTable(rows: SkillUsageRow[]) {
   table.appendChild(headerRow());
   for (const row of rows) {
     const tr = document.createElement('tr');
-    const cells = [row.skill, usageCellOf(row), skillCostCellOf(row)].map(text => {
+    const cells = [row.skill, usageCellOf(row)].map(text => {
       const td = document.createElement('td');
       td.textContent = text;
       return td;
@@ -106,6 +126,30 @@ function note(text: string) {
   return p;
 }
 
+function renderProjects(usage: SkillUsagePayload) {
+  const node = document.getElementById('skills-project')!;
+  node.textContent = '';
+  const select = document.createElement('select');
+  select.id = 'skills-project-select';
+  select.className = 'obs-select';
+  const label = document.createElement('label');
+  label.className = 'obs-field-label';
+  label.htmlFor = select.id;
+  label.textContent = 'Projet';
+  for (const option of projectOptionsOf(usage.projects, getState().skillsProject)) {
+    const el = document.createElement('option');
+    el.value = option.value;
+    el.textContent = option.label;
+    el.selected = option.selected;
+    select.appendChild(el);
+  }
+  select.addEventListener('change', () => {
+    setSkillsProject(select.value === '' ? null : select.value);
+    loadSkills(api);
+  });
+  node.append(label, select);
+}
+
 function render() {
   const state = getState();
   const summaryEl = document.getElementById('skills-summary')!;
@@ -120,17 +164,17 @@ function render() {
   summaryEl.textContent = [
     usage.period ? periodHeader(usage.period) : '',
     usage.basis ? basisLabel(usage.basis) : '',
-    `${usage.sessionsCounted} session(s) lue(s)`,
+    readCountLabel(usage.sessionsCounted, state.skillsProject),
   ].filter(Boolean).join(' — ');
+  renderProjects(usage);
 
   const wasOpen = body.querySelector<HTMLDetailsElement>('details.skills-unused')?.open ?? false;
   const { used, unused } = splitByUse(usage.skills);
   body.textContent = '';
   body.appendChild(buildTable(used));
   if (unused.length > 0) body.appendChild(unusedBlock(unused, wasOpen));
-  body.appendChild(note(COST_DEFINITION));
   if (usage.excludedPendingRescan > 0) {
-    body.appendChild(note(`${usage.excludedPendingRescan} session(s) en attente de ré-analyse — exclues du tableau, jamais en silence.`));
+    body.appendChild(note(excludedNote(usage.excludedPendingRescan)));
   }
 }
 
@@ -138,7 +182,7 @@ export function initSkills() {
   const panel = document.getElementById('skills-overlay')!;
   subscribe(() => { if (panel.classList.contains('visible')) render(); });
 
-  initPeriodSelector(document.getElementById('skills-period')!, () => loadSkills(api));
+  initPeriodSelector(document.getElementById('skills-period')!, () => loadSkills(api), SKILLS_MAX_DAYS);
 
   document.getElementById('btn-skills')!.addEventListener('click', () => {
     panel.classList.toggle('visible');

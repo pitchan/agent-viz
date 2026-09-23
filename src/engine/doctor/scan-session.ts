@@ -55,6 +55,7 @@ export async function scanSession(ref: SessionRef, maxPrompts: number): Promise<
             tokens.addAssistant(evt, agentKey);
             context.addAssistant(evt, agentKey);
             verification.addAssistant(evt, agentKey);
+            skills.addAssistant(evt);
             for (const tu of evt.toolUses) {
               toolResults.registerToolUse(tu);
               reads.registerToolUse(tu);

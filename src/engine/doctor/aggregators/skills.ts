@@ -1,14 +1,18 @@
 import type { NormalizedEvent, ToolUseRef } from '../../core/events.ts';
 
 type SkillListingEvent = Extract<NormalizedEvent, { kind: 'skill_listing' }>;
+type AssistantEvent = Extract<NormalizedEvent, { kind: 'assistant' }>;
 
-/** Faits bruts : ce que les listings proposaient, et ce qui a été appelé. L'Observatoire
- *  en déduit « proposé » et « utilisé » ; le moteur n'interprète pas. */
+/** Faits bruts : ce que les listings proposaient, ce qui a été appelé, et ce que Claude Code
+ *  a marqué. L'Observatoire en déduit « proposé » et « utilisé » ; le moteur n'interprète pas. */
 export interface SkillStats {
   /** Noms réunis de tous les listings de la session, triés. */
   listed: string[];
   /** Appels de l'outil Skill par nom, sous-agents compris. */
   calls: Record<string, number>;
+  /** Skills marqués par Claude Code (attributionSkill) sur au moins un message, triés :
+   *  un skill lancé par une commande slash n'a aucun appel de l'outil Skill. */
+  attributed: string[];
 }
 
 function skillNameOf(input: unknown): string | null {
@@ -22,9 +26,14 @@ export class SkillsAggregator {
   private readonly listed = new Set<string>();
   private readonly seen = new Set<string>();
   private readonly calls: Record<string, number> = {};
+  private readonly attributed = new Set<string>();
 
   addListing(evt: SkillListingEvent): void {
     for (const name of evt.names) this.listed.add(name);
+  }
+
+  addAssistant(evt: Pick<AssistantEvent, 'attributionSkill'>): void {
+    if (evt.attributionSkill !== undefined) this.attributed.add(evt.attributionSkill);
   }
 
   addToolUse(tu: ToolUseRef): void {
@@ -36,6 +45,6 @@ export class SkillsAggregator {
   }
 
   result(): SkillStats {
-    return { listed: [...this.listed].sort(), calls: this.calls };
+    return { listed: [...this.listed].sort(), calls: this.calls, attributed: [...this.attributed].sort() };
   }
 }

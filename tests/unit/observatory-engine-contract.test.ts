@@ -143,7 +143,7 @@ test('the announced price source IS the engine table source — one voice', () =
   expect(engine.priceTable().source).toBe(PRICE_SOURCE);
 });
 
-test('the SessionReport carries the skill facts and the per-skill cost', async () => {
+test('the SessionReport carries the skill facts, and no per-skill cost', async () => {
   // Arrange
   const { discoverSessions, scanSession } = engine;
   const refs = await discoverSessions(FIXTURE_CLAUDE_DIR, {});
@@ -153,5 +153,6 @@ test('the SessionReport carries the skill facts and the per-skill cost', async (
   // Assert
   expect(Array.isArray(r.skills.listed)).toBe(true);
   expect(typeof r.skills.calls).toBe('object');
-  expect(typeof r.tokens.costBySkill).toBe('object');
+  expect(Array.isArray(r.skills.attributed)).toBe(true);
+  expect(r.tokens).not.toHaveProperty('costBySkill');
 });

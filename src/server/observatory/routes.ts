@@ -75,8 +75,11 @@ function createObservatoryRoutes(getService: () => Service): Route[] {
     {
       method: 'GET', path: '/analysis/skills',
       handler: bind(async (_req, res, url, service) => {
-        const usage = await service.skillUsage({ days: daysOf(url), includeMachine: includeMachineOf(url) });
-        sendJson(res, 200, { ...usage, priceSource: PRICE_SOURCE });
+        sendJson(res, 200, await service.skillUsage({
+          days: daysOf(url),
+          includeMachine: includeMachineOf(url),
+          project: url.searchParams.get('project') || undefined,
+        }));
       }),
     },
     {

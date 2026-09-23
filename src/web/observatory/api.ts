@@ -84,8 +84,10 @@ export function fetchModelCosts(opts: WindowOpts = {}) {
   return getJson(`/analysis/models${q ? `?${q}` : ''}`);
 }
 
-export function fetchSkillUsage(opts: WindowOpts = {}) {
-  const q = windowParams(opts).toString();
+export function fetchSkillUsage({ project, ...opts }: WindowOpts & { project?: string } = {}) {
+  const params = windowParams(opts);
+  if (project) params.set('project', project);
+  const q = params.toString();
   return getJson(`/analysis/skills${q ? `?${q}` : ''}`);
 }
 

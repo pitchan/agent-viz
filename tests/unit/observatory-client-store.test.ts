@@ -2,7 +2,7 @@
 // so no server and no DOM are involved.
 import { expect, test } from 'vitest';
 import { getState, subscribe, loadAdvisor, loadAnalysis, loadSession, changeStatus, applyScanEvent, resetStore,
-  setPeriodDays, setIncludeMachine, loadPricing, loadSkills } from '../../src/web/observatory/store.ts';
+  setPeriodDays, setIncludeMachine, loadPricing, loadSkills, setSkillsProject } from '../../src/web/observatory/store.ts';
 import type { WindowOpts } from '../../src/web/observatory/api.ts';
 
 // Le client HTTP tel que les vues l'importent — même définition que celle,
@@ -162,4 +162,48 @@ test('loadSkills loads the per-skill usage on the current window', async () => {
   // Assert
   expect(getState().skillUsage).toEqual({ skills: [] });
   expect(calls[0]).toEqual({ days: 30, includeMachine: false });
+});
+
+test('loadSkills ne lit jamais au-delà de 30 jours, même quand la période partagée vaut 90', async () => {
+  // Arrange
+  resetStore();
+  const calls: WindowOpts[] = [];
+  const api = {
+    fetchSkillUsage: async (opts: WindowOpts) => { calls.push(opts); return { skills: [] }; },
+  } as unknown as ApiClient;
+  setPeriodDays(90);
+  // Act
+  await loadSkills(api);
+  // Assert
+  expect(calls[0]!.days).toBe(30);
+});
+
+test('loadSkills suit une période partagée plus courte que le plafond', async () => {
+  // Arrange
+  resetStore();
+  const calls: WindowOpts[] = [];
+  const api = {
+    fetchSkillUsage: async (opts: WindowOpts) => { calls.push(opts); return { skills: [] }; },
+  } as unknown as ApiClient;
+  setPeriodDays(7);
+  // Act
+  await loadSkills(api);
+  // Assert
+  expect(calls[0]!.days).toBe(7);
+});
+
+test('loadSkills envoie le projet choisi, et rien tant que tous les projets sont demandés', async () => {
+  // Arrange
+  resetStore();
+  const calls: any[] = [];
+  const api = {
+    fetchSkillUsage: async (opts: any) => { calls.push(opts); return { skills: [] }; },
+  } as unknown as ApiClient;
+  // Act
+  await loadSkills(api);
+  setSkillsProject('f--DEV-agent-viz');
+  await loadSkills(api);
+  // Assert
+  expect(calls[0]).toEqual({ days: 30, includeMachine: false, project: undefined });
+  expect(calls[1]!.project).toBe('f--DEV-agent-viz');
 });

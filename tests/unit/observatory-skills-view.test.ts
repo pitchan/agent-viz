@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { skillCostCellOf, splitByUse, unusedTitle, usageCellOf, usageTitleOf } from '../../src/web/observatory/skills-view.ts';
+import { excludedNote, projectOptionsOf, readCountLabel, splitByUse, unusedTitle, usageCellOf, usageTitleOf } from '../../src/web/observatory/skills-view.ts';
 
 test("la cellule d'usage montre le pourcentage arrondi à l'unité", () => {
   expect(usageCellOf({ usedShare: 34 / 103 })).toBe('33 %');
@@ -14,19 +14,7 @@ test('un skill jamais utilisé se lit « 0 % »', () => {
 });
 
 test("l'infobulle d'usage garde le décompte des sessions", () => {
-  expect(usageTitleOf({ usedSessions: 34, offeredSessions: 103 })).toBe('34 sessions sur 103 où il était proposé');
-});
-
-test('un coût inconnu se lit « tarif inconnu », jamais 0', () => {
-  expect(skillCostCellOf({ usedSessions: 1, usd: null })).toBe('tarif inconnu');
-});
-
-test('un coût connu passe par le format monétaire du panneau des tarifs', () => {
-  expect(skillCostCellOf({ usedSessions: 1, usd: 0.001 })).toBe('< 0,01 $');
-});
-
-test("un skill jamais utilisé n'a rien d'attribué : « — »", () => {
-  expect(skillCostCellOf({ usedSessions: 0, usd: 0 })).toBe('—');
+  expect(usageTitleOf({ usedSessions: 34, offeredSessions: 103 })).toBe('34 session(s) sur 103 où il était proposé');
 });
 
 test('les skills jamais utilisés sont séparés des autres, chacun gardant son ordre', () => {
@@ -43,4 +31,52 @@ test('les skills jamais utilisés sont séparés des autres, chacun gardant son 
 
 test('le titre du bloc à déplier porte le nombre de skills jamais utilisés', () => {
   expect(unusedTitle(70)).toBe('Jamais utilisés (70)');
+});
+
+test("la note des sessions écartées ne promet aucune ré-analyse : elle ne dit que le fait certain", () => {
+  expect(excludedNote(3)).toBe(
+    "3 session(s) de la période n'ont pas de données Skills (analysées par une version antérieure) — exclues du tableau.");
+});
+
+test('le menu des projets ouvre sur « Tous les projets », puis les projets tels que le serveur les classe', () => {
+  // Arrange
+  const projects = [
+    { project: 'F--a', label: 'F:/a', sessions: 72 },
+    { project: 'F--b', label: 'F:/b', sessions: 3 },
+  ];
+  // Act
+  const options = projectOptionsOf(projects, 'F--b');
+  // Assert
+  expect(options).toEqual([
+    { value: '', label: 'Tous les projets', selected: false },
+    { value: 'F--a', label: 'F:/a (72)', selected: false },
+    { value: 'F--b', label: 'F:/b (3)', selected: true },
+  ]);
+});
+
+test('sans projet choisi, « Tous les projets » est la ligne retenue', () => {
+  // Arrange
+  const projects = [{ project: 'F--a', label: 'F:/a', sessions: 2 }];
+  // Act
+  const options = projectOptionsOf(projects, null);
+  // Assert
+  expect(options[0]).toEqual({ value: '', label: 'Tous les projets', selected: true });
+});
+
+test('sans projet choisi, le décompte lu ne mentionne pas de projet', () => {
+  // Arrange
+  const sessionsCounted = 8;
+  // Act
+  const label = readCountLabel(sessionsCounted, null);
+  // Assert
+  expect(label).toBe('8 session(s) lue(s)');
+});
+
+test('un projet choisi, le décompte lu précise qu’il ne porte que sur ce projet', () => {
+  // Arrange
+  const sessionsCounted = 3;
+  // Act
+  const label = readCountLabel(sessionsCounted, 'F--proj');
+  // Assert
+  expect(label).toBe('3 session(s) lue(s) pour ce projet');
 });

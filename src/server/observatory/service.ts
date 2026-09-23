@@ -147,10 +147,10 @@ function createObservatoryService(deps: ServiceDeps) {
     },
 
     async skillUsage(
-      opts: WindowOptions = {},
+      { project, ...opts }: WindowOptions & { project?: string } = {},
     ): Promise<ReturnType<typeof computeSkillUsage> & { basis: WindowBasis; period: WindowPeriod }> {
       const { sessions, basis, period } = readWindow(opts);
-      return { ...computeSkillUsage(sessions), basis, period };
+      return { ...computeSkillUsage(sessions, project), basis, period };
     },
 
     // Tariff sheet + provenance: independent of the window — they answer

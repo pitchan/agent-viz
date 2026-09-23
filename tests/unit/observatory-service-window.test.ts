@@ -173,3 +173,17 @@ test('skillUsage counts a stored row without skill facts as pending rescan', asy
   // Assert
   expect(out).toMatchObject({ sessionsCounted: 0, excludedPendingRescan: 1 });
 });
+
+test('skillUsage ne garde que les sessions du projet demandé', async () => {
+  // Arrange — deux sessions lues, deux projets
+  const withSkills = (id: string, project: string) => ({
+    ...HUMAN_ROW, id, project,
+    reportJson: JSON.stringify({ ...R1_REPORT, skills: { listed: ['pptx'], calls: { pptx: 1 }, attributed: [] } }),
+  } as unknown as SessionRow);
+  const deps = fakeDeps({ rows: [withSkills('s1', 'F--a'), withSkills('s2', 'F--b')] });
+  // Act
+  const out = await serviceOf(deps).skillUsage({ project: 'F--a' });
+  // Assert
+  expect(out.sessionsCounted).toBe(1);
+  expect(out.projects.map(p => p.project)).toEqual(['F--a', 'F--b']);
+});
