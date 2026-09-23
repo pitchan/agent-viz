@@ -8,5 +8,5 @@ export type { UsageBucket, UsageVerdict } from './usage.ts';
 export type { ResolveClaudeDirOptions } from './claude-dir.ts';
 export { discoverSessions, parseSince } from './discovery.ts';
 export type { DiscoveryFilters, SessionRef, SubagentRef } from './discovery.ts';
-export { priceTable, pricingKindOf } from './pricing.ts';
-export type { ModelPrices, PricePeriod, PriceTable, PriceTableEntry, PricingKind } from './pricing.ts';
+export { priceTable, pricingKindOf, createPricing, embeddedPricing } from './pricing.ts';
+export type { ModelPrices, PricePeriod, PriceTable, PriceTableEntry, PricingKind, Pricing, AdoptedPrice, AdoptedPrices, AdoptionMark } from './pricing.ts';

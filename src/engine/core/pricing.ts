@@ -73,17 +73,6 @@ const MODEL_INFO: Record<string, { label: string; maxInput: number }> = {
   'claude-haiku-4-5': { label: 'Haiku 4.5', maxInput: 200_000 },
 };
 
-/** Tarif en vigueur pour `model` à l'instant `at` (ISO UTC). */
-function priceAt(model: string, at: string): ModelPrices | undefined {
-  const history = PRICE_HISTORY[model];
-  if (history !== undefined) {
-    for (const period of history) {
-      if (at < period.until) return period.prices;
-    }
-  }
-  return PRICES[model];
-}
-
 /**
  * Ramène un id modèle à sa forme canonique : retire suffixe [1m]/[200k],
  * préfixes de transport et de routage régional, versions -vN[:M] et dates.
@@ -122,20 +111,58 @@ export interface CostResult {
   model: string | null;
 }
 
+/** Un prix repris de LiteLLM par l'utilisateur, lu dans ~/.agent-viz/prices.json. */
+export interface AdoptedPrice {
+  prices: ModelPrices;
+  maxInput: number;
+  /** null : modèle absent de la table embarquée, le prix vaut pour tout message. */
+  from: string | null;
+  /** Le tarif courant que l'adoption remplace ; null pour un modèle nouveau. */
+  replaces: ModelPrices | null;
+  adoptedAt: string;
+  source: 'litellm';
+}
+export type AdoptedPrices = Readonly<Record<string, readonly AdoptedPrice[]>>;
+export interface AdoptionMark { source: 'litellm'; adoptedAt: string; from: string | null }
+
+export interface Pricing {
+  computeCost(usage: RawUsage, model: string | null | undefined, at?: string): CostResult;
+  pricingKindOf(model: string | null | undefined, at?: string): PricingKind;
+  priceTable(): PriceTable;
+}
+
+type PriceAt = (model: string, at: string) => ModelPrices | undefined;
+
+const FIELDS = ['input', 'output', 'cacheCreate', 'cacheRead'] as const;
+const samePrices = (a: ModelPrices, b: ModelPrices): boolean => FIELDS.every((f) => a[f] === b[f]);
+// Un id lu dans un transcript tiers ne doit jamais tomber sur une propriété héritée (`constructor`).
+const own = <T>(rec: Record<string, T>, key: string): T | undefined =>
+  (Object.hasOwn(rec, key) ? rec[key] : undefined);
+
+/** Libellé lisible (« Opus 5.5 ») d'un id canonique ; l'id tel quel hors forme. */
+export function deriveLabel(id: string): string {
+  const m = id.match(/^claude-(opus|sonnet|haiku|fable|mythos)-(\d+)(?:-(\d+))?/);
+  if (!m) return id;
+  const familyRaw = m[1] ?? '';
+  const family = familyRaw.charAt(0).toUpperCase() + familyRaw.slice(1);
+  return m[3] !== undefined ? `${family} ${m[2]}.${m[3]}` : `${family} ${m[2]}`;
+}
+
 /**
  * La formule de coût du produit : cache 1h à 2× input, 5m au tarif
  * cacheCreate, le reste linéaire. Modèle inconnu → usd null, JAMAIS un zéro
  * silencieux (le tarif d'un modèle qu'on ne connaît pas ne s'invente pas).
  * `at` = horodatage ISO du message : le barème appliqué est celui en vigueur à
- * cette date (PRICE_HISTORY) ; sans date, le tarif courant.
+ * cette date ; sans date, le tarif courant.
  */
-export function computeCost(
+function costWith(
+  priceAt: PriceAt,
   usage: RawUsage,
   model: string | null | undefined,
   at?: string,
 ): CostResult {
   const norm = normalizeModel(model);
-  if (norm !== null && ZERO_COST[norm] !== undefined) return { usd: 0, known: true, model: norm };
+  if (norm !== null && own(ZERO_COST, norm) !== undefined) return { usd: 0, known: true, model: norm };
   const p = norm !== null ? priceAt(norm, at ?? new Date().toISOString()) : undefined;
   if (p === undefined) return { usd: null, known: false, model: norm };
 
@@ -172,10 +199,10 @@ export type PricingKind = 'tarife' | 'zero-voulu' | 'inconnu';
  *  de computeCost, qui ne rend qu'un montant. Un 'zero-voulu' est un 0 $
  *  inscrit dans ZERO_COST ; un 'inconnu' est un tarif qu'on ne connaît pas et
  *  qu'on n'invente pas. */
-export function pricingKindOf(model: string | null | undefined, at?: string): PricingKind {
+function kindWith(priceAt: PriceAt, model: string | null | undefined, at?: string): PricingKind {
   const norm = normalizeModel(model);
   if (norm === null) return 'inconnu';
-  if (ZERO_COST[norm] !== undefined) return 'zero-voulu';
+  if (own(ZERO_COST, norm) !== undefined) return 'zero-voulu';
   return priceAt(norm, at ?? new Date().toISOString()) === undefined ? 'inconnu' : 'tarife';
 }
 
@@ -188,6 +215,8 @@ export interface PriceTableEntry {
   maxInput: number;
   current: ModelPrices;
   history: PricePeriod[];
+  /** Présent quand le tarif courant vient d'une adoption LiteLLM. */
+  adopted: AdoptionMark | null;
 }
 
 export interface PriceTable {
@@ -198,15 +227,48 @@ export interface PriceTable {
   zeroCost: { model: string; reason: string }[];
 }
 
-/** Le barème réellement appliqué par computeCost, exposé pour l'affichage et
- *  pour la pastille. Chaque appel rend des copies fraîches : la table de prix
- *  ne peut pas être altérée depuis l'extérieur. */
-export function priceTable(): PriceTable {
+interface Bareme {
+  prices: Record<string, ModelPrices>;
+  history: Record<string, PricePeriod[]>;
+  info: Record<string, { label: string; maxInput: number }>;
+  marks: Record<string, AdoptionMark>;
+}
+
+// La table embarquée garde le dernier mot : une adoption ne s'applique que tant
+// qu'elle couvre un vide (modèle absent) ou le tarif exact qu'elle remplaçait.
+function mergeAdopted(adopted: AdoptedPrices): Bareme {
+  const prices: Record<string, ModelPrices> = { ...PRICES };
+  const history: Record<string, PricePeriod[]> = {};
+  for (const [m, h] of Object.entries(PRICE_HISTORY)) history[m] = [...h];
+  const info = { ...MODEL_INFO };
+  const marks: Record<string, AdoptionMark> = {};
+  for (const [model, list] of Object.entries(adopted)) {
+    const ordered = [...list].sort((a, b) => (a.from ?? '').localeCompare(b.from ?? ''));
+    for (const a of ordered) {
+      const current = own(prices, model);
+      if (a.from === null) {
+        if (own(PRICES, model) !== undefined) continue;
+        info[model] = { label: deriveLabel(model), maxInput: a.maxInput };
+      } else {
+        if (current === undefined || a.replaces === null || !samePrices(current, a.replaces)) continue;
+        history[model] = [...(own(history, model) ?? []), { until: a.from, prices: current }];
+      }
+      prices[model] = a.prices;
+      marks[model] = { source: a.source, adoptedAt: a.adoptedAt, from: a.from };
+    }
+  }
+  return { prices, history, info, marks };
+}
+
+// Chaque appel rend des copies fraîches : la table de prix ne peut pas être
+// altérée depuis l'extérieur.
+function tableOf(b: Bareme): PriceTable {
   return {
     source: 'netgain-table-embarquee',
     unit: 'usd-par-jeton',
-    entries: Object.entries(PRICES).map(([model, prices]) => {
-      const info = MODEL_INFO[model];
+    entries: Object.entries(b.prices).map(([model, prices]) => {
+      const info = own(b.info, model);
+      const mark = own(b.marks, model);
       return {
         model,
         // Un modèle sans descriptif reste visible (libellé = identifiant) ;
@@ -214,9 +276,35 @@ export function priceTable(): PriceTable {
         label: info?.label ?? model,
         maxInput: info?.maxInput ?? 0,
         current: { ...prices },
-        history: (PRICE_HISTORY[model] ?? []).map((p) => ({ until: p.until, prices: { ...p.prices } })),
+        history: (own(b.history, model) ?? []).map((p) => ({ until: p.until, prices: { ...p.prices } })),
+        adopted: mark === undefined ? null : { ...mark },
       };
     }),
     zeroCost: Object.entries(ZERO_COST).map(([model, reason]) => ({ model, reason })),
   };
 }
+
+/** Le barème du produit : table embarquée + prix adoptés. Aucune I/O. */
+export function createPricing(adopted: AdoptedPrices): Pricing {
+  const b = mergeAdopted(adopted);
+  const priceAt: PriceAt = (model, at) => {
+    for (const period of own(b.history, model) ?? []) {
+      if (at < period.until) return period.prices;
+    }
+    return own(b.prices, model);
+  };
+  return {
+    computeCost: (usage, model, at) => costWith(priceAt, usage, model, at),
+    pricingKindOf: (model, at) => kindWith(priceAt, model, at),
+    priceTable: () => tableOf(b),
+  };
+}
+
+/** Le barème de la table embarquée seule. */
+export const embeddedPricing: Pricing = createPricing({});
+/** La formule de coût, sur la table embarquée seule. */
+export const computeCost = embeddedPricing.computeCost;
+/** La nature du tarif, sur la table embarquée seule. */
+export const pricingKindOf = embeddedPricing.pricingKindOf;
+/** Le barème appliqué, exposé pour l'affichage et pour la pastille. */
+export const priceTable = embeddedPricing.priceTable;

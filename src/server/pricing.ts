@@ -65,19 +65,6 @@ function getPrice(id: string | null | undefined, at?: string): PriceEntry | null
 // `{ usd, known, model }`. `known: false` means the tariff is unknown and the
 // total incomplete, and that fact travels to the real-time pill.
 
-// Derive a human label ("Opus 4.7", "Fable 5") from a canonical id when
-// LiteLLM doesn't already provide one (it doesn't expose a "label" field).
-// Claude 5 ids carry a single version digit (claude-fable-5), 4.x carry two.
-function deriveLabel(id: string): string {
-  const m = id.match(/^claude-(opus|sonnet|haiku|fable|mythos)-(\d+)(?:-(\d+))?/);
-  if (m) {
-    const familyRaw = m[1] ?? '';
-    const family = familyRaw.charAt(0).toUpperCase() + familyRaw.slice(1);
-    return m[3] !== undefined ? `${family} ${m[2]}.${m[3]}` : `${family} ${m[2]}`;
-  }
-  return id;
-}
-
 /** Famille et couple [majeur, mineur] (mineur absent = 0) — `null` hors forme. */
 interface FamilyVersion {
   family: string;
