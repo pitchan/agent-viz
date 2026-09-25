@@ -116,6 +116,16 @@ test('costLabel leads with measured bytes for byte-based rules when partial', ()
   expect(label.includes('au moins 1,50 $')).toBeTruthy();
 });
 
+test('costLabel leads with measured bytes for R11 when partial', () => {
+  const rec = {
+    ruleId: 'R11', estimatedCostUsd: 1.5, costBasis: 'octets-approx-4o-par-jeton',
+    evidence: { costComplete: false, bytes: 80000 },
+  } as Recommendation;
+  const label = costLabel(rec);
+  expect(label.startsWith(`${formatBytes(80000)} mesurés`)).toBeTruthy();
+  expect(label.includes('au moins 1,50 $')).toBeTruthy();
+});
+
 // R7 (jetons mesurés, comme R1/R5/R6) a son entrée dans la table des quantités de
 // tête : sans elle, sa carte perdait sa quantité mesurée dès qu'un modèle sans
 // tarif rendait les dollars partiels, au moment où ce chiffre porte seul le constat.

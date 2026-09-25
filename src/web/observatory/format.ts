@@ -123,11 +123,12 @@ const LEAD_QUANTITY_BY_RULE: Record<string, ((e: RecommendationEvidence) => stri
   R5: e => `${formatTokens(e.reprocessedTokens)} jetons mesurés`,
   R6: e => `${formatTokens(e.subagentTokens)} jetons mesurés`,
   R7: e => `${formatTokens(e.tokensAfterLastVerification)} jetons mesurés`,
-  // `?? 0` : type-level seulement — R3/R4 posent toujours ce chiffre quand
+  // `?? 0` : type-level seulement — R3/R4/R11 posent toujours ce chiffre quand
   // leur formateur tourne, `bytes`/`duplicateBytes` ne sont facultatifs que
-  // parce que les cinq autres regles ne les remplissent jamais.
+  // parce que les autres regles ne les remplissent jamais.
   R3: e => `${formatBytes(e.bytes ?? 0)} mesurés`,
   R4: e => `${formatBytes(e.duplicateBytes ?? 0)} mesurés`,
+  R11: e => `${formatBytes(e.bytes ?? 0)} mesurés`,
 };
 
 // La preuve et le résumé ne portent que le booléen `costComplete`, pas sa raison (modèle
