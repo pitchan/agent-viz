@@ -91,7 +91,7 @@ export async function scanSession(ref: SessionRef, maxPrompts: number, pricing: 
             skills.addListing(evt);
             break;
           case 'skill_body':
-            skills.addBody(evt);
+            skills.addBody(evt, agentKey);
             break;
           case 'meta':
             break;

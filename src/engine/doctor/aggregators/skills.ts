@@ -77,14 +77,14 @@ export class SkillsAggregator {
     if (evt.commandName !== undefined) this.typed[evt.commandName] = (this.typed[evt.commandName] ?? 0) + 1;
   }
 
-  addBody(evt: SkillBodyEvent): void {
+  addBody(evt: SkillBodyEvent, agentKey: string): void {
     if (evt.sourceToolUseId !== null) {
       const skill = this.skillOfCall.get(evt.sourceToolUseId);
       if (skill === undefined) this.unattributedBodies += 1;
       else this.bodies.push({ skill, lines: evt.lines, bytes: evt.bytes, by: 'model' });
       return;
     }
-    if (this.pendingTyped === null) {
+    if (agentKey !== 'main' || this.pendingTyped === null) {
       this.unattributedBodies += 1;
       return;
     }

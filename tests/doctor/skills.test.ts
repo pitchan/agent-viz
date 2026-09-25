@@ -88,7 +88,7 @@ test("un texte chargé se rattache à l'appel Skill désigné par son sourceTool
   const agg = new SkillsAggregator();
   agg.addToolUse(skillCall('tu1', 'pptx'));
   // Act
-  agg.addBody(body('tu1'));
+  agg.addBody(body('tu1'), 'main');
   // Assert
   expect(agg.result().bodies).toEqual([{ skill: 'pptx', lines: 600, bytes: 30000, by: 'model' }]);
 });
@@ -98,8 +98,8 @@ test('un texte sans sourceToolUseId se rattache à la commande tapée juste avan
   const agg = new SkillsAggregator();
   agg.addPrompt({ commandName: 'docx' });
   // Act
-  agg.addBody(body(null));
-  agg.addBody(body(null));
+  agg.addBody(body(null), 'main');
+  agg.addBody(body(null), 'main');
   // Assert
   expect(agg.result().bodies).toEqual([{ skill: 'docx', lines: 600, bytes: 30000, by: 'user' }]);
   expect(agg.result().unattributedBodies).toBe(1);
@@ -111,7 +111,7 @@ test('un prompt ordinaire entre la commande et le texte coupe le rattachement', 
   agg.addPrompt({ commandName: 'docx' });
   agg.addPrompt({});
   // Act
-  agg.addBody(body(null));
+  agg.addBody(body(null), 'main');
   // Assert
   expect(agg.result().bodies).toEqual([]);
   expect(agg.result().unattributedBodies).toBe(1);
@@ -121,7 +121,18 @@ test('un sourceToolUseId inconnu est compté comme non rattaché', () => {
   // Arrange
   const agg = new SkillsAggregator();
   // Act
-  agg.addBody(body('tu-inconnu'));
+  agg.addBody(body('tu-inconnu'), 'main');
   // Assert
+  expect(agg.result().unattributedBodies).toBe(1);
+});
+
+test("un texte sans sourceToolUseId dans un sous-agent ne se rattache jamais à une commande tapée", () => {
+  // Arrange
+  const agg = new SkillsAggregator();
+  agg.addPrompt({ commandName: 'docx' });
+  // Act
+  agg.addBody(body(null), 'agent-x');
+  // Assert
+  expect(agg.result().bodies).toEqual([]);
   expect(agg.result().unattributedBodies).toBe(1);
 });
