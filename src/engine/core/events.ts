@@ -54,10 +54,12 @@ export type NormalizedEvent =
       shape: 'string' | 'blocks';
       promptSource?: string;
       originKind?: string;
+      commandName?: string;
       timestamp?: string;
     }
   | { kind: 'compact'; trigger: 'auto' | 'manual'; preTokens: number | null }
   | { kind: 'skill_listing'; names: string[]; entries: SkillListingEntry[] }
+  | { kind: 'skill_body'; lines: number; bytes: number; sourceToolUseId: string | null }
   | { kind: 'meta' }
   | { kind: 'other'; topLevelType: string };
 
@@ -169,7 +171,7 @@ function listedHead(line: string, names: ReadonlySet<string>): { name: string; h
 }
 
 function normalizeUser(line: Rec): NormalizedEvent[] {
-  if (line['isMeta'] === true) return [{ kind: 'meta' }];
+  if (line['isMeta'] === true) return [skillBodyOf(line) ?? { kind: 'meta' }];
   const message = asRec(line['message']) ?? {};
   const content = message['content'];
   const timestamp = asStr(line['timestamp']);
@@ -183,7 +185,7 @@ function normalizeUser(line: Rec): NormalizedEvent[] {
   };
 
   if (typeof content === 'string') {
-    return [{ kind: 'user_prompt', text: content, shape: 'string', ...marks, ...ts }];
+    return [{ kind: 'user_prompt', text: content, shape: 'string', ...marks, ...commandMark(content), ...ts }];
   }
   if (!Array.isArray(content)) return [];
 
@@ -209,8 +211,39 @@ function normalizeUser(line: Rec): NormalizedEvent[] {
     }
   }
   if (toolResults.length > 0) return toolResults;
-  if (texts.length > 0) return [{ kind: 'user_prompt', text: texts.join('\n'), shape: 'blocks', ...marks, ...ts }];
+  if (texts.length > 0) {
+    const text = texts.join('\n');
+    return [{ kind: 'user_prompt', text, shape: 'blocks', ...marks, ...commandMark(text), ...ts }];
+  }
   return [];
+}
+
+const SKILL_BODY_MARKER = 'Base directory for this skill:';
+const COMMAND_NAME = /<command-name>\/?([^<]+)<\/command-name>/;
+
+// Le texte d'un SKILL.md chargé arrive en message caché ; sourceToolUseID le relie à
+// l'appel Skill de Claude, son absence signale une commande « /nom » tapée.
+function skillBodyOf(line: Rec): NormalizedEvent | null {
+  const text = metaText(asRec(line['message'])?.['content']);
+  if (text === null || !text.startsWith(SKILL_BODY_MARKER)) return null;
+  return {
+    kind: 'skill_body',
+    lines: text.split('\n').length,
+    bytes: Buffer.byteLength(text, 'utf8'),
+    sourceToolUseId: asStr(line['sourceToolUseID']),
+  };
+}
+
+function metaText(content: unknown): string | null {
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return null;
+  const texts = content.map(b => asStr(asRec(b)?.['text'])).filter((t): t is string => t !== null);
+  return texts.length === 0 ? null : texts.join('\n');
+}
+
+function commandMark(text: string): { commandName?: string } {
+  const name = COMMAND_NAME.exec(text)?.[1]?.trim();
+  return name ? { commandName: name } : {};
 }
 
 /**
