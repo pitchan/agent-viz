@@ -46,7 +46,7 @@ interface RankedRecommendation {
 const CONFIDENCE_WEIGHT: Record<string, number> = { fait: 1, correlation: 0.6, hypothese: 0.3 };
 const RETURN_FACTOR = 1.5;
 const PRIORITY_SIZE = 3;
-const BASIS_ORDER: string[] = [COST_BASIS.MEASURED_TOKENS, COST_BASIS.APPROX_BYTES];
+const BASIS_ORDER: string[] = [COST_BASIS.MEASURED_TOKENS, COST_BASIS.APPROX_BYTES, COST_BASIS.NOT_PRICED];
 
 function scoreOf(rec: RankedRecommendation): number {
   return rec.estimatedCostUsd * (CONFIDENCE_WEIGHT[rec.confidence] ?? 0);
@@ -55,7 +55,10 @@ function scoreOf(rec: RankedRecommendation): number {
 // 'new' is always proposed; 'accepted' and 'ignored' come back only once the
 // recomputed cost has grown by at least 50 % since the user decided (an
 // adoption is a watched commitment, not a pledge taken on faith). A missing
-// baseline is not a reason to guess — the card stays in the journal.
+// baseline is not a reason to guess — the card stays in the journal. A zero
+// baseline (R2 with no churn measured, R8/R9/R10 always) needs a cost to
+// have appeared at all — 0 * RETURN_FACTOR is still 0, which a zero-cost card
+// always clears.
 // 'arbitrated' never comes back on its own: the user already weighed
 // this exact choice, only lifting the arbitration re-proposes it — its frozen
 // costAtStatusUsd is kept for a FUTURE resurfacing rule, none exists yet.
@@ -63,6 +66,7 @@ function isEligible(rec: RankedRecommendation): boolean {
   if (rec.status === 'arbitrated') return false;
   if (rec.status === 'accepted' || rec.status === 'ignored') {
     if (typeof rec.costAtStatusUsd !== 'number') return false;
+    if (rec.costAtStatusUsd === 0) return rec.estimatedCostUsd > 0;
     return rec.estimatedCostUsd >= rec.costAtStatusUsd * RETURN_FACTOR;
   }
   return true;

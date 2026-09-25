@@ -18,6 +18,9 @@ const BYTES_PER_TOKEN = 4;
 const COST_BASIS = Object.freeze({
   MEASURED_TOKENS: 'jetons-mesures',
   APPROX_BYTES: 'octets-approx-4o-par-jeton',
+  // Une carte dont le coût ne se mesure pas (liste de skills relue depuis le cache, à tarif
+  // réduit) : lui prêter le taux moyen de la session inventerait un nombre.
+  NOT_PRICED: 'non-chiffre',
 });
 
 function usdPerToken(session: Pick<Session, 'netTokens' | 'costUsd'>): number {

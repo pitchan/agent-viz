@@ -21,6 +21,14 @@ export interface ToolUseRef {
   input: unknown;
 }
 
+export interface SkillListingEntry {
+  name: string;
+  /** Caractères de l'entrée telle que listée, lignes de suite comprises. */
+  chars: number;
+  /** Faux quand Claude Code a retiré la description pour tenir le plafond de la liste. */
+  hasDescription: boolean;
+}
+
 export type NormalizedEvent =
   | {
       kind: 'assistant';
@@ -48,10 +56,12 @@ export type NormalizedEvent =
       shape: 'string' | 'blocks';
       promptSource?: string;
       originKind?: string;
+      commandName?: string;
       timestamp?: string;
     }
   | { kind: 'compact'; trigger: 'auto' | 'manual'; preTokens: number | null }
-  | { kind: 'skill_listing'; names: string[] }
+  | { kind: 'skill_listing'; names: string[]; entries: SkillListingEntry[] }
+  | { kind: 'skill_body'; lines: number; bytes: number; sourceToolUseId: string | null }
   | { kind: 'meta' }
   | { kind: 'other'; topLevelType: string };
 
@@ -131,12 +141,39 @@ function normalizeAssistant(line: Rec): NormalizedEvent {
 function normalizeAttachment(line: Rec): NormalizedEvent {
   const attachment = asRec(line['attachment']);
   if (attachment === null || attachment['type'] !== 'skill_listing') return { kind: 'other', topLevelType: 'attachment' };
-  const names = Array.isArray(attachment['names']) ? attachment['names'] : [];
-  return { kind: 'skill_listing', names: names.filter((n): n is string => typeof n === 'string' && n !== '') };
+  const names = (Array.isArray(attachment['names']) ? attachment['names'] : [])
+    .filter((n): n is string => typeof n === 'string' && n !== '');
+  const content = asStr(attachment['content']);
+  const entries = content === null ? [] : parseListingEntries(content, new Set(names));
+  return { kind: 'skill_listing', names, entries };
+}
+
+// Une entrée s'écrit « - nom » ou « - nom: description » ; une ligne qui ne commence pas
+// par un nom listé prolonge l'entrée précédente (description sur plusieurs lignes).
+function parseListingEntries(content: string, names: ReadonlySet<string>): SkillListingEntry[] {
+  const entries: SkillListingEntry[] = [];
+  for (const line of content.split('\n')) {
+    const head = listedHead(line, names);
+    if (head !== null) {
+      entries.push({ name: head.name, chars: line.length, hasDescription: head.hasDescription });
+      continue;
+    }
+    const last = entries[entries.length - 1];
+    if (last !== undefined) last.chars += line.length + 1;
+  }
+  return entries;
+}
+
+function listedHead(line: string, names: ReadonlySet<string>): { name: string; hasDescription: boolean } | null {
+  if (!line.startsWith('- ')) return null;
+  const rest = line.slice(2);
+  const sep = rest.indexOf(': ');
+  const name = sep === -1 ? rest.trimEnd() : rest.slice(0, sep);
+  return names.has(name) ? { name, hasDescription: sep !== -1 } : null;
 }
 
 function normalizeUser(line: Rec): NormalizedEvent[] {
-  if (line['isMeta'] === true) return [{ kind: 'meta' }];
+  if (line['isMeta'] === true) return [skillBodyOf(line) ?? { kind: 'meta' }];
   const message = asRec(line['message']) ?? {};
   const content = message['content'];
   const timestamp = asStr(line['timestamp']);
@@ -150,7 +187,7 @@ function normalizeUser(line: Rec): NormalizedEvent[] {
   };
 
   if (typeof content === 'string') {
-    return [{ kind: 'user_prompt', text: content, shape: 'string', ...marks, ...ts }];
+    return [{ kind: 'user_prompt', text: content, shape: 'string', ...marks, ...commandMark(content), ...ts }];
   }
   if (!Array.isArray(content)) return [];
 
@@ -176,8 +213,39 @@ function normalizeUser(line: Rec): NormalizedEvent[] {
     }
   }
   if (toolResults.length > 0) return toolResults;
-  if (texts.length > 0) return [{ kind: 'user_prompt', text: texts.join('\n'), shape: 'blocks', ...marks, ...ts }];
+  if (texts.length > 0) {
+    const text = texts.join('\n');
+    return [{ kind: 'user_prompt', text, shape: 'blocks', ...marks, ...commandMark(text), ...ts }];
+  }
   return [];
+}
+
+const SKILL_BODY_MARKER = 'Base directory for this skill:';
+const COMMAND_NAME = /<command-name>\/?([^<]+)<\/command-name>/;
+
+// Le texte d'un SKILL.md chargé arrive en message caché ; sourceToolUseID le relie à
+// l'appel Skill de Claude, son absence signale une commande « /nom » tapée.
+function skillBodyOf(line: Rec): NormalizedEvent | null {
+  const text = metaText(asRec(line['message'])?.['content']);
+  if (text === null || !text.startsWith(SKILL_BODY_MARKER)) return null;
+  return {
+    kind: 'skill_body',
+    lines: text.split('\n').length,
+    bytes: Buffer.byteLength(text, 'utf8'),
+    sourceToolUseId: asStr(line['sourceToolUseID']),
+  };
+}
+
+function metaText(content: unknown): string | null {
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return null;
+  const texts = content.map(b => asStr(asRec(b)?.['text'])).filter((t): t is string => t !== null);
+  return texts.length === 0 ? null : texts.join('\n');
+}
+
+function commandMark(text: string): { commandName?: string } {
+  const name = COMMAND_NAME.exec(text)?.[1]?.trim();
+  return name ? { commandName: name } : {};
 }
 
 /**

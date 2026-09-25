@@ -31,12 +31,22 @@ export interface TokenBucket {
   cacheCreate5m: number;
 }
 
-// Faits de SCAN_VERSION 12 : un rapport stocké avant ne les porte pas, et skill-usage.ts
-// écarte la session en la comptant, comme model-costs.ts pour costByModel.
+export interface ListedSkill {
+  name: string;
+  chars: number;
+  hasDescription: boolean;
+}
+
+// listed, calls, attributed : SCAN_VERSION 12 ; le reste : SCAN_VERSION 15. Un rapport stocké
+// avant n'en porte qu'une partie : skill-usage.ts et skill-facts.ts écartent la session en la comptant.
 export interface SkillFacts {
   listed: string[];
   calls: Record<string, number>;
   attributed: string[];
+  listing?: ListedSkill[];
+  typed?: Record<string, number>;
+  bodies?: { skill: string; lines: number; bytes: number; by: 'model' | 'user' }[];
+  unattributedBodies?: number;
 }
 
 export interface SessionReport {
@@ -127,7 +137,7 @@ export interface EvaluationContext {
   configItems: ConfigItem[];
 }
 
-export type SubjectKind = 'project' | 'mcpServer' | 'tool';
+export type SubjectKind = 'project' | 'mcpServer' | 'tool' | 'skill' | 'skillListing';
 
 // ─── Draft recommendations — one evidence shape per rule ───────────────────
 
@@ -240,10 +250,61 @@ export interface R7Recommendation {
   evidence: R7Evidence; action: string;
 }
 
+export interface R8Evidence {
+  sessions: string[];
+  hidden: { name: string; sessions: number }[];
+  sessionsAnalysed: number;
+  largestListingChars: number;
+  excludedPendingRescan: number;
+}
+export interface R8Recommendation {
+  ruleId: 'R8'; subject: string; title: string; category: string;
+  confidence: 'fait'; estimatedCostUsd: number; costBasis: string;
+  evidence: R8Evidence; action: string;
+}
+
+export interface R9Evidence {
+  sessions: string[];
+  copies: { name: string; chars: number }[];
+  excludedPendingRescan: number;
+}
+export interface R9Recommendation {
+  ruleId: 'R9'; subject: string; title: string; category: string;
+  confidence: 'fait'; estimatedCostUsd: number; costBasis: string;
+  evidence: R9Evidence; action: string;
+}
+
+export interface R10Evidence {
+  sessions: string[];
+  typedCount: number;
+  entryChars: number;
+  excludedPendingRescan: number;
+}
+export interface R10Recommendation {
+  ruleId: 'R10'; subject: string; title: string; category: string;
+  confidence: 'fait'; estimatedCostUsd: number; costBasis: string;
+  evidence: R10Evidence; action: string;
+}
+
+export interface R11Evidence {
+  sessions: string[];
+  invocations: number;
+  maxLines: number;
+  bytes: number;
+  excludedPendingRescan: number;
+  costComplete: boolean;
+}
+export interface R11Recommendation {
+  ruleId: 'R11'; subject: string; title: string; category: string;
+  confidence: 'fait'; estimatedCostUsd: number; costBasis: string;
+  evidence: R11Evidence; action: string;
+}
+
 export type Recommendation =
   | R1Recommendation | R2Recommendation | R3Recommendation
   | R4Recommendation | R5Recommendation | R6Recommendation
-  | R7Recommendation;
+  | R7Recommendation | R8Recommendation | R9Recommendation
+  | R10Recommendation | R11Recommendation;
 
 export interface Rule {
   id: string;

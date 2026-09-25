@@ -73,10 +73,21 @@ interface R7Evidence {
   tokensAfterLastVerification: number;
   excludedPendingRescan: number;
 }
+interface R8Evidence { hidden: { name: string; sessions: number }[]; sessionsAnalysed: number; largestListingChars: number; excludedPendingRescan: number }
+interface R9Evidence { copies: { name: string; chars: number }[]; excludedPendingRescan: number }
+interface R10Evidence { typedCount: number; entryChars: number; excludedPendingRescan: number }
+interface R11Evidence { invocations: number; maxLines: number; bytes: number; excludedPendingRescan: number }
 
-// Chaque règle a sa propre forme de preuve (R1..R7 ci-dessus), associée ici à
-// son formateur par un identifiant dynamique (`rec.ruleId`) : aucun paramètre
-// commun n'est sain sans la redécrire. `any` reste local à cette table.
+const plural = (n: number, word: string) => `${n} ${word}${n > 1 ? 's' : ''}`;
+
+// Une session stockée avant la ré-analyse est dite, jamais fondue dans un zéro (précédent R5).
+function pendingRescanLine(n: number): string[] {
+  return n > 0 ? [`${plural(n, 'session')} en attente de ré-analyse (non prise${n > 1 ? 's' : ''} en compte ici)`] : [];
+}
+
+// Chaque règle a sa propre forme de preuve (interfaces ci-dessus), associée
+// ici à son formateur par un identifiant dynamique (`rec.ruleId`) : aucun
+// paramètre commun n'est sain sans la redécrire. `any` reste local à cette table.
 const EVIDENCE_BY_RULE: Record<string, ((e: any) => string[]) | undefined> = {
   R1: (e: R1Evidence) => [
     `${formatTokens(e.prefixChangeTokens)} jetons de préfixe reconstruit`,
@@ -135,13 +146,29 @@ const EVIDENCE_BY_RULE: Record<string, ((e: any) => string[]) | undefined> = {
       + " (toute la session quand aucune vérification n'a été lancée)"
       + ' — travail à risque, pas gaspillage prouvé',
     ];
-    // Une session d'avant la ré-analyse v8 est dite, jamais fondue dans un zéro (précédent R5).
-    if (e.excludedPendingRescan > 0) {
-      const n = e.excludedPendingRescan;
-      lines.push(`${n} session${n > 1 ? 's' : ''} en attente de ré-analyse (non prise${n > 1 ? 's' : ''} en compte ici)`);
-    }
-    return lines;
+    return [...lines, ...pendingRescanLine(e.excludedPendingRescan)];
   },
+  R8: (e: R8Evidence) => [
+    `sans description : ${e.hidden.map(h => `${h.name} (${plural(h.sessions, 'session')})`).join(', ')}`,
+    `sur ${plural(e.sessionsAnalysed, 'session')} analysée${e.sessionsAnalysed > 1 ? 's' : ''}`,
+    `plus grande liste : ${e.largestListingChars} caractères d’entrées`,
+    ...pendingRescanLine(e.excludedPendingRescan),
+  ],
+  R9: (e: R9Evidence) => [
+    `copies : ${e.copies.map(c => `${c.name} (${c.chars} caractères)`).join(', ')}`,
+    ...pendingRescanLine(e.excludedPendingRescan),
+  ],
+  R10: (e: R10Evidence) => [
+    `tapé ${e.typedCount} fois, jamais appelé par Claude`,
+    `${e.entryChars} caractères d’entrée dans la liste, envoyés à chaque tour`,
+    ...pendingRescanLine(e.excludedPendingRescan),
+  ],
+  R11: (e: R11Evidence) => [
+    plural(e.invocations, 'chargement'),
+    `${e.maxLines} lignes pour le plus long`,
+    `${formatBytes(e.bytes)} chargés au total`,
+    ...pendingRescanLine(e.excludedPendingRescan),
+  ],
 };
 
 export function evidenceLines(rec: { ruleId: string; evidence: { sessions: unknown[] } }): string[] {

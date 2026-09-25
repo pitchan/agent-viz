@@ -107,9 +107,21 @@ export function confidenceLabel(c: string) {
 const BASIS_LABELS: Record<string, string> = {
   'jetons-mesures': 'jetons mesurés',
   'octets-approx-4o-par-jeton': 'estimé depuis les octets (≈ 4 octets par jeton)',
+  'non-chiffre': 'non chiffré',
 };
 export function costBasisLabel(basis: string) {
   return BASIS_LABELS[basis] || basis;
+}
+
+// Bases sans dollar affichable : ni un 0,00 $ (coût jamais calculé, pas mesuré à zéro), ni
+// un libellé de « coût partiel » qui laisserait croire à un calcul qui n'a pas eu lieu.
+const UNPRICED_BASES = new Set(['non-chiffre']);
+
+// Seule source de vérité pour « cette base n'a pas de coût mesurable » —
+// advisor-view.ts (boutons/légendes) et decisionLine (ci-dessous) s'y réfèrent
+// tous les deux, plutôt que de retester costBasis chacun à sa façon.
+export function isUnpricedBasis(basis: string): boolean {
+  return UNPRICED_BASES.has(basis);
 }
 
 // When a card's dollars are partial (an unknown model in its sessions), the
@@ -123,11 +135,12 @@ const LEAD_QUANTITY_BY_RULE: Record<string, ((e: RecommendationEvidence) => stri
   R5: e => `${formatTokens(e.reprocessedTokens)} jetons mesurés`,
   R6: e => `${formatTokens(e.subagentTokens)} jetons mesurés`,
   R7: e => `${formatTokens(e.tokensAfterLastVerification)} jetons mesurés`,
-  // `?? 0` : type-level seulement — R3/R4 posent toujours ce chiffre quand
+  // `?? 0` : type-level seulement — R3/R4/R11 posent toujours ce chiffre quand
   // leur formateur tourne, `bytes`/`duplicateBytes` ne sont facultatifs que
-  // parce que les cinq autres regles ne les remplissent jamais.
+  // parce que les autres regles ne les remplissent jamais.
   R3: e => `${formatBytes(e.bytes ?? 0)} mesurés`,
   R4: e => `${formatBytes(e.duplicateBytes ?? 0)} mesurés`,
+  R11: e => `${formatBytes(e.bytes ?? 0)} mesurés`,
 };
 
 // La preuve et le résumé ne portent que le booléen `costComplete`, pas sa raison (modèle
@@ -135,6 +148,7 @@ const LEAD_QUANTITY_BY_RULE: Record<string, ((e: RecommendationEvidence) => stri
 const PARTIAL_COST_REASON = 'une part des messages n’a pas pu être tarifée';
 
 export function costLabel(rec: Recommendation) {
+  if (isUnpricedBasis(rec.costBasis)) return 'non chiffré';
   if (rec.evidence.costComplete === false) {
     const lead = LEAD_QUANTITY_BY_RULE[rec.ruleId];
     if (lead) {
@@ -152,6 +166,7 @@ export function costLabel(rec: Recommendation) {
 const BASIS_TITLES: Record<string, string> = {
   'jetons-mesures': 'Chiffré en jetons mesurés',
   'octets-approx-4o-par-jeton': 'Estimé depuis les octets — à ne pas comparer au bloc ci-dessus',
+  'non-chiffre': 'Non chiffré — le transcript ne permet pas de mettre un prix sur ces conseils',
 };
 export function basisTitle(basis: string) {
   return BASIS_TITLES[basis] || basis;
@@ -177,8 +192,8 @@ const DECISION_WATCH: Record<string, string> = {
   ignored: 'reviendra si le coût regrossit de moitié',
 };
 
-// Le seul appelant reel passe un DecidedRecommendation {id, title}
-// (decisions-view.ts) — repris a l'identique, plus les trois champs que
+// Le seul appelant reel passe un DecidedRecommendation {id, title, costBasis}
+// (decisions-view.ts) — repris a l'identique, plus les quatre champs que
 // decisionLine lit, facultatifs comme dans la vue locale de cet appelant.
 interface DecisionFields {
   id: number;
@@ -186,6 +201,7 @@ interface DecisionFields {
   status?: string;
   statusAt?: string | null;
   statusReason?: string | null;
+  costBasis?: string;
 }
 
 function decidedWhen(rec: DecisionFields) {
@@ -194,9 +210,12 @@ function decidedWhen(rec: DecisionFields) {
 }
 
 // One line per journal card: what was decided, when, and either the user's
-// reason (a refusal) or the watch that stays armed (adoption, sleep).
+// reason (a refusal) or the watch that stays armed (adoption, sleep). Un
+// non-chiffré ne revient jamais tout seul (isEligible, ranking.ts, exige un
+// coût mesuré) : pas de veille à annoncer.
 export function decisionLine(rec: DecisionFields) {
-  const tail = rec.statusReason ?? DECISION_WATCH[rec.status ?? ''] ?? null;
+  const watch = isUnpricedBasis(rec.costBasis ?? '') ? null : DECISION_WATCH[rec.status ?? ''] ?? null;
+  const tail = rec.statusReason ?? watch;
   return tail ? `${decidedWhen(rec)} — ${tail}` : decidedWhen(rec);
 }
 

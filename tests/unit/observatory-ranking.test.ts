@@ -51,6 +51,12 @@ test('an ignored recommendation returns only past +50 % of its cost at decision 
   expect(isEligible(rec(3, { status: 'ignored', estimatedCostUsd: 99, costAtStatusUsd: null }))).toBe(false);
 });
 
+test('une carte décidée à coût nul ne revient que si un coût apparaît', () => {
+  expect(isEligible(rec(1, { status: 'accepted', estimatedCostUsd: 0, costAtStatusUsd: 0 }))).toBe(false);
+  expect(isEligible(rec(2, { status: 'accepted', estimatedCostUsd: 0.5, costAtStatusUsd: 0 }))).toBe(true);
+  expect(isEligible(rec(3, { status: 'ignored', estimatedCostUsd: 0, costAtStatusUsd: 0 }))).toBe(false);
+});
+
 test('a recommendation not re-emitted by the latest scan is stale', () => {
   expect(isStale(rec(1), SCAN)).toBe(false);
   expect(isStale(rec(2, { lastSeenAt: '2026-07-01T00:00:00.000Z' }), SCAN)).toBe(true);
@@ -73,6 +79,21 @@ test('measured-token and byte-approximated recommendations never share a list', 
 test('a basis with no recommendation produces no empty group', () => {
   const { groups } = rankByBasis([rec(1)], { lastScanAt: SCAN });
   expect(groups.map(g => g.basis)).toEqual(['jetons-mesures']);
+});
+
+test('a non-chiffre card gets its own group, after the two priced groups, never inside jetons-mesures', () => {
+  // Arrange
+  const input = [
+    rec(1, { estimatedCostUsd: 5, costBasis: 'jetons-mesures' }),
+    rec(2, { estimatedCostUsd: 90, costBasis: 'octets-approx-4o-par-jeton' }),
+    rec(3, { estimatedCostUsd: 0, costBasis: 'non-chiffre' }),
+  ];
+  // Act
+  const { groups } = rankByBasis(input, { lastScanAt: SCAN });
+  // Assert
+  expect(groups.map(g => g.basis)).toEqual(['jetons-mesures', 'octets-approx-4o-par-jeton', 'non-chiffre']);
+  expect(groups[0]!.all.map(r => r.id), 'jamais mêlée aux cartes chiffrées en jetons').toEqual([1]);
+  expect(groups[2]!.all.map(r => r.id)).toEqual([3]);
 });
 
 test('within a basis, a correlation outranks a fact only when its cost is high enough', () => {

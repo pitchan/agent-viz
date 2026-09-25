@@ -2,6 +2,7 @@
 // here would be a recommendation without evidence — forbidden by the spec.
 import { expect, test } from 'vitest';
 import { evidenceLines } from '../../src/web/observatory/evidence.ts';
+import { formatBytes } from '../../src/web/observatory/format.ts';
 
 // evidenceLines dispatche par ruleId vers une forme d'evidence propre a chaque
 // regle ; sa signature publique ne demande que { sessions } (evidence.ts). Les
@@ -250,4 +251,44 @@ test('R7 dit les sessions en attente de re-analyse au lieu de les taire', () => 
   const lines = evidenceLines(rec);
   // Assert
   expect(lines.some(l => l.includes('2 sessions en attente de ré-analyse')), `la ligne de re-analyse manque : ${JSON.stringify(lines)}`).toBeTruthy();
+});
+
+test('R8 nomme les skills sans description et la taille de la liste', () => {
+  expect(evidenceLines({ ruleId: 'R8', evidence: { sessions: ['a', 'b'],
+    hidden: [{ name: 'init', sessions: 2 }, { name: 'pptx', sessions: 1 }],
+    sessionsAnalysed: 3, largestListingChars: 29991, excludedPendingRescan: 0 } } as Rec)).toEqual([
+    '2 sessions concernées',
+    'sans description : init (2 sessions), pptx (1 session)',
+    'sur 3 sessions analysées',
+    'plus grande liste : 29991 caractères d’entrées',
+  ]);
+});
+
+test('R9 donne chaque copie et sa taille', () => {
+  expect(evidenceLines({ ruleId: 'R9', evidence: { sessions: ['a'],
+    copies: [{ name: 'anthropic-skills:docx', chars: 959 }, { name: 'docx', chars: 793 }],
+    excludedPendingRescan: 0 } } as Rec)).toEqual([
+    '1 session concernée',
+    'copies : anthropic-skills:docx (959 caractères), docx (793 caractères)',
+  ]);
+});
+
+test('R10 dit combien de fois le skill a été tapé et ce que sa description occupe', () => {
+  expect(evidenceLines({ ruleId: 'R10', evidence: { sessions: ['a'], typedCount: 3, entryChars: 853,
+    excludedPendingRescan: 2 } } as Rec)).toEqual([
+    '1 session concernée',
+    'tapé 3 fois, jamais appelé par Claude',
+    '853 caractères d’entrée dans la liste, envoyés à chaque tour',
+    '2 sessions en attente de ré-analyse (non prises en compte ici)',
+  ]);
+});
+
+test('R11 donne les chargements, la longueur et le volume', () => {
+  expect(evidenceLines({ ruleId: 'R11', evidence: { sessions: ['a'], invocations: 2, maxLines: 620,
+    bytes: 80000, excludedPendingRescan: 0 } } as Rec)).toEqual([
+    '1 session concernée',
+    '2 chargements',
+    '620 lignes pour le plus long',
+    `${formatBytes(80000)} chargés au total`,
+  ]);
 });

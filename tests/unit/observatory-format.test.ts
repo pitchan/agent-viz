@@ -56,7 +56,14 @@ test('a partially-priced recommendation says so, never a silent total', () => {
 test('each basis block has a title that warns against comparing across blocks', () => {
   expect(basisTitle('jetons-mesures')).toMatch(/jetons mesurés/i);
   expect(basisTitle('octets-approx-4o-par-jeton')).toMatch(/estimé/i);
+  expect(basisTitle('non-chiffre')).toMatch(/non chiffré/i);
   expect(basisTitle('jetons-mesures')).not.toBe(basisTitle('octets-approx-4o-par-jeton'));
+});
+
+// R8/R9/R10 : un coût jamais calculé n'a pas de dollar à montrer, jamais un 0,00 $.
+test('costLabel for the non-chiffre basis names no dollar amount, even without costComplete', () => {
+  expect(costLabel({ estimatedCostUsd: 0, costBasis: 'non-chiffre', evidence: {} } as Recommendation)).toBe('non chiffré');
+  expect(costLabel({ estimatedCostUsd: 0, costBasis: 'non-chiffre', evidence: { costComplete: false } } as Recommendation)).toBe('non chiffré');
 });
 
 test('formatDayMonth renders JJ/MM', () => {
@@ -113,6 +120,16 @@ test('costLabel leads with measured bytes for byte-based rules when partial', ()
   } as Recommendation;
   const label = costLabel(rec);
   expect(label.startsWith(`${formatBytes(2 * 1024 * 1024)} mesurés`)).toBeTruthy();
+  expect(label.includes('au moins 1,50 $')).toBeTruthy();
+});
+
+test('costLabel leads with measured bytes for R11 when partial', () => {
+  const rec = {
+    ruleId: 'R11', estimatedCostUsd: 1.5, costBasis: 'octets-approx-4o-par-jeton',
+    evidence: { costComplete: false, bytes: 80000 },
+  } as Recommendation;
+  const label = costLabel(rec);
+  expect(label.startsWith(`${formatBytes(80000)} mesurés`)).toBeTruthy();
   expect(label.includes('au moins 1,50 $')).toBeTruthy();
 });
 
@@ -216,6 +233,20 @@ test('decisionLine sans raison consignée n’invente rien', () => {
 
 test('decisionLine sans date consignée le dit, sans deviner', () => {
   expect(decisionLine({ status: 'arbitrated', statusAt: null, statusReason: 'déjà pesé' } as DecisionRec)).toBe('Refusé (date non consignée) — déjà pesé');
+});
+
+test('decisionLine : un non-chiffré adopté ne promet aucun retour', () => {
+  // Un non-chiffré ne revient jamais tout seul (isEligible, ranking.ts, exige
+  // un coût mesuré) : la veille annoncée aux bases chiffrées mentirait ici.
+  expect(decisionLine({
+    status: 'accepted', statusAt: '2026-08-08T12:00:00.000Z', statusReason: null, costBasis: 'non-chiffre',
+  } as DecisionRec)).toBe('Adopté le 08/08/2026');
+});
+
+test('decisionLine : une base chiffrée garde sa promesse de retour', () => {
+  expect(decisionLine({
+    status: 'accepted', statusAt: '2026-08-08T12:00:00.000Z', statusReason: null, costBasis: 'jetons-mesures',
+  } as DecisionRec)).toBe('Adopté le 08/08/2026 — reviendra si le coût regrossit malgré tout');
 });
 
 // ─── Le bandeau de retour : une carte décidée qui re-surface ───────────────

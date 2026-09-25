@@ -60,7 +60,7 @@ function projectResolver(sessions: Session[] | undefined): (slug: string) => str
 }
 
 // Le seul endroit du produit qui accole un projet à un titre. Les
-// recommandations dont le sujet n'est pas un projet — serveur MCP, outil — le
+// recommandations dont le sujet n'est pas un projet — serveur MCP, outil, skill — le
 // nomment déjà dans leur phrase et ressortent intactes.
 function nameProjects(recs: Recommendation[], sessions: Session[] | undefined, rules: Rule[]): Recommendation[] {
   const kinds = new Map(rules.map(r => [r.id, r.subjectKind] as const));

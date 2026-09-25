@@ -81,13 +81,17 @@ export async function scanSession(ref: SessionRef, maxPrompts: number, pricing: 
               prompts.addPrompt(evt);
               sessionKind.addPrompt(evt);
               context.addPrompt(evt);
+              skills.addPrompt(evt);
             }
             break;
           case 'compact':
             context.addCompact(evt, agentKey);
             break;
           case 'skill_listing':
-            skills.addListing(evt);
+            skills.addListing(evt, agentKey);
+            break;
+          case 'skill_body':
+            skills.addBody(evt, agentKey);
             break;
           case 'meta':
             break;

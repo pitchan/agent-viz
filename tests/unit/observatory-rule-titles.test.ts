@@ -87,7 +87,9 @@ const ctx = { sessions: SESSIONS, configItems: [] };
 const projectRules = () => RULES.filter(r => r.subjectKind === 'project');
 
 test('chaque règle déclare la nature de son sujet — contrat identique pour toutes', () => {
-  const kinds = new Set(['project', 'mcpServer', 'tool']);
+  // Les cinq valeurs de SubjectKind (types.ts) : R8..R11 sont arrivées avec
+  // 'skill'/'skillListing', les sept premières règles ne portaient que les trois autres.
+  const kinds = new Set(['project', 'mcpServer', 'tool', 'skill', 'skillListing']);
   for (const rule of RULES) {
     expect(kinds.has(rule.subjectKind), `${rule.id} : subjectKind manquant ou inconnu`).toBeTruthy();
   }
