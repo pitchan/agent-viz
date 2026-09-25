@@ -278,7 +278,7 @@ test('R10 dit combien de fois le skill a été tapé et ce que sa description oc
     excludedPendingRescan: 2 } } as Rec)).toEqual([
     '1 session concernée',
     'tapé 3 fois, jamais appelé par Claude',
-    '853 caractères de description dans la liste, envoyés à chaque tour',
+    '853 caractères d’entrée dans la liste, envoyés à chaque tour',
     '2 sessions en attente de ré-analyse (non prises en compte ici)',
   ]);
 });

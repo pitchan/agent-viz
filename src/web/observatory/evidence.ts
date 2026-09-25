@@ -160,7 +160,7 @@ const EVIDENCE_BY_RULE: Record<string, ((e: any) => string[]) | undefined> = {
   ],
   R10: (e: R10Evidence) => [
     `tapé ${e.typedCount} fois, jamais appelé par Claude`,
-    `${e.entryChars} caractères de description dans la liste, envoyés à chaque tour`,
+    `${e.entryChars} caractères d’entrée dans la liste, envoyés à chaque tour`,
     ...pendingRescanLine(e.excludedPendingRescan),
   ],
   R11: (e: R11Evidence) => [

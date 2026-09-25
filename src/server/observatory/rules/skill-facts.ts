@@ -20,5 +20,4 @@ function splitBySkillFacts(sessions: Session[]): { ready: SkillSession[]; exclud
 // Un plugin préfixe ses skills (« anthropic-skills:docx ») : le nom de base réunit les copies.
 const baseName = (name: string): string => name.slice(name.lastIndexOf(':') + 1);
 
-export type { SkillSession };
 export { splitBySkillFacts, baseName };
