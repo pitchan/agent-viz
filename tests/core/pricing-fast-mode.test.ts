@@ -97,3 +97,8 @@ test('la table affichée porte le tarif rapide, null sans mode rapide', () => {
   expect(opus?.fast).toEqual({ input: 8e-6, output: 4e-5, cacheCreate: 1e-5, cacheRead: 4e-7 });
   expect(sonnet?.fast).toBeNull();
 });
+
+test('pricingKindOf exige la vitesse : un appel qui l’oublie ne compile pas', () => {
+  // @ts-expect-error sans `speed`, un message rapide sans prix serait dit « tarifé »
+  expect(pricingKindOf('claude-sonnet-5', undefined)).toBe('tarife');
+});

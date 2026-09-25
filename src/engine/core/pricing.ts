@@ -133,7 +133,9 @@ export interface AdoptionMark { source: 'anthropic'; adoptedAt: string; from: st
 
 export interface Pricing {
   computeCost(usage: RawUsage, model: string | null | undefined, at?: string): CostResult;
-  pricingKindOf(model: string | null | undefined, at?: string, speed?: string | null): PricingKind;
+  // `speed` est obligatoire, même `undefined` : l'oublier rendrait « tarifé » un message
+  // rapide que computeCost laisse sans prix, soit un zéro silencieux dans le total.
+  pricingKindOf(model: string | null | undefined, at: string | undefined, speed: string | null | undefined): PricingKind;
   priceTable(): PriceTable;
 }
 
@@ -211,7 +213,9 @@ export type PricingKind = 'tarife' | 'zero-voulu' | 'inconnu';
  *  de computeCost, qui ne rend qu'un montant. Un 'zero-voulu' est un 0 $
  *  inscrit dans ZERO_COST ; un 'inconnu' est un tarif qu'on ne connaît pas et
  *  qu'on n'invente pas. */
-function kindWith(priceAt: PriceAt, model: string | null | undefined, at?: string, speed?: string | null): PricingKind {
+function kindWith(
+  priceAt: PriceAt, model: string | null | undefined, at: string | undefined, speed: string | null | undefined,
+): PricingKind {
   const norm = normalizeModel(model);
   if (norm === null) return 'inconnu';
   if (own(ZERO_COST, norm) !== undefined) return 'zero-voulu';
