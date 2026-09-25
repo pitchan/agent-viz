@@ -29,6 +29,9 @@
 //   "one edit" is not a background noise worth raising the floor for — the fact
 //   (a file changed after the last proof) is true from the first unit.
 
+// R11.maxLines reprend la longueur conseillée par Anthropic pour un SKILL.md.
+// R10.minTyped est un choix de départ, sans mesure sur l'historique.
+
 const THRESHOLDS = Object.freeze({
   R1: Object.freeze({ minShareOfNet: 0.20 }),
   R2: Object.freeze({ minLoadedShare: 0.5, maxUsedShare: 0.1 }),
@@ -37,6 +40,8 @@ const THRESHOLDS = Object.freeze({
   R5: Object.freeze({ minCompactions: 2 }),
   R6: Object.freeze({ maxDurationMs: 5 * 60 * 1000, minSubagentShare: 0.3 }),
   R7: Object.freeze({ minEditsAfterLastVerification: 1, minSessions: 3 }),
+  R10: Object.freeze({ minTyped: 3 }),
+  R11: Object.freeze({ maxLines: 500 }),
 });
 
 const THRESHOLD_ORIGIN = Object.freeze({
@@ -47,6 +52,8 @@ const THRESHOLD_ORIGIN = Object.freeze({
   R5: Object.freeze({ minCompactions: 'spec' }),
   R6: Object.freeze({ maxDurationMs: 'spec', minSubagentShare: 'spec' }),
   R7: Object.freeze({ minEditsAfterLastVerification: 'calibration', minSessions: 'calibration' }),
+  R10: Object.freeze({ minTyped: 'spec' }),
+  R11: Object.freeze({ maxLines: 'spec' }),
 });
 
 export { THRESHOLDS, THRESHOLD_ORIGIN };

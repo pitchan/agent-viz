@@ -31,12 +31,22 @@ export interface TokenBucket {
   cacheCreate5m: number;
 }
 
-// Faits de SCAN_VERSION 12 : un rapport stocké avant ne les porte pas, et skill-usage.ts
-// écarte la session en la comptant, comme model-costs.ts pour costByModel.
+export interface ListedSkill {
+  name: string;
+  chars: number;
+  hasDescription: boolean;
+}
+
+// listed, calls, attributed : SCAN_VERSION 12 ; le reste : SCAN_VERSION 14. Un rapport stocké
+// avant n'en porte qu'une partie : skill-usage.ts et skill-facts.ts écartent la session en la comptant.
 export interface SkillFacts {
   listed: string[];
   calls: Record<string, number>;
   attributed: string[];
+  listing?: ListedSkill[];
+  typed?: Record<string, number>;
+  bodies?: { skill: string; lines: number; bytes: number; by: 'model' | 'user' }[];
+  unattributedBodies?: number;
 }
 
 export interface SessionReport {
@@ -125,7 +135,7 @@ export interface EvaluationContext {
   configItems: ConfigItem[];
 }
 
-export type SubjectKind = 'project' | 'mcpServer' | 'tool';
+export type SubjectKind = 'project' | 'mcpServer' | 'tool' | 'skill' | 'skillListing';
 
 // ─── Draft recommendations — one evidence shape per rule ───────────────────
 
