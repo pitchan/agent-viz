@@ -100,3 +100,19 @@ test('une carte non actionnable (« ne se produit plus ») n’a aucun bouton', 
   // Assert
   expect(parClasse(node, 'obs-btn').length).toBe(0);
 });
+
+test('une carte non chiffrée n’a pas de « Plus tard » — elle ne reviendrait jamais', () => {
+  // Arrange + Act
+  const node = recommendationCard(carte({ costBasis: 'non-chiffre' }), { actionable: true });
+  // Assert
+  const boutons = parClasse(node, 'advisor-choice').map(c => parClasse(c, 'obs-btn')[0]);
+  expect(boutons.map(b => b.textContent)).toEqual(['Je l’adopte', 'Non merci']);
+});
+
+test('une carte non chiffrée adoptée ne promet aucun retour', () => {
+  // Arrange + Act
+  const node = recommendationCard(carte({ costBasis: 'non-chiffre' }), { actionable: true });
+  // Assert
+  const [adopte] = parClasse(node, 'advisor-choice');
+  expect(parClasse(adopte, 'advisor-choice-caption')[0].textContent).toBe('La carte part au journal.');
+});

@@ -235,6 +235,20 @@ test('decisionLine sans date consignée le dit, sans deviner', () => {
   expect(decisionLine({ status: 'arbitrated', statusAt: null, statusReason: 'déjà pesé' } as DecisionRec)).toBe('Refusé (date non consignée) — déjà pesé');
 });
 
+test('decisionLine : un non-chiffré adopté ne promet aucun retour', () => {
+  // Un non-chiffré ne revient jamais tout seul (isEligible, ranking.ts, exige
+  // un coût mesuré) : la veille annoncée aux bases chiffrées mentirait ici.
+  expect(decisionLine({
+    status: 'accepted', statusAt: '2026-08-08T12:00:00.000Z', statusReason: null, costBasis: 'non-chiffre',
+  } as DecisionRec)).toBe('Adopté le 08/08/2026');
+});
+
+test('decisionLine : une base chiffrée garde sa promesse de retour', () => {
+  expect(decisionLine({
+    status: 'accepted', statusAt: '2026-08-08T12:00:00.000Z', statusReason: null, costBasis: 'jetons-mesures',
+  } as DecisionRec)).toBe('Adopté le 08/08/2026 — reviendra si le coût regrossit malgré tout');
+});
+
 // ─── Le bandeau de retour : une carte décidée qui re-surface ───────────────
 
 test('returnBanner : une adoption revenue interpelle sur le geste, pourcentage arrondi', () => {

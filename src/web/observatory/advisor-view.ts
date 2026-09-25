@@ -9,7 +9,7 @@ import * as api from './api.ts';
 import { getState, subscribe, loadAdvisor, changeStatus, applyScanEvent } from './store.ts';
 import {
   confidenceLabel, costLabel, basisTitle, periodLabel, basisLabel, periodHeader,
-  scanProgressLabel, summaryHeadline, summaryDetails, returnBanner,
+  scanProgressLabel, summaryHeadline, summaryDetails, returnBanner, isUnpricedBasis,
   type Recommendation, type Summary, type ScanProgress,
 } from './format.ts';
 import { evidenceLines } from './evidence.ts';
@@ -50,6 +50,24 @@ const CHOICE_CAPTIONS = {
   refuse: 'Dis pourquoi en une ligne ; c’est consigné au journal et ne sera plus proposé.',
 };
 
+// Un non-chiffré ne revient jamais tout seul (isEligible, ranking.ts, exige
+// un coût mesuré pour réarmer une carte décidée) : la légende d'adoption ne
+// promet aucun retour.
+const UNPRICED_ACCEPTED_CAPTION = 'La carte part au journal.';
+
+type ChoiceEntry = ['accepted' | 'ignored', string];
+
+// Quels boutons une carte actionnable propose, par base de coût et selon
+// qu'il y a un geste à adopter — table déclarative plutôt qu'un if/else par
+// combinaison (même motif que src/server/routes.ts). Un non-chiffré n'a
+// jamais de « Plus tard » : il ne reviendrait jamais, le bouton mentirait.
+const ENTRIES_BY_BASIS: Record<'priced' | 'unpriced', (hasAction: boolean) => ChoiceEntry[]> = {
+  priced: hasAction => hasAction
+    ? [['accepted', 'Je l’adopte'], ['ignored', 'Plus tard']]
+    : [['ignored', 'Plus tard']],
+  unpriced: hasAction => hasAction ? [['accepted', 'Je l’adopte']] : [],
+};
+
 function choice(content: HTMLElement, caption: string) {
   const wrap = el('div', 'advisor-choice');
   wrap.append(content, el('div', 'advisor-choice-caption', caption));
@@ -79,16 +97,18 @@ export function recommendationCard(rec: Recommendation, { actionable }: { action
 
   if (actionable) {
     // « Je l'adopte » n'existe que s'il y a un geste à adopter ; une carte
-    // informative peut toujours être mise en veille ou refusée.
-    const entries: ['accepted' | 'ignored', string][] = rec.action == null
-      ? [['ignored', 'Plus tard']]
-      : [['accepted', 'Je l’adopte'], ['ignored', 'Plus tard']];
+    // informative peut toujours être mise en veille ou refusée — sauf un
+    // non-chiffré, qui n'a de « Plus tard » dans aucun cas (voir la table).
+    const basisKey = isUnpricedBasis(rec.costBasis) ? 'unpriced' : 'priced';
+    const entries = ENTRIES_BY_BASIS[basisKey](rec.action != null);
     const buttons = el('div', 'advisor-card-buttons');
     for (const [status, label] of entries) {
       const btn = el('button', 'obs-btn', label) as HTMLButtonElement;
       btn.type = 'button';
       btn.dataset.status = status;
-      buttons.appendChild(choice(btn, CHOICE_CAPTIONS[status]));
+      const caption = status === 'accepted' && basisKey === 'unpriced'
+        ? UNPRICED_ACCEPTED_CAPTION : CHOICE_CAPTIONS[status];
+      buttons.appendChild(choice(btn, caption));
     }
     // « Non merci » : câblé avec sa raison — il ne passe pas par la
     // délégation data-status, qui partirait au serveur sans raison.

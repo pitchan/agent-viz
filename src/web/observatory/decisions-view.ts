@@ -11,10 +11,12 @@
 import { decisionLine } from './format.ts';
 
 // Le sous-ensemble d'une recommandation decidee que ce fichier lit ; le reste
-// (statut, raison, date) est l'affaire de decisionLine, dans format.ts.
+// (statut, raison, date, base de coût) est l'affaire de decisionLine, dans
+// format.ts — costBasis n'est lu que par elle, transporté ici sans y toucher.
 interface DecidedRecommendation {
   id: number;
   title: string;
+  costBasis?: string;
 }
 
 function el(tag: string, className?: string, text?: string): HTMLElement {

@@ -117,6 +117,13 @@ export function costBasisLabel(basis: string) {
 // un libellé de « coût partiel » qui laisserait croire à un calcul qui n'a pas eu lieu.
 const UNPRICED_BASES = new Set(['non-chiffre']);
 
+// Seule source de vérité pour « cette base n'a pas de coût mesurable » —
+// advisor-view.ts (boutons/légendes) et decisionLine (ci-dessous) s'y réfèrent
+// tous les deux, plutôt que de retester costBasis chacun à sa façon.
+export function isUnpricedBasis(basis: string): boolean {
+  return UNPRICED_BASES.has(basis);
+}
+
 // When a card's dollars are partial (an unknown model in its sessions), the
 // measured quantity leads and the dollars demote to a lower bound. One entry
 // per rule, reusing the evidence keys the rules already persist; a rule
@@ -141,7 +148,7 @@ const LEAD_QUANTITY_BY_RULE: Record<string, ((e: RecommendationEvidence) => stri
 const PARTIAL_COST_REASON = 'une part des messages n’a pas pu être tarifée';
 
 export function costLabel(rec: Recommendation) {
-  if (UNPRICED_BASES.has(rec.costBasis)) return 'non chiffré';
+  if (isUnpricedBasis(rec.costBasis)) return 'non chiffré';
   if (rec.evidence.costComplete === false) {
     const lead = LEAD_QUANTITY_BY_RULE[rec.ruleId];
     if (lead) {
@@ -185,8 +192,8 @@ const DECISION_WATCH: Record<string, string> = {
   ignored: 'reviendra si le coût regrossit de moitié',
 };
 
-// Le seul appelant reel passe un DecidedRecommendation {id, title}
-// (decisions-view.ts) — repris a l'identique, plus les trois champs que
+// Le seul appelant reel passe un DecidedRecommendation {id, title, costBasis}
+// (decisions-view.ts) — repris a l'identique, plus les quatre champs que
 // decisionLine lit, facultatifs comme dans la vue locale de cet appelant.
 interface DecisionFields {
   id: number;
@@ -194,6 +201,7 @@ interface DecisionFields {
   status?: string;
   statusAt?: string | null;
   statusReason?: string | null;
+  costBasis?: string;
 }
 
 function decidedWhen(rec: DecisionFields) {
@@ -202,9 +210,12 @@ function decidedWhen(rec: DecisionFields) {
 }
 
 // One line per journal card: what was decided, when, and either the user's
-// reason (a refusal) or the watch that stays armed (adoption, sleep).
+// reason (a refusal) or the watch that stays armed (adoption, sleep). Un
+// non-chiffré ne revient jamais tout seul (isEligible, ranking.ts, exige un
+// coût mesuré) : pas de veille à annoncer.
 export function decisionLine(rec: DecisionFields) {
-  const tail = rec.statusReason ?? DECISION_WATCH[rec.status ?? ''] ?? null;
+  const watch = isUnpricedBasis(rec.costBasis ?? '') ? null : DECISION_WATCH[rec.status ?? ''] ?? null;
+  const tail = rec.statusReason ?? watch;
   return tail ? `${decidedWhen(rec)} — ${tail}` : decidedWhen(rec);
 }
 
