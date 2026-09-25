@@ -74,6 +74,19 @@ export function skillListingLine(names: string[], o: LineOpts = {}): string {
   return JSON.stringify({ type: 'attachment', attachment: { type: 'skill_listing', isInitial: true, names }, ...base(o) });
 }
 
+export function skillListingContentLine(names: string[], content: string, o: LineOpts = {}): string {
+  return JSON.stringify({ type: 'attachment', attachment: { type: 'skill_listing', isInitial: true, names, content }, ...base(o) });
+}
+
+/** Texte de SKILL.md chargé : message caché, relié à l'appel Skill quand Claude l'a lancé. */
+export function skillBodyLine(text: string, sourceToolUseId: string | null, o: LineOpts = {}): string {
+  return JSON.stringify({
+    type: 'user', isMeta: true, message: { role: 'user', content: [{ type: 'text', text }] },
+    ...(sourceToolUseId !== null ? { sourceToolUseID: sourceToolUseId } : {}),
+    ...base(o),
+  });
+}
+
 export interface SubagentSpec {
   agentId: string;
   lines: string[];
