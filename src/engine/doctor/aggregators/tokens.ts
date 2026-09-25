@@ -20,6 +20,8 @@ export interface ModelCost {
   /** Dollars cumulés au tarif en vigueur à la date de CHAQUE message.
    *  null = tarif inconnu, jamais un zéro silencieux. */
   usd: number | null;
+  /** Dollars des messages servis en mode rapide, DÉJÀ inclus dans `usd`. */
+  fastUsd: number;
   pricing: PricingKind;
 }
 
@@ -86,9 +88,14 @@ export class TokensAggregator {
     // Dollars par modèle, cumulés au même instant et au même tarif que le coût
     // total — jamais recalculés depuis les seaux (le tarif daté et la part
     // cache 5 min / 1 h d'un message ne se reconstituent pas depuis un agrégat).
-    const mc = (this.costByModel[modelKey] ??= { usd: null, pricing: this.pricing.pricingKindOf(evt.model, evt.timestamp) });
+    const kind = this.pricing.pricingKindOf(evt.model, evt.timestamp, evt.usage.speed);
+    const mc = (this.costByModel[modelKey] ??= { usd: null, fastUsd: 0, pricing: kind });
+    // Un seul message au tarif inconnu fait du montant de la ligne une borne basse :
+    // la ligne se déclare inconnue plutôt que d'afficher un coût partiel comme complet.
+    if (kind === 'inconnu') mc.pricing = 'inconnu';
     if (known && usd !== null) {
       mc.usd = (mc.usd ?? 0) + usd;
+      if (evt.usage.speed === 'fast') mc.fastUsd += usd;
       this.cost += usd;
     } else {
       this.unknown.add(modelKey);
