@@ -248,10 +248,24 @@ export interface R7Recommendation {
   evidence: R7Evidence; action: string;
 }
 
+export interface R8Evidence {
+  sessions: string[];
+  hidden: { name: string; sessions: number }[];
+  sessionsAnalysed: number;
+  largestListingChars: number;
+  excludedPendingRescan: number;
+  costComplete: boolean;
+}
+export interface R8Recommendation {
+  ruleId: 'R8'; subject: string; title: string; category: string;
+  confidence: 'fait'; estimatedCostUsd: number; costBasis: string;
+  evidence: R8Evidence; action: string;
+}
+
 export type Recommendation =
   | R1Recommendation | R2Recommendation | R3Recommendation
   | R4Recommendation | R5Recommendation | R6Recommendation
-  | R7Recommendation;
+  | R7Recommendation | R8Recommendation;
 
 export interface Rule {
   id: string;
