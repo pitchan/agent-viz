@@ -51,6 +51,12 @@ test('an ignored recommendation returns only past +50 % of its cost at decision 
   expect(isEligible(rec(3, { status: 'ignored', estimatedCostUsd: 99, costAtStatusUsd: null }))).toBe(false);
 });
 
+test('une carte décidée à coût nul ne revient que si un coût apparaît', () => {
+  expect(isEligible(rec(1, { status: 'accepted', estimatedCostUsd: 0, costAtStatusUsd: 0 }))).toBe(false);
+  expect(isEligible(rec(2, { status: 'accepted', estimatedCostUsd: 0.5, costAtStatusUsd: 0 }))).toBe(true);
+  expect(isEligible(rec(3, { status: 'ignored', estimatedCostUsd: 0, costAtStatusUsd: 0 }))).toBe(false);
+});
+
 test('a recommendation not re-emitted by the latest scan is stale', () => {
   expect(isStale(rec(1), SCAN)).toBe(false);
   expect(isStale(rec(2, { lastSeenAt: '2026-07-01T00:00:00.000Z' }), SCAN)).toBe(true);
