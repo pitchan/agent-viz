@@ -83,7 +83,9 @@ export interface SessionReport {
     perModel: Record<string, TokenBucket>;
     total: TokenBucket;
     unknownModels: string[];
-    costByModel?: Record<string, { usd: number | null; fastUsd: number; pricing: string }>;
+    // Fait de SCAN_VERSION 14 : un rapport stocké avant ne le porte pas, et
+    // model-costs.ts écarte la session en la comptant.
+    costByModel?: Record<string, { usd: number | null; fastUsd?: number; pricing: string }>;
   };
   // Fait de SCAN_VERSION 8 : un rapport stocké avant ne le porte pas, et R7 écarte la session
   // plutôt que de lui prêter une forme (comme costByModel). Vue restreinte de VerificationStats

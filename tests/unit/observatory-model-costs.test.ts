@@ -134,6 +134,23 @@ test('une session au tarif inconnu rend inconnue la ligne du modèle, quel que s
   expect(r.models.find(m => m.model === 'claude-sonnet-5')?.pricing).toBe('inconnu');
 });
 
+test('une session sans fastUsd sur une entrée costByModel est écartée des lignes ET des totaux, et comptée', () => {
+  // Arrange
+  const avantFastUsd = session({
+    id: 'old-fast', netTokens: 900, costUsd: 0.009,
+    perModel: { 'claude-opus-4-8': bucket(900, 0) },
+    costByModel: { 'claude-opus-4-8': { usd: 0.009, fastUsd: undefined, pricing: 'tarife' } },
+  });
+
+  // Act
+  const r = computeModelCosts([A, avantFastUsd]);
+
+  // Assert
+  expect(r.excludedPendingRescan).toBe(1);
+  expect(r.totals.netTokens).toBe(6000);
+  expect(Number.isFinite(r.totals.fastUsd)).toBe(true);
+});
+
 test('empty input yields zeros, not crashes', () => {
   const r = computeModelCosts([]);
   expect(r.models).toEqual([]);

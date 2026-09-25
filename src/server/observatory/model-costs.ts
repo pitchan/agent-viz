@@ -3,10 +3,10 @@
 // window totals, nothing else. Dollars come from the engine's per-message
 // accumulation (report.tokens.costByModel), NEVER recomputed from token
 // buckets: recomputing would lose the dated tariff and the 5min/1h cache
-// split of each message. Sessions stored before SCAN_VERSION 6 lack
-// costByModel and are excluded from BOTH the rows and the totals — never
-// silently, the count travels in the result — so "sum of rows = total" stays
-// true for what is displayed.
+// split of each message. Sessions stored before SCAN_VERSION 6 (costByModel)
+// or SCAN_VERSION 14 (fastUsd on every entry) are excluded from BOTH the rows
+// and the totals — never silently, the count travels in the result — so
+// "sum of rows = total" stays true for what is displayed.
 
 import { netOf } from './session-mapper.ts';
 import type { Session, TokenBucket } from './rules/types.ts';
@@ -14,18 +14,21 @@ import type { Session, TokenBucket } from './rules/types.ts';
 const emptyBucket = (): TokenBucket =>
   ({ in: 0, out: 0, cacheCreate: 0, cacheRead: 0, cacheCreate1h: 0, cacheCreate5m: 0 });
 
-// costByModel is the SCAN_VERSION 6 field (rules/types.ts): a session stored
-// before it lacks the key entirely. A real `v is X` guard, not a cast — the
-// filtered array below is used to read that field, so the narrowing must
-// actually hold.
+// costByModel is the SCAN_VERSION 6 field, fastUsd on every entry the
+// SCAN_VERSION 14 one (rules/types.ts): a session stored before either lacks
+// it. A real `v is X` guard, not a cast — the filtered array below is used
+// to read both, so the narrowing must actually hold.
 type PricedSession = Session & {
   report: Session['report'] & {
     tokens: Session['report']['tokens'] & {
-      costByModel: NonNullable<Session['report']['tokens']['costByModel']>;
+      costByModel: Record<string, { usd: number | null; fastUsd: number; pricing: string }>;
     };
   };
 };
-const hasCostByModel = (s: Session): s is PricedSession => s.report.tokens.costByModel !== undefined;
+const isPriced = (s: Session): s is PricedSession => {
+  const { costByModel } = s.report.tokens;
+  return costByModel !== undefined && Object.values(costByModel).every(mc => typeof mc.fastUsd === 'number');
+};
 
 interface ModelAgg {
   model: string;
@@ -58,7 +61,7 @@ interface ModelCostsResult {
 }
 
 function computeModelCosts(sessions: Session[]): ModelCostsResult {
-  const ready = sessions.filter(hasCostByModel);
+  const ready = sessions.filter(isPriced);
 
   const byModel = new Map<string, ModelAgg>();
   for (const s of ready) {
