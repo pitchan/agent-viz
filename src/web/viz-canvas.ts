@@ -467,6 +467,9 @@ function paintStaticBg() {
 }
 
 function draw() {
+  // Une zone repliée ou masquée mesure 0 px : drawImage refuse une toile vide et
+  // lèverait à chaque image. Rien n'est visible, il n'y a rien à peindre.
+  if (W === 0 || H === 0) return;
   const cam = vis.camera;
   if (cam.x !== _bgCamX || cam.y !== _bgCamY || cam.zoom !== _bgCamZoom) markBgDirty();
   paintStaticBg();
