@@ -52,14 +52,20 @@ test('Opus 5 en mode rapide : 10 $ / 50 $, cache 1 h à 2 × 10 $', () => {
   expect(r.usd).toBeCloseTo(0.08, 12);
 });
 
-test('speed null ou absent : tarif normal', () => {
+test('speed null : tarif normal', () => {
   expect(computeCost({ input_tokens: 1000, speed: null }, 'claude-opus-5-5').usd).toBeCloseTo(0.004, 12);
+});
+
+test('speed absent : tarif normal', () => {
   expect(computeCost({ input_tokens: 1000 }, 'claude-opus-5-5').usd).toBeCloseTo(0.004, 12);
 });
 
-test('mode rapide sur un modèle sans tarif rapide : coût inconnu, modèle nommé', () => {
+test('Sonnet 5 en mode rapide : coût inconnu, modèle nommé', () => {
   expect(computeCost({ input_tokens: 1000, speed: 'fast' }, 'claude-sonnet-5'))
     .toEqual({ usd: null, known: false, model: 'claude-sonnet-5' });
+});
+
+test('Opus 4.6 en mode rapide : coût inconnu, sa demande rapide revient en "standard"', () => {
   expect(computeCost({ input_tokens: 1000, speed: 'fast' }, 'claude-opus-4-6').usd).toBeNull();
 });
 
@@ -67,9 +73,15 @@ test('un modèle à zéro voulu reste à zéro en mode rapide', () => {
   expect(computeCost({ input_tokens: 1000, speed: 'fast' }, '<synthetic>').usd).toBe(0);
 });
 
-test('pricingKindOf suit la même règle que computeCost', () => {
+test('pricingKindOf : Opus 5.5 rapide est tarifé', () => {
   expect(pricingKindOf('claude-opus-5-5', undefined, 'fast')).toBe('tarife');
+});
+
+test('pricingKindOf : Sonnet 5 rapide est inconnu', () => {
   expect(pricingKindOf('claude-sonnet-5', undefined, 'fast')).toBe('inconnu');
+});
+
+test('pricingKindOf : Sonnet 5 standard est tarifé', () => {
   expect(pricingKindOf('claude-sonnet-5', undefined, 'standard')).toBe('tarife');
 });
 

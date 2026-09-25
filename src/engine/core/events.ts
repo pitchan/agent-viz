@@ -11,7 +11,7 @@ export interface RawUsage {
     ephemeral_5m_input_tokens?: number;
     ephemeral_1h_input_tokens?: number;
   };
-  /** Vitesse réellement servie : `"fast"` ou `"standard"`, `null` sur les vieux journaux. */
+  /** Vitesse réellement servie : `"fast"` ou `"standard"` ; absente ou `null` sur les vieux journaux. */
   speed?: string | null;
 }
 
