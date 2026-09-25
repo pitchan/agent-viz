@@ -22,7 +22,7 @@ export interface SkillStats {
   /** Skills marqués par Claude Code (attributionSkill) sur au moins un message, triés :
    *  un skill lancé par une commande slash n'a aucun appel de l'outil Skill. */
   attributed: string[];
-  /** Dernière entrée vue par nom, triée par nom : taille, description présente ou retirée. */
+  /** Dernière entrée vue par nom dans l'agent principal, triée par nom : taille, description présente ou retirée. */
   listing: SkillListingEntry[];
   /** Commandes « /nom » tapées, par nom, commandes intégrées comprises. */
   typed: Record<string, number>;
@@ -54,9 +54,11 @@ export class SkillsAggregator {
   // Un « /nom » tapé charge son texte juste après ; tout autre prompt coupe ce lien.
   private pendingTyped: string | null = null;
 
-  addListing(evt: SkillListingEvent): void {
+  addListing(evt: SkillListingEvent, agentKey: string): void {
     for (const name of evt.names) this.listed.add(name);
-    for (const entry of evt.entries) this.listing.set(entry.name, entry);
+    // Un sous-agent a une fenêtre de contexte plus petite, donc un budget de liste plus petit :
+    // sa liste ne doit jamais écraser celle, plus complète, de l'agent principal.
+    if (agentKey === 'main') for (const entry of evt.entries) this.listing.set(entry.name, entry);
   }
 
   addAssistant(evt: Pick<AssistantEvent, 'attributionSkill'>): void {

@@ -7,8 +7,8 @@ test('les noms de plusieurs listings sont réunis, sans doublon, triés', () => 
   // Arrange
   const agg = new SkillsAggregator();
   // Act
-  agg.addListing({ kind: 'skill_listing', names: ['pptx', 'docx'], entries: [] });
-  agg.addListing({ kind: 'skill_listing', names: ['docx', 'anthropic-skills:xlsx'], entries: [] });
+  agg.addListing({ kind: 'skill_listing', names: ['pptx', 'docx'], entries: [] }, 'main');
+  agg.addListing({ kind: 'skill_listing', names: ['docx', 'anthropic-skills:xlsx'], entries: [] }, 'main');
   // Assert
   expect(agg.result().listed).toEqual(['anthropic-skills:xlsx', 'docx', 'pptx']);
 });
@@ -66,10 +66,21 @@ test('la dernière entrée vue par nom est gardée, triée par nom', () => {
   // Arrange
   const agg = new SkillsAggregator();
   // Act
-  agg.addListing({ kind: 'skill_listing', names: ['pptx', 'docx'], entries: [entry('pptx', 40), entry('docx', 30)] });
-  agg.addListing({ kind: 'skill_listing', names: ['pptx'], entries: [entry('pptx', 6, false)] });
+  agg.addListing({ kind: 'skill_listing', names: ['pptx', 'docx'], entries: [entry('pptx', 40), entry('docx', 30)] }, 'main');
+  agg.addListing({ kind: 'skill_listing', names: ['pptx'], entries: [entry('pptx', 6, false)] }, 'main');
   // Assert
   expect(agg.result().listing).toEqual([entry('docx', 30), entry('pptx', 6, false)]);
+});
+
+test("la liste d'un sous-agent n'écrase jamais celle de l'agent principal", () => {
+  // Arrange
+  const agg = new SkillsAggregator();
+  agg.addListing({ kind: 'skill_listing', names: ['pptx'], entries: [entry('pptx', 40)] }, 'main');
+  // Act
+  agg.addListing({ kind: 'skill_listing', names: ['pptx'], entries: [entry('pptx', 6, false)] }, 'agent-x');
+  // Assert
+  expect(agg.result().listing).toEqual([entry('pptx', 40)]);
+  expect(agg.result().listed).toContain('pptx');
 });
 
 test('une commande tapée est comptée par nom', () => {
