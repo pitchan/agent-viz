@@ -1,5 +1,5 @@
 'use strict';
-// Les règles de skills lisent des faits qu'un rapport stocké avant SCAN_VERSION 14 ne porte
+// Les règles de skills lisent des faits qu'un rapport stocké avant SCAN_VERSION 15 ne porte
 // pas : une telle session est écartée et comptée, jamais lue comme un zéro.
 
 import type { Session, SkillFacts } from './types.ts';

@@ -37,7 +37,7 @@ export interface ListedSkill {
   hasDescription: boolean;
 }
 
-// listed, calls, attributed : SCAN_VERSION 12 ; le reste : SCAN_VERSION 14. Un rapport stocké
+// listed, calls, attributed : SCAN_VERSION 12 ; le reste : SCAN_VERSION 15. Un rapport stocké
 // avant n'en porte qu'une partie : skill-usage.ts et skill-facts.ts écartent la session en la comptant.
 export interface SkillFacts {
   listed: string[];

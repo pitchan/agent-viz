@@ -48,7 +48,7 @@ test("listing, appel, et skill marqué dans le principal et un sous-agent — au
 
 test('liste, commande tapée et textes chargés, lus de bout en bout', async () => {
   // Arrange
-  writeSessionTree(claudeDir, 'F--skills-v14', 'sess-v14', [
+  writeSessionTree(claudeDir, 'F--skills-v15', 'sess-v15', [
     skillListingContentLine(['docx', 'anthropic-skills:docx', 'pptx'],
       '- docx: Word.\n- anthropic-skills:docx: Word aussi.\n- pptx'),
     promptLine('<command-name>/docx</command-name>', { timestamp: '2026-09-01T10:00:00.000Z' }),
@@ -58,7 +58,7 @@ test('liste, commande tapée et textes chargés, lus de bout en bout', async () 
     toolResultLine('tu1', 'Launching skill: pptx', { timestamp: '2026-09-01T10:00:02.000Z' }),
     skillBodyLine('Base directory for this skill: C:\\s\\pptx\n# Pptx\nfin', 'tu1'),
   ], []);
-  const refs = await discoverSessions(claudeDir, { project: 'F--skills-v14' });
+  const refs = await discoverSessions(claudeDir, { project: 'F--skills-v15' });
   // Act
   const r = await scanSession(refs[0]!, 100, embeddedPricing);
   // Assert
