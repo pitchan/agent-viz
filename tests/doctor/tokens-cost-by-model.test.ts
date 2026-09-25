@@ -34,14 +34,14 @@ test('tarif daté PAR MODÈLE : les deux barèmes sonnet-5 s’additionnent, pas
 test('zéro voulu : usd 0, pricing zero-voulu', () => {
   const agg = new TokensAggregator(embeddedPricing);
   agg.addAssistant(assistant({ msgId: 'z1', model: '<synthetic>', usage: { input_tokens: 50 } }), 'main');
-  expect(agg.result().costByModel['<synthetic>']).toEqual({ usd: 0, pricing: 'zero-voulu' });
+  expect(agg.result().costByModel['<synthetic>']).toEqual({ usd: 0, fastUsd: 0, pricing: 'zero-voulu' });
 });
 
 test('modèle inconnu : usd null, pricing inconnu, PRÉSENT dans costByModel', () => {
   const agg = new TokensAggregator(embeddedPricing);
   agg.addAssistant(assistant({ msgId: 'u1', model: 'claude-futur-9', usage: { input_tokens: 500 } }), 'main');
   const r = agg.result();
-  expect(r.costByModel['claude-futur-9']).toEqual({ usd: null, pricing: 'inconnu' });
+  expect(r.costByModel['claude-futur-9']).toEqual({ usd: null, fastUsd: 0, pricing: 'inconnu' });
   expect(r.unknownModels).toEqual(['claude-futur-9']);
   expect(r.costUsd).toBe(0);
 });

@@ -155,7 +155,7 @@ function accumulateUsage(
   if (model) {
     const canonique = normalizeModel(model);
     const pricing = currentPricing();
-    const nature = pricing.pricingKindOf(model, at ?? undefined);
+    const nature = pricing.pricingKindOf(model, at ?? undefined, raw.speed);
     // Inconnu : on NOMME le modèle et marque le total incomplet ; `lastModel` garde la pastille.
     if (nature === 'inconnu') {
       if (canonique !== null) {

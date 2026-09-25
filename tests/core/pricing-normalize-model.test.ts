@@ -41,7 +41,7 @@ test('TÉMOIN NÉGATIF : élargir la normalisation ne rend pas tout connu', () =
   // plus large que le fait : ce qui est reconnu, c'est le PRÉFIXE, et le
   // modèle dessous doit toujours figurer à la table.
   expect(normalizeModel('us.anthropic.claude-opus-99-9')).toBe('claude-opus-99-9');
-  expect(pricingKindOf('us.anthropic.claude-opus-99-9')).toBe('inconnu');
+  expect(pricingKindOf('us.anthropic.claude-opus-99-9', undefined, undefined)).toBe('inconnu');
   expect(computeCost({ input_tokens: 10 }, 'us.anthropic.claude-opus-99-9').known).toBe(false);
   // Et un préfixe qui n'est pas un routeur connu n'est pas retiré.
   expect(normalizeModel('zz.anthropic.claude-opus-5')).toBe('zz.anthropic.claude-opus-5');
@@ -53,5 +53,5 @@ test('un identifiant régional est tarifé comme sa forme canonique', () => {
   const canonique = computeCost(usage, 'claude-opus-4-7');
   expect(regional.known).toBe(true);
   expect(regional.usd).toBe(canonique.usd);
-  expect(pricingKindOf('us.anthropic.claude-opus-4-7')).toBe('tarife');
+  expect(pricingKindOf('us.anthropic.claude-opus-4-7', undefined, undefined)).toBe('tarife');
 });

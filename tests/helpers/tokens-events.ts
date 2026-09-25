@@ -1,12 +1,12 @@
 // Fabrique d'événement `assistant` pour les filets de TokensAggregator : un défaut
 // valide, chaque test ne déclare que ce qui diffère (`tests/CLAUDE.md` § 2).
-import type { NormalizedEvent } from '../../src/engine/core/events.ts';
+import type { NormalizedEvent, RawUsage } from '../../src/engine/core/events.ts';
 import type { UsageVerdict } from '../../src/engine/core/usage.ts';
 
 export function assistant(over: {
   msgId?: string | null;
   model?: string;
-  usage?: Record<string, number>;
+  usage?: RawUsage;
   usageVerdict?: UsageVerdict;
   timestamp?: string;
 }): Extract<NormalizedEvent, { kind: 'assistant' }> {
