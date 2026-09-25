@@ -1,5 +1,7 @@
 'use strict';
-// R8 — la liste des skills a dépassé son plafond : Claude Code a retiré des descriptions.
+// R8 — un skill listé sans description : soit un réglage "name-only" (skillOverrides),
+// soit la liste a dépassé son plafond et Claude Code l'a retirée lui-même. Le transcript ne
+// distingue pas les deux causes, donc le titre énonce le fait mesuré, jamais la cause.
 //
 // Un skill sans description reste appelable, mais Claude le choisit moins souvent seul
 // (doc Claude Code). Coût 0 : la liste est relue depuis le cache, et le taux moyen de la
@@ -33,7 +35,7 @@ function evaluate(ctx: EvaluationContext): R8Recommendation[] {
   return [{
     ruleId: ID,
     subject: SUBJECT,
-    title: `Liste des skills au plafond : ${n} description${n > 1 ? 's' : ''} retirée${n > 1 ? 's' : ''}`,
+    title: `${n} skill${n > 1 ? 's' : ''} listé${n > 1 ? 's' : ''} sans description`,
     category: CATEGORY,
     confidence: 'fait',
     estimatedCostUsd: 0,
@@ -46,7 +48,8 @@ function evaluate(ctx: EvaluationContext): R8Recommendation[] {
       excludedPendingRescan,
       costComplete: touched.every(s => s.costComplete),
     },
-    action: 'Passer en "name-only" ou "off" (réglage skillOverrides) les skills en double ou jamais appelés, '
+    action: 'Une description absente vient d’un réglage "name-only" (skillOverrides) ou du plafond de la liste. '
+      + 'Dans le second cas : passer en "name-only" ou "off" les skills en double ou jamais appelés, '
       + 'ou relever skillListingBudgetFraction (par défaut 1 % de la fenêtre de contexte).',
   }];
 }

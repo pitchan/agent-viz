@@ -18,7 +18,7 @@ test('une description retirée produit une seule carte, sans coût, avec les ski
   expect(recs[0]).toMatchObject({
     ruleId: 'R8', subject: 'liste-des-skills', category: 'skills', confidence: 'fait',
     estimatedCostUsd: 0, costBasis: 'jetons-mesures',
-    title: 'Liste des skills au plafond : 2 descriptions retirées',
+    title: '2 skills listés sans description',
   });
   expect(recs[0]!.evidence).toEqual({
     sessions: ['s1', 's2'],

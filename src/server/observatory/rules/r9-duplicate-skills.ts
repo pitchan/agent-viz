@@ -12,6 +12,9 @@ const CATEGORY = 'skills';
 
 interface Group {
   chars: Map<string, number>;
+  // Le plafond de la liste retient le pire tour, pas l'union des noms vus sur la période :
+  // le plus grand nombre de copies observé DANS UNE MÊME session.
+  maxCopies: number;
   sessions: string[];
   costComplete: boolean;
 }
@@ -27,8 +30,9 @@ function evaluate(ctx: EvaluationContext): R9Recommendation[] {
     }
     for (const [base, entries] of byBase) {
       if (entries.length < 2) continue;
-      const group: Group = groups.get(base) ?? { chars: new Map(), sessions: [], costComplete: true };
+      const group: Group = groups.get(base) ?? { chars: new Map(), maxCopies: 0, sessions: [], costComplete: true };
       for (const e of entries) group.chars.set(e.name, Math.max(group.chars.get(e.name) ?? 0, e.chars));
+      group.maxCopies = Math.max(group.maxCopies, entries.length);
       group.sessions.push(session.id);
       group.costComplete = group.costComplete && session.costComplete;
       groups.set(base, group);
@@ -38,7 +42,7 @@ function evaluate(ctx: EvaluationContext): R9Recommendation[] {
   return [...groups].map(([base, group]): R9Recommendation => ({
     ruleId: ID,
     subject: base,
-    title: `Skill « ${base} » présent ${group.chars.size} fois dans la liste`,
+    title: `Skill « ${base} » présent ${group.maxCopies} fois dans la liste`,
     category: CATEGORY,
     confidence: 'fait',
     estimatedCostUsd: 0,
@@ -50,7 +54,7 @@ function evaluate(ctx: EvaluationContext): R9Recommendation[] {
       excludedPendingRescan,
       costComplete: group.costComplete,
     },
-    action: 'Garder une seule copie : désactiver le plugin qui fait doublon, '
+    action: 'Si ces copies font la même chose, en garder une seule : désactiver le plugin qui fait doublon, '
       + 'ou "off" dans skillOverrides pour la copie en trop.',
   }));
 }

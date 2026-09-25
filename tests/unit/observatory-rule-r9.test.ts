@@ -32,3 +32,16 @@ test('des noms de base distincts : aucune carte', () => {
   // Act / Assert
   expect(r9.evaluate({ sessions, configItems: [] })).toEqual([]);
 });
+
+test('le compte du titre est le pire tour, pas l\'union des noms vus sur la période', () => {
+  // Arrange
+  const sessions = [
+    skillSession('s1', { listing: [listed('docx'), listed('a:docx')] }),
+    skillSession('s2', { listing: [listed('docx'), listed('b:docx')] }),
+  ];
+  // Act
+  const recs = r9.evaluate({ sessions, configItems: [] });
+  // Assert
+  expect(recs[0]!.title).toBe('Skill « docx » présent 2 fois dans la liste');
+  expect(recs[0]!.evidence.copies.map(c => c.name)).toEqual(['a:docx', 'b:docx', 'docx']);
+});

@@ -1,7 +1,7 @@
 'use strict';
 // R11 — le texte d'un skill chargé dépasse la longueur conseillée par Anthropic pour un
 // SKILL.md. Chargé, il reste dans le contexte jusqu'à la fin de la session ; le coût ne
-// compte qu'un passage, c'est donc un minimum.
+// compte qu'un passage par chargement.
 
 import { COST_BASIS, usdForBytes } from './cost.ts';
 import { splitBySkillFacts } from './skill-facts.ts';
