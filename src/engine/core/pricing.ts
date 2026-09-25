@@ -34,6 +34,15 @@ const PRICES: Record<string, ModelPrices> = {
   'claude-haiku-4-5': { input: 1e-6, output: 5e-6, cacheCreate: 1.25e-6, cacheRead: 1e-7 },
 };
 
+// Tarif du mode rapide, repris de la page des tarifs d'Anthropic ; les multiplicateurs
+// de cache s'y appliquent comme au tarif normal. Pas de ligne Opus 4.6 : une demande
+// rapide y est servie en vitesse normale et marquée `"standard"`.
+const FAST_PRICES: Record<string, ModelPrices> = {
+  'claude-opus-5-5': { input: 8e-6, output: 4e-5, cacheCreate: 1e-5, cacheRead: 4e-7 },
+  'claude-opus-5': { input: 1e-5, output: 5e-5, cacheCreate: 1.25e-5, cacheRead: 1e-6 },
+  'claude-opus-4-8': { input: 1e-5, output: 5e-5, cacheCreate: 1.25e-5, cacheRead: 1e-6 },
+};
+
 // Les périodes datées ANTÉRIEURES au tarif courant, triées par `until` croissant. Chacune
 // s'applique aux messages horodatés STRICTEMENT avant son `until` (ISO UTC, comparaison
 // lexicographique — les deux formats sont zéro-paddés).
@@ -124,7 +133,7 @@ export interface AdoptionMark { source: 'anthropic'; adoptedAt: string; from: st
 
 export interface Pricing {
   computeCost(usage: RawUsage, model: string | null | undefined, at?: string): CostResult;
-  pricingKindOf(model: string | null | undefined, at?: string): PricingKind;
+  pricingKindOf(model: string | null | undefined, at?: string, speed?: string | null): PricingKind;
   priceTable(): PriceTable;
 }
 
@@ -135,6 +144,12 @@ const samePrices = (a: ModelPrices, b: ModelPrices): boolean => FIELDS.every((f)
 // Un id lu dans un transcript tiers ne doit jamais tomber sur une propriété héritée (`constructor`).
 const own = <T>(rec: Record<string, T>, key: string): T | undefined =>
   (Object.hasOwn(rec, key) ? rec[key] : undefined);
+
+// Seul `"fast"` change de barème ; un modèle absent de FAST_PRICES rend undefined,
+// donc un coût inconnu, jamais le tarif normal.
+function pricesFor(priceAt: PriceAt, norm: string, at: string | undefined, speed: unknown): ModelPrices | undefined {
+  return speed === 'fast' ? own(FAST_PRICES, norm) : priceAt(norm, at ?? new Date().toISOString());
+}
 
 /** Libellé lisible (« Opus 5.5 ») d'un id canonique ; l'id tel quel hors forme. */
 export function deriveLabel(id: string): string {
@@ -160,13 +175,13 @@ function costWith(
 ): CostResult {
   const norm = normalizeModel(model);
   if (norm !== null && own(ZERO_COST, norm) !== undefined) return { usd: 0, known: true, model: norm };
-  const p = norm !== null ? priceAt(norm, at ?? new Date().toISOString()) : undefined;
-  if (p === undefined) return { usd: null, known: false, model: norm };
-
   // `usage` vient d'un JSONL écrit par un tiers : `normalizeEvent` écarte un non-objet mais pas ses
   // champs, et `"cache_creation": null`, du JSON valide, faisait LEVER cette fonction. Le serveur
   // calcule son coût ici lui aussi : sans ces deux gardes, la panne le toucherait.
   const u: RawUsage = isRecord(usage) ? usage : {};
+  const p = norm !== null ? pricesFor(priceAt, norm, at, u.speed) : undefined;
+  if (p === undefined) return { usd: null, known: false, model: norm };
+
   const cc = isRecord(u.cache_creation) ? u.cache_creation : undefined;
   // Un champ brut qui n'est pas un compte (chaîne, Infinity, négatif, décimal)
   // coûte zéro, comme il compte zéro jeton dans usage.ts : le coût lit la MÊME
@@ -196,11 +211,11 @@ export type PricingKind = 'tarife' | 'zero-voulu' | 'inconnu';
  *  de computeCost, qui ne rend qu'un montant. Un 'zero-voulu' est un 0 $
  *  inscrit dans ZERO_COST ; un 'inconnu' est un tarif qu'on ne connaît pas et
  *  qu'on n'invente pas. */
-function kindWith(priceAt: PriceAt, model: string | null | undefined, at?: string): PricingKind {
+function kindWith(priceAt: PriceAt, model: string | null | undefined, at?: string, speed?: string | null): PricingKind {
   const norm = normalizeModel(model);
   if (norm === null) return 'inconnu';
   if (own(ZERO_COST, norm) !== undefined) return 'zero-voulu';
-  return priceAt(norm, at ?? new Date().toISOString()) === undefined ? 'inconnu' : 'tarife';
+  return pricesFor(priceAt, norm, at, speed) === undefined ? 'inconnu' : 'tarife';
 }
 
 export interface PriceTableEntry {
@@ -212,6 +227,8 @@ export interface PriceTableEntry {
   maxInput: number;
   current: ModelPrices;
   history: PricePeriod[];
+  /** Tarif du mode rapide ; null pour un modèle qui n'en a pas. */
+  fast: ModelPrices | null;
   /** Présent quand le tarif courant vient de la page des tarifs d'Anthropic. */
   adopted: AdoptionMark | null;
 }
@@ -265,6 +282,7 @@ function tableOf(b: Bareme): PriceTable {
     entries: Object.entries(b.prices).map(([model, prices]) => {
       const info = own(b.info, model);
       const mark = own(b.marks, model);
+      const fast = own(FAST_PRICES, model);
       return {
         model,
         // Un modèle sans descriptif reste visible (libellé = identifiant) ;
@@ -273,6 +291,7 @@ function tableOf(b: Bareme): PriceTable {
         maxInput: info?.maxInput ?? 0,
         current: { ...prices },
         history: (own(b.history, model) ?? []).map((p) => ({ until: p.until, prices: { ...p.prices } })),
+        fast: fast === undefined ? null : { ...fast },
         adopted: mark === undefined ? null : { ...mark },
       };
     }),
@@ -291,7 +310,7 @@ export function createPricing(adopted: AdoptedPrices): Pricing {
   };
   return {
     computeCost: (usage, model, at) => costWith(priceAt, usage, model, at),
-    pricingKindOf: (model, at) => kindWith(priceAt, model, at),
+    pricingKindOf: (model, at, speed) => kindWith(priceAt, model, at, speed),
     priceTable: () => tableOf(b),
   };
 }
