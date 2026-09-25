@@ -9,20 +9,26 @@ import type { Session, TokenBucket } from '../../src/server/observatory/rules/ty
 const bucket = (inTok: number, out: number, cc = 0, cr = 0): TokenBucket =>
   ({ in: inTok, out, cacheCreate: cc, cacheRead: cr, cacheCreate1h: 0, cacheCreate5m: 0 });
 
+type CostEntry = { usd: number | null; fastUsd?: number; pricing: string };
+
 interface SessionFixtureOpts {
   id: string;
   netTokens: number;
   costUsd: number;
   costComplete?: boolean;
   perModel: Record<string, TokenBucket>;
-  costByModel: Record<string, { usd: number | null; pricing: string }>;
+  costByModel: Record<string, CostEntry>;
   cacheRead?: number;
   unknownModels?: string[];
 }
 
+// fastUsd vaut 0 sauf quand un test le déclare : un modèle sans mode rapide n'en a pas.
+const withFast = (cbm: Record<string, CostEntry>) =>
+  Object.fromEntries(Object.entries(cbm).map(([k, v]) => [k, { fastUsd: 0, ...v }]));
+
 function session({ id, netTokens, costUsd, costComplete = true, perModel, costByModel, cacheRead = 0, unknownModels = [] }: SessionFixtureOpts) {
   return { id, netTokens, costUsd, costComplete,
-    report: { tokens: { perModel, costByModel, total: { cacheRead }, unknownModels } } } as unknown as Session;
+    report: { tokens: { perModel, costByModel: withFast(costByModel), total: { cacheRead }, unknownModels } } } as unknown as Session;
 }
 
 const A = session({
@@ -89,6 +95,43 @@ test('a session scanned before SCAN_VERSION 6 is excluded from rows AND totals, 
   expect(r.totals.netTokens).toBe(6000);
   const sum = r.models.reduce((acc, m) => acc + (m.costUsd ?? 0), 0);
   expect(Math.abs(sum - r.totals.costUsd) < 1e-9).toBeTruthy();
+});
+
+test('fastUsd est additionné par modèle et au total', () => {
+  // Arrange
+  const rapide = session({
+    id: 'f', netTokens: 1000, costUsd: 0.012,
+    perModel: { 'claude-opus-5-5': bucket(2000, 0) },
+    costByModel: { 'claude-opus-5-5': { usd: 0.012, fastUsd: 0.008, pricing: 'tarife' } },
+  });
+
+  // Act
+  const r = computeModelCosts([A, rapide]);
+
+  // Assert
+  expect(r.models.find(m => m.model === 'claude-opus-5-5')?.fastUsd).toBeCloseTo(0.008, 12);
+  expect(r.models.find(m => m.model === 'claude-opus-4-8')?.fastUsd).toBe(0);
+  expect(r.totals.fastUsd).toBeCloseTo(0.008, 12);
+});
+
+test('une session au tarif inconnu rend inconnue la ligne du modèle, quel que soit l’ordre', () => {
+  // Arrange
+  const partielle = session({
+    id: 'p', netTokens: 1000, costUsd: 0.002, costComplete: false, unknownModels: ['claude-sonnet-5'],
+    perModel: { 'claude-sonnet-5': bucket(1000, 0) },
+    costByModel: { 'claude-sonnet-5': { usd: 0.002, pricing: 'inconnu' } },
+  });
+  const complete = session({
+    id: 'q', netTokens: 1000, costUsd: 0.002,
+    perModel: { 'claude-sonnet-5': bucket(1000, 0) },
+    costByModel: { 'claude-sonnet-5': { usd: 0.002, pricing: 'tarife' } },
+  });
+
+  // Act
+  const r = computeModelCosts([complete, partielle]);
+
+  // Assert
+  expect(r.models.find(m => m.model === 'claude-sonnet-5')?.pricing).toBe('inconnu');
 });
 
 test('empty input yields zeros, not crashes', () => {

@@ -31,6 +31,7 @@ interface ModelAgg {
   model: string;
   bucket: TokenBucket;
   costUsd: number | null;
+  fastUsd: number;
   pricing: string;
   sessions: number;
 }
@@ -44,6 +45,7 @@ interface ModelCostRow extends ModelAgg {
 interface ModelCostsTotals {
   netTokens: number;
   costUsd: number;
+  fastUsd: number;
   costComplete: boolean;
   cacheReadTokens: number;
 }
@@ -64,12 +66,15 @@ function computeModelCosts(sessions: Session[]): ModelCostsResult {
     for (const [model, mc] of Object.entries(costByModel)) {
       let agg = byModel.get(model);
       if (!agg) {
-        agg = { model, bucket: emptyBucket(), costUsd: null, pricing: mc.pricing, sessions: 0 };
+        agg = { model, bucket: emptyBucket(), costUsd: null, fastUsd: 0, pricing: mc.pricing, sessions: 0 };
         byModel.set(model, agg);
       }
       const b = perModel[model];
       if (b) for (const k of Object.keys(agg.bucket) as (keyof TokenBucket)[]) agg.bucket[k] += b[k] ?? 0;
       if (mc.usd !== null) agg.costUsd = (agg.costUsd ?? 0) + mc.usd;
+      agg.fastUsd += mc.fastUsd;
+      // Une seule session au tarif inconnu fait du montant de la ligne une borne basse.
+      if (mc.pricing === 'inconnu') agg.pricing = 'inconnu';
       agg.sessions += 1;
     }
   }
@@ -77,6 +82,7 @@ function computeModelCosts(sessions: Session[]): ModelCostsResult {
   const totals: ModelCostsTotals = {
     netTokens: ready.reduce((acc, s) => acc + s.netTokens, 0),
     costUsd: ready.reduce((acc, s) => acc + s.costUsd, 0),
+    fastUsd: [...byModel.values()].reduce((acc, agg) => acc + agg.fastUsd, 0),
     costComplete: ready.every(s => s.costComplete),
     cacheReadTokens: ready.reduce((acc, s) => acc + s.report.tokens.total.cacheRead, 0),
   };
