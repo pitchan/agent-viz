@@ -144,7 +144,7 @@ function buildCostTable(models: ModelCostRow[]) {
       formatTokens(row.bucket.cacheCreate), formatTokens(row.bucket.cacheRead),
       formatTokens(row.netTokens),
       costCellOf(row),
-      fastCostCell(row.fastUsd),
+      fastCostCell(row.fastUsd, row.pricing),
       row.shareOfCost === null ? '—' : formatShare(row.shareOfCost),
     ], row.model));
   }

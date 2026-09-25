@@ -280,8 +280,10 @@ export function formatUsdExact(n: number) {
 }
 
 // Le mode rapide ne s'affiche que s'il a servi : un tiret plutôt qu'un 0,00 $ qui
-// laisserait croire à un coût mesuré.
-export function fastCostCell(fastUsd: number): string {
+// laisserait croire à un coût mesuré. Une ligne au tarif inconnu le redit au lieu
+// du tiret : le montant rapide, comme le coût, n'est pas déterminé.
+export function fastCostCell(fastUsd: number, pricing: string): string {
+  if (pricing === 'inconnu') return 'tarif inconnu';
   return fastUsd > 0 ? formatUsdExact(fastUsd) : '—';
 }
 

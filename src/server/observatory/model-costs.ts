@@ -94,15 +94,19 @@ function computeModelCosts(sessions: Session[]): ModelCostsResult {
     ...agg,
     netTokens: netOf(agg.bucket),
     shareOfNet: totals.netTokens > 0 ? netOf(agg.bucket) / totals.netTokens : 0,
-    // A model without a known tariff has no cost share — null, never a fake 0.
-    shareOfCost: agg.costUsd !== null && totals.costUsd > 0 ? agg.costUsd / totals.costUsd : null,
+    // A model without a known tariff, or whose dollars are only a partial sum
+    // (pricing 'inconnu'), has no cost share — null, never a fake or partial one.
+    shareOfCost: agg.costUsd !== null && agg.pricing !== 'inconnu' && totals.costUsd > 0
+      ? agg.costUsd / totals.costUsd : null,
   }));
 
-  // Priced models by descending dollars; models with no known tariff LAST,
-  // by descending net tokens — visible, never hidden.
-  const hasCost = (r: ModelCostRow): r is ModelCostRow & { costUsd: number } => r.costUsd !== null;
+  // Priced models by descending dollars; models with no known tariff, or whose
+  // costUsd is only a partial sum ('inconnu'), LAST by descending net tokens —
+  // visible, never ranked as if the amount were complete.
+  const hasCost = (r: ModelCostRow): r is ModelCostRow & { costUsd: number } =>
+    r.costUsd !== null && r.pricing !== 'inconnu';
   const priced = rows.filter(hasCost).sort((a, b) => b.costUsd - a.costUsd);
-  const unpriced = rows.filter(r => r.costUsd === null).sort((a, b) => b.netTokens - a.netTokens);
+  const unpriced = rows.filter(r => !hasCost(r)).sort((a, b) => b.netTokens - a.netTokens);
 
   return {
     models: [...priced, ...unpriced],

@@ -4,11 +4,15 @@ import { expect, test } from 'vitest';
 import { fastCostCell, fastTotalNote, fastRatesCell } from '../../src/web/observatory/format.ts';
 
 test('cellule du coût rapide : le montant quand le mode rapide a servi', () => {
-  expect(fastCostCell(2)).toBe('2,00 $');
+  expect(fastCostCell(2, 'tarife')).toBe('2,00 $');
 });
 
 test('cellule du coût rapide : un tiret sans mode rapide', () => {
-  expect(fastCostCell(0)).toBe('—');
+  expect(fastCostCell(0, 'tarife')).toBe('—');
+});
+
+test('cellule du coût rapide : tarif inconnu sur une ligne inconnue', () => {
+  expect(fastCostCell(0, 'inconnu')).toBe('tarif inconnu');
 });
 
 test('mention du résumé : le montant rapide quand il a servi', () => {

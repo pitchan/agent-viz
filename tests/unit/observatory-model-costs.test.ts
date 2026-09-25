@@ -134,6 +134,36 @@ test('une session au tarif inconnu rend inconnue la ligne du modèle, quel que s
   expect(r.models.find(m => m.model === 'claude-sonnet-5')?.pricing).toBe('inconnu');
 });
 
+test('une ligne au tarif inconnu n’a pas de part de coût, même avec des dollars partiels', () => {
+  // Arrange
+  const partielle = session({
+    id: 'p2', netTokens: 1000, costUsd: 0.002, costComplete: false, unknownModels: ['claude-sonnet-5'],
+    perModel: { 'claude-sonnet-5': bucket(1000, 0) },
+    costByModel: { 'claude-sonnet-5': { usd: 0.002, pricing: 'inconnu' } },
+  });
+
+  // Act
+  const r = computeModelCosts([A, partielle]);
+
+  // Assert
+  expect(r.models.find(m => m.model === 'claude-sonnet-5')?.shareOfCost).toBe(null);
+});
+
+test('une ligne au tarif inconnu se classe après les lignes tarifées, même avec plus de dollars', () => {
+  // Arrange
+  const grosseInconnue = session({
+    id: 'g', netTokens: 50, costUsd: 5, costComplete: false, unknownModels: ['claude-sonnet-5'],
+    perModel: { 'claude-sonnet-5': bucket(50, 0) },
+    costByModel: { 'claude-sonnet-5': { usd: 5, pricing: 'inconnu' } },
+  });
+
+  // Act
+  const r = computeModelCosts([A, grosseInconnue]);
+
+  // Assert
+  expect(r.models.map(m => m.model)).toEqual(['claude-opus-4-8', 'claude-haiku-4-5', 'claude-sonnet-5']);
+});
+
 test('une session sans fastUsd sur une entrée costByModel est écartée des lignes ET des totaux, et comptée', () => {
   // Arrange
   const avantFastUsd = session({
