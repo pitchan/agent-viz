@@ -279,6 +279,20 @@ export function formatUsdExact(n: number) {
   return n > 0 && s === '0,00 $' ? '< 0,01 $' : s;
 }
 
+// Le mode rapide ne s'affiche que s'il a servi : un tiret plutôt qu'un 0,00 $ qui
+// laisserait croire à un coût mesuré.
+export function fastCostCell(fastUsd: number): string {
+  return fastUsd > 0 ? formatUsdExact(fastUsd) : '—';
+}
+
+export function fastTotalNote(fastUsd: number): string {
+  return fastUsd > 0 ? ` dont ${formatUsdExact(fastUsd)} en mode rapide` : '';
+}
+
+export function fastRatesCell(fast: { input: number; output: number } | null): string {
+  return fast === null ? '—' : `${formatUsdPerMTok(fast.input)} entrée / ${formatUsdPerMTok(fast.output)} sortie`;
+}
+
 // La date seule suffit : l'heure d'un clic n'aide pas à juger un tarif.
 export function adoptionNote(mark: { source: string; adoptedAt: string; from: string | null } | null): string {
   return mark === null ? '' : `tarif Anthropic appliqué le ${mark.adoptedAt.slice(0, 10)}`;

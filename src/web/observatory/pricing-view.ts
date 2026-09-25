@@ -11,7 +11,7 @@ import { getState, subscribe, loadPricing } from './store.ts';
 import {
   formatTokens, formatUsdExact, formatUsdPerMTok, formatShare, modelLabel, adoptionNote,
   driftTitle, ratesPerMTok, vigieStatus, pendingReason, checkOutcome,
-  basisLabel, periodHeader, type Period, type SummaryBasis,
+  basisLabel, periodHeader, fastCostCell, fastTotalNote, fastRatesCell, type Period, type SummaryBasis,
 } from './format.ts';
 import { initPeriodSelector } from './period-selector.ts';
 
@@ -22,6 +22,7 @@ interface ModelCostRow {
   model: string;
   pricing: string;
   costUsd: number;
+  fastUsd: number;
   bucket: { in: number; out: number; cacheCreate: number; cacheRead: number };
   netTokens: number;
   shareOfCost: number | null;
@@ -30,6 +31,7 @@ interface ModelCostRow {
 interface ModelCostsTotals {
   netTokens: number;
   costUsd: number;
+  fastUsd: number;
   costComplete: boolean;
   cacheReadTokens: number;
 }
@@ -54,6 +56,7 @@ interface TariffEntry {
   current: { input: number; output: number; cacheCreate: number; cacheRead: number };
   maxInput: number;
   history: TariffPeriod[];
+  fast: { input: number; output: number; cacheCreate: number; cacheRead: number } | null;
   adopted: { source: string; adoptedAt: string; from: string | null } | null;
 }
 
@@ -97,9 +100,9 @@ interface PricingPayload {
 }
 
 const COST_HEADERS = ['Modèle', 'Entrée', 'Sortie', 'Création de cache',
-  'Relecture de cache', 'Jetons nets', 'Coût', 'Part'];
+  'Relecture de cache', 'Jetons nets', 'Coût', 'dont mode rapide', 'Part'];
 const TARIFF_HEADERS = ['Modèle', 'Entrée', 'Sortie', 'Écriture cache 5 min',
-  'Relecture', 'Fenêtre', 'Périodes datées'];
+  'Relecture', 'Mode rapide (entrée / sortie)', 'Fenêtre', 'Périodes datées'];
 
 // "tarif inconnu" instead of an amount, a wanted zero says so with no shame:
 // no silent cell, ever.
@@ -141,6 +144,7 @@ function buildCostTable(models: ModelCostRow[]) {
       formatTokens(row.bucket.cacheCreate), formatTokens(row.bucket.cacheRead),
       formatTokens(row.netTokens),
       costCellOf(row),
+      fastCostCell(row.fastUsd),
       row.shareOfCost === null ? '—' : formatShare(row.shareOfCost),
     ], row.model));
   }
@@ -163,6 +167,7 @@ function buildTariffTable(priceTable: PriceTable) {
       e.adopted ? `${e.label} (${adoptionNote(e.adopted)})` : e.label,
       formatUsdPerMTok(e.current.input), formatUsdPerMTok(e.current.output),
       formatUsdPerMTok(e.current.cacheCreate), formatUsdPerMTok(e.current.cacheRead),
+      fastRatesCell(e.fast),
       formatTokens(e.maxInput),
       periodsCell(e.history),
     ], e.model));
@@ -278,7 +283,7 @@ function render() {
   summaryEl.textContent = [
     modelCosts.period ? periodHeader(modelCosts.period) : '',
     modelCosts.basis ? basisLabel(modelCosts.basis) : '',
-    `${formatTokens(totals.netTokens)} jetons nets — ${formatUsdExact(totals.costUsd)}${totals.costComplete ? '' : ' (coût partiel)'}`,
+    `${formatTokens(totals.netTokens)} jetons nets — ${formatUsdExact(totals.costUsd)}${fastTotalNote(totals.fastUsd)}${totals.costComplete ? '' : ' (coût partiel)'}`,
     `${formatTokens(totals.cacheReadTokens)} jetons relus depuis le cache (jamais additionnés aux nets)`,
   ].filter(Boolean).join(' — ');
 
