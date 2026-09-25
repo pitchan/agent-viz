@@ -1,7 +1,7 @@
 'use strict';
 // R10 — un skill que seul l'utilisateur lance (« /nom » tapé), jamais choisi par Claude,
 // garde sa description dans la liste à chaque tour. disable-model-invocation l'en retire ;
-// la contrepartie est que Claude ne peut plus l'appeler seul. Coût 0, comme R8.
+// la contrepartie est que Claude ne peut plus l'appeler seul. Non chiffré, comme R8.
 
 import { COST_BASIS } from './cost.ts';
 import { splitBySkillFacts } from './skill-facts.ts';
@@ -14,7 +14,6 @@ const CATEGORY = 'skills';
 interface Typed {
   count: number;
   sessions: string[];
-  costComplete: boolean;
 }
 
 function evaluate(ctx: EvaluationContext): R10Recommendation[] {
@@ -25,10 +24,9 @@ function evaluate(ctx: EvaluationContext): R10Recommendation[] {
   for (const session of ready) {
     const { typed: typedHere, calls, listing } = session.report.skills;
     for (const [name, count] of Object.entries(typedHere)) {
-      const agg: Typed = typed.get(name) ?? { count: 0, sessions: [], costComplete: true };
+      const agg: Typed = typed.get(name) ?? { count: 0, sessions: [] };
       agg.count += count;
       agg.sessions.push(session.id);
-      agg.costComplete = agg.costComplete && session.costComplete;
       typed.set(name, agg);
     }
     for (const [name, count] of Object.entries(calls)) modelCalls.set(name, (modelCalls.get(name) ?? 0) + count);
@@ -48,8 +46,8 @@ function evaluate(ctx: EvaluationContext): R10Recommendation[] {
       category: CATEGORY,
       confidence: 'fait',
       estimatedCostUsd: 0,
-      costBasis: COST_BASIS.MEASURED_TOKENS,
-      evidence: { sessions: agg.sessions, typedCount: agg.count, entryChars, excludedPendingRescan, costComplete: agg.costComplete },
+      costBasis: COST_BASIS.NOT_PRICED,
+      evidence: { sessions: agg.sessions, typedCount: agg.count, entryChars, excludedPendingRescan },
       action: 'Ajouter disable-model-invocation: true dans son SKILL.md, ou "user-invocable-only" dans skillOverrides '
         + 'pour un skill de plugin : sa description sort de la liste. Claude ne pourra plus l’appeler seul.',
     });

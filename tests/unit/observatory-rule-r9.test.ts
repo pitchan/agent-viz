@@ -15,14 +15,13 @@ test('deux copies du même nom de base produisent une carte par nom de base', ()
   // Assert
   expect(recs.length).toBe(1);
   expect(recs[0]).toMatchObject({
-    ruleId: 'R9', subject: 'docx', category: 'skills', estimatedCostUsd: 0,
+    ruleId: 'R9', subject: 'docx', category: 'skills', estimatedCostUsd: 0, costBasis: 'non-chiffre',
     title: 'Skill « docx » présent 2 fois dans la liste',
   });
   expect(recs[0]!.evidence).toEqual({
     sessions: ['s1'],
     copies: [{ name: 'anthropic-skills:docx', chars: 959 }, { name: 'docx', chars: 793 }],
     excludedPendingRescan: 1,
-    costComplete: true,
   });
 });
 

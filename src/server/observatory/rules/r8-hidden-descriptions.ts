@@ -4,8 +4,8 @@
 // distingue pas les deux causes, donc le titre énonce le fait mesuré, jamais la cause.
 //
 // Un skill sans description reste appelable, mais Claude le choisit moins souvent seul
-// (doc Claude Code). Coût 0 : la liste est relue depuis le cache, et le taux moyen de la
-// session la surévaluerait ; la carte se classe donc après toute carte chiffrée de son bloc.
+// (doc Claude Code). Non chiffré : la liste est relue depuis le cache, et le taux moyen de la
+// session la surévaluerait ; la carte va dans le bloc « non chiffré », à part des cartes chiffrées.
 
 import { COST_BASIS } from './cost.ts';
 import { splitBySkillFacts } from './skill-facts.ts';
@@ -39,14 +39,13 @@ function evaluate(ctx: EvaluationContext): R8Recommendation[] {
     category: CATEGORY,
     confidence: 'fait',
     estimatedCostUsd: 0,
-    costBasis: COST_BASIS.MEASURED_TOKENS,
+    costBasis: COST_BASIS.NOT_PRICED,
     evidence: {
       sessions: touched.map(s => s.id),
       hidden,
       sessionsAnalysed: ready.length,
       largestListingChars,
       excludedPendingRescan,
-      costComplete: touched.every(s => s.costComplete),
     },
     action: 'Une description absente vient d’un réglage "name-only" (skillOverrides) ou du plafond de la liste. '
       + 'Dans le second cas : passer en "name-only" ou "off" les skills en double ou jamais appelés, '

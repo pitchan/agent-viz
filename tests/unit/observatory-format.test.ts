@@ -56,7 +56,14 @@ test('a partially-priced recommendation says so, never a silent total', () => {
 test('each basis block has a title that warns against comparing across blocks', () => {
   expect(basisTitle('jetons-mesures')).toMatch(/jetons mesurés/i);
   expect(basisTitle('octets-approx-4o-par-jeton')).toMatch(/estimé/i);
+  expect(basisTitle('non-chiffre')).toMatch(/non chiffré/i);
   expect(basisTitle('jetons-mesures')).not.toBe(basisTitle('octets-approx-4o-par-jeton'));
+});
+
+// R8/R9/R10 : un coût jamais calculé n'a pas de dollar à montrer, jamais un 0,00 $.
+test('costLabel for the non-chiffre basis names no dollar amount, even without costComplete', () => {
+  expect(costLabel({ estimatedCostUsd: 0, costBasis: 'non-chiffre', evidence: {} } as Recommendation)).toBe('non chiffré');
+  expect(costLabel({ estimatedCostUsd: 0, costBasis: 'non-chiffre', evidence: { costComplete: false } } as Recommendation)).toBe('non chiffré');
 });
 
 test('formatDayMonth renders JJ/MM', () => {

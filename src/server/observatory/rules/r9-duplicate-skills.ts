@@ -1,7 +1,7 @@
 'use strict';
 // R9 — un même skill figure plusieurs fois dans la liste (skill personnel et copie de
 // plugin) : chaque copie occupe la liste et pousse d'autres descriptions hors du plafond.
-// Coût 0, pour la même raison que R8.
+// Non chiffré, pour la même raison que R8.
 
 import { COST_BASIS } from './cost.ts';
 import { baseName, splitBySkillFacts } from './skill-facts.ts';
@@ -16,7 +16,6 @@ interface Group {
   // le plus grand nombre de copies observé DANS UNE MÊME session.
   maxCopies: number;
   sessions: string[];
-  costComplete: boolean;
 }
 
 function evaluate(ctx: EvaluationContext): R9Recommendation[] {
@@ -30,11 +29,10 @@ function evaluate(ctx: EvaluationContext): R9Recommendation[] {
     }
     for (const [base, entries] of byBase) {
       if (entries.length < 2) continue;
-      const group: Group = groups.get(base) ?? { chars: new Map(), maxCopies: 0, sessions: [], costComplete: true };
+      const group: Group = groups.get(base) ?? { chars: new Map(), maxCopies: 0, sessions: [] };
       for (const e of entries) group.chars.set(e.name, Math.max(group.chars.get(e.name) ?? 0, e.chars));
       group.maxCopies = Math.max(group.maxCopies, entries.length);
       group.sessions.push(session.id);
-      group.costComplete = group.costComplete && session.costComplete;
       groups.set(base, group);
     }
   }
@@ -46,13 +44,12 @@ function evaluate(ctx: EvaluationContext): R9Recommendation[] {
     category: CATEGORY,
     confidence: 'fait',
     estimatedCostUsd: 0,
-    costBasis: COST_BASIS.MEASURED_TOKENS,
+    costBasis: COST_BASIS.NOT_PRICED,
     evidence: {
       sessions: group.sessions,
       copies: [...group.chars].map(([name, chars]) => ({ name, chars }))
         .sort((a, b) => (a.name < b.name ? -1 : 1)),
       excludedPendingRescan,
-      costComplete: group.costComplete,
     },
     action: 'Si ces copies font la même chose, en garder une seule : désactiver le plugin qui fait doublon, '
       + 'ou "off" dans skillOverrides pour la copie en trop.',

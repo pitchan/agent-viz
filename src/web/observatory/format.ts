@@ -107,10 +107,15 @@ export function confidenceLabel(c: string) {
 const BASIS_LABELS: Record<string, string> = {
   'jetons-mesures': 'jetons mesurés',
   'octets-approx-4o-par-jeton': 'estimé depuis les octets (≈ 4 octets par jeton)',
+  'non-chiffre': 'non chiffré',
 };
 export function costBasisLabel(basis: string) {
   return BASIS_LABELS[basis] || basis;
 }
+
+// Bases sans dollar affichable : ni un 0,00 $ (coût jamais calculé, pas mesuré à zéro), ni
+// un libellé de « coût partiel » qui laisserait croire à un calcul qui n'a pas eu lieu.
+const UNPRICED_BASES = new Set(['non-chiffre']);
 
 // When a card's dollars are partial (an unknown model in its sessions), the
 // measured quantity leads and the dollars demote to a lower bound. One entry
@@ -136,6 +141,7 @@ const LEAD_QUANTITY_BY_RULE: Record<string, ((e: RecommendationEvidence) => stri
 const PARTIAL_COST_REASON = 'une part des messages n’a pas pu être tarifée';
 
 export function costLabel(rec: Recommendation) {
+  if (UNPRICED_BASES.has(rec.costBasis)) return 'non chiffré';
   if (rec.evidence.costComplete === false) {
     const lead = LEAD_QUANTITY_BY_RULE[rec.ruleId];
     if (lead) {
@@ -153,6 +159,7 @@ export function costLabel(rec: Recommendation) {
 const BASIS_TITLES: Record<string, string> = {
   'jetons-mesures': 'Chiffré en jetons mesurés',
   'octets-approx-4o-par-jeton': 'Estimé depuis les octets — à ne pas comparer au bloc ci-dessus',
+  'non-chiffre': 'Non chiffré — le transcript ne permet pas de mettre un prix sur ces conseils',
 };
 export function basisTitle(basis: string) {
   return BASIS_TITLES[basis] || basis;

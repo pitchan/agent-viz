@@ -31,10 +31,13 @@ test('sumUsd prices each session at its own rate — never a global rate', () =>
   expect(sumUsd([])).toBe(0);
 });
 
-test('the two cost bases are distinct, explicit strings', () => {
+test('the three cost bases are distinct, explicit strings', () => {
   expect(COST_BASIS.MEASURED_TOKENS).toBe('jetons-mesures');
   expect(COST_BASIS.APPROX_BYTES).toBe('octets-approx-4o-par-jeton');
-  expect(Object.keys(COST_BASIS).length, 'a third basis needs a ranking decision first').toBe(2);
+  // NOT_PRICED : décidé (BASIS_ORDER, ranking.ts) — R8/R9/R10 vont dans leur propre
+  // bloc, jamais mêlées aux cartes chiffrées. Une quatrième base en redemande une.
+  expect(COST_BASIS.NOT_PRICED).toBe('non-chiffre');
+  expect(Object.keys(COST_BASIS).length, 'a fourth basis needs a ranking decision first').toBe(3);
 });
 
 test('every threshold declares where its value comes from', () => {

@@ -15,11 +15,11 @@ test('tapé 3 fois, jamais appelé par Claude, décrit dans la liste : une carte
   // Assert
   expect(recs.length).toBe(1);
   expect(recs[0]).toMatchObject({
-    ruleId: 'R10', subject: 'code-review', category: 'skills', estimatedCostUsd: 0,
+    ruleId: 'R10', subject: 'code-review', category: 'skills', estimatedCostUsd: 0, costBasis: 'non-chiffre',
     title: 'Skill « code-review » lancé seulement à la main, sa description reste dans la liste',
   });
   expect(recs[0]!.evidence).toEqual({
-    sessions: ['s1', 's2'], typedCount: 3, entryChars: 853, excludedPendingRescan: 1, costComplete: true,
+    sessions: ['s1', 's2'], typedCount: 3, entryChars: 853, excludedPendingRescan: 1,
   });
 });
 

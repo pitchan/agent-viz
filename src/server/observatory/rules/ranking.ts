@@ -46,7 +46,7 @@ interface RankedRecommendation {
 const CONFIDENCE_WEIGHT: Record<string, number> = { fait: 1, correlation: 0.6, hypothese: 0.3 };
 const RETURN_FACTOR = 1.5;
 const PRIORITY_SIZE = 3;
-const BASIS_ORDER: string[] = [COST_BASIS.MEASURED_TOKENS, COST_BASIS.APPROX_BYTES];
+const BASIS_ORDER: string[] = [COST_BASIS.MEASURED_TOKENS, COST_BASIS.APPROX_BYTES, COST_BASIS.NOT_PRICED];
 
 function scoreOf(rec: RankedRecommendation): number {
   return rec.estimatedCostUsd * (CONFIDENCE_WEIGHT[rec.confidence] ?? 0);

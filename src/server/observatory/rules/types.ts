@@ -256,7 +256,6 @@ export interface R8Evidence {
   sessionsAnalysed: number;
   largestListingChars: number;
   excludedPendingRescan: number;
-  costComplete: boolean;
 }
 export interface R8Recommendation {
   ruleId: 'R8'; subject: string; title: string; category: string;
@@ -268,7 +267,6 @@ export interface R9Evidence {
   sessions: string[];
   copies: { name: string; chars: number }[];
   excludedPendingRescan: number;
-  costComplete: boolean;
 }
 export interface R9Recommendation {
   ruleId: 'R9'; subject: string; title: string; category: string;
@@ -281,7 +279,6 @@ export interface R10Evidence {
   typedCount: number;
   entryChars: number;
   excludedPendingRescan: number;
-  costComplete: boolean;
 }
 export interface R10Recommendation {
   ruleId: 'R10'; subject: string; title: string; category: string;

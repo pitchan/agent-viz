@@ -81,6 +81,21 @@ test('a basis with no recommendation produces no empty group', () => {
   expect(groups.map(g => g.basis)).toEqual(['jetons-mesures']);
 });
 
+test('a non-chiffre card gets its own group, after the two priced groups, never inside jetons-mesures', () => {
+  // Arrange
+  const input = [
+    rec(1, { estimatedCostUsd: 5, costBasis: 'jetons-mesures' }),
+    rec(2, { estimatedCostUsd: 90, costBasis: 'octets-approx-4o-par-jeton' }),
+    rec(3, { estimatedCostUsd: 0, costBasis: 'non-chiffre' }),
+  ];
+  // Act
+  const { groups } = rankByBasis(input, { lastScanAt: SCAN });
+  // Assert
+  expect(groups.map(g => g.basis)).toEqual(['jetons-mesures', 'octets-approx-4o-par-jeton', 'non-chiffre']);
+  expect(groups[0]!.all.map(r => r.id), 'jamais mêlée aux cartes chiffrées en jetons').toEqual([1]);
+  expect(groups[2]!.all.map(r => r.id)).toEqual([3]);
+});
+
 test('within a basis, a correlation outranks a fact only when its cost is high enough', () => {
   const { groups } = rankByBasis([
     rec(1, { estimatedCostUsd: 10, confidence: 'fait' }),

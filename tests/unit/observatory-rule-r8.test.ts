@@ -17,7 +17,7 @@ test('une description retirée produit une seule carte, sans coût, avec les ski
   expect(recs.length).toBe(1);
   expect(recs[0]).toMatchObject({
     ruleId: 'R8', subject: 'liste-des-skills', category: 'skills', confidence: 'fait',
-    estimatedCostUsd: 0, costBasis: 'jetons-mesures',
+    estimatedCostUsd: 0, costBasis: 'non-chiffre',
     title: '2 skills listés sans description',
   });
   expect(recs[0]!.evidence).toEqual({
@@ -26,7 +26,6 @@ test('une description retirée produit une seule carte, sans coût, avec les ski
     sessionsAnalysed: 3,
     largestListingChars: 529,
     excludedPendingRescan: 1,
-    costComplete: true,
   });
 });
 
