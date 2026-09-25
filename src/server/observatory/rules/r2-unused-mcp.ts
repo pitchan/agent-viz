@@ -7,9 +7,9 @@
 //   applied to the scanned period (evidence.inventorySnapshot = true).
 // * The cost of merely loading a server is not isolable from a transcript. The
 //   only measured, attributable cost is the prefix churn marked "tools
-//   appeared". When that is zero the recommendation costs zero and therefore
-//   never reaches the priority block — that is the price of refusing to invent
-//   a saving, and it is intended.
+//   appeared". When that is zero the recommendation costs zero and ranks
+//   after every priced card of its block — that is the price of refusing to
+//   invent a saving, and it is intended.
 
 import { COST_BASIS, sumUsd } from './cost.ts';
 import { THRESHOLDS } from './thresholds.ts';

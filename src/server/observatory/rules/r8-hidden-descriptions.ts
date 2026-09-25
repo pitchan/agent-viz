@@ -5,7 +5,7 @@
 //
 // Un skill sans description reste appelable, mais Claude le choisit moins souvent seul
 // (doc Claude Code). Coût 0 : la liste est relue depuis le cache, et le taux moyen de la
-// session la surévaluerait ; la carte ne monte donc jamais dans le bloc prioritaire (comme R2).
+// session la surévaluerait ; la carte se classe donc après toute carte chiffrée de son bloc.
 
 import { COST_BASIS } from './cost.ts';
 import { splitBySkillFacts } from './skill-facts.ts';
