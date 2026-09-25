@@ -274,10 +274,24 @@ export interface R9Recommendation {
   evidence: R9Evidence; action: string;
 }
 
+export interface R10Evidence {
+  sessions: string[];
+  typedCount: number;
+  entryChars: number;
+  excludedPendingRescan: number;
+  costComplete: boolean;
+}
+export interface R10Recommendation {
+  ruleId: 'R10'; subject: string; title: string; category: string;
+  confidence: 'fait'; estimatedCostUsd: number; costBasis: string;
+  evidence: R10Evidence; action: string;
+}
+
 export type Recommendation =
   | R1Recommendation | R2Recommendation | R3Recommendation
   | R4Recommendation | R5Recommendation | R6Recommendation
-  | R7Recommendation | R8Recommendation | R9Recommendation;
+  | R7Recommendation | R8Recommendation | R9Recommendation
+  | R10Recommendation;
 
 export interface Rule {
   id: string;
