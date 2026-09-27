@@ -90,6 +90,17 @@ export function addUsage(b: UsageBucket, u: RawUsage): void {
   b.cacheCreate5m += countOrZero(u.cache_creation?.ephemeral_5m_input_tokens);
 }
 
+/** L'inverse exact d'`addUsage` sur le même `u` : retire ce qu'une ligne a compté quand une
+ *  ligne plus récente du même message la remplace (voir `isDedupableMsgId`). */
+export function subtractUsage(b: UsageBucket, u: RawUsage): void {
+  b.in -= countOrZero(u.input_tokens);
+  b.out -= countOrZero(u.output_tokens);
+  b.cacheCreate -= countOrZero(u.cache_creation_input_tokens);
+  b.cacheRead -= countOrZero(u.cache_read_input_tokens);
+  b.cacheCreate1h -= countOrZero(u.cache_creation?.ephemeral_1h_input_tokens);
+  b.cacheCreate5m -= countOrZero(u.cache_creation?.ephemeral_5m_input_tokens);
+}
+
 /** Fusionne `src` dans `target`, champ pour champ. `src` n'est pas touché. */
 export function sumUsageInto(target: UsageBucket, src: UsageBucket): void {
   target.in += src.in;
@@ -102,9 +113,15 @@ export function sumUsageInto(target: UsageBucket, src: UsageBucket): void {
 
 /**
  * LA règle de déduplication, à un seul endroit. Claude Code écrit une ligne
- * JSONL par bloc de contenu (réflexion, texte, appel d'outil) et **toutes
- * portent le même `usage`** : sans déduplication par identifiant de message, le
- * seau compte N fois la même consommation.
+ * JSONL par bloc de contenu (réflexion, texte, appel d'outil), toutes sous le
+ * même identifiant de message : sans déduplication, le seau compte N fois la
+ * même consommation.
+ *
+ * **La dernière ligne saine d'un message l'emporte.** Dans les fichiers de
+ * sous-agents, les premières lignes portent un `output_tokens` partiel, pris
+ * pendant le streaming (16, puis 169 pour le même message) ; seule la dernière
+ * porte le compte final. Garder la première ne compte qu'une fraction de la
+ * sortie des sous-agents.
  *
  * **Un identifiant vide n'est pas un identifiant.** Dédupliquer sur `''` fusionnerait des
  * messages **distincts** dépourvus d'identifiant en un seul, donc **sous-compterait** — une

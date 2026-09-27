@@ -19,7 +19,7 @@ import { broadcastSSE } from './sse.ts';
 import { getPrice } from './pricing.ts';
 import { normalizeModel } from '../engine/core/pricing.ts';
 import { currentPricing } from './pricing-state.ts';
-import { addUsage, countOrZero, emptyUsageBucket, isDedupableMsgId, usageVerdict } from '../engine/core/usage.ts';
+import { addUsage, countOrZero, emptyUsageBucket, isDedupableMsgId, subtractUsage, usageVerdict } from '../engine/core/usage.ts';
 import type { UsageBucket } from '../engine/core/usage.ts';
 import type { RawUsage } from '../engine/core/events.ts';
 
@@ -35,7 +35,7 @@ interface Bucket extends UsageBucket {
   costComplete: boolean;
   unknownModels: string[];
   malformedUsageMessages: number;
-  _seenMsgIds: Set<string>;
+  _counted: Map<string, { raw: RawUsage; cost: number }>;
 }
 
 /** La tranche `rec.tokens` telle que CE fichier la construit et la lit.
@@ -71,12 +71,10 @@ function newBucket(): Bucket {
     // `malformedUsageMessages` compte les messages au `usage` inexploitable : leurs champs
     // inexploitables valent zéro, aux jetons comme au coût.
     costComplete: true, unknownModels: [], malformedUsageMessages: 0,
-    // Set of Anthropic message ids already accumulated. Claude Code writes one
-    // JSONL line per content block (thinking, text, tool_use) but every line
-    // carries the same `usage` — without dedup the bucket sums it N times.
-    // JSON.stringify serializes a Set to `{}`, so this stays invisible in the
-    // SSE snapshot envelope.
-    _seenMsgIds: new Set(),
+    // Par identifiant de message, la ligne comptée et son coût : une ligne plus récente du même
+    // message les retire avant de compter les siens (`isDedupableMsgId`). JSON.stringify rend
+    // une Map en `{}` : elle reste invisible dans l'enveloppe SSE.
+    _counted: new Map(),
   };
 }
 
@@ -100,12 +98,12 @@ function tokenSum(b: UsageBucket | null | undefined): number {
 
 /** Un seau réel, reconnu à ses champs propres — jamais un cast : la même
  *  frontière `unknown` que `ensureTokens`, côté lecture. `'in' in v` couvre le
- *  fond du moteur, `_seenMsgIds instanceof Set` couvre ce que seul CE fichier
+ *  fond du moteur, `_counted instanceof Map` couvre ce que seul CE fichier
  *  pose ; les deux ensemble ne matchent rien d'autre dans le produit. */
 function isBucket(v: unknown): v is Bucket {
   if (typeof v !== 'object' || v === null) return false;
-  if (!('_seenMsgIds' in v) || !('in' in v)) return false;
-  return v._seenMsgIds instanceof Set;
+  if (!('_counted' in v) || !('in' in v)) return false;
+  return v._counted instanceof Map;
 }
 
 function accumulateUsage(
@@ -124,15 +122,20 @@ function accumulateUsage(
   // Sans `usage`, aucune mesure : la ligne est ignorée et ne rend pas la session partielle.
   const verdict = usageVerdict(usage);
   if (verdict === 'absent') return;
-  // Idempotence by Anthropic message id — see _seenMsgIds note in newBucket.
+  // Idempotence by Anthropic message id — see _counted note in newBucket.
   // Opt-in: callers without a stable id (e.g. legacy hooks) keep cumulating
   // as before.
   // Un identifiant vide ne déduplique pas (`isDedupableMsgId`) ; `msgId !== null` en tête donne
   // à TypeScript la certitude que ce prédicat vérifie sans rétrécir son paramètre `unknown`.
-  if (msgId !== null && isDedupableMsgId(msgId)) {
-    if (bucket._seenMsgIds.has(msgId)) return;
-    bucket._seenMsgIds.add(msgId);
+  const id = msgId !== null && isDedupableMsgId(msgId) ? msgId : null;
+  const deja = id === null ? undefined : bucket._counted.get(id);
+  if (deja !== undefined) {
+    // La dernière ligne saine l'emporte : une ligne identique ou malformée ne change rien.
+    if (verdict !== 'sain' || memeMesure(deja.raw, raw)) return;
+    subtractUsage(bucket, deja.raw);
+    bucket.costUsd -= deja.cost;
   }
+  let cout = 0;
   // Compté une fois par message : ses champs inexploitables valent zéro, jetons et coût de la
   // session deviennent des bornes inférieures.
   if (verdict === 'malforme') {
@@ -167,8 +170,8 @@ function accumulateUsage(
       // Tarifé ou zéro voulu (`<synthetic>`, Ollama local) : le montant compte, le total reste complet.
       // `usd` est fini (chaque champ passe par `countOrZero`) et `null` seulement pour un tarif
       // inconnu, écarté ci-dessus : `?? 0` ne traite que ce cas.
-      const cost = pricing.computeCost(raw, model, at ?? undefined).usd;
-      bucket.costUsd += cost ?? 0;
+      cout = pricing.computeCost(raw, model, at ?? undefined).usd ?? 0;
+      bucket.costUsd += cout;
       // Seul un modèle tarifé devient celui de la pastille : `<synthetic>` est un artefact du harnais.
       if (nature === 'tarife') {
         bucket.lastModel = canonique;
@@ -177,6 +180,17 @@ function accumulateUsage(
       }
     }
   }
+  if (id !== null) bucket._counted.set(id, { raw, cost: cout });
+}
+
+/** Deux lignes du même message qui compteraient les mêmes jetons : les recompter ne ferait
+ *  qu'ajouter des erreurs d'arrondi au coût. */
+function memeMesure(a: RawUsage, b: RawUsage): boolean {
+  const x = emptyUsageBucket();
+  const y = emptyUsageBucket();
+  addUsage(x, a);
+  addUsage(y, b);
+  return (Object.keys(x) as Array<keyof UsageBucket>).every(k => x[k] === y[k]);
 }
 
 interface TokensSnapshot {

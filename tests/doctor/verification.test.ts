@@ -281,3 +281,15 @@ test('une edition a la milliseconde exacte du dernier resultat est couverte', ()
   assert.equal(stats.editsAfterLastVerification, 0, 'egalite stricte : couverte, jamais en queue');
   assert.deepEqual(stats.filesAfterLastVerification, []);
 });
+
+test('la queue compte la sortie finale d un message ecrit sur plusieurs lignes', () => {
+  // Arrange : un sous-agent ecrit le meme message deux fois, la premiere avec un compte partiel.
+  const agg = new VerificationAggregator();
+  const u = (out: number) => ({ input_tokens: 10, output_tokens: out, cache_creation_input_tokens: 0 });
+  agg.addAssistant(assistant({ msgId: 'm1', timestamp: T(2), usage: u(16) }) as never, 'agent-a');
+  agg.addAssistant(assistant({ msgId: 'm1', timestamp: T(2), usage: u(169) }) as never, 'agent-a');
+  // Act
+  const stats = agg.result();
+  // Assert
+  assert.equal(stats.tokensAfterLastVerification, 10 + 169);
+});

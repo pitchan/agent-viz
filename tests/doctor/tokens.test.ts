@@ -216,3 +216,28 @@ test('un modèle à zéro voulu ne rend pas le coût partiel', () => {
   expect(r.unknownModels).toEqual([]);
   expect(r.malformedUsageMessages).toBe(0);
 });
+
+// Dans les fichiers de sous-agents, Claude Code écrit le même message sur plusieurs lignes dont
+// la première porte un `output_tokens` partiel, pris pendant le streaming : la dernière l'emporte.
+test('la dernière ligne d un message l emporte : le compte de sortie partiel est remplacé', () => {
+  const agg = new TokensAggregator(embeddedPricing);
+  agg.addAssistant(assistant({ msgId: 'msg_s', usage: { input_tokens: 10, output_tokens: 16 } }), 'agent-a');
+  agg.addAssistant(assistant({ msgId: 'msg_s', usage: { input_tokens: 10, output_tokens: 169 } }), 'agent-a');
+  const seul = new TokensAggregator(embeddedPricing);
+  seul.addAssistant(assistant({ msgId: 'msg_s', usage: { input_tokens: 10, output_tokens: 169 } }), 'agent-a');
+  const r = agg.result();
+  expect(r.perAgent['agent-a']).toEqual(seul.result().perAgent['agent-a']);
+  expect(r.total.out).toBe(169);
+  expect(r.costUsd).toBe(seul.result().costUsd);
+  expect(r.costByModel).toEqual(seul.result().costByModel);
+});
+
+test('une ligne malformée ne remplace pas la mesure saine du même message', () => {
+  const agg = new TokensAggregator(embeddedPricing);
+  agg.addAssistant(assistant({ msgId: 'msg_m', usage: { input_tokens: 10, output_tokens: 40 } }), 'main');
+  agg.addAssistant(assistant({ msgId: 'msg_m', usage: { input_tokens: -1, output_tokens: 90 }, usageVerdict: 'malforme' }), 'main');
+  const r = agg.result();
+  expect(r.main.out).toBe(40);
+  expect(r.malformedUsageMessages).toBe(0);
+  expect(r.costComplete).toBe(true);
+});
