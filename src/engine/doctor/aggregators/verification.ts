@@ -94,7 +94,7 @@ export class VerificationAggregator {
   private readonly pendingEdits = new Map<string, PendingEdit>();
   private readonly verifs: Array<{ t: number; rec: VerificationRecord }> = [];
   private readonly edits: Array<{ t: number; at: string; path: string }> = [];
-  private readonly usageSeen = new Set<string>();
+  private readonly usageSeen = new Map<string, { t: number; net: number }>();
   private readonly usages: Array<{ t: number; net: number }> = [];
   private unordered = 0;
 
@@ -118,16 +118,21 @@ export class VerificationAggregator {
       }
     }
     if (evt.usage !== null) {
-      if (isDedupableMsgId(evt.msgId)) {
-        const key = `${agentKey}:${evt.msgId}`;
-        if (this.usageSeen.has(key)) return;
-        this.usageSeen.add(key);
-      }
       const bucket = emptyUsageBucket();
       addUsage(bucket, evt.usage);
+      // Une ligne plus récente du même message remplace sa mesure, à la date de la première :
+      // la dernière porte le compte de sortie final (`isDedupableMsgId`).
+      const key = isDedupableMsgId(evt.msgId) ? `${agentKey}:${evt.msgId}` : null;
+      const deja = key === null ? undefined : this.usageSeen.get(key);
+      if (deja !== undefined) {
+        if (evt.usageVerdict !== 'malforme') deja.net = netTokens(bucket);
+        return;
+      }
       const t = toMs(evt.timestamp);
       if (Number.isNaN(t)) this.unordered += 1;
-      this.usages.push({ t, net: netTokens(bucket) });
+      const usage = { t, net: netTokens(bucket) };
+      this.usages.push(usage);
+      if (key !== null) this.usageSeen.set(key, usage);
     }
   }
 

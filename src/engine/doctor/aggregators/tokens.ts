@@ -46,76 +46,86 @@ export interface TokensResult {
 
 /**
  * Métrique 1 : tokens et coût par session, main + sous-agents, par modèle.
- * Claude Code écrit une ligne JSONL par content block portant le MÊME usage :
- * la déduplication par message.id est obligatoire.
+ * Un message s'écrit sur plusieurs lignes JSONL et une seule compte, la dernière saine
+ * (règle et raison : `isDedupableMsgId`) : le calcul attend donc la fin de la lecture.
  */
 export class TokensAggregator {
   // Le barème arrive de l'appelant : la CLI et le serveur y mettent les prix adoptés.
   private readonly pricing: Pricing;
   constructor(pricing: Pricing) { this.pricing = pricing; }
 
-  private readonly seen = new Set<string>();
-  private readonly main = emptyBucket();
-  private readonly perAgent: Record<string, TokenBucket> = {};
-  private readonly perModel: Record<string, TokenBucket> = {};
-  private readonly costByModel: Record<string, ModelCost> = {};
-  private cost = 0;
-  private readonly unknown = new Set<string>();
-  private malformed = 0;
+  // Une entrée par message, dans l'ordre de première apparition ; un message sans
+  // identifiant exploitable a la sienne, jamais fusionnée avec une autre.
+  private readonly retenus = new Map<string, { evt: AssistantEvent; agentKey: string }>();
+  private sansId = 0;
 
   addAssistant(evt: AssistantEvent, agentKey: string): void {
     // Sans `usage`, aucune mesure : la ligne est ignorée et ne rend pas la session partielle.
     if (evt.usageVerdict === 'absent') return;
     // Un identifiant vide ne déduplique pas (`isDedupableMsgId`) : tester `msgId !== null`
     // fusionnait des messages distincts sans identifiant, et les sous-comptait.
-    if (isDedupableMsgId(evt.msgId)) {
-      const key = `${agentKey}:${evt.msgId}`;
-      if (this.seen.has(key)) return;
-      this.seen.add(key);
+    if (!isDedupableMsgId(evt.msgId)) {
+      this.retenus.set(`#${this.sansId++}`, { evt, agentKey });
+      return;
     }
-    // Compté une fois par message, avant d'écarter un `usage` non objet : ce message n'apporte
-    // aucun jeton, mais jetons et coût de la session deviennent des bornes inférieures.
-    if (evt.usageVerdict === 'malforme') this.malformed += 1;
-    if (evt.usage === null) return;
-    const bucket = agentKey === 'main' ? this.main : (this.perAgent[agentKey] ??= emptyBucket());
-    addUsage(bucket, evt.usage);
-
-    // Le tarif appliqué est celui en vigueur à la date du message : un changement
-    // de prix adopté ne réécrit pas les messages d'avant.
-    const { usd, known, model } = this.pricing.computeCost(evt.usage, evt.model, evt.timestamp);
-    const modelKey = model ?? '(inconnu)';
-    addUsage((this.perModel[modelKey] ??= emptyBucket()), evt.usage);
-    // Dollars par modèle, cumulés au même instant et au même tarif que le coût
-    // total — jamais recalculés depuis les seaux (le tarif daté et la part
-    // cache 5 min / 1 h d'un message ne se reconstituent pas depuis un agrégat).
-    const kind = this.pricing.pricingKindOf(evt.model, evt.timestamp, evt.usage.speed);
-    const mc = (this.costByModel[modelKey] ??= { usd: null, fastUsd: 0, pricing: kind });
-    // Un seul message au tarif inconnu fait du montant de la ligne une borne basse :
-    // la ligne se déclare inconnue plutôt que d'afficher un coût partiel comme complet.
-    if (kind === 'inconnu') mc.pricing = 'inconnu';
-    if (known && usd !== null) {
-      mc.usd = (mc.usd ?? 0) + usd;
-      if (evt.usage.speed === 'fast') mc.fastUsd += usd;
-      this.cost += usd;
-    } else {
-      this.unknown.add(modelKey);
+    const key = `${agentKey}:${evt.msgId}`;
+    const prec = this.retenus.get(key);
+    // Une ligne malformée ne remplace pas la mesure saine du même message.
+    if (prec === undefined || evt.usageVerdict === 'sain' || prec.evt.usageVerdict !== 'sain') {
+      this.retenus.set(key, { evt, agentKey });
     }
   }
 
   result(): TokensResult {
+    const main = emptyBucket();
+    const perAgent: Record<string, TokenBucket> = {};
+    const perModel: Record<string, TokenBucket> = {};
+    const costByModel: Record<string, ModelCost> = {};
+    const unknown = new Set<string>();
+    let cost = 0;
+    let malformed = 0;
+    for (const { evt, agentKey } of this.retenus.values()) {
+      // Compté une fois par message, avant d'écarter un `usage` non objet : ce message n'apporte
+      // aucun jeton, mais jetons et coût de la session deviennent des bornes inférieures.
+      if (evt.usageVerdict === 'malforme') malformed += 1;
+      if (evt.usage === null) continue;
+      const bucket = agentKey === 'main' ? main : (perAgent[agentKey] ??= emptyBucket());
+      addUsage(bucket, evt.usage);
+
+      // Le tarif appliqué est celui en vigueur à la date du message : un changement
+      // de prix adopté ne réécrit pas les messages d'avant.
+      const { usd, known, model } = this.pricing.computeCost(evt.usage, evt.model, evt.timestamp);
+      const modelKey = model ?? '(inconnu)';
+      addUsage((perModel[modelKey] ??= emptyBucket()), evt.usage);
+      // Dollars par modèle, cumulés au même instant et au même tarif que le coût
+      // total — jamais recalculés depuis les seaux (le tarif daté et la part
+      // cache 5 min / 1 h d'un message ne se reconstituent pas depuis un agrégat).
+      const kind = this.pricing.pricingKindOf(evt.model, evt.timestamp, evt.usage.speed);
+      const mc = (costByModel[modelKey] ??= { usd: null, fastUsd: 0, pricing: kind });
+      // Un seul message au tarif inconnu fait du montant de la ligne une borne basse :
+      // la ligne se déclare inconnue plutôt que d'afficher un coût partiel comme complet.
+      if (kind === 'inconnu') mc.pricing = 'inconnu';
+      if (known && usd !== null) {
+        mc.usd = (mc.usd ?? 0) + usd;
+        if (evt.usage.speed === 'fast') mc.fastUsd += usd;
+        cost += usd;
+      } else {
+        unknown.add(modelKey);
+      }
+    }
     const total = emptyBucket();
-    sumUsageInto(total, this.main);
-    for (const b of Object.values(this.perAgent)) sumUsageInto(total, b);
+    sumUsageInto(total, main);
+    for (const b of Object.values(perAgent)) sumUsageInto(total, b);
     return {
-      main: this.main,
-      perAgent: this.perAgent,
-      perModel: this.perModel,
+      main,
+      perAgent,
+      perModel,
       total,
-      costUsd: this.cost,
-      costComplete: this.unknown.size === 0 && this.malformed === 0,
-      unknownModels: [...this.unknown].sort(),
-      malformedUsageMessages: this.malformed,
-      costByModel: this.costByModel,
+      costUsd: cost,
+      costComplete: unknown.size === 0 && malformed === 0,
+      unknownModels: [...unknown].sort(),
+      malformedUsageMessages: malformed,
+      costByModel,
     };
   }
 }

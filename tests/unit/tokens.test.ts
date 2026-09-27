@@ -428,3 +428,16 @@ test('le compte des messages inexploitables traverse l’enveloppe SSE', () => {
   expect(msg.main.malformedUsageMessages).toBe(1);
   expect(msg.main.costComplete).toBe(false);
 });
+
+// Dans les fichiers de sous-agents, la première ligne d'un message porte un `output_tokens`
+// partiel, pris pendant le streaming : la dernière ligne lue remplace ce que la première a compté.
+test('accumulateUsage : la dernière ligne d un message remplace le compte partiel, coût compris', () => {
+  const b = newBucket();
+  accumulateUsage(b, { input_tokens: 100, output_tokens: 16 }, 'claude-sonnet-4-5', 'msg_S', null);
+  accumulateUsage(b, { input_tokens: 100, output_tokens: 169 }, 'claude-sonnet-4-5', 'msg_S', null);
+  const seul = newBucket();
+  accumulateUsage(seul, { input_tokens: 100, output_tokens: 169 }, 'claude-sonnet-4-5', 'msg_S', null);
+  expect(b.in).toBe(100);
+  expect(b.out).toBe(169);
+  expect(b.costUsd).toBeCloseTo(seul.costUsd, 12);
+});
