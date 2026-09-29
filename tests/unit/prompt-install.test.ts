@@ -155,6 +155,7 @@ test('promptInstallParams: target antigravity → scope options omit local', asy
   press(io.input, 'return');
   const result = await promise;
   expect(result).toEqual({ target: 'antigravity', scope: 'project' });
+  expect(io.captured).not.toMatch(/local — this repo only/);
 });
 
 // Regression: on Windows real TTY, raw mode was being toggled between the
