@@ -1,6 +1,6 @@
 // L'adaptateur Antigravity ne possède qu'une clé du hooks.json, « agent-viz » : tout
 // autre nom de hook doit survivre à l'installation comme au retrait.
-import { expect, test } from 'vitest';
+import { afterEach, expect, test } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -14,8 +14,17 @@ interface Resultat {
   audit?: Array<{ event: string; installed: boolean; stale: boolean; others: number }>;
 }
 
+// Chaque bac à sable créé par projet()/paquet() de ce fichier, retiré au terme du test
+// qui l'a créé — cf. tests/CLAUDE.md §4 : le disque de tests/unit se nettoie lui-même.
+const dirsCreated: string[] = [];
+
+afterEach(() => {
+  for (const d of dirsCreated.splice(0)) fs.rmSync(d, { recursive: true, force: true });
+});
+
 function projet(prefixe: string) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), prefixe));
+  dirsCreated.push(root);
   fs.mkdirSync(path.join(root, '.git'));
   return root;
 }
@@ -23,6 +32,7 @@ function projet(prefixe: string) {
 // Un faux paquet : resolveHookCommand ne choisit le mode « absolute » que si bin/agent-viz.js existe.
 function paquet(prefixe: string) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), prefixe));
+  dirsCreated.push(root);
   fs.mkdirSync(path.join(root, 'bin'));
   fs.writeFileSync(path.join(root, 'bin', 'agent-viz.js'), '');
   return root;
@@ -128,4 +138,73 @@ test('le retrait supprime un fichier qui ne portait que nous', () => {
   uninstall({ target: 'antigravity', scope: 'project', cwd: root });
   // Assert
   expect(fs.existsSync(fichier(root))).toBe(false);
+});
+
+test('le retrait ignore une clé agent-viz qui ne porte aucune commande à nous', () => {
+  // Arrange
+  const root = projet('avtest-agy-etrangere-');
+  const etrangere = { 'agent-viz': { Stop: [{ type: 'command', command: './autre.sh' }] } };
+  fs.mkdirSync(path.dirname(fichier(root)), { recursive: true });
+  fs.writeFileSync(fichier(root), JSON.stringify(etrangere));
+  // Act
+  const r = uninstall({ target: 'antigravity', scope: 'project', cwd: root }).antigravity as Resultat;
+  // Assert
+  expect(r.results?.[0]?.removed).toBe(0);
+  expect(lire(fichier(root))).toEqual(etrangere);
+});
+
+test('le retrait après une installation réelle compte les 3 commandes retirées', () => {
+  // Arrange
+  const root = projet('avtest-agy-compte-');
+  install({ target: 'antigravity', scope: 'project', cwd: root, packageRoot: paquet('avpkg-agy-') });
+  // Act
+  const r = uninstall({ target: 'antigravity', scope: 'project', cwd: root }).antigravity as Resultat;
+  // Assert
+  expect(r.results?.[0]?.removed).toBe(3);
+});
+
+test('un PreToolUse écrit à plat, sans enveloppe matcher/hooks, est signalé périmé par l’audit', () => {
+  // Arrange
+  const root = projet('avtest-agy-plat-audit-');
+  const pkg = paquet('avpkg-agy-plat-audit-');
+  install({ target: 'antigravity', scope: 'project', cwd: root, packageRoot: pkg });
+  const avant = lire(fichier(root));
+  const commande = avant['agent-viz'].PreToolUse[0].hooks[0].command;
+  avant['agent-viz'].PreToolUse = [{ type: 'command', command: commande, timeout: 10 }];
+  fs.writeFileSync(fichier(root), JSON.stringify(avant));
+  // Act
+  const r = audit({ target: 'antigravity', scope: 'project', cwd: root, packageRoot: pkg }).antigravity as Resultat;
+  // Assert
+  const pre = r.audit!.find(l => l.event === 'PreToolUse')!;
+  expect(pre.installed).toBe(true);
+  expect(pre.stale).toBe(true);
+});
+
+test('l’installation répare un PreToolUse à plat en restaurant l’enveloppe matcher/hooks', () => {
+  // Arrange
+  const root = projet('avtest-agy-plat-repare-');
+  const pkg = paquet('avpkg-agy-plat-repare-');
+  install({ target: 'antigravity', scope: 'project', cwd: root, packageRoot: pkg });
+  const avant = lire(fichier(root));
+  const commande = avant['agent-viz'].PreToolUse[0].hooks[0].command;
+  avant['agent-viz'].PreToolUse = [{ type: 'command', command: commande, timeout: 10 }];
+  fs.writeFileSync(fichier(root), JSON.stringify(avant));
+  // Act
+  install({ target: 'antigravity', scope: 'project', cwd: root, packageRoot: pkg });
+  // Assert
+  expect(lire(fichier(root))['agent-viz'].PreToolUse[0].matcher).toBe('*');
+});
+
+test('une clé d’événement en trop dans notre bloc fait réécrire le bloc entier', () => {
+  // Arrange
+  const root = projet('avtest-agy-extra-');
+  const pkg = paquet('avpkg-agy-extra-');
+  install({ target: 'antigravity', scope: 'project', cwd: root, packageRoot: pkg });
+  const avant = lire(fichier(root));
+  avant['agent-viz'].PreInvocation = [{ type: 'command', command: 'echo trop' }];
+  fs.writeFileSync(fichier(root), JSON.stringify(avant));
+  // Act
+  install({ target: 'antigravity', scope: 'project', cwd: root, packageRoot: pkg });
+  // Assert
+  expect(lire(fichier(root))['agent-viz'].PreInvocation).toBe(undefined);
 });

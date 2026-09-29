@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { isDeepStrictEqual } from 'node:util';
 import type { AgentOpts, ResolvedTarget, ResolvedCommand, AgentInstaller } from './types.ts';
 import { HOOK_TIMEOUT_SEC } from './types.ts';
 import { AGENT_CONFIG, eventsFor } from './config.ts';
@@ -34,7 +35,9 @@ function antigravityCommand(packageRoot: string | undefined): ResolvedCommand {
   if (cmd.mode === 'npx') return cmd;
   // Le mode « absolute » porte toujours `path` (scopes.ts).
   const p = cmd.path!;
-  if (/\s/.test(p)) throw new Error(`antigravity: agent-viz path contains a space, which agy hooks cannot run: ${p}`);
+  if (p.includes(' ')) {
+    throw new Error(`antigravity: agent-viz path contains a space, which agy hooks cannot run (install agent-viz under a path without spaces): ${p}`);
+  }
   return { ...cmd, command: `node ${p} hook --source=antigravity` };
 }
 
@@ -83,11 +86,15 @@ function hasOurHook(content: unknown): boolean {
 }
 
 function auditRows(content: unknown, base: string) {
+  const built = buildBlock(base);
   const ours = isRecord(content) && isRecord(content[OUR_KEY]) ? content[OUR_KEY] : {};
   return eventsFor('antigravity').map(ev => {
     const mine = handlersOf(ours[ev]).filter(h => isAgentVizCommand(h.command));
     const installed = mine.length > 0;
-    const stale = mine.some(h => h.command !== commandFor(base, ev) || h.timeout !== HOOK_TIMEOUT_SEC);
+    // La forme compte autant que la commande : agy rejette TOUT le fichier si un
+    // événement à enveloppe {matcher,hooks} est écrit à plat, ou l'inverse.
+    const stale = installed && !isDeepStrictEqual(ours[ev], built[ev]);
+    // `others` : le nombre de noms de hook DU FICHIER (hors le nôtre) qui abonnent aussi cet événement.
     const others = isRecord(content)
       ? Object.entries(content).filter(([k, v]) => k !== OUR_KEY && isRecord(v) && Array.isArray(v[ev])).length
       : 0;
@@ -119,6 +126,7 @@ export function installAntigravity({ scope, cwd, packageRoot }: AgentOpts = {}) 
   if (existing !== null && !isRecord(existing)) {
     throw new Error(`refusing to overwrite ${target.file}: not a hooks.json object`);
   }
+  const built = buildBlock(cmd.command);
   const rows = auditRows(existing, cmd.command);
   const missing = rows.filter(r => !r.installed).map(r => r.event);
   const updated = rows.filter(r => r.installed && r.stale).map(r => r.event);
@@ -127,12 +135,19 @@ export function installAntigravity({ scope, cwd, packageRoot }: AgentOpts = {}) 
   const crossScope = () => scanInstalled(antigravitySweepTargets(cwd, { packageRoot }), antigravityHookIn)
     .installed.filter(s => s.scope !== target.scope);
 
-  if (missing.length === 0 && updated.length === 0) {
+  // Gate au niveau du bloc entier, pas seulement des lignes par événement : une clé en
+  // trop (ex. PreInvocation) n'a pas de ligne dans `rows` (qui ne connaît que les
+  // événements déclarés), mais rend déjà `existingBlock` inégal à `built` — un seul
+  // `isDeepStrictEqual` couvre ce cas sans garde séparée sur les clés en trop.
+  const existingBlock = isRecord(existing) && isRecord(existing[OUR_KEY]) ? existing[OUR_KEY] : null;
+  const blockUpToDate = existingBlock !== null && isDeepStrictEqual(existingBlock, built);
+
+  if (missing.length === 0 && updated.length === 0 && blockUpToDate) {
     return { target, action: 'noop', missing, updated, present, coexisting, command: cmd, backup: null, crossScope: crossScope() };
   }
   const action = (missing.length && updated.length) ? 'installed+updated' : missing.length ? 'installed' : 'updated';
   const backup = backupHookFile(target.file);
-  writeJsonAtomic(target.file, { ...(existing ?? {}), [OUR_KEY]: buildBlock(cmd.command) });
+  writeJsonAtomic(target.file, { ...(existing ?? {}), [OUR_KEY]: built });
   return { target, action, missing, updated, present, coexisting, command: cmd, backup, gitignore: null, crossScope: crossScope() };
 }
 
@@ -144,13 +159,17 @@ export function uninstallAntigravity({ scope, cwd, packageRoot }: AgentOpts = {}
   for (const t of targets) {
     if (!fs.existsSync(t.file)) { results.push({ ...t, removed: 0, exists: false, backup: null }); continue; }
     const content = readHooksFile(t.file);
-    if (!isRecord(content) || !isRecord(content[OUR_KEY])) {
+    if (!hasOurHook(content)) {
       results.push({ ...t, removed: 0, exists: true, backup: null });
       continue;
     }
-    const removed = Object.values(content[OUR_KEY]).filter(v => Array.isArray(v)).length;
+    // `hasOurHook` vient de garantir `isRecord(content) && isRecord(content[OUR_KEY])`.
+    const ourBlock = (content as Record<string, unknown>)[OUR_KEY] as Record<string, unknown>;
+    const removed = Object.values(ourBlock)
+      .flatMap(v => handlersOf(v))
+      .filter(h => isAgentVizCommand(h.command)).length;
     const backup = backupHookFile(t.file);
-    const rest: Record<string, unknown> = { ...content };
+    const rest: Record<string, unknown> = { ...(content as Record<string, unknown>) };
     delete rest[OUR_KEY];
     // Pas de `catch {}` muet : un retrait qui échoue lève, et le registre en fait un `{ error }`.
     if (Object.keys(rest).length > 0) writeJsonAtomic(t.file, rest);

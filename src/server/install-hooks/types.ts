@@ -69,7 +69,7 @@ export interface AgentOpts {
 // illisible, mais `scanInstalled` l'attrape et range la cible dans `unreadable`.
 // Ne pas écrire ici que le registre traduit tout.
 //
-// Ajouter un 3e agent = un fichier d'adaptateur + une entrée AGENT_CONFIG +
+// Ajouter un agent = un fichier d'adaptateur + une entrée AGENT_CONFIG +
 // une entrée INSTALLERS.
 export interface AgentInstaller {
   install: (opts: AgentOpts) => unknown;
