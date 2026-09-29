@@ -61,7 +61,7 @@ fetch('/version')
 // ─── Session selection (owned here, read-only from elsewhere) ─────────────
 export let currentSessionId: string | null = null;
 export const sessionTitles = new Map<string, string>();
-export const sessionAgents = new Map<string, string>(); // sid → 'claude' | 'copilot' | 'antigravity'
+export const sessionAgents = new Map<string, string>(); // sid → agentSource brut (badge seulement si KNOWN_AGENTS le connaît)
 
 // ─── SSE + poll state ─────────────────────────────────────────────────────
 let sseSource: EventSource | null = null;
@@ -293,9 +293,9 @@ export function updateTopbarPrompt() {
   const badge = document.getElementById('topbar-agent');
   if (badge) {
     const agent = sid ? sessionAgents.get(sid) : null;
-    if (agent) {
+    if (agent && KNOWN_AGENTS.has(agent)) {
       badge.textContent = agent;
-      badge.className = `agent-badge agent-${KNOWN_AGENTS.has(agent) ? agent : 'claude'} visible`;
+      badge.className = `agent-badge agent-${agent} visible`;
     } else {
       badge.className = 'agent-badge';
       badge.textContent = '';
