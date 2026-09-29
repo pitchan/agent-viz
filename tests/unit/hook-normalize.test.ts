@@ -44,7 +44,20 @@ test('un PreToolUse et son PostToolUse portent le même tool_use_id', () => {
 });
 
 test('un PostToolUse sans erreur reste un succès', () => {
-  const evt = NORMALIZERS.antigravity(outil({ error: '' }), 'PostToolUse');
+  // Arrange
+  const brut = outil({ error: '' });
+  // Act
+  const evt = NORMALIZERS.antigravity(brut, 'PostToolUse');
+  // Assert
+  expect(evt.hook_event_name).toBe('PostToolUse');
+});
+
+test('un PostToolUse sans champ error reste un succès', () => {
+  // Arrange
+  const brut = outil();
+  // Act
+  const evt = NORMALIZERS.antigravity(brut, 'PostToolUse');
+  // Assert
   expect(evt.hook_event_name).toBe('PostToolUse');
 });
 
@@ -70,23 +83,49 @@ test('un Stop Antigravity garde son nom et sa session', () => {
 });
 
 test('un événement Antigravity inconnu garde son nom brut, rien n’est deviné', () => {
-  const evt = NORMALIZERS.antigravity({ conversationId: CONV, invocationNum: 0 }, 'PreInvocation');
+  // Arrange
+  const brut = { conversationId: CONV, invocationNum: 0 };
+  // Act
+  const evt = NORMALIZERS.antigravity(brut, 'PreInvocation');
+  // Assert
   expect(evt.hook_event_name).toBe('PreInvocation');
 });
 
 test('les champs d’origine restent dans l’événement normalisé', () => {
-  const evt = NORMALIZERS.antigravity(outil(), 'PreToolUse');
+  // Arrange
+  const brut = outil();
+  // Act
+  const evt = NORMALIZERS.antigravity(brut, 'PreToolUse');
+  // Assert
   expect(evt.conversationId).toBe(CONV);
   expect(evt.stepIdx).toBe(2);
 });
 
-test('les charges Claude et Copilot passent inchangées', () => {
+test('un stepIdx à 0 produit quand même un tool_use_id', () => {
+  // Arrange
+  const brut = outil({ stepIdx: 0 });
+  // Act
+  const evt = NORMALIZERS.antigravity(brut, 'PreToolUse');
+  // Assert
+  expect(evt.tool_use_id).toBe(`${CONV}:0`);
+});
+
+test('une charge Claude passe inchangée', () => {
   // Arrange
   const brut = { session_id: 's1', hook_event_name: 'PreToolUse', tool_name: 'Read', tool_use_id: 't1' };
   // Act
-  const sorties = [NORMALIZERS.claude(brut, undefined), NORMALIZERS.copilot(brut, undefined)];
+  const evt = NORMALIZERS.claude(brut, undefined);
   // Assert
-  for (const s of sorties) expect(s).toEqual(brut);
+  expect(evt).toEqual(brut);
+});
+
+test('une charge Copilot passe inchangée', () => {
+  // Arrange
+  const brut = { session_id: 's1', hook_event_name: 'PreToolUse', tool_name: 'Read', tool_use_id: 't1' };
+  // Act
+  const evt = NORMALIZERS.copilot(brut, undefined);
+  // Assert
+  expect(evt).toEqual(brut);
 });
 
 test('seul Antigravity exige le drapeau --event', () => {
