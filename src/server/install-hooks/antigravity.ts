@@ -80,7 +80,7 @@ function readHooksFile(file: string): unknown {
   }
 }
 
-function hasOurHook(content: unknown): boolean {
+function hasOurHook(content: unknown): content is Record<string, Record<string, unknown>> {
   if (!isRecord(content) || !isRecord(content[OUR_KEY])) return false;
   return Object.values(content[OUR_KEY]).some(v => handlersOf(v).some(h => isAgentVizCommand(h.command)));
 }
@@ -135,16 +135,15 @@ export function installAntigravity({ scope, cwd, packageRoot }: AgentOpts = {}) 
   const crossScope = () => scanInstalled(antigravitySweepTargets(cwd, { packageRoot }), antigravityHookIn)
     .installed.filter(s => s.scope !== target.scope);
 
-  // Gate au niveau du bloc entier, pas seulement des lignes par événement : une clé en
-  // trop (ex. PreInvocation) n'a pas de ligne dans `rows` (qui ne connaît que les
-  // événements déclarés), mais rend déjà `existingBlock` inégal à `built` — un seul
-  // `isDeepStrictEqual` couvre ce cas sans garde séparée sur les clés en trop.
+  // Tout le bloc est comparé : une clé d'événement en trop n'a pas de ligne dans rows.
   const existingBlock = isRecord(existing) && isRecord(existing[OUR_KEY]) ? existing[OUR_KEY] : null;
   const blockUpToDate = existingBlock !== null && isDeepStrictEqual(existingBlock, built);
 
-  if (missing.length === 0 && updated.length === 0 && blockUpToDate) {
+  if (blockUpToDate) {
     return { target, action: 'noop', missing, updated, present, coexisting, command: cmd, backup: null, crossScope: crossScope() };
   }
+  // `updated` peut rester vide ici : seule la FORME du bloc diffère (ex. une clé en
+  // trop), ce que les lignes d'audit par événement ne rapportent pas.
   const action = (missing.length && updated.length) ? 'installed+updated' : missing.length ? 'installed' : 'updated';
   const backup = backupHookFile(target.file);
   writeJsonAtomic(target.file, { ...(existing ?? {}), [OUR_KEY]: built });
@@ -163,13 +162,14 @@ export function uninstallAntigravity({ scope, cwd, packageRoot }: AgentOpts = {}
       results.push({ ...t, removed: 0, exists: true, backup: null });
       continue;
     }
-    // `hasOurHook` vient de garantir `isRecord(content) && isRecord(content[OUR_KEY])`.
-    const ourBlock = (content as Record<string, unknown>)[OUR_KEY] as Record<string, unknown>;
+    // `hasOurHook` a garanti `isRecord(content[OUR_KEY])` ; `noUncheckedIndexedAccess`
+    // ne le sait pas pour un accès indexé, le `!` documente cet invariant.
+    const ourBlock = content[OUR_KEY]!;
     const removed = Object.values(ourBlock)
       .flatMap(v => handlersOf(v))
       .filter(h => isAgentVizCommand(h.command)).length;
     const backup = backupHookFile(t.file);
-    const rest: Record<string, unknown> = { ...(content as Record<string, unknown>) };
+    const rest: Record<string, unknown> = { ...content };
     delete rest[OUR_KEY];
     // Pas de `catch {}` muet : un retrait qui échoue lève, et le registre en fait un `{ error }`.
     if (Object.keys(rest).length > 0) writeJsonAtomic(t.file, rest);
