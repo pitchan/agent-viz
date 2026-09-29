@@ -89,3 +89,12 @@ test('une ligne d’usage préfixée d’un BOM est comptabilisée', () => {
   expect(rec.tokens.main.lastModel).toBe('claude-sonnet-4-5');
 });
 
+test('une session Antigravity a un adaptateur, sans jetons annoncés', () => {
+  // Arrange — le registre importé ci-dessus
+  // Act
+  const adapter = getAdapter('antigravity');
+  // Assert
+  expect(adapter).toBe(TRANSCRIPT_ADAPTERS.antigravity);
+  expect(adapter.tokensSupported).toBe(false);
+});
+

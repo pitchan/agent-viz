@@ -5,8 +5,9 @@
 
 import * as claude from './claude.ts';
 import * as copilot from './copilot.ts';
+import * as antigravity from './antigravity.ts';
 
-const TRANSCRIPT_ADAPTERS = { claude, copilot };
+const TRANSCRIPT_ADAPTERS = { claude, copilot, antigravity };
 
 // Garde de type sur les clés réelles du registre — vit ici, à côté de la
 // constante qu'elle protège, plutôt qu'un cast : `Object.hasOwn` seul ne
