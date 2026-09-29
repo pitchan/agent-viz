@@ -18,6 +18,9 @@ const SETTINGS_AVEC_NOTRE_HOOK = json({ model: 'x', hooks: { Stop: [{ hooks: [{ 
 
 const fichierClaude = (projet: string) => path.join(projet, '.claude', 'settings.json');
 const fichierCopilot = (projet: string) => path.join(projet, '.github', 'hooks', 'agent-viz.json');
+const fichierAntigravity = (projet: string) => path.join(projet, '.agents', 'hooks.json');
+const NOTRE_ENTREE_ANTIGRAVITY = { type: 'command', command: `${NOTRE_COMMANDE} --event=Stop`, timeout: 10 };
+const ENTREE_TIERCE_ANTIGRAVITY = { type: 'command', command: './lint.sh' };
 
 // Les mutations de chaque agent du registre ; un agent ajouté sans ses lignes
 // fait rougir le test de couverture plus bas.
@@ -36,6 +39,13 @@ const MUTATIONS = {
       agir: uninstall, copieRendue: (r: any) => r.copilot.results[0].backup, fichierReste: true },
     { nom: 'la suppression du fichier Copilot', fichier: fichierCopilot, avant: json({ version: 1, hooks: { PreToolUse: [NOTRE_ENTREE_COPILOT] } }),
       agir: uninstall, copieRendue: (r: any) => r.copilot.results[0].backup, fichierReste: false },
+  ],
+  antigravity: [
+    { nom: 'l\'installation Antigravity', fichier: fichierAntigravity, avant: json({ 'lint-checker': { Stop: [ENTREE_TIERCE_ANTIGRAVITY] } }),
+      agir: install, copieRendue: (r: any) => r.antigravity.backup, fichierReste: true },
+    { nom: 'le retrait Antigravity', fichier: fichierAntigravity,
+      avant: json({ 'agent-viz': { Stop: [NOTRE_ENTREE_ANTIGRAVITY] }, 'lint-checker': { Stop: [ENTREE_TIERCE_ANTIGRAVITY] } }),
+      agir: uninstall, copieRendue: (r: any) => r.antigravity.results[0].backup, fichierReste: true },
   ],
 };
 

@@ -7,15 +7,16 @@ import type { AgentName, AgentConfigEntry } from './types.ts';
 // Per-agent paths + gitignore entry + liste d'evenements. Add a third agent
 // here, then register its adapter in registry.ts.
 //
-// Pourquoi la liste d'evenements est PAR AGENT et non partagee : les deux
-// agents n'ont pas le meme vocabulaire. PostToolUseFailure a ete releve sur
-// machine cote Claude Code ; rien ne dit que Copilot CLI le connaisse, et on
-// n'a aucun moyen de le verifier d'ici. Ecrire dans la configuration d'un
-// tiers un nom d'evenement qu'on n'a pas mesure, c'est lui faire porter un
-// risque qu'on n'a pas evalue — chaque agent ne recoit donc que ce qu'on lui
-// a constate.
-export const AGENT_CONFIG: Record<AgentName, AgentConfigEntry> = {
+// Pourquoi la liste d'evenements est PAR AGENT et non partagee : les agents
+// n'ont pas le meme vocabulaire. PostToolUseFailure a ete releve sur
+// machine cote Claude Code ; rien ne dit que Copilot CLI ou Antigravity le
+// connaissent, et on n'a aucun moyen de le verifier d'ici. Ecrire dans la
+// configuration d'un tiers un nom d'evenement qu'on n'a pas mesure, c'est lui
+// faire porter un risque qu'on n'a pas evalue — chaque agent ne recoit donc
+// que ce qu'on lui a constate.
+export const AGENT_CONFIG = {
   claude: {
+    label: 'Claude Code',
     // PostToolUseFailure est le SEUL endroit ou un outil en erreur se signale :
     // PostToolUse ne se declenche que sur un succes. Sans cet abonnement, une
     // commande qui echoue ne laisse qu'un PreToolUse orphelin — un trou, que
@@ -27,13 +28,24 @@ export const AGENT_CONFIG: Record<AgentName, AgentConfigEntry> = {
     gitignoreEntry: '.claude/settings.local.json',
   },
   copilot: {
+    label: 'Copilot CLI',
     events: ['UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop', 'SessionStart'],
     userFile: () => path.join(os.homedir(), '.copilot', 'hooks', 'agent-viz.json'),
     projectFile: (root) => path.join(root, '.github', 'hooks', 'agent-viz.json'),
     localFile: (root) => path.join(root, '.github', 'hooks', 'agent-viz.local.json'),
     gitignoreEntry: '.github/hooks/agent-viz.local.json',
   },
-};
+  antigravity: {
+    label: 'Antigravity CLI',
+    // PreInvocation / PostInvocation n'ont rien à afficher, et agy lance ses hooks de
+    // façon bloquante : chaque abonnement coûte un démarrage de node par appel du modèle.
+    events: ['PreToolUse', 'PostToolUse', 'Stop'],
+    userFile: () => path.join(os.homedir(), '.gemini', 'antigravity-cli', 'hooks.json'),
+    projectFile: (root) => path.join(root, '.agents', 'hooks.json'),
+    localFile: null,
+    gitignoreEntry: null,
+  },
+} satisfies Record<AgentName, AgentConfigEntry>;
 
 export function eventsFor(agent: AgentName): string[] {
   return AGENT_CONFIG[agent].events;
@@ -47,4 +59,5 @@ export const EVENTS: string[] = AGENT_CONFIG.claude.events;
 export const GITIGNORE_EXTRAS: Record<AgentName, string[]> = {
   claude: ['.claude/', '.claude', '.claude/*.local.json', '*.local.json'],
   copilot: ['.github/hooks/', '.github/hooks/*.local.json'],
+  antigravity: [],
 };

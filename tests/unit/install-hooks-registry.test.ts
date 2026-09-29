@@ -35,7 +35,7 @@ test('chaque adaptateur du registre expose le contrat AgentInstaller complet', (
   // Act
   const agents = Object.keys(INSTALLERS).sort();
   // Assert
-  expect(agents).toEqual(['claude', 'copilot']);
+  expect(agents).toEqual(['antigravity', 'claude', 'copilot']);
   for (const [name, inst] of Object.entries(INSTALLERS)) {
     for (const m of METHODS) {
       expect(typeof inst[m], `${name}.${m} doit être une fonction`).toBe('function');
@@ -220,7 +220,7 @@ test('TARGETS liste les agents du registre puis both, dans cet ordre', () => {
   // Act
   const cibles = TARGETS;
   // Assert
-  expect(cibles).toEqual(['claude', 'copilot', 'both']);
+  expect(cibles).toEqual(['claude', 'copilot', 'antigravity', 'both']);
 });
 
 // Une cible inconnue lève au lieu de retomber sur l'auto-détection : sinon une

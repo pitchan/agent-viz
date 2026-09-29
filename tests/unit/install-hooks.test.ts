@@ -113,7 +113,7 @@ test('install: refreshes existing hook whose timeout drifted (5 → 10)', () => 
 test('resolveScope: no explicit scope defaults to user (global) even inside a project', () => {
   const projectRoot = makeTempDir('avtest-defscope-');
   fs.mkdirSync(path.join(projectRoot, '.git'));
-  for (const agent of ['claude', 'copilot'] as const) {
+  for (const agent of ['claude', 'copilot', 'antigravity'] as const) {
     const r = resolveScope({ cwd: projectRoot, agent });
     expect(r.scope, `${agent}: default scope should be 'user', got '${r.scope}'`).toBe('user');
     expect(r.projectRoot, `${agent}: user scope must not carry a projectRoot`).toBe(null);
@@ -179,6 +179,30 @@ test('installCopilot: le fichier ecrit ne declare que les evenements connus de C
   const copilot = result.copilot as AgentInstallResult;
   const written = JSON.parse(fs.readFileSync(copilot.target!.file, 'utf8'));
   expect(Object.keys(written.hooks), 'agent-viz ne doit ecrire aucun nom d evenement non mesure dans la config d un tiers').toEqual(EVENTS_COPILOT_ATTENDUS);
+});
+
+test('resolveScope: --local est refusé pour un agent sans fichier local', () => {
+  // Arrange
+  const projectRoot = makeTempDir('avtest-agy-local-');
+  fs.mkdirSync(path.join(projectRoot, '.git'));
+  // Act
+  const essai = () => resolveScope({ scope: 'local', cwd: projectRoot, agent: 'antigravity' });
+  // Assert
+  expect(essai).toThrow(/--local is not supported for antigravity/);
+});
+
+test('resolveScope: la portée projet d’Antigravity vise .agents/hooks.json', () => {
+  // Arrange
+  const projectRoot = makeTempDir('avtest-agy-project-');
+  fs.mkdirSync(path.join(projectRoot, '.git'));
+  // Act
+  const r = resolveScope({ scope: 'project', cwd: projectRoot, agent: 'antigravity' });
+  // Assert
+  expect(r.file).toBe(path.join(projectRoot, '.agents', 'hooks.json'));
+});
+
+test('EVENTS: Antigravity n’abonne que les trois événements affichés', () => {
+  expect(_internals.eventsFor('antigravity')).toEqual(['PreToolUse', 'PostToolUse', 'Stop']);
 });
 
 test('install: une configuration aux 5 anciens evenements ne gagne que le nouveau', () => {

@@ -2,18 +2,21 @@
 // communs aux modules de src/server/install-hooks/, dont `Target` que
 // prompt-install.ts importe aussi.
 
-export type AgentName = 'claude' | 'copilot';
+export type AgentName = 'claude' | 'copilot' | 'antigravity';
 // Ce que `--target` et l'invite d'installation acceptent : un agent, ou 'both'
 // pour tous les agents du registre.
 export type Target = AgentName | 'both';
 export type Scope = 'user' | 'project' | 'local';
 
+// `localFile` et `gitignoreEntry` valent `null` pour un agent qui n'a pas de fichier de
+// portée locale (Antigravity) : `resolveScope` refuse alors `--local` en le nommant.
 export interface AgentConfigEntry {
+  label: string;
   events: string[];
   userFile: () => string;
   projectFile: (root: string) => string;
-  localFile: (root: string) => string;
-  gitignoreEntry: string;
+  localFile: ((root: string) => string) | null;
+  gitignoreEntry: string | null;
 }
 
 export interface ResolvedTarget {

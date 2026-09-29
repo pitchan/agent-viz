@@ -55,6 +55,7 @@ export function resolveScope({ scope, cwd, agent = 'claude', packageRoot }: Agen
     return { scope: 'project', file: cfg.projectFile(projectRoot), projectRoot };
   }
   // scope === 'local'
+  if (!cfg.localFile) throw new Error(`--local is not supported for ${agent}`);
   if (!projectRoot) throw new Error('--local requested but no .git/ or package.json found from cwd');
   return { scope: 'local', file: cfg.localFile(projectRoot), projectRoot };
 }
@@ -85,7 +86,7 @@ export function resolveHookCommand({ packageRoot, agent = 'claude' }: AgentOpts 
 // holds historical broader patterns we accept as "already ignored".
 export function ensureGitignore(
   projectRoot: string, target: string, extraPatterns: string[] = [],
-): { changed: boolean; reason?: string } {
+): { changed: boolean; reason?: string; entry?: string } {
   const gi = path.join(projectRoot, '.gitignore');
   if (!fs.existsSync(gi)) return { changed: false, reason: 'no .gitignore (skipped)' };
   const content = fs.readFileSync(gi, 'utf8');
@@ -94,7 +95,7 @@ export function ensureGitignore(
   if (lines.some(l => accepted.has(l))) return { changed: false, reason: 'already ignored' };
   const sep = content.endsWith('\n') ? '' : '\n';
   fs.appendFileSync(gi, `${sep}${target}\n`);
-  return { changed: true };
+  return { changed: true, entry: target };
 }
 
 // La boucle « quelles cibles portent réellement notre hook », écrite une

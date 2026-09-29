@@ -13,10 +13,13 @@ import type { AgentName, AgentOpts, ScanResult, AgentInstaller, Target } from '.
 import { scanInstalled } from './scopes.ts';
 import { claudeInstaller } from './claude.ts';
 import { copilotInstaller } from './copilot.ts';
+import { antigravityInstaller } from './antigravity.ts';
+import { AGENT_CONFIG } from './config.ts';
 
 export const INSTALLERS: Record<AgentName, AgentInstaller> = {
   claude: claudeInstaller,
   copilot: copilotInstaller,
+  antigravity: antigravityInstaller,
 };
 
 // Une clef réelle du registre — vit ici, à côté de la constante qu'elle
@@ -24,6 +27,12 @@ export const INSTALLERS: Record<AgentName, AgentInstaller> = {
 // vers `AgentName` (même geste que transcript-adapters/index.ts).
 export function isAgentName(v: string): v is AgentName {
   return Object.hasOwn(INSTALLERS, v);
+}
+
+// Le libellé affiché d'un agent : la CLI le lit ici au lieu de le deviner d'après le nom.
+export function agentLabel(name: string): string {
+  if (!isAgentName(name)) throw new Error(`unknown agent '${name}'`);
+  return AGENT_CONFIG[name].label;
 }
 
 // Les valeurs valides de `target` : un agent du registre, ou 'both' pour tous.
@@ -39,8 +48,8 @@ export function pickAgents({ target }: { target?: string }): AgentName[] {
   if (target === 'both') return all;
   if (target === undefined) {
     const detected = all.filter(a => INSTALLERS[a].detect());
-    // `all` porte toujours 'claude' et 'copilot' (registre fixe ci-dessus) :
-    // `all[0]` existe forcément, le `!` documente cet invariant.
+    // `all` n'est jamais vide (registre fixe ci-dessus) : `all[0]` existe
+    // forcément, le `!` documente cet invariant.
     return detected.length > 0 ? detected : [all[0]!];
   }
   if (isAgentName(target)) return [target];
