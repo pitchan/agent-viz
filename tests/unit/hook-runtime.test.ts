@@ -126,6 +126,7 @@ test('une charge Antigravity sans --event est refusée, tracée, jamais écrite'
     expect(lit(path.join(r.dossier, 'conv-agy-2.jsonl')), 'un événement sans nom ne doit pas être écrit').toBe(null);
     expect(lit(path.join(r.dossier, '_hook-errors.log'))).toMatch(/--event/);
     expect(r.code).toBe(0);
+    expect(r.stdout, 'agy lit stdout : le hook doit y rester muet').toBe('');
   } finally {
     fs.rmSync(r.racine, { recursive: true, force: true });
   }
