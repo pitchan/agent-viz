@@ -11,6 +11,9 @@ const installHooksFactice = (backup: string | null) => [
   `const backup = ${JSON.stringify(backup)};`,
   "const target = { file: 'FICHIER-SONDE', scope: 'user', projectRoot: null };",
   'export function resolveScope() { return target; }',
+  // Le stub par défaut de cli.js (cli-defaut-stub.ts) appelle agentLabel(agent) :
+  // ce factice doit l'exporter, comme le vrai install-hooks.js le fait.
+  "export function agentLabel(agent) { return agent === 'claude' ? 'Claude Code' : agent; }",
   'export function install() {',
   "  return { claude: { target, action: 'installed', command: { command: 'COMMANDE-SONDE', mode: 'absolute' },",
   "    missing: ['Stop'], updated: [], present: [], coexisting: {}, gitignore: null, crossScope: [], backup } };",

@@ -83,7 +83,7 @@ export function installClaude({ scope, cwd, packageRoot }: AgentOpts = {}) {
   const backup = backupHookFile(target.file);
   writeSettings(target.file, settings);
 
-  let gitignore: { changed: boolean; reason?: string } | null = null;
+  let gitignore: ReturnType<typeof ensureGitignore> | null = null;
   if (target.scope === 'local' && target.projectRoot) {
     gitignore = ensureGitignore(target.projectRoot, AGENT_CONFIG.claude.gitignoreEntry, GITIGNORE_EXTRAS.claude);
   }

@@ -205,7 +205,7 @@ export function installCopilot({ scope, cwd, packageRoot }: AgentOpts = {}) {
   const backup = backupHookFile(target.file);
   writeJsonAtomic(target.file, content);
 
-  let gitignore: { changed: boolean; reason?: string } | null = null;
+  let gitignore: ReturnType<typeof ensureGitignore> | null = null;
   if (target.scope === 'local' && target.projectRoot) {
     gitignore = ensureGitignore(target.projectRoot, AGENT_CONFIG.copilot.gitignoreEntry, GITIGNORE_EXTRAS.copilot);
   }

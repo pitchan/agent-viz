@@ -60,6 +60,18 @@ function pickTargetDefault(detected: DetectedAgents): number {
   return found.length === 1 ? AGENTS.indexOf(found[0]!) : AGENTS.length;
 }
 
+// Les agents couverts par une cible : lui seul, ou tout le registre pour 'both'.
+function agentsFor(target: Target): AgentName[] {
+  return target === 'both' ? AGENTS : [target];
+}
+
+// 'local' n'a de sens que si CHAQUE agent couvert le supporte (Antigravity n'a pas de
+// portée locale) : avec le registre actuel, 'both' l'exclut donc aussi.
+function scopeOptionsFor(target: Target): SelectOption<'user' | 'project' | 'local'>[] {
+  const supportsLocal = agentsFor(target).every(a => AGENT_CONFIG[a].localFile !== null);
+  return supportsLocal ? SCOPE_OPTIONS : SCOPE_OPTIONS.filter(o => o.value !== 'local');
+}
+
 // Render a single-question selector. Returns the selected option's value.
 // Throws Error('aborted') on Ctrl+C.
 //
@@ -182,7 +194,7 @@ async function promptInstallParams({ detected, projectRoot, io }: {
 
     const scope = await ask({
       question: 'Where to install hooks?',
-      options: SCOPE_OPTIONS,
+      options: scopeOptionsFor(target),
       initial: 0,                                   // user
       io,
     });

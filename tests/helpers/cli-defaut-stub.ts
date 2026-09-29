@@ -47,13 +47,13 @@ export async function cmdStart(flags, packageRoot) {
   const shouldInstall = flags['install-hooks'] !== false;
 
   if (shouldInstall) {
-    const { install } = await import(pathToFileURL(path.join(packageRoot, 'dist', 'server', 'install-hooks.js')).href);
+    const { install, agentLabel } = await import(pathToFileURL(path.join(packageRoot, 'dist', 'server', 'install-hooks.js')).href);
     try {
       const result = install({ cwd: process.cwd(), packageRoot });
       let printed = false;
       for (const [agent, r] of Object.entries(result)) {
         if (!r) continue;
-        const label = agent === 'claude' ? 'Claude Code' : 'Copilot CLI';
+        const label = agentLabel(agent);
         if (r.error) {
           console.error(String(c.warn('!')) + ' ' + label + ' hooks not installed: ' + r.error);
           continue;
@@ -68,7 +68,7 @@ export async function cmdStart(flags, packageRoot) {
         if (r.missing && r.missing.length > 0) console.log('  added on: ' + r.missing.join(', '));
         if (r.updated && r.updated.length > 0) console.log('  refreshed on (was stale): ' + r.updated.join(', '));
         if (r.gitignore && r.gitignore.changed) {
-          console.log('  + .gitignore : added ' + (agent === 'claude' ? '.claude/settings.local.json' : '.github/hooks/agent-viz.local.json'));
+          console.log('  + .gitignore : added ' + r.gitignore.entry);
         }
         printed = true;
       }
@@ -109,13 +109,13 @@ export async function cmdStop(flags, packageRoot) {
 
   const shouldUninstall = flags['keep-hooks'] !== true;
   if (shouldUninstall) {
-    const { uninstall, resolveScope } = await import(pathToFileURL(path.join(packageRoot, 'dist', 'server', 'install-hooks.js')).href);
+    const { uninstall, resolveScope, agentLabel } = await import(pathToFileURL(path.join(packageRoot, 'dist', 'server', 'install-hooks.js')).href);
     try {
       const scoped = resolveScope({ cwd: process.cwd(), packageRoot });
       const result = uninstall({ scope: scoped.scope, cwd: process.cwd(), packageRoot });
       let totalRemoved = 0;
       for (const [agent, x] of Object.entries(result)) {
-        const label = agent === 'claude' ? 'Claude Code' : 'Copilot CLI';
+        const label = agentLabel(agent);
         if (x.error) {
           console.log(String(c.err('X')) + ' ' + label + ' hooks NOT removed: ' + x.error);
           continue;
@@ -153,7 +153,7 @@ export async function cmdStop(flags, packageRoot) {
 
 export async function cmdStatus(flags, packageRoot) {
   const { status } = await import(pathToFileURL(path.join(packageRoot, 'dist', 'server', 'lifecycle.js')).href);
-  const { installedScopes } = await import(pathToFileURL(path.join(packageRoot, 'dist', 'server', 'install-hooks.js')).href);
+  const { installedScopes, agentLabel } = await import(pathToFileURL(path.join(packageRoot, 'dist', 'server', 'install-hooks.js')).href);
   const s = await status({ port: requestedPort(flags) });
   if (s.running) {
     console.log(String(c.ok('running')) + ' -> http://localhost:' + s.port);
@@ -170,7 +170,7 @@ export async function cmdStatus(flags, packageRoot) {
   const lines = [];
   for (const [agent, scan] of Object.entries(scopes)) {
     if (!scan) continue;
-    const label = agent === 'claude' ? 'Claude Code' : 'Copilot CLI';
+    const label = agentLabel(agent);
     const list = scan.installed;
     if (list.length > 0) {
       const names = list.map((x) => x.scope).join(', ');
@@ -190,7 +190,7 @@ export async function cmdStatus(flags, packageRoot) {
 export async function cmdInstallHooks(flags, packageRoot) {
   let scope = pickScopeFlag(flags);
   let target = flags.target;
-  const { install, audit, detectAgents, findProjectRoot } = await import(pathToFileURL(path.join(packageRoot, 'dist', 'server', 'install-hooks.js')).href);
+  const { install, audit, detectAgents, findProjectRoot, agentLabel } = await import(pathToFileURL(path.join(packageRoot, 'dist', 'server', 'install-hooks.js')).href);
 
   const noFlags = !scope && !target && !flags.check;
   if (noFlags) {
@@ -219,7 +219,7 @@ export async function cmdInstallHooks(flags, packageRoot) {
     const result = audit({ target, scope, cwd: process.cwd(), packageRoot });
     let exitCode = 0;
     for (const [agent, a] of Object.entries(result)) {
-      const label = agent === 'claude' ? 'Claude Code' : 'Copilot CLI';
+      const label = agentLabel(agent);
       if (a.error) {
         console.log(label + ':');
         console.log('  ' + c.err('X') + ' ' + a.error);
@@ -243,7 +243,7 @@ export async function cmdInstallHooks(flags, packageRoot) {
   const result = install({ target, scope, cwd: process.cwd(), packageRoot });
   let refused = false;
   for (const [agent, r] of Object.entries(result)) {
-    const label = agent === 'claude' ? 'Claude Code' : 'Copilot CLI';
+    const label = agentLabel(agent);
     if (r.error) {
       console.log(label + ':');
       console.log('  ' + c.err('X') + ' ' + r.error);
@@ -267,7 +267,7 @@ export async function cmdInstallHooks(flags, packageRoot) {
       for (const [ev, n] of others) console.log(c.dim('    - ' + ev + ': ' + n + ' other(s)'));
     }
     if (r.gitignore && r.gitignore.changed) {
-      console.log('  + .gitignore : added ' + (agent === 'claude' ? '.claude/settings.local.json' : '.github/hooks/agent-viz.local.json'));
+      console.log('  + .gitignore : added ' + r.gitignore.entry);
     }
     if (r.crossScope && r.crossScope.length > 0) {
       const othersScope = r.crossScope.map((s) => s.scope).join(', ');
@@ -291,12 +291,12 @@ export async function cmdInstallHooks(flags, packageRoot) {
 export async function cmdUninstallHooks(flags, packageRoot) {
   const scope = pickScopeFlag(flags);
   const target = flags.target;
-  const { uninstall } = await import(pathToFileURL(path.join(packageRoot, 'dist', 'server', 'install-hooks.js')).href);
+  const { uninstall, agentLabel } = await import(pathToFileURL(path.join(packageRoot, 'dist', 'server', 'install-hooks.js')).href);
   const result = uninstall({ target, scope, cwd: process.cwd(), packageRoot });
   let total = 0;
   let failed = false;
   for (const [agent, x] of Object.entries(result)) {
-    const label = agent === 'claude' ? 'Claude Code' : 'Copilot CLI';
+    const label = agentLabel(agent);
     if (x.error) {
       console.log(label + ': ' + c.err('X') + ' ' + x.error);
       failed = true;

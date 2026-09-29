@@ -14,7 +14,7 @@ test('pickTargetDefault: only copilot detected → index 1', () => {
   expect(pickTargetDefault({ claude: false, copilot: true, antigravity: false })).toBe(1);
 });
 
-test('pickTargetDefault: seul Antigravity détecté → son index', () => {
+test('pickTargetDefault: only antigravity detected → index 2', () => {
   expect(pickTargetDefault({ claude: false, copilot: false, antigravity: true })).toBe(2);
 });
 
@@ -104,6 +104,8 @@ test('promptInstallParams: detection labels rendered correctly', async () => {
   await promise;
   expect(io.captured).toMatch(/Claude Code \(detected\)/);
   expect(io.captured).toMatch(/Copilot CLI \(not detected\)/);
+  expect(io.captured).toMatch(/Antigravity CLI \(not detected\)/);
+  expect(io.captured).toMatch(/All agents/);
 });
 
 test('promptInstallParams: with projectRoot, scope prompt asked, default user', async () => {
@@ -121,20 +123,38 @@ test('promptInstallParams: with projectRoot, scope prompt asked, default user', 
   expect(io.captured).toMatch(/Where to install hooks\?/);
 });
 
-test('promptInstallParams: scope down twice + enter → local', async () => {
+// 'both' couvre aussi Antigravity, qui n'a pas de portée locale : ce test choisit
+// donc un agent seul (Claude) plutôt que 'both', pour garder 'local' atteignable.
+test('promptInstallParams: scope down twice + enter → local (single agent that supports it)', async () => {
   const io = makeMockIO();
   const promise = promptInstallParams({
-    detected: { claude: true, copilot: true, antigravity: false },
+    detected: { claude: true, copilot: false, antigravity: false },
     projectRoot: '/some/project',
     io: { input: io.input, output: io.output },
   });
   await tick();
-  press(io.input, 'return'); await tick();    // accept All agents
+  press(io.input, 'return'); await tick();    // accept Claude Code (default, single detected)
   press(io.input, 'down'); await tick();       // user → project
   press(io.input, 'down'); await tick();       // project → local
   press(io.input, 'return');
   const result = await promise;
   expect(result.scope).toBe('local');
+});
+
+test('promptInstallParams: target antigravity → scope options omit local', async () => {
+  const io = makeMockIO();
+  const promise = promptInstallParams({
+    detected: { claude: false, copilot: false, antigravity: true },
+    projectRoot: '/some/project',
+    io: { input: io.input, output: io.output },
+  });
+  await tick();
+  press(io.input, 'return'); await tick();    // accept Antigravity CLI (default, single detected)
+  press(io.input, 'down'); await tick();       // user → project
+  press(io.input, 'down'); await tick();       // project (last: local is excluded) → no-op
+  press(io.input, 'return');
+  const result = await promise;
+  expect(result).toEqual({ target: 'antigravity', scope: 'project' });
 });
 
 // Regression: on Windows real TTY, raw mode was being toggled between the

@@ -8,7 +8,7 @@
 //   agent-viz status
 //   agent-viz install-hooks   [--user|--project|--local]
 //   agent-viz uninstall-hooks [--user|--project|--local]
-//   agent-viz hook            (internal — invoked by an agent's hook config)
+//   agent-viz hook            (internal — invoked by an agent's hook config; --source, --event)
 //   agent-viz --help | --version
 
 import path from 'node:path';
