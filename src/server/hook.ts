@@ -4,14 +4,15 @@
 // file in os.tmpdir()/agent-events/, and fire-and-forget POST /notify to the
 // running agent-viz server (default 127.0.0.1:3333).
 //
-// Source agent (claude | copilot) is taken from --source=<agent> on argv.
-// Sans --source, la source est 'claude' : des settings.json portent encore une
-// commande de hook installée sans ce drapeau, et elle doit rester lue.
+// Source agent taken from --source=<agent> on argv; sans --source, 'claude' : des
+// settings.json portent encore une commande installée sans ce drapeau. Une source dont la
+// charge ne nomme pas l'événement (Antigravity) reçoit aussi --event=<nom>.
 
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { HOOK_SOURCES, NORMALIZERS, NEEDS_EVENT_FLAG, type HookSource } from './hook-normalize.ts';
 
 // node:http arrive par process.getBuiltinModule, pas par `import` : matérialiser son espace de
 // noms ESM se paie à chaque processus de hook, donc à chaque événement. getBuiltinModule rend le
@@ -32,20 +33,27 @@ function logHookError(message: string): void {
   } catch {}
 }
 
-function parseSource(argv: string[]): 'claude' | 'copilot' {
+function parseSource(argv: string[]): HookSource {
   for (const a of argv) {
     if (a.startsWith('--source=')) {
       const v = a.slice('--source='.length);
-      if (v === 'claude' || v === 'copilot') return v;
+      const known = HOOK_SOURCES.find(s => s === v);
+      if (known) return known;
     }
   }
   return 'claude';
+}
+
+function parseEvent(argv: string[]): string | undefined {
+  const a = argv.find(x => x.startsWith('--event='));
+  return a ? a.slice('--event='.length) : undefined;
 }
 
 function runHook(): void {
   try { fs.mkdirSync(DIR, { recursive: true }); } catch {}
 
   const source = parseSource(process.argv.slice(2));
+  const event = parseEvent(process.argv.slice(2));
 
   // Safety net: if stdin never closes (Windows-common), exit after 3 s — under every hook
   // `timeout` a settings file can carry (10 s, or 5 s from an older install), so the safety
@@ -61,7 +69,12 @@ function runHook(): void {
       // BOM U+FEFF toléré : un writer Windows (.NET UTF8Encoding) préfixe la charge, que JSON.parse
       // rejette ; sans ce retrait, l'événement était perdu en silence. Le BOM est comparé par CODE
       // de caractère : un BOM littéral dans le source serait invisible à la relecture.
-      const evt: Record<string, unknown> = JSON.parse(input.charCodeAt(0) === 0xFEFF ? input.slice(1) : input);
+      const raw: Record<string, unknown> = JSON.parse(input.charCodeAt(0) === 0xFEFF ? input.slice(1) : input);
+      if (NEEDS_EVENT_FLAG[source] && !event) {
+        logHookError(`--event missing, event dropped source=${source}`);
+        process.exit(0);
+      }
+      const evt = NORMALIZERS[source](raw, event);
       evt._ts = new Date().toISOString();
       evt._source = source;
       const sid = evt.session_id;
@@ -92,6 +105,6 @@ function runHook(): void {
   });
 }
 
-export { runHook, parseSource };
+export { runHook, parseSource, parseEvent };
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) runHook();

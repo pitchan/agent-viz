@@ -19,6 +19,7 @@ const BOM = Buffer.from([0xef, 0xbb, 0xbf]);
 interface ResultatHook {
   code: number | null;
   stderr: string;
+  stdout: string;
   racine: string;
   dossier: string;
 }
@@ -26,19 +27,22 @@ interface ResultatHook {
 // Lance le hook sur une charge donnée, dans un dossier temporaire isolé.
 // Le port pointe volontairement vers personne : le POST /notify est en
 // « tire et oublie », son échec est déjà avalé par `req.on('error')`.
-function lanceLeHook(charge: string | Buffer): Promise<ResultatHook> {
+function lanceLeHook(charge: string | Buffer, args: string[] = ['--source=claude']): Promise<ResultatHook> {
   const racine = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-viz-hook-test-'));
   return new Promise<ResultatHook>((resolve, reject) => {
-    const enfant = spawn(process.execPath, [HOOK, '--source=claude'], {
+    const enfant = spawn(process.execPath, [HOOK, ...args], {
       env: { ...process.env, TMPDIR: racine, TEMP: racine, TMP: racine, AGENT_VIZ_PORT: '59999' },
-      stdio: ['pipe', 'ignore', 'pipe'],
+      stdio: ['pipe', 'pipe', 'pipe'],
     });
     let stderr = '';
+    let stdout = '';
+    enfant.stdout.on('data', c => { stdout += c; });
     enfant.stderr.on('data', c => { stderr += c; });
     enfant.on('error', reject);
     enfant.on('close', code => resolve({
       code,
       stderr,
+      stdout,
       racine,
       dossier: path.join(racine, 'agent-events'),
     }));
@@ -88,6 +92,40 @@ test('non-régression : une charge normale, sans BOM, reste capturée et sans er
     expect(JSON.parse(ligne!.trim()).session_id).toBe('sess-normale-1');
     expect(lit(path.join(r.dossier, '_hook-errors.log')),
       'une charge valide ne doit rien écrire dans le journal d’erreur').toBe(null);
+  } finally {
+    fs.rmSync(r.racine, { recursive: true, force: true });
+  }
+});
+
+test('une charge Antigravity est écrite normalisée, sous le nom de sa conversation', async () => {
+  // Arrange
+  const charge = { conversationId: 'conv-agy-1', stepIdx: 4, toolCall: { name: 'run_command', args: { CommandLine: 'echo fin' } } };
+  // Act
+  const r = await lanceLeHook(JSON.stringify(charge), ['--source=antigravity', '--event=PreToolUse']);
+  // Assert
+  try {
+    const ligne = lit(path.join(r.dossier, 'conv-agy-1.jsonl'));
+    expect(ligne, 'aucun .jsonl écrit pour la conversation').not.toBe(null);
+    const relu = JSON.parse(ligne!.trim());
+    expect(relu.hook_event_name).toBe('PreToolUse');
+    expect(relu.tool_use_id).toBe('conv-agy-1:4');
+    expect(relu._source).toBe('antigravity');
+    expect(r.stdout, 'agy lit stdout : le hook doit y rester muet').toBe('');
+  } finally {
+    fs.rmSync(r.racine, { recursive: true, force: true });
+  }
+});
+
+test('une charge Antigravity sans --event est refusée, tracée, jamais écrite', async () => {
+  // Arrange
+  const charge = { conversationId: 'conv-agy-2', stepIdx: 1 };
+  // Act
+  const r = await lanceLeHook(JSON.stringify(charge), ['--source=antigravity']);
+  // Assert
+  try {
+    expect(lit(path.join(r.dossier, 'conv-agy-2.jsonl')), 'un événement sans nom ne doit pas être écrit').toBe(null);
+    expect(lit(path.join(r.dossier, '_hook-errors.log'))).toMatch(/--event/);
+    expect(r.code).toBe(0);
   } finally {
     fs.rmSync(r.racine, { recursive: true, force: true });
   }
