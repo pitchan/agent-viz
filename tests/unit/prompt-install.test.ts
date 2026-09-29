@@ -2,20 +2,24 @@ import { expect, test } from 'vitest';
 import { PassThrough } from 'node:stream';
 import { pickTargetDefault, promptInstallParams } from '../../src/server/prompt-install.ts';
 
-test('pickTargetDefault: both detected → index 2 (Both)', () => {
-  expect(pickTargetDefault({ claude: true, copilot: true })).toBe(2);
+test('pickTargetDefault: both detected → index 3 (All agents)', () => {
+  expect(pickTargetDefault({ claude: true, copilot: true, antigravity: false })).toBe(3);
 });
 
 test('pickTargetDefault: only claude detected → index 0', () => {
-  expect(pickTargetDefault({ claude: true, copilot: false })).toBe(0);
+  expect(pickTargetDefault({ claude: true, copilot: false, antigravity: false })).toBe(0);
 });
 
 test('pickTargetDefault: only copilot detected → index 1', () => {
-  expect(pickTargetDefault({ claude: false, copilot: true })).toBe(1);
+  expect(pickTargetDefault({ claude: false, copilot: true, antigravity: false })).toBe(1);
 });
 
-test('pickTargetDefault: nothing detected → index 2 (Both, lets user pre-install)', () => {
-  expect(pickTargetDefault({ claude: false, copilot: false })).toBe(2);
+test('pickTargetDefault: seul Antigravity détecté → son index', () => {
+  expect(pickTargetDefault({ claude: false, copilot: false, antigravity: true })).toBe(2);
+});
+
+test('pickTargetDefault: nothing detected → index 3 (All agents, lets user pre-install)', () => {
+  expect(pickTargetDefault({ claude: false, copilot: false, antigravity: false })).toBe(3);
 });
 
 type MockInput = PassThrough & {
@@ -47,12 +51,12 @@ async function tick() { return new Promise((r) => setImmediate(r)); }
 test('promptInstallParams: target=both default, no project → returns user scope without prompt', async () => {
   const io = makeMockIO();
   const promise = promptInstallParams({
-    detected: { claude: true, copilot: true },
+    detected: { claude: true, copilot: true, antigravity: false },
     projectRoot: null,
     io: { input: io.input, output: io.output },
   });
   await tick();
-  press(io.input, 'return');                 // accept "Both"
+  press(io.input, 'return');                 // accept "All agents"
   const result = await promise;
   expect(result).toEqual({ target: 'both', scope: 'user' });
   expect(io.captured).toMatch(/Which agent\(s\) to instrument\?/);
@@ -62,13 +66,14 @@ test('promptInstallParams: target=both default, no project → returns user scop
 test('promptInstallParams: arrow down navigates to "both" (already last index stays put)', async () => {
   const io = makeMockIO();
   const promise = promptInstallParams({
-    detected: { claude: true, copilot: false },     // default index 0 = claude
+    detected: { claude: true, copilot: false, antigravity: false },     // default index 0 = claude
     projectRoot: null,
     io: { input: io.input, output: io.output },
   });
   await tick();
   press(io.input, 'down'); await tick();              // claude → copilot
-  press(io.input, 'down'); await tick();              // copilot → both
+  press(io.input, 'down'); await tick();              // copilot → antigravity
+  press(io.input, 'down'); await tick();              // antigravity → both
   press(io.input, 'down'); await tick();              // both (last) → no-op
   press(io.input, 'return');
   const result = await promise;
@@ -78,7 +83,7 @@ test('promptInstallParams: arrow down navigates to "both" (already last index st
 test('promptInstallParams: Ctrl+C rejects with aborted', async () => {
   const io = makeMockIO();
   const promise = promptInstallParams({
-    detected: { claude: true, copilot: true },
+    detected: { claude: true, copilot: true, antigravity: false },
     projectRoot: null,
     io: { input: io.input, output: io.output },
   });
@@ -90,7 +95,7 @@ test('promptInstallParams: Ctrl+C rejects with aborted', async () => {
 test('promptInstallParams: detection labels rendered correctly', async () => {
   const io = makeMockIO();
   const promise = promptInstallParams({
-    detected: { claude: true, copilot: false },
+    detected: { claude: true, copilot: false, antigravity: false },
     projectRoot: null,
     io: { input: io.input, output: io.output },
   });
@@ -104,12 +109,12 @@ test('promptInstallParams: detection labels rendered correctly', async () => {
 test('promptInstallParams: with projectRoot, scope prompt asked, default user', async () => {
   const io = makeMockIO();
   const promise = promptInstallParams({
-    detected: { claude: true, copilot: true },
+    detected: { claude: true, copilot: true, antigravity: false },
     projectRoot: '/some/project',
     io: { input: io.input, output: io.output },
   });
   await tick();
-  press(io.input, 'return'); await tick();    // accept Both
+  press(io.input, 'return'); await tick();    // accept All agents
   press(io.input, 'return');                   // accept user (default)
   const result = await promise;
   expect(result).toEqual({ target: 'both', scope: 'user' });
@@ -119,12 +124,12 @@ test('promptInstallParams: with projectRoot, scope prompt asked, default user', 
 test('promptInstallParams: scope down twice + enter → local', async () => {
   const io = makeMockIO();
   const promise = promptInstallParams({
-    detected: { claude: true, copilot: true },
+    detected: { claude: true, copilot: true, antigravity: false },
     projectRoot: '/some/project',
     io: { input: io.input, output: io.output },
   });
   await tick();
-  press(io.input, 'return'); await tick();    // accept Both
+  press(io.input, 'return'); await tick();    // accept All agents
   press(io.input, 'down'); await tick();       // user → project
   press(io.input, 'down'); await tick();       // project → local
   press(io.input, 'return');
@@ -151,12 +156,12 @@ test('promptInstallParams: raw mode is toggled exactly once per dialog (not per 
   io.input.unref = function (this: MockInput) { calls.push(['unref']); return this; };
 
   const promise = promptInstallParams({
-    detected: { claude: true, copilot: true },
+    detected: { claude: true, copilot: true, antigravity: false },
     projectRoot: '/some/project',
     io: { input: io.input, output: io.output },
   });
   await tick();
-  press(io.input, 'return'); await tick();    // accept Both
+  press(io.input, 'return'); await tick();    // accept All agents
   press(io.input, 'return');                   // accept user
   await promise;
 

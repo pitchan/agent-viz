@@ -5,14 +5,11 @@
 
 import readline from 'node:readline';
 import { styleText } from 'node:util';
-import type { Target } from './install-hooks/types.ts';
+import type { AgentName, Target } from './install-hooks/types.ts';
+import { AGENT_CONFIG } from './install-hooks/config.ts';
 
-// Forme rendue par `detectAgents()` (install-hooks.ts) : un booléen par agent
-// connu, jamais plus.
-interface DetectedAgents {
-  claude: boolean;
-  copilot: boolean;
-}
+// Forme rendue par `detectAgents()` (install-hooks.ts) : un booléen par agent du registre.
+type DetectedAgents = Record<AgentName, boolean>;
 
 // Le flux d'entrée du dialogue. `readline.emitKeypressEvents` exige un
 // `NodeJS.ReadableStream` — c'est la base de ce type ; les propriétés TTY
@@ -44,10 +41,11 @@ interface SelectOption<T extends string> {
   label: string;
 }
 
+const AGENTS = Object.keys(AGENT_CONFIG) as AgentName[];
+
 const TARGET_OPTIONS: SelectOption<Target>[] = [
-  { value: 'claude',  label: 'Claude Code' },
-  { value: 'copilot', label: 'Copilot CLI' },
-  { value: 'both',    label: 'Both' },
+  ...AGENTS.map(a => ({ value: a, label: AGENT_CONFIG[a].label })),
+  { value: 'both', label: 'All agents' },
 ];
 
 const SCOPE_OPTIONS: SelectOption<'user' | 'project' | 'local'>[] = [
@@ -56,11 +54,10 @@ const SCOPE_OPTIONS: SelectOption<'user' | 'project' | 'local'>[] = [
   { value: 'local',   label: 'local — this repo only, gitignored' },
 ];
 
+// Un seul agent détecté : on le propose. Aucun ou plusieurs : tous, pour pré-installer.
 function pickTargetDefault(detected: DetectedAgents): number {
-  if (detected.claude && detected.copilot) return 2;
-  if (detected.claude) return 0;
-  if (detected.copilot) return 1;
-  return 2;
+  const found = AGENTS.filter(a => detected[a]);
+  return found.length === 1 ? AGENTS.indexOf(found[0]!) : AGENTS.length;
 }
 
 // Render a single-question selector. Returns the selected option's value.

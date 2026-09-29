@@ -8,7 +8,7 @@
 //   agent-viz status
 //   agent-viz install-hooks   [--user|--project|--local]
 //   agent-viz uninstall-hooks [--user|--project|--local]
-//   agent-viz hook            (internal — invoked by Claude Code via settings.json)
+//   agent-viz hook            (internal — invoked by an agent's hook config)
 //   agent-viz --help | --version
 
 import path from 'node:path';
@@ -38,7 +38,7 @@ const c = {
 
 // Copie de TARGETS du registre : l'analyse des options la vérifie avant de
 // charger dist/. tests/repo/cli-flags et bin-help la comparent au registre.
-const TARGETS = ['claude', 'copilot', 'both'];
+const TARGETS = ['claude', 'copilot', 'antigravity', 'both'];
 
 function help() {
   console.log(`agent-viz v${PKG_VERSION}
@@ -52,15 +52,16 @@ Usage:
   agent-viz stop                 Stop the running visualizer (also removes hooks).
                                    --keep-hooks       keep hooks installed (symmetric to start --no-install-hooks)
   agent-viz status               Show running state + URL.
-  agent-viz install-hooks        Install hooks. Default: auto-detect (Claude + Copilot if present).
+  agent-viz install-hooks        Install hooks. Default: auto-detect (Claude, Copilot, Antigravity if present).
                                    --target=${TARGETS.join('|')}   force a target
-                                   --user             user-level config (~/.claude or ~/.copilot) — default
+                                   --user             user-level config (~/.claude, ~/.copilot, ~/.gemini) — default
                                    --project          repo-committed config
                                    --local            repo-local gitignored config
                                    --check            audit instead of installing (exit 1 on stale/missing)
   agent-viz uninstall-hooks      Remove hooks (sweeps all targets unless --target given).
   agent-viz hook                 Internal — read JSON event from stdin.
-                                   --source=claude|copilot   set the source agent tag
+                                   --source=claude|copilot|antigravity   set the source agent tag
+                                   --event=<name>     event name, for agents whose payload omits it (antigravity)
   agent-viz [<command>] --help   Show this help (never runs the command).
   agent-viz --version            Print version.
 
@@ -216,7 +217,7 @@ function showFirstRunWelcomeIfNeeded(argv: string[]) {
   console.log(`${c.ok('✓')} Welcome to agent-viz!`);
   console.log('');
   console.log('  Get started:');
-  console.log(`    ${c.ok('agent-viz install-hooks')}    ${c.hint('←')} configure Claude/Copilot hooks (interactive)`);
+  console.log(`    ${c.ok('agent-viz install-hooks')}    ${c.hint('←')} configure Claude/Copilot/Antigravity hooks (interactive)`);
   console.log(`    ${c.ok('agent-viz')}                  start the dashboard at http://localhost:3333`);
   console.log(`    ${c.dim('agent-viz --help')}           list all commands`);
   console.log('');

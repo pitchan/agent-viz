@@ -17,7 +17,7 @@ import {
 import { resolveScope, resolveHookCommand, findProjectRoot, ensureGitignore } from './install-hooks/scopes.ts';
 import { auditSettings } from './install-hooks/claude.ts';
 import {
-  detectAgents, install, uninstall, audit, installedScopes, findInstalledScopes,
+  detectAgents, install, uninstall, audit, installedScopes, findInstalledScopes, agentLabel,
 } from './install-hooks/registry.ts';
 import { cliMain } from './install-hooks/cli.ts';
 
@@ -39,6 +39,7 @@ export {
   audit,
   installedScopes,
   findInstalledScopes,
+  agentLabel,
   resolveScope,
   resolveHookCommand,
   findProjectRoot,
