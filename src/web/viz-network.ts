@@ -23,12 +23,14 @@ import { resetErrors } from './viz-errors.ts';
 // the server, which keeps listening whether or not a tab is open and answers that question
 // from its own catch-up state.
 
+// Les agents dont la vue sait dessiner le badge ; la classe CSS agent-<nom> porte la couleur.
+const KNOWN_AGENTS = new Set(['claude', 'copilot', 'antigravity']);
+
 // Render a small pill badge identifying the source agent. Returns HTML safe to
-// inline (label is fixed, no user input).
+// inline (label comes from KNOWN_AGENTS, no user input).
 function badgeHtml(agentSource: string | undefined) {
-  if (agentSource !== 'claude' && agentSource !== 'copilot') return '';
-  const src = agentSource;
-  return `<span class="agent-badge agent-${src}">${src}</span>`;
+  if (!agentSource || !KNOWN_AGENTS.has(agentSource)) return '';
+  return `<span class="agent-badge agent-${agentSource}">${agentSource}</span>`;
 }
 
 // ─── DOM refs ─────────────────────────────────────────────────────────────
@@ -59,7 +61,7 @@ fetch('/version')
 // ─── Session selection (owned here, read-only from elsewhere) ─────────────
 export let currentSessionId: string | null = null;
 export const sessionTitles = new Map<string, string>();
-export const sessionAgents = new Map<string, string>(); // sid → 'claude' | 'copilot'
+export const sessionAgents = new Map<string, string>(); // sid → 'claude' | 'copilot' | 'antigravity'
 
 // ─── SSE + poll state ─────────────────────────────────────────────────────
 let sseSource: EventSource | null = null;
@@ -293,7 +295,7 @@ export function updateTopbarPrompt() {
     const agent = sid ? sessionAgents.get(sid) : null;
     if (agent) {
       badge.textContent = agent;
-      badge.className = `agent-badge agent-${agent === 'copilot' ? 'copilot' : 'claude'} visible`;
+      badge.className = `agent-badge agent-${KNOWN_AGENTS.has(agent) ? agent : 'claude'} visible`;
     } else {
       badge.className = 'agent-badge';
       badge.textContent = '';

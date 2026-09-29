@@ -8,6 +8,7 @@
   --holo-muted: rgba(102, 204, 255, 0.15);
   --agent: #bc8cff;
   --agent-dim: rgba(188, 140, 255, 0.5);
+  --antigravity: #ff7eb6;
   --tool: #ffbb44;
   --tool-dim: rgba(255, 187, 68, 0.4);
   --complete: #66ffaa;
@@ -120,6 +121,10 @@ body {
 .agent-badge.agent-claude {
   color: var(--holo);
   background: rgba(102, 204, 255, 0.06);
+}
+.agent-badge.agent-antigravity {
+  color: var(--antigravity);
+  background: rgba(255, 126, 182, 0.06);
 }
 .session-card .agent-badge {
   margin-left: 6px;
