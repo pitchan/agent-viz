@@ -40,36 +40,53 @@ export function agentLabel(name: string): string {
 // ses tests la comparent à celle-ci.
 export const TARGETS: readonly Target[] = [...(Object.keys(INSTALLERS) as AgentName[]), 'both'];
 
-// Un --local sans agent nommé ne vise que les agents qui ont une portée locale : sinon le
-// refus d'Antigravity fait échouer la commande pour les autres. Nommé, l'agent refuse lui-même.
-function agentsSupporting(scope: Scope | undefined): AgentName[] {
-  const all = Object.keys(INSTALLERS) as AgentName[];
-  return scope === 'local' ? all.filter(a => AGENT_CONFIG[a].localFile !== null) : all;
+type Detect = (agent: AgentName) => boolean;
+const realDetect: Detect = a => INSTALLERS[a].detect();
+
+// Les agents à traiter, et ceux écartés faute de la portée demandée : un écarté est
+// rendu comme donnée, pour que la CLI le nomme au lieu de le taire.
+interface Selection { act: AgentName[]; skipped: AgentName[] }
+
+function supportsScope(agent: AgentName, scope: Scope | undefined): boolean {
+  return scope !== 'local' || AGENT_CONFIG[agent].localFile !== null;
 }
 
-// Pick which agents to act on. `target` accepts a registered agent name,
-// 'both', or undefined → auto-detect (fallback: first registered). Any other
-// value throws: a mistyped target must not act on agents nobody named.
-export function pickAgents(
-  { target, scope }: { target?: string; scope?: Scope },
-  // Substitué par les tests seuls : la détection réelle lit PATH et HOME.
-  detect: (agent: AgentName) => boolean = a => INSTALLERS[a].detect(),
-): AgentName[] {
+function splitByScope(picked: AgentName[], scope: Scope | undefined): Selection {
+  return {
+    act: picked.filter(a => supportsScope(a, scope)),
+    skipped: picked.filter(a => !supportsScope(a, scope)),
+  };
+}
+
+// Les agents visés avant tout filtre de portée. `target` accepts a registered agent name,
+// 'both', or undefined → auto-detect (fallback: first registered). Any other value throws:
+// a mistyped target must not act on agents nobody named.
+function candidates(target: string | undefined, detect: Detect): AgentName[] {
   const all = Object.keys(INSTALLERS) as AgentName[];
-  const eligible = agentsSupporting(scope);
-  if (target === 'both') return eligible;
+  if (target === 'both') return all;
   if (target === undefined) {
     const detected = all.filter(detect);
     // `all` n'est jamais vide (registre fixe ci-dessus) : `all[0]` existe
     // forcément, le `!` documente cet invariant.
-    if (detected.length === 0) return [all[0]!];
-    // Installer un agent non détecté à la place de ceux qui le sont serait un repli silencieux.
-    const usable = detected.filter(a => eligible.includes(a));
-    if (usable.length === 0) throw new Error(`no detected agent supports --${scope} (detected: ${detected.join(', ')})`);
-    return usable;
+    return detected.length > 0 ? detected : [all[0]!];
   }
   if (isAgentName(target)) return [target];
   throw new Error(`unknown target '${target}' (expected ${TARGETS.join('|')})`);
+}
+
+// Un agent nommé n'est jamais écarté : son adaptateur refuse lui-même une portée qu'il n'a
+// pas. Sans agent nommé, installer un agent non détecté à la place serait un repli silencieux.
+function select({ target, scope }: { target?: string; scope?: Scope }, detect: Detect): Selection {
+  const picked = candidates(target, detect);
+  if (target !== undefined && target !== 'both') return { act: picked, skipped: [] };
+  const sel = splitByScope(picked, scope);
+  if (sel.act.length === 0) throw new Error(`no detected agent supports --${scope} (detected: ${picked.join(', ')})`);
+  return sel;
+}
+
+// `detect` n'est substitué que par les tests : la détection réelle lit PATH et HOME.
+export function pickAgents(opts: { target?: string; scope?: Scope }, detect: Detect = realDetect): AgentName[] {
+  return select(opts, detect).act;
 }
 
 // Un adaptateur a le droit de REFUSER (copilot.ts refuse d'écraser un fichier qui porte notre nom
@@ -79,14 +96,20 @@ function failure(err: unknown): { error: string } {
   return { error: err instanceof Error ? err.message : String(err) };
 }
 
-export function dispatch(method: 'install' | 'uninstall' | 'audit', opts: AgentOpts): Record<string, unknown> {
-  const agents = pickAgents(opts);
+function run(sel: Selection, scope: Scope | undefined, call: (a: AgentName) => unknown): Record<string, unknown> {
   const out: Record<string, unknown> = {};
-  for (const a of agents) {
-    try { out[a] = INSTALLERS[a][method](opts); }
-    catch (err) { out[a] = failure(err); }
+  for (const a of Object.keys(INSTALLERS) as AgentName[]) {
+    if (sel.skipped.includes(a)) out[a] = { skipped: `no ${scope} scope` };
+    else if (sel.act.includes(a)) {
+      try { out[a] = call(a); }
+      catch (err) { out[a] = failure(err); }
+    }
   }
   return out;
+}
+
+export function dispatch(method: 'install' | 'uninstall' | 'audit', opts: AgentOpts): Record<string, unknown> {
+  return run(select(opts, realDetect), opts.scope, a => INSTALLERS[a][method](opts));
 }
 
 export function install(opts: AgentOpts = {}): Record<string, unknown>   { return dispatch('install', opts); }
@@ -94,13 +117,10 @@ export function audit(opts: AgentOpts = {}): Record<string, unknown>     { retur
 export function uninstall(opts: AgentOpts = {}): Record<string, unknown> {
   // Default to ALL registered agents (sweep), even if not currently detected.
   // `=== undefined` : une cible vide est une cible invalide, pas une absence de cible.
-  const agents: AgentName[] = opts.target === undefined ? agentsSupporting(opts.scope) : pickAgents(opts);
-  const out: Record<string, unknown> = {};
-  for (const a of agents) {
-    try { out[a] = INSTALLERS[a].uninstall(opts); }
-    catch (err) { out[a] = failure(err); }
-  }
-  return out;
+  const sel = opts.target === undefined
+    ? splitByScope(Object.keys(INSTALLERS) as AgentName[], opts.scope)
+    : select(opts, realDetect);
+  return run(sel, opts.scope, a => INSTALLERS[a].uninstall(opts));
 }
 
 // Back-compat: detectAgents() returns { claude: bool, copilot: bool, ... }

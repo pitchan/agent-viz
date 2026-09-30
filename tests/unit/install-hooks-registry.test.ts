@@ -28,6 +28,7 @@ interface AgentResult {
   coexisting?: Record<string, number>;
   command?: { command: string };
   results?: Array<{ removed: number }>;
+  skipped?: string;
 }
 
 test('chaque adaptateur du registre expose le contrat AgentInstaller complet', () => {
@@ -265,15 +266,15 @@ test('uninstall avec une cible inconnue lève et laisse en place le hook posé',
   expect(INSTALLERS.claude.installedIn(settings), 'le hook Claude doit rester posé après le refus').toBeTruthy();
 });
 
-// Antigravity n'a pas de portée locale : un `--local` sans agent nommé doit le laisser
-// de côté, sans quoi son refus fait échouer la commande pour Claude et Copilot.
+// Antigravity n'a pas de portée locale : un `--local` sans agent nommé le déclare
+// écarté, sans quoi son refus fait échouer la commande pour Claude et Copilot.
 function bacJetable(prefixe: string, projetGit: boolean) {
   const dir = projetGit ? sandboxProject(prefixe) : fs.mkdtempSync(path.join(os.tmpdir(), prefixe));
   onTestFinished(() => fs.rmSync(dir, { recursive: true, force: true }));
   return dir;
 }
 
-test('uninstall --local sans cible écarte Antigravity et ne rend aucune erreur', () => {
+test('uninstall --local sans cible déclare Antigravity écarté et ne rend aucune erreur', () => {
   // Arrange
   const root = bacJetable('avtest-local-sweep-', true);
   const packageRoot = bacJetable('avtest-pkg-', false);
@@ -282,13 +283,13 @@ test('uninstall --local sans cible écarte Antigravity et ne rend aucune erreur'
   const result = uninstall({ scope: 'local', cwd: root, packageRoot });
 
   // Assert
-  expect(Object.keys(result).sort()).toEqual(['claude', 'copilot']);
+  expect(result.antigravity).toEqual({ skipped: 'no local scope' });
   for (const [agent, r] of Object.entries(result)) {
     expect((r as AgentResult).error, `${agent} ne doit pas échouer`).toBeUndefined();
   }
 });
 
-test('install --local --target=both écarte Antigravity et installe Claude et Copilot', () => {
+test('install --local --target=both déclare Antigravity écarté et installe Claude et Copilot', () => {
   // Arrange
   const root = bacJetable('avtest-local-both-', true);
   const packageRoot = bacJetable('avtest-pkg-', false);
@@ -297,7 +298,7 @@ test('install --local --target=both écarte Antigravity et installe Claude et Co
   const result = install({ scope: 'local', target: 'both', cwd: root, packageRoot });
 
   // Assert
-  expect(Object.keys(result).sort()).toEqual(['claude', 'copilot']);
+  expect(result.antigravity).toEqual({ skipped: 'no local scope' });
   expect((result.claude as AgentResult).error).toBeUndefined();
   expect((result.copilot as AgentResult).error).toBeUndefined();
 });

@@ -187,6 +187,15 @@ export async function cmdStatus(flags, packageRoot) {
   }
 }
 
+function registryOrExit(call) {
+  try { return call(); }
+  catch (e) {
+    console.error(String(c.err('X')) + ' ' + e.message);
+    process.exitCode = 1;
+    return null;
+  }
+}
+
 export async function cmdInstallHooks(flags, packageRoot) {
   let scope = pickScopeFlag(flags);
   let target = flags.target;
@@ -216,10 +225,15 @@ export async function cmdInstallHooks(flags, packageRoot) {
   }
 
   if (flags.check) {
-    const result = audit({ target, scope, cwd: process.cwd(), packageRoot });
+    const result = registryOrExit(() => audit({ target, scope, cwd: process.cwd(), packageRoot }));
+    if (!result) return;
     let exitCode = 0;
     for (const [agent, a] of Object.entries(result)) {
       const label = agentLabel(agent);
+      if (a.skipped) {
+        console.log(c.dim(label + ': ' + a.skipped + ', skipped'));
+        continue;
+      }
       if (a.error) {
         console.log(label + ':');
         console.log('  ' + c.err('X') + ' ' + a.error);
@@ -240,10 +254,15 @@ export async function cmdInstallHooks(flags, packageRoot) {
     process.exit(exitCode);
   }
 
-  const result = install({ target, scope, cwd: process.cwd(), packageRoot });
+  const result = registryOrExit(() => install({ target, scope, cwd: process.cwd(), packageRoot }));
+  if (!result) return;
   let refused = false;
   for (const [agent, r] of Object.entries(result)) {
     const label = agentLabel(agent);
+    if (r.skipped) {
+      console.log(c.dim(label + ': ' + r.skipped + ', skipped'));
+      continue;
+    }
     if (r.error) {
       console.log(label + ':');
       console.log('  ' + c.err('X') + ' ' + r.error);
@@ -297,6 +316,10 @@ export async function cmdUninstallHooks(flags, packageRoot) {
   let failed = false;
   for (const [agent, x] of Object.entries(result)) {
     const label = agentLabel(agent);
+    if (x.skipped) {
+      console.log(c.dim(label + ': ' + x.skipped + ', skipped'));
+      continue;
+    }
     if (x.error) {
       console.log(label + ': ' + c.err('X') + ' ' + x.error);
       failed = true;

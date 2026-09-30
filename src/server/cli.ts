@@ -202,6 +202,17 @@ export async function cmdStatus(flags: Record<string, any>, packageRoot: string)
   }
 }
 
+// Le registre lève quand la sélection d'agents est impossible (aucun agent détecté n'a la
+// portée demandée) : un message d'une ligne, pas une pile, et une sortie 1.
+function registryOrExit<T>(call: () => T): T | null {
+  try { return call(); }
+  catch (e: any) {
+    console.error(`${c.err('✗')} ${e.message}`);
+    process.exitCode = 1;
+    return null;
+  }
+}
+
 export async function cmdInstallHooks(flags: Record<string, any>, packageRoot: string) {
   let scope = pickScopeFlag(flags);
   let target = flags.target;
@@ -234,10 +245,15 @@ export async function cmdInstallHooks(flags: Record<string, any>, packageRoot: s
   }
 
   if (flags.check) {
-    const result = audit({ target, scope, cwd: process.cwd(), packageRoot });
+    const result = registryOrExit(() => audit({ target, scope, cwd: process.cwd(), packageRoot }));
+    if (!result) return;
     let exitCode = 0;
     for (const [agent, a] of Object.entries(result) as [string, any][]) {
       const label = agentLabel(agent);
+      if (a.skipped) {
+        console.log(c.dim(`${label}: ${a.skipped}, skipped`));
+        continue;
+      }
       // `audit` passe par le registre, qui traduit tout refus en `{ error }` :
       // un fichier de hooks illisible fait lever la lecture. Sans cette garde,
       // `--check` imprimait « settings : undefined » puis mourait sur
@@ -262,10 +278,15 @@ export async function cmdInstallHooks(flags: Record<string, any>, packageRoot: s
     process.exit(exitCode);
   }
 
-  const result = install({ target, scope, cwd: process.cwd(), packageRoot });
+  const result = registryOrExit(() => install({ target, scope, cwd: process.cwd(), packageRoot }));
+  if (!result) return;
   let refused = false;
   for (const [agent, r] of Object.entries(result) as [string, any][]) {
     const label = agentLabel(agent);
+    if (r.skipped) {
+      console.log(c.dim(`${label}: ${r.skipped}, skipped`));
+      continue;
+    }
     if (r.error) {
       console.log(`${label}:`);
       console.log(`  ${c.err('✗')} ${r.error}`);
@@ -318,6 +339,10 @@ export async function cmdUninstallHooks(flags: Record<string, any>, packageRoot:
   let failed = false;
   for (const [agent, x] of Object.entries(result) as [string, any][]) {
     const label = agentLabel(agent);
+    if (x.skipped) {
+      console.log(c.dim(`${label}: ${x.skipped}, skipped`));
+      continue;
+    }
     if (x.error) {
       console.log(`${label}: ${c.err('✗')} ${x.error}`);
       failed = true;
