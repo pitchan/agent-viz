@@ -169,12 +169,13 @@ async function readAndBroadcast(filePath: string): Promise<void> {
   }
 }
 
+// The live read resumes where the index stopped counting, not at the current
+// size: a new session's first lines are on disk before its watcher is armed,
+// and a file indexed at start-up is not replayed on the canvas.
 function watchSession(filePath: string): void {
   if (watchers.has(filePath)) return;
-  try {
-    const stat = fs.statSync(filePath);
-    fileOffsets.set(filePath, stat.size);
-  } catch { return; }
+  if (!fs.existsSync(filePath)) return;
+  fileOffsets.set(filePath, sessionIndex.get(idFromPath(filePath))?.size ?? 0);
 
   const watcher = fs.watch(filePath, () => {
     // Debounce 50 ms — Windows fires multiple change events per write.

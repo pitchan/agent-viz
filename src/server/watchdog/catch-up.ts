@@ -1,7 +1,8 @@
 'use strict';
 // catch-up.ts — le rattrapage au demarrage.
 //
-// Les watchers d'evenements posent leur curseur a la FIN du fichier
+// Les watchers d'evenements posent leur curseur la ou l'index a fini de
+// compter, donc a la FIN d'un fichier indexe au demarrage
 // (event-reader.watchSession) : rien de ce qui est deja sur le disque ne
 // repasse par eux. C'est delibere — rouvrir le serveur ne doit pas rejouer
 // toute l'activite sur le canevas.
