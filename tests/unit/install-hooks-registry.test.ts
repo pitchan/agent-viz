@@ -313,3 +313,26 @@ test('install --local --target=antigravity reste un refus nommé', () => {
   // Assert
   expect((result.antigravity as AgentResult).error).toMatch(/--local is not supported/);
 });
+
+// La détection réelle lit PATH et HOME : ces tests lui substituent une réponse fixe.
+test('--local refuse en nommant le cas quand aucun agent détecté n\'a de portée locale', () => {
+  // Arrange
+  const seulAntigravity = (a: string) => a === 'antigravity';
+
+  // Act
+  const appel = () => pickAgents({ scope: 'local' }, seulAntigravity);
+
+  // Assert
+  expect(appel).toThrow(/no detected agent supports --local \(detected: antigravity\)/);
+});
+
+test('--local garde parmi les agents détectés ceux qui ont une portée locale', () => {
+  // Arrange
+  const claudeEtAntigravity = (a: string) => a === 'claude' || a === 'antigravity';
+
+  // Act
+  const agents = pickAgents({ scope: 'local' }, claudeEtAntigravity);
+
+  // Assert
+  expect(agents).toEqual(['claude']);
+});

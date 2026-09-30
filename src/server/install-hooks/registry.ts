@@ -50,14 +50,23 @@ function agentsSupporting(scope: Scope | undefined): AgentName[] {
 // Pick which agents to act on. `target` accepts a registered agent name,
 // 'both', or undefined → auto-detect (fallback: first registered). Any other
 // value throws: a mistyped target must not act on agents nobody named.
-export function pickAgents({ target, scope }: { target?: string; scope?: Scope }): AgentName[] {
-  const all = agentsSupporting(scope);
-  if (target === 'both') return all;
+export function pickAgents(
+  { target, scope }: { target?: string; scope?: Scope },
+  // Substitué par les tests seuls : la détection réelle lit PATH et HOME.
+  detect: (agent: AgentName) => boolean = a => INSTALLERS[a].detect(),
+): AgentName[] {
+  const all = Object.keys(INSTALLERS) as AgentName[];
+  const eligible = agentsSupporting(scope);
+  if (target === 'both') return eligible;
   if (target === undefined) {
-    const detected = all.filter(a => INSTALLERS[a].detect());
-    // Claude a une portée locale et figure dans le registre fixe : `all` n'est
-    // jamais vide, le `!` documente cet invariant.
-    return detected.length > 0 ? detected : [all[0]!];
+    const detected = all.filter(detect);
+    // `all` n'est jamais vide (registre fixe ci-dessus) : `all[0]` existe
+    // forcément, le `!` documente cet invariant.
+    if (detected.length === 0) return [all[0]!];
+    // Installer un agent non détecté à la place de ceux qui le sont serait un repli silencieux.
+    const usable = detected.filter(a => eligible.includes(a));
+    if (usable.length === 0) throw new Error(`no detected agent supports --${scope} (detected: ${detected.join(', ')})`);
+    return usable;
   }
   if (isAgentName(target)) return [target];
   throw new Error(`unknown target '${target}' (expected ${TARGETS.join('|')})`);
