@@ -100,7 +100,7 @@ Detection: an agent is considered installed if its CLI binary is on your `PATH` 
 
 ### Antigravity CLI
 
-- agent-viz writes a single `agent-viz` key in `~/.gemini/antigravity-cli/hooks.json` (or `<repo>/.agents/hooks.json` with `--project`); other hook names in that file are left untouched.
+- agent-viz writes a single `agent-viz` key in `~/.gemini/config/hooks.json` (or `<repo>/.agents/hooks.json` with `--project`); other hook names in that file are left untouched.
 - There is no `--local` scope for Antigravity: the interactive prompt does not offer it.
 - The agent-viz install path must not contain a space: Antigravity passes quotes through to the command on Windows, so a quoted path cannot run.
 
@@ -117,7 +117,7 @@ The first time you run `agent-viz`, it auto-registers hooks for each detected ag
 |---|---|
 | Claude Code | `~/.claude/settings.json` |
 | Copilot CLI | `~/.copilot/hooks/agent-viz.json` |
-| Antigravity CLI | `~/.gemini/antigravity-cli/hooks.json` |
+| Antigravity CLI | `~/.gemini/config/hooks.json` |
 
 Project scopes are opt-in. You only need the commands below in three situations:
 

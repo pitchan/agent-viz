@@ -40,7 +40,9 @@ export const AGENT_CONFIG = {
     // PreInvocation / PostInvocation n'ont rien à afficher, et agy lance ses hooks de
     // façon bloquante : chaque abonnement coûte un démarrage de node par appel du modèle.
     events: ['PreToolUse', 'PostToolUse', 'Stop'],
-    userFile: () => path.join(os.homedir(), '.gemini', 'antigravity-cli', 'hooks.json'),
+    // La racine globale d'agy est ~/.gemini/config/ : un hooks.json posé sous
+    // ~/.gemini/antigravity-cli/ est compté au chargement mais jamais exécuté.
+    userFile: () => path.join(os.homedir(), '.gemini', 'config', 'hooks.json'),
     projectFile: (root) => path.join(root, '.agents', 'hooks.json'),
     localFile: null,
     gitignoreEntry: null,

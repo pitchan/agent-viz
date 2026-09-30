@@ -201,6 +201,15 @@ test('resolveScope: la portée projet d’Antigravity vise .agents/hooks.json', 
   expect(r.file).toBe(path.join(projectRoot, '.agents', 'hooks.json'));
 });
 
+test('resolveScope: la portée utilisateur d’Antigravity vise ~/.gemini/config/hooks.json', () => {
+  // Arrange
+  const cwd = makeTempDir('avtest-agy-user-');
+  // Act
+  const r = resolveScope({ scope: 'user', cwd, agent: 'antigravity' });
+  // Assert
+  expect(r.file).toBe(path.join(os.homedir(), '.gemini', 'config', 'hooks.json'));
+});
+
 test('EVENTS: Antigravity n’abonne que les trois événements affichés', () => {
   expect(_internals.eventsFor('antigravity')).toEqual(['PreToolUse', 'PostToolUse', 'Stop']);
 });
