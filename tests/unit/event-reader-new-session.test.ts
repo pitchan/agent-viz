@@ -2,7 +2,7 @@
 // Une session neuve est deja ecrite quand son watcher s'arme : la premiere
 // ligne precede toujours l'evenement de dossier qui l'annonce.
 
-import { afterAll, afterEach, expect, test } from 'vitest';
+import { afterAll, afterEach, beforeEach, expect, test, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -21,10 +21,16 @@ const { DIR, sessionIndex } = await import('../../src/server/session-index.ts');
 const {
   readAndBroadcast, watchSession, unwatchSession, liveHandoffOffset,
 } = await import('../../src/server/event-reader.ts');
+const { sessionFileChanged } = await import('../../src/server/housekeep.ts');
 
 const suivis: string[] = [];
 const auditeurs: SseClient[] = [];
+// L'annonce « liste des sessions changee » est retardee par un minuteur de
+// module : le laisser courir d'un test a l'autre en avalerait une.
+beforeEach(() => { vi.useFakeTimers({ toFake: ['setTimeout'] }); });
 afterEach(() => {
+  vi.runOnlyPendingTimers();
+  vi.useRealTimers();
   for (const fp of suivis.splice(0)) unwatchSession(fp);
   for (const c of auditeurs.splice(0)) sseClients.delete(c);
 });
@@ -35,20 +41,25 @@ test('bac a sable: le dossier d evenements est celui du test', () => {
 });
 
 const evenement = (i: number) => JSON.stringify({
-  hook_event_name: 'PreToolUse', session_id: 's', tool_name: 'Bash', tool_use_id: `t${i}`,
+  hook_event_name: 'PreToolUse', session_id: 's', tool_name: 'Bash', tool_use_id: `t${i}`, _source: 'copilot',
 });
 const TROIS_LIGNES = [1, 2, 3].map(evenement).join('\n') + '\n';
 
 // `agentSource: 'copilot'` et `promptCache: null` tiennent le lecteur de
 // transcription et la sonde du premier prompt hors de ce qu'on mesure ici.
-function session(nom: string, contenu: string, dejaCompte: { size: number; eventCount: number }) {
+function fichier(nom: string, contenu: string) {
   const fp = path.join(DIR, `${nom}.jsonl`);
   fs.writeFileSync(fp, contenu);
+  suivis.push(fp);
+  return fp;
+}
+
+function session(nom: string, contenu: string, dejaCompte: { size: number; eventCount: number }) {
+  const fp = fichier(nom, contenu);
   sessionIndex.set(nom, {
     id: nom, promptCache: null, promptWindow: 0, mtime: Date.now(), agentSource: 'copilot',
     ...dejaCompte,
   } as SessionRecord);
-  suivis.push(fp);
   return fp;
 }
 
@@ -97,4 +108,62 @@ test('le rattrapage laisse au chemin vif toute une session neuve', () => {
 
   // Assert
   expect(liveHandoffOffset(fp)).toBe(0);
+});
+
+// Le chemin de `/notify` : le hook peut prevenir avant que le watcher du
+// dossier ait pose la fiche de la session.
+test('une session sans fiche dans l index est lue et comptee depuis sa premiere ligne', async () => {
+  // Arrange
+  const fp = fichier('sans-fiche', TROIS_LIGNES);
+  const recus = ecouterSSE();
+  watchSession(fp);
+
+  // Act
+  await readAndBroadcast(fp);
+
+  // Assert
+  expect(sessionIndex.get('sans-fiche')?.eventCount).toBe(3);
+  expect(recus.filter(m => m.type === 'event').map(m => m.event.tool_use_id)).toEqual(['t1', 't2', 't3']);
+});
+
+// Le balayage tourne apres l index initial : un fichier qu il ne connait pas
+// est ne depuis, et le watcher du dossier le lira depuis son premier octet.
+test('le rattrapage laisse au chemin vif une session que l index ne connait pas encore', () => {
+  // Arrange
+  const fp = fichier('pas-encore-vue', TROIS_LIGNES);
+
+  // Act
+  const frontiere = liveHandoffOffset(fp);
+
+  // Assert
+  expect(frontiere).toBe(0);
+});
+
+test('le watcher du dossier lit une session neuve des qu il la voit', async () => {
+  // Arrange
+  const fp = fichier('vue-par-le-dossier', TROIS_LIGNES);
+  const recus = ecouterSSE();
+
+  // Act
+  await sessionFileChanged(fp);
+
+  // Assert
+  expect(sessionIndex.get('vue-par-le-dossier')?.eventCount).toBe(3);
+  expect(recus.filter(m => m.type === 'event').map(m => m.event.tool_use_id)).toEqual(['t1', 't2', 't3']);
+});
+
+// Quand `/notify` devance le watcher du dossier, c'est la lecture qui pose la
+// fiche : le watcher du dossier la trouve deja la et n'annoncerait plus rien.
+test('une session dont la lecture pose la fiche annonce que la liste des sessions a change', async () => {
+  // Arrange
+  const fp = fichier('fiche-par-la-lecture', TROIS_LIGNES);
+  const recus = ecouterSSE();
+  watchSession(fp);
+
+  // Act
+  await readAndBroadcast(fp);
+  vi.runOnlyPendingTimers();
+
+  // Assert
+  expect(recus.filter(m => m.type === 'sessionsChanged').length).toBe(1);
 });

@@ -15,7 +15,7 @@ import {
   sessionIndex,
   idFromPath, touchIndex,
 } from './session-index.ts';
-import { broadcastSSE } from './sse.ts';
+import { broadcastSSE, broadcastSessionsChanged } from './sse.ts';
 import { decodeJsonlLine } from '../engine/core/jsonl.ts';
 import { clearTokensTimer } from './tokens.ts';
 import {
@@ -80,12 +80,16 @@ const fedFrom = new Map<string, number>();
 // so a line written meanwhile travels both paths. The journal de-duplicates the
 // alert but not the detector's counters, and loop counts every PreToolUse.
 //
-// null means that no live path covers this file. 0 is a real answer (a watcher
-// armed on an empty file owns all of it), so the code tests `has`; the test is
+// null means an indexed file that no live path covers: the sweep reads it all.
+// A file the index does not know was born after the start-up index, and the
+// dir watcher hands it to the live path from byte 0 — hence 0, not null.
+//
+// 0 is therefore a real answer, so the code tests `has`; the test is
 //   « cablage: le rattrapage s arrete la ou le chemin vif prend la main »
 function liveHandoffOffset(fp: string): number | null {
   if (fedFrom.has(fp)) return fedFrom.get(fp) ?? null;
-  return fileOffsets.has(fp) ? (fileOffsets.get(fp) ?? null) : null;
+  if (fileOffsets.has(fp)) return fileOffsets.get(fp) ?? null;
+  return sessionIndex.has(idFromPath(fp)) ? null : 0;
 }
 
 // Read new bytes from a session file and broadcast via SSE.
@@ -108,7 +112,11 @@ async function readAndBroadcast(filePath: string): Promise<void> {
     // Count newlines so we can update the in-memory index cheaply.
     let newlines = 0;
     for (let i = 0; i < buf.length; i++) if (buf[i] === 0x0a) newlines++;
+    // When /notify beats the dir watcher, this read creates the record, and the
+    // dir watcher then finds it known: announcing it falls to us.
+    const newRecord = !sessionIndex.has(idFromPath(filePath));
     touchIndex(filePath, len, newlines);
+    if (newRecord) broadcastSessionsChanged();
     const sessionName = path.basename(filePath, '.jsonl');
     const lines = text.trim().split('\n');
     const rec = sessionIndex.get(sessionName);

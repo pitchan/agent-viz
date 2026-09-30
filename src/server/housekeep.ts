@@ -19,6 +19,7 @@ import {
 import { broadcastSessionsChanged } from './sse.ts';
 import {
   watchSession, unwatchSession, isWatched, resetFileOffset, deleteSession,
+  readAndBroadcast,
 } from './event-reader.ts';
 import { ensureTranscriptWatcher } from './transcript.ts';
 import { decodeJsonlLine } from '../engine/core/jsonl.ts';
@@ -185,4 +186,23 @@ async function scanAndWatch(): Promise<void> {
   }
 }
 
-export { compactSession, housekeep, scanAndWatch };
+// Handler of the events-dir watcher, armed after the initial index: a file the
+// index does not know is new, and its first lines are already on disk when the
+// event arrives, so they are read now rather than at the next write.
+async function sessionFileChanged(fp: string): Promise<void> {
+  if (!fs.existsSync(fp)) return;
+  const id = idFromPath(fp);
+  if (!sessionIndex.has(id)) {
+    sessionIndex.set(id, {
+      id, promptCache: undefined, promptWindow: 0,
+      eventCount: 0, size: 0, mtime: Date.now(),
+      agentSource: undefined,
+    });
+    broadcastSessionsChanged();
+  }
+  if (isWatched(fp)) return;
+  watchSession(fp);
+  await readAndBroadcast(fp);
+}
+
+export { compactSession, housekeep, scanAndWatch, sessionFileChanged };

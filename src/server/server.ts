@@ -3,8 +3,8 @@
 // agent-viz HTTP server entry point — boot wiring only.
 //
 // Owns: port binding (an occupied port is never freed by force), the initial
-// scan + periodic housekeep schedule, and the fs.watch on the events dir that
-// promotes newly-arriving .jsonl files into sessionIndex.
+// scan + periodic housekeep schedule, and the fs.watch on the events dir,
+// armed after that scan (its handler, sessionFileChanged, is in housekeep.ts).
 //
 // Everything else (request handling, session bookkeeping, transcript
 // tailing, token tracking, file reading) lives in src/server/*.ts.
@@ -14,14 +14,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import {
-  DIR,
-  sessionIndex,
-  idFromPath,
-} from './session-index.ts';
-import { broadcastSessionsChanged, broadcastSSE } from './sse.ts';
-import { watchSession, liveHandoffOffset } from './event-reader.ts';
-import { housekeep, scanAndWatch } from './housekeep.ts';
+import { DIR } from './session-index.ts';
+import { broadcastSSE } from './sse.ts';
+import { liveHandoffOffset } from './event-reader.ts';
+import { housekeep, scanAndWatch, sessionFileChanged } from './housekeep.ts';
 import { dispatch, setServer } from './routes.ts';
 import { applyAdoptedPrices } from './pricing-state.ts';
 import { adoptedPricesPath, readAdoptedPrices } from '../engine/core/adopted-prices.ts';
@@ -30,25 +26,6 @@ import { startWatchdog } from './watchdog/index.ts';
 import { bindPort, portInUseMessage } from './bind-port.ts';
 
 const PORT = Number(process.env.PORT || 3333);
-
-// Watch the events dir for new session files (filling sessionIndex live).
-fs.watch(DIR, (_, filename) => {
-  if (!filename || !filename.endsWith('.jsonl')) return;
-  const fp = path.join(DIR, filename);
-  if (fs.existsSync(fp)) {
-    const id = idFromPath(fp);
-    const isNew = !sessionIndex.has(id);
-    if (isNew) {
-      sessionIndex.set(id, {
-        id, promptCache: undefined, promptWindow: 0,
-        eventCount: 0, size: 0, mtime: Date.now(),
-        agentSource: undefined,
-      });
-      broadcastSessionsChanged();
-    }
-    watchSession(fp);
-  }
-});
 
 async function startServer(): Promise<void> {
   // No CORS header: the server bind is loopback-only and the UI is same-origin.
@@ -73,6 +50,12 @@ async function boot(): Promise<void> {
   // Les prix adoptés précèdent tout calcul de coût : pastille, vigie et observatoire.
   applyAdoptedPrices(await readAdoptedPrices(adoptedPricesPath(os.homedir()), fs.promises.readFile));
   await scanAndWatch();
+  // Armed after the initial index, never before: a record it creates then means
+  // a file the index never saw, which the live reader owns from byte 0.
+  fs.watch(DIR, (_, filename) => {
+    if (!filename || !filename.endsWith('.jsonl')) return;
+    void sessionFileChanged(path.join(DIR, filename));
+  });
   // Purge old/empty sessions + compact large files on boot.
   await housekeep();
   // Analysis scan: fire-and-forget so a large first scan never delays the

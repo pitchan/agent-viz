@@ -1,11 +1,10 @@
 'use strict';
 // catch-up.ts — le rattrapage au demarrage.
 //
-// Les watchers d'evenements posent leur curseur la ou l'index a fini de
-// compter, donc a la FIN d'un fichier indexe au demarrage
-// (event-reader.watchSession) : rien de ce qui est deja sur le disque ne
-// repasse par eux. C'est delibere — rouvrir le serveur ne doit pas rejouer
-// toute l'activite sur le canevas.
+// Un watcher d'evenements lit a partir de ce que l'index a deja compte
+// (event-reader.watchSession) : un fichier indexe au demarrage ne repasse pas
+// par lui, pour que rouvrir le serveur ne rejoue pas l'activite sur le canevas.
+// Une session nee apres l'index initial, elle, y passe en entier.
 //
 // Le chien de garde, lui, a besoin de ce passe : c'est meme tout son interet,
 // une panne survenue serveur eteint doit se retrouver au journal. D'ou ce
@@ -15,10 +14,10 @@
 //
 // Depuis leur debut, et jusqu'ou ? Jusqu'a l'octet ou le chemin vif prend la
 // main, quand il y en a un — voir `limiteVive` plus bas. Les deux chemins
-// tournent en meme temps : les watchers sont armes avant ce balayage, ils
-// livrent pendant qu'il tourne, et tout ce qui serait lu par les deux serait
-// COMPTE deux fois par le detecteur. Le journal dedoublonne l'alerte, pas les
-// compteurs qui la produisent.
+// tournent en meme temps : les watchers, celui du dossier compris, sont armes
+// avant ce balayage, ils livrent pendant qu'il tourne, et tout ce qui serait lu
+// par les deux serait COMPTE deux fois par le detecteur. Le journal dedoublonne
+// l'alerte, pas les compteurs qui la produisent.
 
 import { promises as fsp } from 'node:fs';
 import path from 'node:path';
@@ -40,14 +39,14 @@ function isNodeErrnoException(err: unknown): err is NodeJS.ErrnoException {
 }
 
 // `limiteVive` rend, pour un fichier, l'octet a partir duquel le chemin vif
-// prend la main — ou null quand aucun watcher ne le couvre, auquel cas le
-// fichier entier est l'affaire du balayage. Elle est INJECTEE, et pas
+// prend la main — ou null pour un fichier indexe qu'aucun watcher ne couvre,
+// auquel cas le fichier entier est l'affaire du balayage. Elle est INJECTEE, et pas
 // importee : la connaitre voudrait dire dependre du lecteur d'evenements, qui
 // depend deja de ce module. Le cycle serait la ; l'injection le rend
 // impossible, et ce fichier continue de ne connaitre que le service et le
 // dossier.
 //
-// Sans elle — appelant qui l'oublie, ou fichier sans watcher — on lit tout.
+// Sans elle — appelant qui l'oublie, ou fichier indexe sans watcher — on lit tout.
 // C'est le comportement le plus sur : relire de trop ne perd jamais un fait,
 // et le journal dedoublonne l'alerte.
 async function catchUpFromDisk(

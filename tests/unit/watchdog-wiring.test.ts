@@ -327,7 +327,8 @@ test('cablage: le rattrapage s arrete la ou le chemin vif prend la main', async 
   const priseEnMain = fs.statSync(fp).size;
   resetFileOffset(fp, priseEnMain);
   expect(liveHandoffOffset(fp), 'le lecteur d evenements expose sa frontiere').toBe(priseEnMain);
-  // Un fichier que personne ne suit : le balayage en est seul responsable.
+  // Un fichier indexe que personne ne suit : le balayage en est seul responsable.
+  sessionIndex.set('jamais-suivi', { id: 'jamais-suivi', eventCount: 0, size: 0 } as any);
   expect(liveHandoffOffset(path.join(path.dirname(fp), 'jamais-suivi.jsonl'))).toBe(null);
   // Et zero est une REPONSE, pas une absence de reponse : un watcher arme sur
   // un fichier vide possede tout ce qui y sera ecrit. Un test de veracite
