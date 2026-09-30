@@ -77,10 +77,13 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 }
 
 // Stream-count newlines without loading the whole file into a string.
-function countNewlinesStreaming(fp: string): Promise<number> {
+// Bounded to `bytes`, the size the caller records: the live reader starts
+// there, and would count a second time any line appended past it.
+function countNewlinesStreaming(fp: string, bytes: number): Promise<number> {
+  if (bytes === 0) return Promise.resolve(0);
   return new Promise((resolve) => {
     let count = 0;
-    const stream = fs.createReadStream(fp);
+    const stream = fs.createReadStream(fp, { end: bytes - 1 });
     // Pas d'encodage posé sur le flux : le runtime ne livre que des `Buffer`,
     // jamais des `string` — le type de l'écouteur `data`, lui, couvre les deux.
     stream.on('data', (chunk: string | Buffer) => {
@@ -97,7 +100,7 @@ async function indexSessionInitial(fp: string): Promise<void> {
   if (sessionIndex.has(id)) return;
   try {
     const stat = await fsp.stat(fp);
-    const eventCount = await countNewlinesStreaming(fp);
+    const eventCount = await countNewlinesStreaming(fp, stat.size);
     // Backfill agentSource from the first event's _source (first 4 KB). Undefined when the field
     // is missing: hook.ts stamps _source on every event, so absence means a file written without
     // that stamp or by a foreign producer. Don't silently coerce to 'claude'.

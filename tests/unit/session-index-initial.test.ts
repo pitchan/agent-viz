@@ -50,17 +50,41 @@ test('DIR est bien redirigé dans le dossier jetable de ce test', () => {
 
 test('countNewlinesStreaming compte les sauts de ligne, pas les événements', async () => {
   const { fp } = poseUnFichier('a\nb\nc\n');
-  expect(await countNewlinesStreaming(fp)).toBe(3);
+  expect(await countNewlinesStreaming(fp, 6)).toBe(3);
+});
+
+// La taille relevee par l'appelant borne le compte : une ligne ajoutee apres
+// elle revient au chemin vif, qui la compterait une seconde fois.
+test('countNewlinesStreaming ne compte que les octets sous la taille donnee', async () => {
+  // Arrange
+  const { fp } = poseUnFichier('a\nb\nc\n');
+
+  // Act
+  const compte = await countNewlinesStreaming(fp, 4);
+
+  // Assert
+  expect(compte).toBe(2);
+});
+
+test('countNewlinesStreaming rend 0 pour une taille nulle', async () => {
+  // Arrange
+  const { fp } = poseUnFichier('a\nb\n');
+
+  // Act
+  const compte = await countNewlinesStreaming(fp, 0);
+
+  // Assert
+  expect(compte).toBe(0);
 });
 
 test('CARACTÉRISATION — sans saut de ligne final, la dernière ligne n’est pas comptée', async () => {
   const { fp } = poseUnFichier('a\nb\nc');
-  expect(await countNewlinesStreaming(fp), 'le compteur compte des séparateurs, pas des enregistrements : une dernière ligne sans ' +
+  expect(await countNewlinesStreaming(fp, 5),'le compteur compte des séparateurs, pas des enregistrements : une dernière ligne sans ' +
     '\\n est invisible. Angle mort épinglé volontairement.').toBe(2);
 });
 
 test('countNewlinesStreaming rend 0 sur un fichier absent, sans lever', async () => {
-  expect(await countNewlinesStreaming(path.join(DIR, 'jamais-ecrit.jsonl'))).toBe(0);
+  expect(await countNewlinesStreaming(path.join(DIR, 'jamais-ecrit.jsonl'), 1)).toBe(0);
 });
 
 // ── indexSessionInitial : le décodage de la première ligne ──────────────────
