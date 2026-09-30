@@ -1,6 +1,6 @@
 # agent-viz
 
-Real-time visualizer for [Claude Code](https://docs.claude.com/en/docs/claude-code) and [GitHub Copilot CLI](https://docs.github.com/en/copilot/concepts/agents/about-copilot-cli) sessions. Streams hook events into a live web dashboard with per-agent badges, multi-agent topology, token usage, and tool-call timeline.
+Real-time visualizer for [Claude Code](https://docs.claude.com/en/docs/claude-code), [GitHub Copilot CLI](https://docs.github.com/en/copilot/concepts/agents/about-copilot-cli) and [Antigravity CLI](https://antigravity.google) sessions. Streams hook events into a live web dashboard with per-agent badges, multi-agent topology, token usage, and tool-call timeline.
 
 ## Install & start (recommended)
 
@@ -85,17 +85,29 @@ L'analyse repose sur le moteur netgain, qui **fait partie d'agent-viz** : même 
 
 ## Multi-agent support
 
-agent-viz captures events from **both Claude Code and GitHub Copilot CLI** simultaneously. On first run, it auto-detects which CLI agents are installed locally and registers the appropriate hooks for each. Sessions are tagged in the dashboard with a colored pill badge (cyan for Claude, violet for Copilot).
+agent-viz captures events from **Claude Code, GitHub Copilot CLI and Antigravity CLI** simultaneously. On first run, it auto-detects which CLI agents are installed locally and registers the appropriate hooks for each. Sessions are tagged in the dashboard with a colored pill badge (cyan for Claude, violet for Copilot, pink for Antigravity).
 
 To force a target explicitly:
 
 ```bash
-agent-viz install-hooks --target=claude     # Claude only
-agent-viz install-hooks --target=copilot    # Copilot only
-agent-viz install-hooks --target=both       # both even if not detected
+agent-viz install-hooks --target=claude        # Claude only
+agent-viz install-hooks --target=copilot       # Copilot only
+agent-viz install-hooks --target=antigravity   # Antigravity only
+agent-viz install-hooks --target=both          # all agents even if not detected
 ```
 
-Detection: an agent is considered installed if its CLI binary is on your `PATH`, or if its config home (`~/.claude/` for Claude, `~/.copilot/` for Copilot) exists with at least one file inside.
+Detection: an agent is considered installed if its CLI binary is on your `PATH` (`agy` for Antigravity), or if its config home (`~/.claude/` for Claude, `~/.copilot/` for Copilot, `~/.gemini/antigravity-cli/` for Antigravity) exists with at least one file inside.
+
+### Antigravity CLI
+
+- agent-viz writes a single `agent-viz` key in `~/.gemini/antigravity-cli/hooks.json` (or `<repo>/.agents/hooks.json` with `--project`); other hook names in that file are left untouched.
+- There is no `--local` scope for Antigravity: the interactive prompt does not offer it.
+- The agent-viz install path must not contain a space: Antigravity passes quotes through to the command on Windows, so a quoted path cannot run.
+
+Known limits, all on Antigravity's side:
+- A command that exits with an error is shown as successful: Antigravity reports `error: ""` for it.
+- A tool call rejected before it runs (e.g. reading a missing file) stays "running": no end event is sent.
+- No prompt node and "Tokens N/A": no hook event carries the prompt text or token counts.
 
 ## Hook management
 
@@ -105,6 +117,7 @@ The first time you run `agent-viz`, it auto-registers hooks for each detected ag
 |---|---|
 | Claude Code | `~/.claude/settings.json` |
 | Copilot CLI | `~/.copilot/hooks/agent-viz.json` |
+| Antigravity CLI | `~/.gemini/antigravity-cli/hooks.json` |
 
 Project scopes are opt-in. You only need the commands below in three situations:
 
