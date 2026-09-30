@@ -1,7 +1,8 @@
 'use strict';
 // Periodic maintenance — purge old/empty sessions, compact large files,
-// drop fs.watch handles for sessions older than the watch window, and the
-// initial scan-and-watch sweep at boot.
+// drop fs.watch handles for sessions older than the watch window, the
+// initial scan-and-watch sweep at boot, and the events-dir watcher's handler
+// for session files that appear or change after that sweep.
 
 import fs from 'node:fs';
 const fsp = fs.promises;

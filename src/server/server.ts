@@ -54,7 +54,8 @@ async function boot(): Promise<void> {
   // a file the index never saw, which the live reader owns from byte 0.
   fs.watch(DIR, (_, filename) => {
     if (!filename || !filename.endsWith('.jsonl')) return;
-    void sessionFileChanged(path.join(DIR, filename));
+    sessionFileChanged(path.join(DIR, filename))
+      .catch(err => console.error(`[housekeep] sessionFileChanged ${filename} failed: ${err.message}`));
   });
   // Purge old/empty sessions + compact large files on boot.
   await housekeep();

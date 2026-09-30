@@ -55,8 +55,12 @@ function lit(fichier: string): string | null {
 }
 
 test('un hook préfixé d’un BOM est capturé, pas perdu', async () => {
+  // Arrange
   const evt = { session_id: 'sess-bom-1', hook_event_name: 'PreToolUse', tool_name: 'Read' };
-  const r = await lanceLeHook(Buffer.concat([BOM, Buffer.from(JSON.stringify(evt))]));
+  const charge = Buffer.concat([BOM, Buffer.from(JSON.stringify(evt))]);
+  // Act
+  const r = await lanceLeHook(charge);
+  // Assert
   try {
     const ligne = lit(path.join(r.dossier, 'sess-bom-1.jsonl'));
     expect(ligne, 'aucun .jsonl écrit : l’événement a été perdu').not.toBe(null);
@@ -70,7 +74,11 @@ test('un hook préfixé d’un BOM est capturé, pas perdu', async () => {
 });
 
 test('une charge illisible laisse une trace dans _hook-errors.log', async () => {
-  const r = await lanceLeHook('{ceci n’est pas du JSON');
+  // Arrange
+  const charge = '{ceci n’est pas du JSON';
+  // Act
+  const r = await lanceLeHook(charge);
+  // Assert
   try {
     const journal = lit(path.join(r.dossier, '_hook-errors.log'));
     expect(journal, 'aucun journal d’erreur : l’échec est totalement silencieux').not.toBe(null);
@@ -84,8 +92,12 @@ test('une charge illisible laisse une trace dans _hook-errors.log', async () => 
 // sans la tolérance au BOM. Il existe pour qu'un retrait de BOM trop gourmand, ou un
 // journal d'erreur écrit à tort, se voie immédiatement sur le chemin normal.
 test('non-régression : une charge normale, sans BOM, reste capturée et sans erreur journalisée', async () => {
+  // Arrange
   const evt = { session_id: 'sess-normale-1', hook_event_name: 'PostToolUse', tool_name: 'Edit' };
-  const r = await lanceLeHook(JSON.stringify(evt));
+  const charge = JSON.stringify(evt);
+  // Act
+  const r = await lanceLeHook(charge);
+  // Assert
   try {
     const ligne = lit(path.join(r.dossier, 'sess-normale-1.jsonl'));
     expect(ligne, 'le chemin normal a cessé de capturer').not.toBe(null);
