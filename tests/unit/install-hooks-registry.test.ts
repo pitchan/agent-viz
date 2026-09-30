@@ -1,7 +1,7 @@
-// Le contrat qui rend l'ajout d'un 3e agent falsifiable : chaque entrée du
+// Le contrat qui rend l'ajout d'un agent de plus falsifiable : chaque entrée du
 // registre expose les 6 méthodes d'AgentInstaller. Sans sweepTargets et
 // installedIn, findInstalledScopes rebrancherait sur le nom d'agent.
-import { expect, test } from 'vitest';
+import { expect, onTestFinished, test } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -199,7 +199,7 @@ test('aller-retour install → uninstall → install : le cycle stop/start reste
   expect(finales.includes(copilot2.command?.command ?? ''), `notre entrée absente du disque après l'install #2 : ${JSON.stringify(finales)}`).toBeTruthy();
 });
 
-test('un 3e agent hypothétique serait affiché : le rendu ne nomme aucun agent en dur', () => {
+test('un agent de plus, hypothétique, serait affiché : le rendu ne nomme aucun agent en dur', () => {
   // Arrange — le registre réel, plus une entrée synthétique qui n'existe pas
   // dans AGENT_CONFIG : on ne teste que la FORME du rendu, pas l'installation.
   const noms = Object.keys(INSTALLERS);
@@ -211,7 +211,7 @@ test('un 3e agent hypothétique serait affiché : le rendu ne nomme aucun agent 
 
   // Assert — aucun accès en dur `result.claude` / `result.copilot`
   for (const nom of noms) {
-    expect(!source.includes(`result.${nom}`), `cli.ts nomme encore result.${nom} en dur — un 3e agent ne serait pas affiché`).toBeTruthy();
+    expect(!source.includes(`result.${nom}`), `cli.ts nomme encore result.${nom} en dur — un agent de plus ne serait pas affiché`).toBeTruthy();
   }
 });
 
@@ -263,4 +263,53 @@ test('uninstall avec une cible inconnue lève et laisse en place le hook posé',
   // Assert
   expect(appel).toThrow(/unknown target 'cloude'/);
   expect(INSTALLERS.claude.installedIn(settings), 'le hook Claude doit rester posé après le refus').toBeTruthy();
+});
+
+// Antigravity n'a pas de portée locale : un `--local` sans agent nommé doit le laisser
+// de côté, sans quoi son refus fait échouer la commande pour Claude et Copilot.
+function bacJetable(prefixe: string, projetGit: boolean) {
+  const dir = projetGit ? sandboxProject(prefixe) : fs.mkdtempSync(path.join(os.tmpdir(), prefixe));
+  onTestFinished(() => fs.rmSync(dir, { recursive: true, force: true }));
+  return dir;
+}
+
+test('uninstall --local sans cible écarte Antigravity et ne rend aucune erreur', () => {
+  // Arrange
+  const root = bacJetable('avtest-local-sweep-', true);
+  const packageRoot = bacJetable('avtest-pkg-', false);
+
+  // Act
+  const result = uninstall({ scope: 'local', cwd: root, packageRoot });
+
+  // Assert
+  expect(Object.keys(result).sort()).toEqual(['claude', 'copilot']);
+  for (const [agent, r] of Object.entries(result)) {
+    expect((r as AgentResult).error, `${agent} ne doit pas échouer`).toBeUndefined();
+  }
+});
+
+test('install --local --target=both écarte Antigravity et installe Claude et Copilot', () => {
+  // Arrange
+  const root = bacJetable('avtest-local-both-', true);
+  const packageRoot = bacJetable('avtest-pkg-', false);
+
+  // Act
+  const result = install({ scope: 'local', target: 'both', cwd: root, packageRoot });
+
+  // Assert
+  expect(Object.keys(result).sort()).toEqual(['claude', 'copilot']);
+  expect((result.claude as AgentResult).error).toBeUndefined();
+  expect((result.copilot as AgentResult).error).toBeUndefined();
+});
+
+test('install --local --target=antigravity reste un refus nommé', () => {
+  // Arrange
+  const root = bacJetable('avtest-local-agy-', true);
+  const packageRoot = bacJetable('avtest-pkg-', false);
+
+  // Act
+  const result = install({ scope: 'local', target: 'antigravity', cwd: root, packageRoot });
+
+  // Assert
+  expect((result.antigravity as AgentResult).error).toMatch(/--local is not supported/);
 });

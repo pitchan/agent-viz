@@ -65,10 +65,10 @@ function agentsFor(target: Target): AgentName[] {
   return target === 'both' ? AGENTS : [target];
 }
 
-// 'local' n'a de sens que si CHAQUE agent couvert le supporte (Antigravity n'a pas de
-// portée locale) : avec le registre actuel, 'both' l'exclut donc aussi.
+// 'local' est proposé dès qu'UN agent couvert le supporte : le registre écarte d'un
+// --local les agents sans portée locale (Antigravity), sauf s'il est seul visé.
 function scopeOptionsFor(target: Target): SelectOption<'user' | 'project' | 'local'>[] {
-  const supportsLocal = agentsFor(target).every(a => AGENT_CONFIG[a].localFile !== null);
+  const supportsLocal = agentsFor(target).some(a => AGENT_CONFIG[a].localFile !== null);
   return supportsLocal ? SCOPE_OPTIONS : SCOPE_OPTIONS.filter(o => o.value !== 'local');
 }
 

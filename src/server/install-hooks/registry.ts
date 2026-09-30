@@ -1,7 +1,7 @@
 // ── Registry + multi-agent dispatchers (public API) ──
 //
 // Each entry implements the AgentInstaller contract (types.ts) and is detected
-// via its `detect` predicate. To add a 3rd agent: implement the contract in a
+// via its `detect` predicate. To add one more agent: implement the contract in a
 // new adapter file, add its AGENT_CONFIG entry, and register here. Dispatchers
 // don't need to change.
 //
@@ -9,7 +9,7 @@
 // undefined → auto-detect; uninstall defaults to ALL agents (don't leave hooks
 // behind if an agent got removed from PATH after install).
 // Returns { <agent>: result, ... } where each side carries the per-agent result.
-import type { AgentName, AgentOpts, ScanResult, AgentInstaller, Target } from './types.ts';
+import type { AgentName, AgentOpts, ScanResult, AgentInstaller, Scope, Target } from './types.ts';
 import { scanInstalled } from './scopes.ts';
 import { claudeInstaller } from './claude.ts';
 import { copilotInstaller } from './copilot.ts';
@@ -40,16 +40,23 @@ export function agentLabel(name: string): string {
 // ses tests la comparent à celle-ci.
 export const TARGETS: readonly Target[] = [...(Object.keys(INSTALLERS) as AgentName[]), 'both'];
 
+// Un --local sans agent nommé ne vise que les agents qui ont une portée locale : sinon le
+// refus d'Antigravity fait échouer la commande pour les autres. Nommé, l'agent refuse lui-même.
+function agentsSupporting(scope: Scope | undefined): AgentName[] {
+  const all = Object.keys(INSTALLERS) as AgentName[];
+  return scope === 'local' ? all.filter(a => AGENT_CONFIG[a].localFile !== null) : all;
+}
+
 // Pick which agents to act on. `target` accepts a registered agent name,
 // 'both', or undefined → auto-detect (fallback: first registered). Any other
 // value throws: a mistyped target must not act on agents nobody named.
-export function pickAgents({ target }: { target?: string }): AgentName[] {
-  const all = Object.keys(INSTALLERS) as AgentName[];
+export function pickAgents({ target, scope }: { target?: string; scope?: Scope }): AgentName[] {
+  const all = agentsSupporting(scope);
   if (target === 'both') return all;
   if (target === undefined) {
     const detected = all.filter(a => INSTALLERS[a].detect());
-    // `all` n'est jamais vide (registre fixe ci-dessus) : `all[0]` existe
-    // forcément, le `!` documente cet invariant.
+    // Claude a une portée locale et figure dans le registre fixe : `all` n'est
+    // jamais vide, le `!` documente cet invariant.
     return detected.length > 0 ? detected : [all[0]!];
   }
   if (isAgentName(target)) return [target];
@@ -78,7 +85,7 @@ export function audit(opts: AgentOpts = {}): Record<string, unknown>     { retur
 export function uninstall(opts: AgentOpts = {}): Record<string, unknown> {
   // Default to ALL registered agents (sweep), even if not currently detected.
   // `=== undefined` : une cible vide est une cible invalide, pas une absence de cible.
-  const agents: AgentName[] = opts.target === undefined ? (Object.keys(INSTALLERS) as AgentName[]) : pickAgents(opts);
+  const agents: AgentName[] = opts.target === undefined ? agentsSupporting(opts.scope) : pickAgents(opts);
   const out: Record<string, unknown> = {};
   for (const a of agents) {
     try { out[a] = INSTALLERS[a].uninstall(opts); }

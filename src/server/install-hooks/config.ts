@@ -1,11 +1,11 @@
 // La configuration déclarative par agent : chemins, entrée .gitignore, liste
-// d'événements. Un 3e agent commence ici, par une entrée de données.
+// d'événements. Un agent de plus commence ici, par une entrée de données.
 import path from 'node:path';
 import os from 'node:os';
 import type { AgentName, AgentConfigEntry } from './types.ts';
 
-// Per-agent paths + gitignore entry + liste d'evenements. Add a third agent
-// here, then register its adapter in registry.ts.
+// Per-agent paths + gitignore entry + liste d'evenements. Un agent de plus
+// commence ici, puis son adaptateur s'enregistre dans registry.ts.
 //
 // Pourquoi la liste d'evenements est PAR AGENT et non partagee : les agents
 // n'ont pas le meme vocabulaire. PostToolUseFailure a ete releve sur

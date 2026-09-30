@@ -123,8 +123,6 @@ test('promptInstallParams: with projectRoot, scope prompt asked, default user', 
   expect(io.captured).toMatch(/Where to install hooks\?/);
 });
 
-// 'both' couvre aussi Antigravity, qui n'a pas de portée locale : ce test choisit
-// donc un agent seul (Claude) plutôt que 'both', pour garder 'local' atteignable.
 test('promptInstallParams: scope down twice + enter → local (single agent that supports it)', async () => {
   const io = makeMockIO();
   const promise = promptInstallParams({
@@ -139,6 +137,30 @@ test('promptInstallParams: scope down twice + enter → local (single agent that
   press(io.input, 'return');
   const result = await promise;
   expect(result.scope).toBe('local');
+});
+
+// 'both' couvre Antigravity, sans portée locale, mais aussi Claude et Copilot : le
+// registre écarte Antigravity d'un --local, donc 'local' reste proposé.
+test('promptInstallParams: target both → local offered (at least one agent supports it)', async () => {
+  // Arrange
+  const io = makeMockIO();
+  const promise = promptInstallParams({
+    detected: { claude: true, copilot: true, antigravity: true },
+    projectRoot: '/some/project',
+    io: { input: io.input, output: io.output },
+  });
+  await tick();
+  press(io.input, 'return'); await tick();    // accept All agents (default, several detected)
+  press(io.input, 'down'); await tick();       // user → project
+  press(io.input, 'down'); await tick();       // project → local
+  press(io.input, 'return');
+
+  // Act
+  const result = await promise;
+
+  // Assert
+  expect(result).toEqual({ target: 'both', scope: 'local' });
+  expect(io.captured).toMatch(/local — this repo only/);
 });
 
 test('promptInstallParams: target antigravity → scope options omit local', async () => {

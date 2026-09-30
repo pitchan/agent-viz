@@ -2,8 +2,10 @@
 // consommateurs d'agent-events/*.jsonl : le vocabulaire de Claude Code. Pur : hook.ts
 // garde l'I/O, un agent de plus = une entrée de table, sans toucher aux lecteurs.
 
-export type HookSource = 'claude' | 'copilot' | 'antigravity';
-export const HOOK_SOURCES: readonly HookSource[] = ['claude', 'copilot', 'antigravity'];
+// Import de type seul : effacé à la compilation, il n'ajoute aucun chargement au hook.
+import type { AgentName } from './install-hooks/types.ts';
+
+export type HookSource = AgentName;
 
 type Payload = Record<string, unknown>;
 type Normalizer = (raw: Payload, event: string | undefined) => Payload;
@@ -39,6 +41,9 @@ export const NORMALIZERS: Record<HookSource, Normalizer> = {
   copilot: identity,
   antigravity: normalizeAntigravity,
 };
+
+// Lue des clefs d'une table `Record<HookSource, …>` : un agent oublié ici ne compile pas.
+export const HOOK_SOURCES = Object.keys(NORMALIZERS) as readonly HookSource[];
 
 // Une source dont la charge ne nomme pas l'événement ne peut pas être lue sans --event.
 export const NEEDS_EVENT_FLAG: Record<HookSource, boolean> = {

@@ -114,7 +114,7 @@ export async function cmdStop(flags: Record<string, any>, packageRoot: string) {
   // Mirror of cmdStart's auto-install: stop also removes hooks unless opted out.
   // We target the SAME scope `start` would have resolved from this cwd
   // (`resolveScope` returns 'user' when no scope is given, project root or not),
-  // so unrelated installs in other scopes are preserved. Sweeps both agents —
+  // so unrelated installs in other scopes are preserved. Sweeps all registered agents —
   // uninstalling an agent that was never installed is a no-op.
   const shouldUninstall = flags['keep-hooks'] !== true;
   if (shouldUninstall) {

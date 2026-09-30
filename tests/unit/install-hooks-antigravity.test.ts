@@ -15,7 +15,7 @@ interface Resultat {
 }
 
 // Chaque bac à sable créé par projet()/paquet() de ce fichier, retiré au terme du test
-// qui l'a créé — cf. tests/CLAUDE.md §4 : le disque de tests/unit se nettoie lui-même.
+// qui l'a créé : rien ne doit survivre hors du bac.
 const dirsCreated: string[] = [];
 
 afterEach(() => {
