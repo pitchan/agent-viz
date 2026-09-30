@@ -73,10 +73,10 @@ bin/agent-viz.js                  le binaire
 src/server/                       HTTP, SSE, table de routes, tarification d'affichage ;
                                   les commandes du binaire (hook.ts · install-hooks.ts ·
                                   lifecycle.ts · prompt-install.ts) et le démon (server.ts)
-src/server/install-hooks/         l'installation des hooks, par agent (Claude / Copilot) et par portée
+src/server/install-hooks/         l'installation des hooks, par agent (Claude / Copilot / Antigravity) et par portée
 src/server/observatory/           orchestration des scans, base, provenance
 src/server/observatory/rules/     les règles de conseil, une par fichier
-src/server/transcript-adapters/   Claude / Copilot, un contrat commun
+src/server/transcript-adapters/   Claude / Copilot / Antigravity, un contrat commun
 src/server/watchdog/              surveillance et alertes
 ```
 
@@ -399,7 +399,7 @@ la principale façon de se tromper sur ce produit.
 ### Flux A — la capture temps réel
 
 ```
-Claude Code / Copilot CLI
+Claude Code / Copilot CLI / Antigravity CLI
    └─ le hook lance `agent-viz hook`
         ├─ écrit  ${tmpdir}/agent-events/<session>.jsonl     (hook.ts : DIR, runHook)
         └─ POST /notify au démon, sans attendre la réponse
@@ -470,6 +470,12 @@ rend `exit 0` sans la nommer. Ce qu'il ne dit pas : que le point d'entrée
 | Hook | Commande inscrite | Événement |
 |---|---|---|
 | agent-viz | `node "<abs>/bin/agent-viz.js" hook --source=claude\|copilot` **ou** `npx --yes @vcueto/agent-viz@X.Y.Z hook --source=…` | les événements Claude / Copilot |
+| agent-viz | `node <abs>/bin/agent-viz.js hook --source=antigravity --event=<Nom>` (chemin **sans** guillemets) **ou** la forme `npx` suivie de `--event=<Nom>` | les événements Antigravity, **une commande par événement** |
+
+Deux écarts pour Antigravity, dans `src/server/install-hooks/antigravity.ts` :
+la charge d'agy ne nomme pas son événement, d'où `--event` ; et agy transmet les
+guillemets tels quels à node sous Windows, d'où un chemin sans guillemets — un
+chemin qui contient une espace est refusé à l'installation.
 
 Le hook agent-viz a **deux modes**, et la différence compte : si la racine du
 paquet est un cache `npx` éphémère, la commande écrite ne contient **aucun
@@ -477,8 +483,8 @@ chemin** (`resolveHookCommand`, dans `src/server/install-hooks/scopes.ts`).
 L'installation globale ou locale produit la forme absolue ; `npx` produit la
 forme portable.
 
-Ce que ce dépôt n'établit pas : **sous quelle forme Claude Code ou Copilot CLI
-remontent à l'utilisateur l'échec d'un hook** dont la commande ne trouve plus son
+Ce que ce dépôt n'établit pas : **sous quelle forme Claude Code, Copilot CLI ou
+Antigravity CLI remontent à l'utilisateur l'échec d'un hook** dont la commande ne trouve plus son
 fichier. Rien ici ne le teste.
 
 ### Le produit écrit chez son utilisateur — en deux endroits de natures différentes
@@ -488,7 +494,7 @@ n'y paraît.
 
 | Qui écrit | Où | Chemin absolu ? |
 |---|---|---|
-| `src/server/install-hooks/` | **six** destinations possibles selon l'agent et la portée : `~/.claude/settings.json`, `<dépôt>/.claude/settings{,.local}.json`, `~/.copilot/hooks/agent-viz.json`, `<dépôt>/.github/hooks/agent-viz{,.local}.json` | **seulement en mode `absolute`** |
+| `src/server/install-hooks/` | **huit** destinations possibles selon l'agent et la portée : `~/.claude/settings.json`, `<dépôt>/.claude/settings{,.local}.json`, `~/.copilot/hooks/agent-viz.json`, `<dépôt>/.github/hooks/agent-viz{,.local}.json`, `~/.gemini/config/hooks.json`, `<dépôt>/.agents/hooks.json` — Antigravity n'a pas de portée locale | **seulement en mode `absolute`** |
 | `src/server/install-hooks/` | ajoute une ligne au **`.gitignore` du dépôt de l'utilisateur**, quand il écrit un fichier de portée locale — jamais n'en crée un (`ensureGitignore`, dans `scopes.ts`) | sans objet |
 
 La deuxième ligne est la plus intrusive des deux : c'est la seule qui touche un
@@ -501,6 +507,10 @@ Une ligne reconnue n'est jamais doublée : l'installation la réécrit quand ell
 la forme standard (`node "…"` ou `npx …`, `isStandardShape`), et la laisse telle
 quelle sinon. Pour Copilot CLI, toute commande qui nomme `agent-viz` et `hook`
 est reconnue (`isAgentVizCommand`, dans `copilot.ts`) et remplacée sur place.
+Pour Antigravity CLI, l'installation ne possède que la clé `agent-viz` du
+`hooks.json` : une commande qui nomme `agent-viz` et `hook` n'est reconnue
+(`isAgentVizCommand`, dans `antigravity.ts`) que sous cette clé, et les autres
+clés du fichier ne sont jamais touchées.
 
 ---
 
