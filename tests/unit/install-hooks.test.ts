@@ -211,7 +211,7 @@ test('resolveScope: la portée utilisateur d’Antigravity vise ~/.gemini/config
 });
 
 test('EVENTS: Antigravity n’abonne que les trois événements affichés', () => {
-  expect(_internals.eventsFor('antigravity')).toEqual(['PreToolUse', 'PostToolUse', 'Stop']);
+  expect(_internals.eventsFor('antigravity')).toEqual(['PreToolUse', 'PostToolUse', 'PostInvocation', 'Stop']);
 });
 
 test('install: une configuration aux 5 anciens evenements ne gagne que le nouveau', () => {

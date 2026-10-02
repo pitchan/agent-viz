@@ -153,14 +153,14 @@ test('le retrait ignore une clé agent-viz qui ne porte aucune commande à nous'
   expect(lire(fichier(root))).toEqual(etrangere);
 });
 
-test('le retrait après une installation réelle compte les 3 commandes retirées', () => {
+test('le retrait après une installation réelle compte les 4 commandes retirées', () => {
   // Arrange
   const root = projet('avtest-agy-compte-');
   install({ target: 'antigravity', scope: 'project', cwd: root, packageRoot: paquet('avpkg-agy-') });
   // Act
   const r = uninstall({ target: 'antigravity', scope: 'project', cwd: root }).antigravity as Resultat;
   // Assert
-  expect(r.results?.[0]?.removed).toBe(3);
+  expect(r.results?.[0]?.removed).toBe(4);
 });
 
 test('un PreToolUse écrit à plat, sans enveloppe matcher/hooks, est signalé périmé par l’audit', () => {

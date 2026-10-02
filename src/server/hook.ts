@@ -13,6 +13,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { HOOK_SOURCES, NORMALIZERS, NEEDS_EVENT_FLAG, type HookSource } from './hook-normalize.ts';
+import { lateFailures } from './hook-antigravity-verdicts.ts';
 
 // node:http arrive par process.getBuiltinModule, pas par `import` : matérialiser son espace de
 // noms ESM se paie à chaque processus de hook, donc à chaque événement. getBuiltinModule rend le
@@ -32,6 +33,29 @@ function logHookError(message: string): void {
     fs.appendFileSync(path.join(DIR, '_hook-errors.log'), `${new Date().toISOString()} ${message}\n`);
   } catch {}
 }
+
+type Payload = Record<string, unknown>;
+
+function readText(file: string): string {
+  try { return fs.readFileSync(file, 'utf8'); } catch { return ''; }
+}
+
+// Un événement d'agent qui n'est pas écrit tel quel : il est remplacé par ceux qu'on en déduit.
+// `null` quand l'événement suit le chemin ordinaire.
+type Replacer = (raw: Payload, event: string | undefined) => Payload[] | null;
+
+function antigravityPostInvocation(raw: Payload, event: string | undefined): Payload[] | null {
+  if (event !== 'PostInvocation') return null;
+  const { conversationId, transcriptPath } = raw;
+  if (typeof conversationId !== 'string' || typeof transcriptPath !== 'string') return [];
+  return lateFailures(readText(path.join(DIR, `${conversationId}.jsonl`)), readText(transcriptPath));
+}
+
+const REPLACERS: Record<HookSource, Replacer | null> = {
+  claude: null,
+  copilot: null,
+  antigravity: antigravityPostInvocation,
+};
 
 function parseSource(argv: string[]): HookSource {
   for (const a of argv) {
@@ -74,16 +98,18 @@ function runHook(): void {
         logHookError(`--event missing, event dropped source=${source}`);
         process.exit(0);
       }
-      const evt = NORMALIZERS[source](raw, event);
-      evt._ts = new Date().toISOString();
-      evt._source = source;
-      const sid = evt.session_id;
+      const events = REPLACERS[source]?.(raw, event) ?? [NORMALIZERS[source](raw, event)];
+      // Rien à écrire : le serveur n'est pas réveillé pour un fichier qui n'a pas bougé.
+      const first = events[0];
+      if (!first) process.exit(0);
+      const sid = first.session_id;
       if (typeof sid !== 'string' || !sid) {
-        logHookError(`event without session_id (${evt.hook_event_name || '?'}) source=${source}`);
+        logHookError(`event without session_id (${first.hook_event_name || '?'}) source=${source}`);
         process.exit(0);
       }
-      const file = path.join(DIR, `${sid}.jsonl`);
-      fs.appendFileSync(file, JSON.stringify(evt) + '\n');
+      const ts = new Date().toISOString();
+      const lines = events.map(evt => JSON.stringify({ ...evt, _ts: ts, _source: source }) + '\n');
+      fs.appendFileSync(path.join(DIR, `${sid}.jsonl`), lines.join(''));
 
       const body = JSON.stringify({ session: sid });
       const req = http.request({
