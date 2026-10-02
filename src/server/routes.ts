@@ -22,7 +22,7 @@ import { ensureFirstPrompt } from './transcript.ts';
 import {
   readAndBroadcast, watchSession, deleteSession,
 } from './event-reader.ts';
-import { scanAndWatch } from './housekeep.ts';
+import { rescanSessions } from './housekeep.ts';
 import { createObservatoryRoutes } from './observatory/routes.ts';
 import { getObservatoryService } from './observatory/index.ts';
 import { createWatchdogRoutes } from './watchdog/routes.ts';
@@ -319,12 +319,9 @@ function tokensHandler(_req: IncomingMessage, res: ServerResponse, url: URL): vo
 }
 
 async function sessionsHandler(_req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
-  // Optional forced rescan — rebuild index from disk. Useful if the user
-  // deleted files outside the app or suspects drift.
-  if (url.searchParams.has('rescan')) {
-    sessionIndex.clear();
-    await scanAndWatch();
-  }
+  // Optional forced rescan — catch up with the disk. Useful if the user
+  // deleted or added files outside the app.
+  if (url.searchParams.has('rescan')) await rescanSessions();
   // Warm any not-yet-attempted prompt caches in parallel (fire-and-forget
   // after the response so the client gets a fast reply).
   const missing: string[] = [];

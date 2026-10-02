@@ -187,6 +187,16 @@ async function scanAndWatch(): Promise<void> {
   }
 }
 
+// Rattrape le disque sans vider la liste : une session connue garde son enregistrement et ses
+// watchers, donc un événement écrit pendant la reconstruction n'est ni perdu ni rejoué.
+async function rescanSessions(): Promise<void> {
+  for (const id of [...sessionIndex.keys()]) {
+    const fp = path.join(DIR, `${id}.jsonl`);
+    if (!fs.existsSync(fp)) await deleteSession(fp);
+  }
+  await scanAndWatch();
+}
+
 // Handler of the events-dir watcher, armed after the initial index: a file the
 // index does not know is new, and its first lines are already on disk when the
 // event arrives, so they are read now rather than at the next write.
@@ -206,4 +216,4 @@ async function sessionFileChanged(fp: string): Promise<void> {
   await readAndBroadcast(fp);
 }
 
-export { compactSession, housekeep, scanAndWatch, sessionFileChanged };
+export { compactSession, housekeep, rescanSessions, scanAndWatch, sessionFileChanged };
