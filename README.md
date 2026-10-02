@@ -105,8 +105,9 @@ Detection: an agent is considered installed if its CLI binary is on your `PATH` 
 - The agent-viz install path must not contain a space: Antigravity passes quotes through to the command on Windows, so a quoted path cannot run.
 
 Known limits, all on Antigravity's side:
-- A command that exits with an error is shown as successful: Antigravity reports `error: ""` for it.
-- A tool call rejected before it runs is shown as done once the turn ends: no end event is sent.
+- A failed tool (non-zero exit, or a call rejected before it runs) turns red once the model call ends, not when the tool ends: Antigravity writes the result after its end event.
+- The error text is Antigravity's own sentence; its exit code is not always the command's (`exit 3` is reported as code 1).
+- To read these results, agent-viz also runs on `PostInvocation`: one more hook process per model call.
 - Tokens are read from `~/.gemini/antigravity-cli/conversations/<id>.db` (undocumented). They lag one model call behind during a turn and are exact once it ends. If the format changes, the session shows "Tokens N/A" instead of a wrong figure.
 - No cost: agent-viz has no Gemini price table.
 - No session duration: Antigravity sends no session-start event.
