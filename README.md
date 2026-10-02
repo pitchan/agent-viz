@@ -106,8 +106,11 @@ Detection: an agent is considered installed if its CLI binary is on your `PATH` 
 
 Known limits, all on Antigravity's side:
 - A command that exits with an error is shown as successful: Antigravity reports `error: ""` for it.
-- A tool call rejected before it runs (e.g. reading a missing file) stays "running": no end event is sent.
-- No prompt node and "Tokens N/A": no hook event carries the prompt text or token counts.
+- A tool call rejected before it runs is shown as done once the turn ends: no end event is sent.
+- Tokens are read from `~/.gemini/antigravity-cli/conversations/<id>.db` (undocumented). They lag one model call behind during a turn and are exact once it ends. If the format changes, the session shows "Tokens N/A" instead of a wrong figure.
+- No cost: agent-viz has no Gemini price table.
+- No session duration: Antigravity sends no session-start event.
+- The analysis panels (Conseils, Sessions analysées, Jetons & tarifs, Skills) cover Claude Code sessions only.
 
 ## Hook management
 
