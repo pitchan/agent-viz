@@ -76,7 +76,8 @@ src/server/                       HTTP, SSE, table de routes, tarification d'aff
 src/server/install-hooks/         l'installation des hooks, par agent (Claude / Copilot / Antigravity) et par portée
 src/server/observatory/           orchestration des scans, base, provenance
 src/server/observatory/rules/     les règles de conseil, une par fichier
-src/server/transcript-adapters/   Claude / Copilot / Antigravity, un contrat commun
+src/server/transcript-adapters/   Claude / Copilot / Antigravity, un contrat commun : où est le transcript,
+                                  quelle est la question, d'où viennent les jetons (transcript ou base d'agy)
 src/server/watchdog/              surveillance et alertes
 ```
 
