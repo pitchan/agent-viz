@@ -14,6 +14,8 @@ import { decodeJsonlLine } from '../engine/core/jsonl.ts';
 import { ensureTokens, scheduleTokensBroadcast, tokenSum } from './tokens.ts';
 import { broadcastSessionsChanged } from './sse.ts';
 import { getAdapter } from './transcript-adapters/index.ts';
+import type { UsageSnapshotSource } from './transcript-adapters/types.ts';
+import { applyUsageSnapshot } from './usage-snapshot.ts';
 // Type partagé du contrat de Liskov des adaptateurs : ce que
 // `parseUsageLine`/`discoverPath` attendent réellement pour `rec`. Emprunté par
 // nom plutôt que redéclaré localement.
@@ -140,60 +142,13 @@ async function getTranscriptPath(sessionFile: string): Promise<string | null> {
 
 // ── Prompt extraction ──
 
-// Strip tagged blocks (<tag>content</tag>) and standalone tags, then trim.
-function cleanUserText(raw: string): string {
-  return raw.replace(/<(\w[\w-]*)[\s>][\s\S]*?<\/\1>/g, '').replace(/<[^>]+>/g, '').trim();
-}
-
-// Check if text is IDE/system noise rather than a real user prompt.
-function isNoise(text: string): boolean {
-  return /^(The user (opened|is viewing|has selected|scrolled)|ide_selection|gitStatus:|Current branch:)/i.test(text);
-}
-
-// Extract the first real user prompt from a transcript buffer.
-function extractPromptFromText(content: string): string | null {
-  const lines = content.split('\n');
-  for (const line of lines) {
-    // Le verdict vient de la primitive commune. Un échec reste muet ici : la fenêtre lue est
-    // bornée (256 Ko puis 1 Mo) et coupe en plein milieu de ligne, donc une trace se
-    // déclencherait à chaque lecture — du bruit de routine, pas un signal.
-    //
-    // Le `try` rattrape deux levées, `cleanUserText(block.text)` sur un bloc `text` sans `text`
-    // et `block.type` sur un bloc `null` : la ligne ENTIÈRE est abandonnée, frères valides
-    // compris. Un garde `isRecord(block)` sauterait le seul bloc cassé et changerait qui gagne.
-    const verdict = decodeJsonlLine(line);
-    if (!verdict || !verdict.ok) continue;
-    const o = verdict.value;
-    if (!isRecord(o)) continue;
-    try {
-      if (o.type === 'user' || o.type === 'human') {
-        const message = isRecord(o.message) ? o.message : null;
-        const c: unknown = (message && message.content) || o.content;
-        if (typeof c === 'string') {
-          const clean = cleanUserText(c);
-          if (clean && clean.length > 5 && !isNoise(clean)) return clean.slice(0, 120);
-        }
-        if (Array.isArray(c)) {
-          const blocks: unknown[] = c;
-          for (const block of blocks) {
-            // Cast, jamais `isRecord` : un bloc `null`/`undefined` doit lever
-            // ICI — voir le commentaire au-dessus du `try`.
-            const b = block as { type?: unknown; text?: unknown };
-            if (b.type === 'text') {
-              const text = cleanUserText(b.text as string);
-              if (text && text.length > 5 && !text.startsWith('{') && !isNoise(text)) return text.slice(0, 120);
-            }
-          }
-        }
-      }
-    } catch {}
-  }
-  return null;
-}
-
 // Stream up to `maxBytes` from the transcript and try to extract the first
-// user prompt. Returns null if not found in the window, string otherwise.
-async function readPromptBounded(transcriptPath: string, maxBytes: number): Promise<string | null> {
+// user prompt with the session's adapter. Returns null if not found in the window.
+async function readPromptBounded(
+  transcriptPath: string,
+  maxBytes: number,
+  extractPrompt: (text: string) => string | null,
+): Promise<string | null> {
   return new Promise<string | null>((resolve) => {
     const chunks: Buffer[] = [];
     let total = 0;
@@ -209,7 +164,7 @@ async function readPromptBounded(transcriptPath: string, maxBytes: number): Prom
     stream.on('end', () => {
       try {
         const text = Buffer.concat(chunks, total).toString('utf8');
-        resolve(extractPromptFromText(text));
+        resolve(extractPrompt(text));
       } catch { resolve(null); }
     });
     stream.on('error', () => resolve(null));
@@ -234,7 +189,7 @@ async function ensureFirstPrompt(sessionFile: string): Promise<string | null> {
   // (bornes déjà réduites à ce qui reste à essayer) sans accès indexé.
   for (const w of windows.slice(Math.max(0, start))) {
     rec.promptWindow = w;
-    const prompt = await readPromptBounded(tp, w);
+    const prompt = await readPromptBounded(tp, w, getAdapter(rec.agentSource).extractPrompt);
     if (prompt) {
       rec.promptCache = prompt;
       broadcastSessionsChanged();
@@ -407,6 +362,10 @@ async function ensureTranscriptWatcher(sessionFile: string): Promise<void> {
     if (rec.tokens) rec.tokens.unsupported = true;
     return;
   }
+  if (adapter.usageSnapshot) {
+    await refreshUsageSnapshot(sessionFile, rec, adapter.usageSnapshot);
+    return;
+  }
   const tr = ensureTranscriptSlice(rec);
 
   if (!tr.main && !tr._mainPending) {
@@ -447,6 +406,16 @@ async function ensureTranscriptWatcher(sessionFile: string): Promise<void> {
   await ensureSubagentTails(tr, rec);
 }
 
+// Jetons tenus hors du transcript : relus à chaque événement du hook, sans watcher.
+async function refreshUsageSnapshot(sessionFile: string, rec: SessionWithSlices, source: UsageSnapshotSource): Promise<void> {
+  const tp = await getTranscriptPath(sessionFile);
+  if (!tp) { flagTranscriptMissing(rec, rec.id); return; }
+  ensureTokens(rec);
+  if (!rec.tokens) return;
+  rec.tokens.transcriptMissing = false;
+  if (applyUsageSnapshot(rec.id, rec.tokens, source, tp)) scheduleTokensBroadcast(rec.id, rec as TokensCarrierLike);
+}
+
 // Mark a session's token bucket as "transcript not located yet" and broadcast
 // it, so the UI shows an explicit state instead of a blank pill. Transient:
 // ensureTranscriptWatcher clears it as soon as discovery succeeds.
@@ -479,7 +448,7 @@ function closeTail(tail: Tail | null): void {
 
 // Exposed for tests:
 const _internals = {
-  readFirstLine, extractPromptFromText, parseTranscriptEvent,
+  readFirstLine, parseTranscriptEvent,
   ensureTranscriptSlice, makeTail, ensureSubagentTails, readTailDelta,
 };
 

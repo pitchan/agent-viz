@@ -145,10 +145,67 @@ function parseUsageLine(line: string, rec: UsageRecord): boolean {
   return true;
 }
 
+// ── Prompt extraction ──
+
+// Strip tagged blocks (<tag>content</tag>) and standalone tags, then trim.
+function cleanUserText(raw: string): string {
+  return raw.replace(/<(\w[\w-]*)[\s>][\s\S]*?<\/\1>/g, '').replace(/<[^>]+>/g, '').trim();
+}
+
+// Check if text is IDE/system noise rather than a real user prompt.
+function isNoise(text: string): boolean {
+  return /^(The user (opened|is viewing|has selected|scrolled)|ide_selection|gitStatus:|Current branch:)/i.test(text);
+}
+
+// Extract the first real user prompt from a transcript buffer.
+function extractPrompt(content: string): string | null {
+  const lines = content.split('\n');
+  for (const line of lines) {
+    // Le verdict vient de la primitive commune. Un échec reste muet ici : la fenêtre lue est
+    // bornée (256 Ko puis 1 Mo) et coupe en plein milieu de ligne, donc une trace se
+    // déclencherait à chaque lecture — du bruit de routine, pas un signal.
+    //
+    // Le `try` rattrape deux levées, `cleanUserText(block.text)` sur un bloc `text` sans `text`
+    // et `block.type` sur un bloc `null` : la ligne ENTIÈRE est abandonnée, frères valides
+    // compris. Un garde `isRecord(block)` sauterait le seul bloc cassé et changerait qui gagne.
+    const verdict = decodeJsonlLine(line);
+    if (!verdict || !verdict.ok) continue;
+    const o = verdict.value;
+    if (!isRecord(o)) continue;
+    try {
+      if (o.type === 'user' || o.type === 'human') {
+        const message = isRecord(o.message) ? o.message : null;
+        const c: unknown = (message && message.content) || o.content;
+        if (typeof c === 'string') {
+          const clean = cleanUserText(c);
+          if (clean && clean.length > 5 && !isNoise(clean)) return clean.slice(0, 120);
+        }
+        if (Array.isArray(c)) {
+          const blocks: unknown[] = c;
+          for (const block of blocks) {
+            // Cast, jamais `isRecord` : un bloc `null`/`undefined` doit lever
+            // ICI — voir le commentaire au-dessus du `try`.
+            const b = block as { type?: unknown; text?: unknown };
+            if (b.type === 'text') {
+              const text = cleanUserText(b.text as string);
+              if (text && text.length > 5 && !text.startsWith('{') && !isNoise(text)) return text.slice(0, 120);
+            }
+          }
+        }
+      }
+    } catch {}
+  }
+  return null;
+}
+
 const tokensSupported = true;
+// Les jetons de Claude sont dans le transcript, lus ligne à ligne par `parseUsageLine`.
+const usageSnapshot = null;
 
 export {
   tokensSupported,
   discoverPath,
+  extractPrompt,
   parseUsageLine,
+  usageSnapshot,
 };

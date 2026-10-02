@@ -12,6 +12,7 @@ import { ensureTokens } from '../../src/server/tokens.ts';
 const REQUIRED_FIELDS = {
   tokensSupported: 'boolean',
   discoverPath: 'function',
+  extractPrompt: 'function',
   parseUsageLine: 'function',
 };
 
@@ -35,18 +36,25 @@ test('getAdapter: null/undefined defaults to claude (sessions without _source)',
   expect(getAdapter('copilot')).toBe(TRANSCRIPT_ADAPTERS.copilot);
 });
 
-test('getAdapter: unknown string logs an error and returns claude (loud fallback)', () => {
-  // An unrecognised agentSource means a new producer was added at the hook
-  // layer without a matching adapter. The system stays up (transcript
-  // pipeline keeps running for known sources) but stderr surfaces the bug.
+test("une source inconnue n'est lue avec le format d'aucun agent, et le dit une seule fois", () => {
+  // Arrange
   const captured: string[] = [];
   const original = console.error;
   console.error = (...args) => captured.push(args.join(' '));
+  const ligneClaude = JSON.stringify({
+    type: 'assistant', isSidechain: false,
+    message: { id: 'msg_1', model: 'claude-sonnet-4-5', usage: { input_tokens: 1, output_tokens: 1 } },
+  });
   try {
-    const adapter = getAdapter('something-new');
-    expect(adapter).toBe(TRANSCRIPT_ADAPTERS.claude);
-    expect(captured.length, 'expected exactly one console.error call').toBe(1);
-    expect(captured[0]).toMatch(/unknown agentSource "something-new"/);
+    // Act
+    const adapter = getAdapter('agent-jamais-vu');
+    getAdapter('agent-jamais-vu');
+    // Assert
+    expect(adapter.tokensSupported).toBe(false);
+    expect(adapter.discoverPath({ transcript_path: '/x.jsonl' })).toBe(null);
+    expect(adapter.parseUsageLine(ligneClaude, {})).toBe(false);
+    expect(captured).toHaveLength(1);
+    expect(captured[0]).toMatch(/unknown agentSource "agent-jamais-vu"/);
   } finally {
     console.error = original;
   }
@@ -89,12 +97,11 @@ test('une ligne d’usage préfixée d’un BOM est comptabilisée', () => {
   expect(rec.tokens.main.lastModel).toBe('claude-sonnet-4-5');
 });
 
-test('une session Antigravity a un adaptateur, sans jetons annoncés', () => {
-  // Arrange — le registre importé ci-dessus
+test('une session Antigravity trouve son transcript dans le premier événement', () => {
+  // Arrange
+  const premier = { _source: 'antigravity', transcript_path: 'C:/x/brain/c/.system_generated/logs/transcript_full.jsonl' };
   // Act
-  const adapter = getAdapter('antigravity');
+  const chemin = getAdapter('antigravity').discoverPath(premier);
   // Assert
-  expect(adapter).toBe(TRANSCRIPT_ADAPTERS.antigravity);
-  expect(adapter.tokensSupported).toBe(false);
+  expect(chemin).toBe(premier.transcript_path);
 });
-

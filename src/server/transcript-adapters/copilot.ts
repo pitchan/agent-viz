@@ -10,12 +10,16 @@ import type { UsageRecord } from './claude.ts';
 // (`transcript-adapters.test.ts`) vérifie à l'exécution — deux adaptateurs
 // interchangeables, jamais deux formes d'appel.
 function discoverPath(_firstEvent: unknown): null { return null; }
+function extractPrompt(_text: string): null { return null; }
 function parseUsageLine(_line: string, _rec: UsageRecord): false { return false; }
 
 const tokensSupported = false;
+const usageSnapshot = null;
 
 export {
   tokensSupported,
   discoverPath,
+  extractPrompt,
   parseUsageLine,
+  usageSnapshot,
 };
