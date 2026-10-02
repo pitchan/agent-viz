@@ -6,6 +6,7 @@
 // without triggering any side effect (no setInterval at import time).
 
 import { formatDuration } from './viz-duration.ts';
+import { FILE_TOOLS } from '../engine/core/tool-subject.ts';
 import type { VizNode, TimelineEntry } from './viz-state.ts';
 
 // Ce module PUR ne recoit jamais `state`/`vis` par import (pas de cycle avec
@@ -188,14 +189,14 @@ function computeContext(state: NarratorState, vis: NarratorVis) {
   for (let i = entries.length - 1; i >= 0 && filePaths.length < 5; i--) {
     const e = entries[i]!;
     if (e.type !== 'tool') continue;
-    if (e.label !== 'Read' && e.label !== 'Edit' && e.label !== 'Write') continue;
+    if (!FILE_TOOLS.has(e.label)) continue;
     if (!e.sub) continue;
     filePaths.push(e.sub);
   }
   for (const id of vis.runningNodes) {
     const n = state.nodes.get(id);
     if (!n) continue;
-    if (n.label !== 'Read' && n.label !== 'Edit' && n.label !== 'Write') continue;
+    if (!FILE_TOOLS.has(n.label)) continue;
     if (n.sub && !filePaths.includes(n.sub)) filePaths.push(n.sub);
   }
   return commonPathPrefix(filePaths);

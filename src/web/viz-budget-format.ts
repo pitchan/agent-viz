@@ -74,9 +74,9 @@ function totalPill(main: TokenBucket, perAgent: Map<string, TokenBucket>) {
 
 export function budgetPresentation(tokens: BudgetTokens): BudgetPresentation {
   if (tokens.tokensSupported === false) {
-    return { kind: 'unavailable', text: 'Tokens N/A', title: 'Token usage is not exposed by this provider (e.g. Copilot Chat).' };
+    return { kind: 'unavailable', text: 'Tokens N/A', title: 'Token usage is not available for this session.' };
   }
-  // Suivi des jetons actif (Claude), mais le transcript n'est pas encore sur le
+  // Suivi des jetons actif, mais le transcript n'est pas encore sur le
   // disque : le dire plutôt que laisser la pastille vide.
   if (tokens.transcriptMissing) {
     return { kind: 'unavailable', text: 'Transcript N/A', title: 'Transcript file not located yet — token tracking starts as soon as it appears on disk.' };

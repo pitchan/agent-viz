@@ -57,3 +57,31 @@ test('known tool with the identifying field missing → empty string', () => {
 test('Read: un file_path hors chaîne ne fait pas lever', () => {
   expect(toolSubject({ tool_name: 'Read', tool_input: { file_path: 42 } } as unknown as ToolCallEvent)).toBe('42');
 });
+
+// Les outils d'Antigravity CLI, avec les noms de champs relevés sur des sessions réelles.
+test('une commande Antigravity rend sa ligne de commande entière', () => {
+  // Arrange
+  const evt = { tool_name: 'run_command', tool_input: { CommandLine: 'cmd /c dir /s C:/Windows/System32/drivers', Cwd: 'C:/x' } };
+  // Act
+  const sujet = toolSubject(evt);
+  // Assert
+  expect(sujet).toBe('cmd /c dir /s C:/Windows/System32/drivers');
+});
+
+test('une lecture de fichier Antigravity rend le nom du fichier', () => {
+  // Arrange
+  const evt = { tool_name: 'view_file', tool_input: { AbsolutePath: 'C:/Users/x/projet/notes.txt' } };
+  // Act
+  const sujet = toolSubject(evt);
+  // Assert
+  expect(sujet).toBe('notes.txt');
+});
+
+test('une écriture et une modification de fichier Antigravity rendent le nom du fichier visé', () => {
+  // Arrange
+  const cible = { TargetFile: 'C:/Users/x/projet/nouveau.txt' };
+  // Act
+  const sujets = ['write_to_file', 'replace_file_content'].map(tool_name => toolSubject({ tool_name, tool_input: cible }));
+  // Assert
+  expect(sujets).toEqual(['nouveau.txt', 'nouveau.txt']);
+});

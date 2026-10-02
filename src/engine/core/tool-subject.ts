@@ -19,6 +19,10 @@ export interface ToolInput {
   pattern?: string;
   description?: string;
   skill?: string;
+  // Antigravity CLI nomme ses champs autrement que Claude Code.
+  CommandLine?: string;
+  AbsolutePath?: string;
+  TargetFile?: string;
 }
 
 export interface ToolCallEvent {
@@ -49,7 +53,17 @@ const TOOL_SUBJECT: Record<string, SubjectPicker> = {
   Glob:  ti => ti.pattern,
   Agent: ti => ti.description,
   Skill: ti => ti.skill,
+  // Outils d'Antigravity CLI, relevés sur des sessions réelles.
+  run_command: ti => ti.CommandLine,
+  view_file: ti => ti.AbsolutePath && basename(ti.AbsolutePath),
+  write_to_file: ti => ti.TargetFile && basename(ti.TargetFile),
+  replace_file_content: ti => ti.TargetFile && basename(ti.TargetFile),
 };
+
+// Les outils dont le sujet est un fichier, tous agents confondus.
+export const FILE_TOOLS: ReadonlySet<string> = new Set([
+  'Read', 'Write', 'Edit', 'view_file', 'write_to_file', 'replace_file_content',
+]);
 
 export function toolSubject(evt: ToolCallEvent): string {
   const ti = evt.tool_input;

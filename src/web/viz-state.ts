@@ -361,11 +361,21 @@ export function formatCostBound(usd: number | null | undefined, complete: boolea
 // (date and `[1m]` suffixes stripped), hence the `$` anchor. Anything else stays raw.
 export function modelLabel(id: string | null | undefined) {
   if (!id) return '';
-  const m = id.match(/^claude-(opus|sonnet|haiku|fable|mythos)-(\d+)(?:-(\d+))?$/);
-  if (!m) return id;
-  const family = `${m[1]![0]!.toUpperCase()}${m[1]!.slice(1)}`;
-  return m[3] !== undefined ? `${family} ${m[2]}.${m[3]}` : `${family} ${m[2]}`;
+  for (const [pattern, format] of MODEL_LABELS) {
+    const m = id.match(pattern);
+    if (m) return format(m);
+  }
+  return id;
 }
+
+const capitalize = (s: string) => `${s[0]!.toUpperCase()}${s.slice(1)}`;
+
+// Une règle par famille d'identifiants ; un identifiant qu'aucune ne reconnaît s'affiche tel quel.
+const MODEL_LABELS: Array<[RegExp, (m: RegExpMatchArray) => string]> = [
+  [/^claude-(opus|sonnet|haiku|fable|mythos)-(\d+)(?:-(\d+))?$/,
+    m => (m[3] !== undefined ? `${capitalize(m[1]!)} ${m[2]}.${m[3]}` : `${capitalize(m[1]!)} ${m[2]}`)],
+  [/^gemini-(\d+(?:\.\d+)?)-([a-z]+)$/, m => `Gemini ${m[1]} ${capitalize(m[2]!)}`],
+];
 
 // Le modèle écrit sous le titre d'un nœud Session ou Agent. Lu dans les seaux de jetons,
 // qui arrivent après la création du nœud par les hooks : '' tant qu'il est inconnu.

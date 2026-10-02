@@ -254,3 +254,21 @@ test('driver: setRenderFn(null) silences the driver', async () => {
   markNarratorDirty(); // must not throw
   await Promise.resolve();
 });
+
+test("les lectures de fichier d'Antigravity donnent aussi le dossier de travail", () => {
+  // Arrange
+  const state = freshState();
+  withSessionAndTool(state, {
+    tools: [
+      { id: '1', label: 'view_file', sub: 'auth/login.js', status: 'running' },
+      { id: '2', label: 'view_file', sub: 'auth/middleware.js', status: 'running' },
+    ],
+  });
+  const vis = freshVis();
+  vis.runningNodes.add('t:1');
+  vis.runningNodes.add('t:2');
+  // Act
+  const result = composeNarrator(state, vis, Date.now());
+  // Assert
+  expect(result!.text).toContain('auth/');
+});

@@ -268,3 +268,12 @@ test('returnBanner sans coût de référence exploitable ne chiffre rien', () =>
   // constate le retour sans inventer un chiffre.
   expect(returnBanner({ status: 'ignored', statusAt: '2026-08-08T12:00:00.000Z', estimatedCostUsd: 15, costAtStatusUsd: 0 } as Recommendation)).toBe('Mis en veille le 08/08/2026 — le coût a regrossi depuis.');
 });
+
+test('un modèle Gemini reçoit un libellé lisible, un identifiant inconnu reste tel quel', () => {
+  // Arrange
+  const ids = ['gemini-3.8-flash', 'gemini-3-pro', 'gemini-3.8-flash-high'];
+  // Act
+  const libelles = ids.map(modelLabel);
+  // Assert
+  expect(libelles).toEqual(['Gemini 3.8 Flash', 'Gemini 3 Pro', 'gemini-3.8-flash-high']);
+});

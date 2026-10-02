@@ -272,7 +272,7 @@ function drawEmptyState() {
 
   ctx.fillStyle = hexAlpha('#66ccff', 0.5);
   ctx.font = '14px -apple-system, system-ui, sans-serif';
-  ctx.fillText('Waiting for Claude Code events...', W / 2 - 180, H / 2 + 90);
+  ctx.fillText('Waiting for agent events...', W / 2 - 180, H / 2 + 90);
 
   ctx.fillStyle = hexAlpha('#66ccff', 0.25);
   ctx.font = '12px -apple-system, system-ui, sans-serif';
