@@ -1,6 +1,12 @@
 # agent-viz
 
-Real-time visualizer for [Claude Code](https://docs.claude.com/en/docs/claude-code), [GitHub Copilot CLI](https://docs.github.com/en/copilot/concepts/agents/about-copilot-cli) and [Antigravity CLI](https://antigravity.google) sessions. Streams hook events into a live web dashboard with per-agent badges, multi-agent topology, token usage, and tool-call timeline.
+**Where do your tokens go?** One command, zero runtime dependencies: agent-viz tracks your coding agents live and puts a measured figure on what they waste.
+
+It works with [Claude Code](https://docs.claude.com/en/docs/claude-code), [GitHub Copilot CLI](https://docs.github.com/en/copilot/concepts/agents/about-copilot-cli) and [Antigravity CLI](https://antigravity.google). It reads, measures and advises. It runs nothing on your behalf, and none of your data leaves your machine.
+
+- **Live view** — every tool call, every subagent, tokens and cost, as the session runs.
+- **Live alerts** — an agent repeating the same call, failing in a row, or gone silent raises an alert while it happens. No rule to configure.
+- **Advice** — costs measured on your own past sessions, each one tied to a figure and to one action.
 
 ## Install & start (recommended)
 
@@ -30,6 +36,50 @@ npm install -g @vcueto/agent-viz
 agent-viz stop --keep-hooks
 agent-viz
 ```
+
+## What works with which agent
+
+| Feature | Claude Code | Copilot CLI | Antigravity CLI |
+|---|:---:|:---:|:---:|
+| **Live view** | | | |
+| Tool calls as they happen | ✅ | ✅ | ✅ |
+| A failed tool shown as an error | ✅ | ❌ ¹ | ⚠️ ² |
+| Subagents in the topology | ✅ | 🚧 | ❌ |
+| Tokens | ✅ | ❌ ³ | ⚠️ ⁴ |
+| Cost | ✅ | ❌ | ❌ ⁵ |
+| Session duration | ✅ | ✅ | ❌ ⁶ |
+| **Live alerts** | | | |
+| Loop | ✅ | ✅ | ✅ |
+| Stuck | ✅ | 🚧 | ✅ |
+| Retry storm | ✅ | ❌ ¹ | ⚠️ ² |
+| Bad invocation | ✅ | ❌ ¹ | 🚧 |
+| **Observatory** | | | |
+| Advice, analysed sessions, tokens & prices, skills | ✅ | ❌ | ❌ |
+
+✅ works · ⚠️ works with a limit · ❌ not available · 🚧 not reliable yet: do not count on it for that agent
+
+1. Copilot CLI sends no tool-failure event.
+2. Known once the model call ends, not when the tool ends.
+3. Copilot CLI does not expose token usage.
+4. One model call behind during a turn, exact once it ends.
+5. agent-viz has no Gemini price table.
+6. Antigravity sends no session-start event.
+
+Codex CLI and Cursor are not supported.
+
+## What it changes on your machine
+
+| What | Where | How to undo |
+|---|---|---|
+| Hook entries, one per captured event | `~/.claude/settings.json`, `~/.copilot/hooks/agent-viz.json`, `~/.gemini/config/hooks.json` — only for the agents found on your machine | `agent-viz stop` removes them; `agent-viz uninstall-hooks` does it without touching the dashboard |
+| A copy of each hooks file, taken before it is changed | `~/.agent-viz/backups/` | delete the folder |
+| Live events, as the agent sends them: prompts, tool inputs and tool results | `<temp dir>/agent-events/`, one file per session, deleted after 24 hours | `agent-viz` deletes them on its own; the dashboard also has a clear button |
+| The analysis database: counters, sizes, tool names, and [three named exceptions](#observatory-analysis-and-advice) | `~/.agent-viz/observatory.db` | delete the file, it is rebuilt from your transcripts |
+
+- agent-viz adds its own hook entries and leaves the ones you wrote untouched. See [Coexistence with other hooks](#coexistence-with-other-hooks).
+- `agent-viz install-hooks --check` shows what is wired up without writing anything.
+- The server listens on `127.0.0.1` only.
+- The only outbound traffic: once a day, agent-viz downloads two public Anthropic documentation pages (prices and model list) to check its bundled price table against them. Nothing about you or your sessions is sent.
 
 ## Other ways to run it
 
@@ -62,26 +112,77 @@ Adds `agent-viz` as a dev dependency. The hook command embedded in `settings.jso
 | Open browser automatically | `agent-viz start --open` |
 | Skip auto hook install | `agent-viz start --no-install-hooks` |
 
-## Observatoire (analyse et conseils)
+## Live alerts
 
-Deux pages s'ajoutent à la vue temps réel, accessibles depuis la barre d'outils.
+Four detectors watch the event stream of every session. They need no configuration. An alert appears on the bell in the top bar and, if you allow it, as a browser notification.
 
-- **Conseils** — les actions prioritaires, chacune adossée à un chiffre mesuré sur vos propres sessions : quel projet reconstruit son préfixe de cache en cours de route, quel serveur MCP est chargé partout mais jamais appelé, quelle commande imprime beaucoup et souvent, quels fichiers sont relus par plusieurs agents, quelles sessions sont compactées plusieurs fois, quels sous-agents partent sur des tâches trop courtes, quelles sessions laissent des modifications non vérifiées — des fichiers modifiés après la dernière commande de test, de build, de lint ou de typecheck, et les jetons émis après cette dernière preuve. Aucune économie n'est projetée : ce sont des coûts constatés sur la période.
-- **Sessions analysées** — le tableau des sessions mesurées (coût, jetons nets, durée, modèle dominant) avec le détail chiffré session par session.
+| Alert | Raised when |
+|---|---|
+| **Loop** | the same agent calls the same tool with the same input 4 times within 60 seconds |
+| **Retry storm** | the same agent fails 3 times in a row on the same tool; a success resets the count |
+| **Stuck** | a tool is still running and no event has arrived for 3 minutes |
+| **Bad invocation** | a call failed because of how it was written, for a cause you fix once on your workstation — a Windows path passed unquoted to bash, for instance |
 
-L'Observatoire mesure et conseille ; il n'exécute jamais rien à votre place. Chaque carte pose une seule question — que faites-vous de ce conseil ? — et propose trois réponses : **« Je l'adopte »** (la carte part au journal ; si son coût recalculé regrossit d'au moins 50 % malgré tout, elle revient vous demander si le geste a vraiment pris), **« Plus tard »** (elle revient d'elle-même au même seuil), ou **« Non merci »** — vous avez pesé ce choix en connaissance de cause, hors de l'outil, et vous consignez la raison en une ligne ; ce conseil ne sera plus jamais proposé. Aucune décision n'est irréversible : toutes rejoignent la section repliée « Décisions rendues », qui garde le compte visible, la décision et sa date affichées, et un bouton « Réactiver » sur chaque ligne. Limite connue : l'identité d'un projet est son **chemin** — un projet déplacé ou renommé est un nouveau sujet, sa carte renaît active.
+- An alert states a count it has seen, such as "3 of 4 failing". It never claims more than that.
+- A call you interrupt yourself is never counted as a failure.
+- A stuck alert withdraws itself when the session speaks again. After 30 minutes of silence the session is treated as over, not stuck.
+- Retry storm and Bad invocation rely on the tool-failure event, which not every agent sends: see [What works with which agent](#what-works-with-which-agent).
 
-La fenêtre d'analyse se choisit dans l'en-tête (7, 30 ou 90 jours, 30 par défaut) et chaque carte affiche la période sur laquelle elle a été constatée. Les sessions machines (`claude -p`, scripts) sont scannées et badgées, mais jamais comptées dans les conseils ni dans les totaux par défaut ; un interrupteur les affiche à la demande, et le résumé annonce toujours l'assiette retenue (sessions humaines, machines exclues, indéterminées exclues). La base se migre seule à l'ouverture : une colonne nouvelle déclenche un re-scan complet au premier lancement, en tâche de fond, sans bloquer la vue temps réel.
+## Observatory (analysis and advice)
 
-Trois points à savoir :
+Two pages come on top of the live view, opened from the toolbar. Their labels are in French in the interface.
 
-- **Deux blocs, jamais un classement commun.** Certaines règles chiffrent de vrais jetons, d'autres partent d'octets convertis (≈ 4 octets par jeton). Les deux n'ont pas la même précision : la page les présente séparément et n'affiche **aucun total**, parce qu'une même session alimente plusieurs règles et serait comptée deux fois.
-- **Une seule source de prix.** La table de tarifs embarquée dans le moteur tarife tout le produit — vue temps réel comprise — et chaque page nomme sa provenance. Elle porte les tarifs datés : un message est facturé au prix en vigueur le jour où il a été envoyé. Une table publique en ligne sert uniquement de vigie : elle est comparée chaque jour à la table embarquée et signale une dérive, sans jamais fixer un prix. Une session dont le modèle n'a pas de tarif connu est marquée « partiel », jamais arrondie à zéro en silence.
-- **Des métadonnées, et trois exceptions nommées.** L'essentiel de ce qui est conservé, ce sont des compteurs, des tailles et des noms d'outils : aucun contenu de fichier ni de sortie d'outil n'entre dans la base. Trois choses y entrent quand même, et il vaut mieux le savoir : les **chemins** des fichiers modifiés après la dernière vérification (20 au plus par session) ; le **texte de deux commandes** de vérification par session, la première et la dernière — 200 caractères au plus, et les affectations du type `NPM_TOKEN=…` retirées avant écriture ; et un **extrait des questions** que vous avez posées, quand elles ressemblent à une question de navigation dans le code. Tout cela reste chez vous : la base est un fichier local, elle n'est envoyée nulle part.
+- **Advice** (*Conseils*) — the actions to take first, each one tied to a figure measured on your own sessions:
+  - which project rebuilds its cache prefix mid-session;
+  - which MCP server is loaded everywhere and never called;
+  - which command prints a lot, often;
+  - which files several agents read again;
+  - which sessions are compacted several times;
+  - which subagents are started for tasks too short to be worth it;
+  - which sessions end with unverified changes — files modified after the last test, build, lint or typecheck command, and the tokens emitted after that last proof.
+- **Analysed sessions** (*Sessions analysées*) — the table of measured sessions (cost, net tokens, duration, main model), with the figures session by session.
 
-La base `~/.agent-viz/observatory.db` est un **dérivé jetable** : les transcripts restent la source de vérité, et la supprimer ne perd que les décisions « je l'adopte / plus tard / non merci » (raisons de refus comprises) que vous avez posées sur les recommandations — elle se reconstruit au scan suivant (au démarrage, puis toutes les heures). Le bouton « Purger la base » de la page Conseils fait ce geste sans toucher au fichier : il vide la base (après confirmation) puis relance un scan complet.
+No saving is projected: these are costs observed over the period.
 
-L'analyse repose sur le moteur netgain, qui **fait partie d'agent-viz** : même dépôt (dossier `src/engine/`), même paquet, même version, même installation. Il n'y a rien à brancher ni à installer à côté. Si le moteur venait à manquer — installation abîmée —, les deux pages affichent l'erreur exacte et **la vue temps réel continue de fonctionner normalement**.
+### What you do with a piece of advice
+
+The Observatory measures and advises. It never runs anything on your behalf. Each card asks one question and offers three answers:
+
+| Answer | What happens |
+|---|---|
+| **I adopt it** (*Je l'adopte*) | the card goes to the journal; if its recomputed cost grows back by 50 % or more, it returns and asks whether the change really took |
+| **Later** (*Plus tard*) | the card returns on its own at the same threshold |
+| **No thanks** (*Non merci*) | you record your reason in one line; this advice is never offered again |
+
+- No decision is final: each one is listed in the folded section *Décisions rendues*, with its date and a *Réactiver* button.
+- Known limit: a project is identified by its **path**. A moved or renamed project is a new subject, and its card comes back active.
+
+### What is counted
+
+- The analysis window is chosen in the header: 7, 30 or 90 days, 30 by default. Each card shows the period it was observed on.
+- Machine sessions (`claude -p`, scripts) are scanned and badged, and left out of the advice and the totals by default. A switch shows them on demand, and the summary always states which sessions were counted.
+- The database migrates on its own at startup: a new column triggers a full re-scan in the background, without blocking the live view.
+
+### Three things to know
+
+- **Two blocks, never one ranking.** Some rules count real tokens, others start from bytes converted at about 4 bytes per token. The two do not have the same precision: the page shows them apart and displays **no total**, because one session feeds several rules and would be counted twice.
+- **One source of prices.** The price table bundled with the engine prices the whole product, live view included, and each page names where its prices come from. The table is dated: a message is priced at the rate in force on the day it was sent. The public pages downloaded once a day only serve as a check: they flag a drift and never set a price. A session whose model has no known price is marked "partial", never rounded to zero silently.
+- **Metadata, and three named exceptions.** Most of what the database keeps is counters, sizes and tool names: no file content and no tool output goes into it. Three things do, and you should know it:
+  - the **paths** of files modified after the last verification, 20 at most per session;
+  - the **text of two verification commands** per session, the first and the last, 200 characters at most, with assignments such as `NPM_TOKEN=…` removed before writing;
+  - an **excerpt of the questions** you asked, when they look like a question about finding your way in the code.
+
+  All of it stays on your machine: the database is a local file and is sent nowhere.
+
+### The database is disposable
+
+- `~/.agent-viz/observatory.db` is derived data: your transcripts remain the source of truth.
+- Deleting it only loses the decisions you recorded on the advice cards, refusal reasons included. It is rebuilt at the next scan: at startup, then every hour.
+- The *Purger la base* button on the Advice page does the same without touching the file: it empties the database, after confirmation, then starts a full scan.
+
+### The analysis engine
+
+The analysis runs on the netgain engine, which **is part of agent-viz**: same repository (folder `src/engine/`), same package, same version, same install. There is nothing to plug in or install on the side. If the engine were missing — a damaged install — both pages show the exact error and **the live view keeps working normally**.
 
 ## Multi-agent support
 
