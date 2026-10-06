@@ -92,11 +92,29 @@ function failureKey(agentId: string | undefined, toolName: string | undefined): 
   return `${agentId || ''}:${toolName}`;
 }
 
-function hashInput(toolInput: ToolInput | undefined): string {
+// Par outil, les champs d'entree qui LIBELLENT l'appel sans changer ce qu'il fait : le
+// modele les reecrit d'un appel a l'autre, donc ils ne distinguent pas deux repetitions.
+// Tout champ absent d'ici compte — un `offset` de Read fait un autre appel.
+const LABEL_FIELDS: Record<string, ReadonlySet<string>> = {
+  Bash:       new Set(['description']),
+  PowerShell: new Set(['description']),
+};
+
+function hashInput(toolName: string | undefined, toolInput: ToolInput | undefined): string {
   // `== null` couvre `undefined` ET `null` : la comparaison stricte aux deux
   // ferait dire a tsc que l'une des deux ne peut jamais etre vraie.
   if (toolInput == null) return '';
-  return JSON.stringify(toolInput);
+  const labels = toolName ? LABEL_FIELDS[toolName] : undefined;
+  if (!labels) return JSON.stringify(toolInput);
+  return JSON.stringify(Object.fromEntries(
+    Object.entries(toolInput).filter(([field]) => !labels.has(field)),
+  ));
+}
+
+// Une seule ecriture de la signature d'un appel : `loop` compte dessus et `retryStorm`
+// la compare a la sienne, deux formules separees pourraient diverger sans qu'on le voie.
+function callSignature(evt: WatchdogEvent): string {
+  return `${evt.agent_id || ''}:${evt.tool_name}:${hashInput(evt.tool_name, evt.tool_input)}`;
 }
 
 interface CallOccurrence {
@@ -311,7 +329,7 @@ function failureSuffix(occurrences: CallOccurrence[]): string {
 // last one.
 function failureSignature(buf: SessionBuffer, evt: WatchdogEvent): string | null {
   if (evt.tool_input !== undefined) {
-    return `${evt.agent_id || ''}:${evt.tool_name}:${hashInput(evt.tool_input)}`;
+    return callSignature(evt);
   }
   if (!evt.tool_use_id) return null;
   return buf.sigOfCall.get(evt.tool_use_id) ?? null;
@@ -379,7 +397,7 @@ const DETECTORS: Record<AlertType, Detector> = {
       const who = actor(evt);
       // The agent is part of the signature: two subagents each calling the
       // same command twice is four calls and no loop.
-      const sig = `${who.agentId}:${evt.tool_name}:${hashInput(evt.tool_input)}`;
+      const sig = callSignature(evt);
       pruneCalls(buf, ts - ctx.thresholds.loop.windowMs);
       let occ = buf.calls.get(sig);
       if (!occ) { occ = []; buf.calls.set(sig, occ); }
