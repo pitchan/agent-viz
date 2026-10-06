@@ -1,7 +1,7 @@
 {
   "name": "@vcueto/agent-viz",
-  "version": "0.45.0",
-  "description": "Real-time visualizer for Claude Code and GitHub Copilot CLI sessions: live event stream, token tracking, multi-agent topology with per-source badges, plus a token observatory built on the bundled netgain analysis engine.",
+  "version": "0.45.1",
+  "description": "Where do your tokens go? One command, zero runtime dependencies: agent-viz tracks your coding agents live (Claude Code, GitHub Copilot CLI, Antigravity CLI) and puts a measured figure on what they waste.",
   "bin": {
     "agent-viz": "bin/agent-viz.js",
     "netgain": "dist/engine/cli.js"
@@ -47,6 +47,10 @@
     "copilot",
     "github-copilot",
     "copilot-cli",
+    "antigravity",
+    "antigravity-cli",
+    "token-usage",
+    "cost-tracking",
     "visualizer",
     "hooks",
     "agent",
