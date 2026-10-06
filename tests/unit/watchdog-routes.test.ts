@@ -158,6 +158,18 @@ test('le serveur les sert vraiment : la table de routage les porte', async () =>
   expect(refus.code, 'un POST venu d ailleurs doit etre refuse par le repartiteur').toBe(405);
 });
 
+test('un corps d acquittement demesure est refuse en 413, sans rien consigner', async () => {
+  // Arrange
+  const acquittes: string[] = [];
+  const service = faux({ ack: (id: string) => { acquittes.push(id); return true; } });
+  const megaoctet = Buffer.alloc(1024 * 1024, 'a');
+  // Act
+  const res = await POST(service, megaoctet);
+  // Assert
+  expect(res.code).toBe(413);
+  expect(acquittes).toEqual([]);
+});
+
 // ── Traduction seulement ─────────────────────────────────────────────────────
 
 test('traduction seulement : la route ne peut atteindre aucun autre module', () => {

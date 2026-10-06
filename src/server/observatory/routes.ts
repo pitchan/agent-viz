@@ -109,7 +109,11 @@ function createObservatoryRoutes(getService: () => Service): Route[] {
       handler: bind(async (_req, res, url, service) => {
         const id = url.pathname.slice('/analysis/session/'.length);
         if (!id) { sendJson(res, 400, { error: 'identifiant de session manquant' }); return; }
-        const session = await service.session(decodeURIComponent(id));
+        // Un encodage en pourcent invalide est une faute du client, pas du service.
+        let decoded: string;
+        try { decoded = decodeURIComponent(id); }
+        catch { sendJson(res, 400, { error: 'identifiant de session mal encodé' }); return; }
+        const session = await service.session(decoded);
         if (!session) { sendJson(res, 404, { error: 'session inconnue' }); return; }
         sendJson(res, 200, { ...session, priceSource: PRICE_SOURCE });
       }),

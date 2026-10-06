@@ -62,13 +62,13 @@ function feedItemHTML(e: TimelineEntry) {
   // alone would give a failed Read the same amber dot as twenty successful ones.
   const color = (n && n.status === 'error') ? COLORS.error : getTypeColor(e.type);
   const isActive = state.selected === e.nodeId;
-  return `<div class="feed-item${isActive ? ' active' : ''}${isRunning ? ' running' : ''}" data-node="${e.nodeId}">
+  return `<div class="feed-item${isActive ? ' active' : ''}${isRunning ? ' running' : ''}" data-node="${esc(e.nodeId)}">
     <div class="feed-dot" style="background:${color};box-shadow:0 0 6px ${hexAlpha(color, 0.4)}"></div>
     <div class="feed-info">
       <div class="feed-label" style="color:${hexAlpha(color, 0.9)}">${esc(e.label)}</div>
       ${e.sub ? `<div class="feed-sub">${esc(e.sub)}</div>` : ''}
     </div>
-    <div class="feed-dur">${dur}</div>
+    <div class="feed-dur">${esc(dur)}</div>
   </div>`;
 }
 
@@ -155,11 +155,11 @@ export function showDetail(n: VizNode) {
   document.getElementById('detail-meta-grid')!.innerHTML = `
     <div class="meta-card">
       <div class="meta-label">Status</div>
-      <div class="meta-value" style="color:${statusColor}">${n.status}</div>
+      <div class="meta-value" style="color:${statusColor}">${esc(n.status)}</div>
     </div>
     <div class="meta-card">
       <div class="meta-label">Duration</div>
-      <div class="meta-value">${n.duration || '—'}</div>
+      <div class="meta-value">${esc(n.duration || '—')}</div>
     </div>
     <div class="meta-card">
       <div class="meta-label">Children</div>
@@ -167,7 +167,7 @@ export function showDetail(n: VizNode) {
     </div>
     <div class="meta-card">
       <div class="meta-label">Type</div>
-      <div class="meta-value">${n.type}</div>
+      <div class="meta-value">${esc(n.type)}</div>
     </div>
     ${tokenCardsHTML(n)}
   `;

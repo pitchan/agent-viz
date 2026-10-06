@@ -130,12 +130,26 @@ function enClef(v: unknown): string | null {
 // abimee est encore une chaine non vide, elle traverse la garde et s'ecrit au
 // journal — une ligne qui n'acquitte aucune alerte, et qui y reste 90 jours.
 // Le decoupage n'est pas notre affaire, il suit les segments du reseau.
-function lireCorps(req: RequestLike): Promise<string | null> {
+//
+// Rend TROP_GROS des que le corps depasse la borne, sans attendre la fin : un
+// acquittement tient en une clef et un horodatage, et rien de plus gros ne
+// doit etre garde en memoire.
+const CORPS_MAX_OCTETS = 16 * 1024;
+const TROP_GROS = Symbol('corps trop volumineux');
+
+function lireCorps(req: RequestLike): Promise<string | null | typeof TROP_GROS> {
   return new Promise((resolve) => {
-    const morceaux: Buffer[] = [];
+    let morceaux: Buffer[] = [];
+    let recu = 0;
     // `Buffer.from` pour le cas ou un appelant aurait pose un encodage sur le
     // flux, auquel cas les morceaux arrivent deja en texte.
-    req.on('data', (c) => { morceaux.push(Buffer.isBuffer(c) ? c : Buffer.from(c)); });
+    req.on('data', (c) => {
+      if (recu > CORPS_MAX_OCTETS) return;
+      const morceau = Buffer.isBuffer(c) ? c : Buffer.from(c);
+      recu += morceau.length;
+      if (recu > CORPS_MAX_OCTETS) { morceaux = []; resolve(TROP_GROS); return; }
+      morceaux.push(morceau);
+    });
     req.on('end', () => resolve(Buffer.concat(morceaux).toString('utf8')));
     req.on('error', () => resolve(null));
   });
@@ -173,6 +187,10 @@ function createWatchdogRoutes(getService: () => ServiceLike | null) {
       sameOrigin: true,
       handler: async (req: RequestLike, res: ResponseLike) => {
         const brut = await lireCorps(req);
+        if (brut === TROP_GROS) {
+          sendJson(res, 413, { error: 'corps trop volumineux' });
+          return;
+        }
         let charge: unknown;
         // `JSON.parse(null)` rend null au lieu de lever (coercion `ToString`
         // du runtime : `null` -> `"null"`) : le corps coupe suit le meme

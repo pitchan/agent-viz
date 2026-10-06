@@ -178,32 +178,7 @@
 </div>
 <div id="node-tooltip"></div>
 
-<!-- Modularized JS — see ./src/web/viz-*.ts -->
-<script type="module">
-  // Order: state → canvas (registers tick) → layout → ui → network.
-  // viz-ui and viz-network have a benign import cycle; ES modules handle it
-  // because all cross-calls happen inside event handlers.
-  import './src/web/viz-state.ts';
-  import './src/web/viz-canvas.ts';
-  import './src/web/viz-layout.ts';
-  import './src/web/viz-ui.ts';
-  import { loadSessions, connectSSE, poll } from './src/web/viz-network.ts';
-  import { garbageCollect } from './src/web/viz-layout.ts';
-  import { requestRender } from './src/web/viz-state.ts';
-  import { initAdvisor } from './src/web/observatory/advisor-view.ts';
-  import { initAnalysis } from './src/web/observatory/analysis-view.ts';
-  import { initPricing } from './src/web/observatory/pricing-view.ts';
-  import { initSkills } from './src/web/observatory/skills-view.ts';
-
-  initAdvisor();
-  initAnalysis();
-  initPricing();
-  initSkills();
-  loadSessions();
-  connectSSE();
-  poll();
-  setInterval(garbageCollect, 60000);
-  requestRender();
-</script>
+<!-- Modularized JS — see ./src/web/viz-*.ts ; entry point: viz-boot.ts -->
+<script type="module" src="./src/web/viz-boot.ts"></script>
 </body>
 </html>

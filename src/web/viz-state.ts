@@ -264,7 +264,13 @@ export function parseMcpName(toolName: string | undefined | null) {
 }
 
 export function truncate(s: string, max: number) { return s.length > max ? s.slice(0, max - 1) + '…' : s; }
-export function esc(s: unknown) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+// Les guillemets aussi : `esc` sert autant dans un attribut (`data-node="…"`)
+// que dans du texte, et un guillemet y ferme l'attribut.
+export function esc(s: unknown) {
+  return String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
 export function easeInOut(t: number) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
 export function lerp(a: number, b: number, t: number) { return a + (b - a) * t; }
 

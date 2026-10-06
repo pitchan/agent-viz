@@ -31,6 +31,9 @@ async function startServer(): Promise<void> {
   // No CORS header: the server bind is loopback-only and the UI is same-origin.
   // A wildcard would let any visited site read transcripts from localhost.
   const server = http.createServer((req, res) => {
+    // Every answer is read as the type it declares, never guessed from its
+    // bytes: session content must not be sniffed into HTML or script.
+    res.setHeader('X-Content-Type-Options', 'nosniff');
     dispatch(req, res).catch(err => {
       console.error('[server] dispatch error:', err && err.message);
       try { res.writeHead(500); res.end('internal error'); } catch {}

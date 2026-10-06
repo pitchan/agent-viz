@@ -88,6 +88,20 @@ test('une charge illisible laisse une trace dans _hook-errors.log', async () => 
   }
 });
 
+test('un identifiant de session qui sort du dossier est refusé, tracé, jamais écrit', async () => {
+  // Arrange
+  const evt = { session_id: '../evade', hook_event_name: 'PreToolUse', tool_name: 'Read' };
+  // Act
+  const r = await lanceLeHook(JSON.stringify(evt));
+  // Assert
+  try {
+    expect(lit(path.join(r.racine, 'evade.jsonl')), 'un fichier a été écrit hors du dossier d’événements').toBe(null);
+    expect(lit(path.join(r.dossier, '_hook-errors.log'))).toMatch(/session_id/);
+  } finally {
+    fs.rmSync(r.racine, { recursive: true, force: true });
+  }
+});
+
 // Garde-fou de NON-RÉGRESSION, pas un contrôle étalonnant : ce cas passe avec ou
 // sans la tolérance au BOM. Il existe pour qu'un retrait de BOM trop gourmand, ou un
 // journal d'erreur écrit à tort, se voie immédiatement sur le chemin normal.

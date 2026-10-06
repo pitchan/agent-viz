@@ -103,6 +103,11 @@ test('an absent or non-numeric days parameter reaches the service as undefined',
   expect(got).toEqual({ days: undefined, includeMachine: false });
 });
 
+test('GET /analysis/session/<id> answers 400 to an id that is not valid percent-encoding', async () => {
+  const res = await router()('GET', '/analysis/session/%E0%A4%A');
+  expect(res.statusCode).toBe(400);
+});
+
 test('GET /analysis/sessions returns the analytic list', async () => {
   const res = await router()('GET', '/analysis/sessions?project=F--proj');
   expect(res.statusCode).toBe(200);

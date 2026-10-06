@@ -14,6 +14,7 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { HOOK_SOURCES, NORMALIZERS, NEEDS_EVENT_FLAG, type HookSource } from './hook-normalize.ts';
 import { lateFailures } from './hook-antigravity-verdicts.ts';
+import { validSessionId } from './session-id.ts';
 
 // node:http arrive par process.getBuiltinModule, pas par `import` : matérialiser son espace de
 // noms ESM se paie à chaque processus de hook, donc à chaque événement. getBuiltinModule rend le
@@ -29,7 +30,7 @@ const PORT = parseInt(process.env.AGENT_VIZ_PORT || process.env.PORT || '3333', 
 // ne peut de toute façon rien en faire ici.
 function logHookError(message: string): void {
   try {
-    fs.mkdirSync(DIR, { recursive: true });
+    fs.mkdirSync(DIR, { recursive: true, mode: 0o700 });
     fs.appendFileSync(path.join(DIR, '_hook-errors.log'), `${new Date().toISOString()} ${message}\n`);
   } catch {}
 }
@@ -47,7 +48,7 @@ type Replacer = (raw: Payload, event: string | undefined) => Payload[] | null;
 function antigravityPostInvocation(raw: Payload, event: string | undefined): Payload[] | null {
   if (event !== 'PostInvocation') return null;
   const { conversationId, transcriptPath } = raw;
-  if (typeof conversationId !== 'string' || typeof transcriptPath !== 'string') return [];
+  if (!validSessionId(conversationId) || typeof transcriptPath !== 'string') return [];
   return lateFailures(readText(path.join(DIR, `${conversationId}.jsonl`)), readText(transcriptPath));
 }
 
@@ -74,7 +75,7 @@ function parseEvent(argv: string[]): string | undefined {
 }
 
 function runHook(): void {
-  try { fs.mkdirSync(DIR, { recursive: true }); } catch {}
+  try { fs.mkdirSync(DIR, { recursive: true, mode: 0o700 }); } catch {}
 
   const source = parseSource(process.argv.slice(2));
   const event = parseEvent(process.argv.slice(2));
@@ -105,6 +106,12 @@ function runHook(): void {
       const sid = first.session_id;
       if (typeof sid !== 'string' || !sid) {
         logHookError(`event without session_id (${first.hook_event_name || '?'}) source=${source}`);
+        process.exit(0);
+      }
+      // Le serveur ne lit que ces noms-là : tout autre session_id écrirait un
+      // fichier que personne ne relit, ou hors du dossier d'événements.
+      if (!validSessionId(sid)) {
+        logHookError(`session_id refused, not a safe file name (${first.hook_event_name || '?'}) source=${source}`);
         process.exit(0);
       }
       const ts = new Date().toISOString();

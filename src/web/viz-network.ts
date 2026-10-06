@@ -271,7 +271,7 @@ export async function loadSessions() {
         <div class="s-meta"><span>Follows most recent session</span></div>
       </div>` +
       sessions.map(s => `
-        <div class="session-card${currentSessionId === s.id ? ' active' : ''}" data-sid="${s.id}">
+        <div class="session-card${currentSessionId === s.id ? ' active' : ''}" data-sid="${esc(s.id)}">
           <div class="s-title">${esc(s.id.slice(0, 8))}${badgeHtml(s.agentSource)}</div>
           ${s.prompt ? `<div class="s-prompt">${esc(s.prompt)}</div>` : ''}
           <div class="s-meta">

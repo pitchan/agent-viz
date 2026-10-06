@@ -23,6 +23,7 @@ import {
   readAndBroadcast, watchSession, deleteSession,
 } from './event-reader.ts';
 import { rescanSessions } from './housekeep.ts';
+import { sameOrigin, localHost } from './request-guards.ts';
 import { createObservatoryRoutes } from './observatory/routes.ts';
 import { getObservatoryService } from './observatory/index.ts';
 import { createWatchdogRoutes } from './watchdog/routes.ts';
@@ -55,7 +56,6 @@ interface Route {
   handler: (req: IncomingMessage, res: ServerResponse, url: URL) => void | Promise<void>;
 }
 
-const PORT = process.env.PORT || 3333;
 const PROJECT_ROOT = path.join(import.meta.dirname, '..', '..');
 const HTML = path.join(PROJECT_ROOT, 'index.html');
 
@@ -65,26 +65,34 @@ const HTML = path.join(PROJECT_ROOT, 'index.html');
 let _server: Server | null = null;
 function setServer(s: Server): void { _server = s; }
 
-// Reject cross-origin POSTs to destructive endpoints. CLI/programmatic callers
-// (lifecycle.ts, curl) have no Origin header and are allowed; browsers always
-// send Origin on cross-origin requests, so a malicious site can't hit /shutdown
-// or /events?clear from a tab in another origin.
-function sameOrigin(req: IncomingMessage): boolean {
-  const origin = req.headers.origin;
-  if (!origin) return true;
-  return origin === `http://localhost:${PORT}` || origin === `http://127.0.0.1:${PORT}`;
-}
-
 // ─── Handlers ──────────────────────────────────────────────────────────────
+
+// hook.ts sends `{"session":"<id>"}` and nothing else: anything beyond this
+// is not a notification, and must not be buffered.
+const NOTIFY_MAX_BYTES = 4096;
 
 // Instant push from hook.ts — bypasses fs.watch latency.
 function notifyHandler(req: IncomingMessage, res: ServerResponse): void {
   let body = '';
+  let received = 0;
+  let refused = false;
   // `'data'` sur `IncomingMessage` (aucun encodage posé) rend TOUJOURS un
   // `Buffer` à l'exécution ; `string` reste dans l'union par fidélité au type
   // d'événement du flux.
-  req.on('data', (c: Buffer | string) => { body += typeof c === 'string' ? c : c.toString('utf8'); });
+  req.on('data', (c: Buffer | string) => {
+    if (refused) return;
+    received += c.length;
+    if (received > NOTIFY_MAX_BYTES) {
+      refused = true;
+      body = '';
+      res.writeHead(413, { 'Content-Type': 'text/plain' });
+      res.end('body too large');
+      return;
+    }
+    body += typeof c === 'string' ? c : c.toString('utf8');
+  });
   req.on('end', async () => {
+    if (refused) return;
     try {
       const parsed: unknown = JSON.parse(body);
       const session = isRecord(parsed) ? parsed.session : undefined;
@@ -195,10 +203,23 @@ function versionHandler(_req: IncomingMessage, res: ServerResponse): void {
   res.end(JSON.stringify({ version: VERSION }));
 }
 
+// What the page may load and run: its own files only, so text that slips into
+// the HTML unescaped cannot execute. 'unsafe-inline' is for styles alone — the
+// views set colours through `style="…"` attributes.
+const PAGE_POLICY = [
+  "default-src 'none'", "script-src 'self'", "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data:", "connect-src 'self'",
+  "frame-ancestors 'none'", "base-uri 'none'", "form-action 'none'",
+].join('; ');
+
 async function indexHandler(_req: IncomingMessage, res: ServerResponse): Promise<void> {
   try {
     const html = await fsp.readFile(HTML);
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.writeHead(200, {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Content-Security-Policy': PAGE_POLICY,
+      'X-Frame-Options': 'DENY',
+    });
     res.end(html);
   } catch {
     res.writeHead(500);
@@ -362,7 +383,7 @@ async function sessionsHandler(_req: IncomingMessage, res: ServerResponse, url: 
 
 // ─── Route table ──────────────────────────────────────────────────────────
 const ROUTES: Route[] = [
-  { method: 'POST', path: '/notify',     handler: notifyHandler },
+  { method: 'POST', path: '/notify',     handler: notifyHandler, sameOrigin: true },
   { method: 'POST', path: '/shutdown',   handler: shutdownHandler, sameOrigin: true },
   { method: 'GET',  prefix: '/src/web/', handler: staticHandler },
   { method: 'GET',  path: '/src/engine/core/tool-subject.ts', handler: engineStaticHandler },
@@ -393,9 +414,15 @@ function pathMatches(route: Route, pathname: string): boolean {
   return false;
 }
 
-// Find route, run guards, dispatch. 404 for unknown path, 405 for known path
-// without a matching method or with a failed sameOrigin guard.
+// Find route, run guards, dispatch. 403 for a foreign Host, 404 for unknown
+// path, 405 for known path without a matching method or with a failed
+// sameOrigin guard.
 async function dispatch(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  if (!localHost(req)) {
+    res.writeHead(403, { 'Content-Type': 'text/plain' });
+    res.end('forbidden host');
+    return;
+  }
   // `req.url` est `string | undefined` dans le type Node — toujours défini en
   // pratique pour une vraie requête entrante (posé par le serveur HTTP avant
   // que `dispatch` ne soit appelé) ; le repli documente l'invariant sans

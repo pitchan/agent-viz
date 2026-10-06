@@ -17,9 +17,12 @@ import os from 'node:os';
 
 import { decodeJsonlLine } from '../engine/core/jsonl.ts';
 import type { JsonlLine } from '../engine/core/jsonl.ts';
+import { validSessionId } from './session-id.ts';
 
 const DIR = path.join(os.tmpdir(), 'agent-events');
-try { fs.mkdirSync(DIR, { recursive: true }); } catch {}
+// 0o700 : sous Linux, os.tmpdir() est partagé entre les comptes de la machine,
+// et ce dossier porte des prompts. Sans effet sous Windows.
+try { fs.mkdirSync(DIR, { recursive: true, mode: 0o700 }); } catch {}
 
 // ── Housekeeping config (overridable via env) ──
 // Sessions older than this are deleted on boot + every hour.
@@ -60,13 +63,6 @@ function sessionFilePath(sid: string): string {
 }
 
 function idFromPath(fp: string): string { return path.basename(fp, '.jsonl'); }
-
-// Session IDs come from Claude Code (UUID); hook.ts refuses and logs an event without one.
-// We restrict to safe filename chars to prevent path traversal via crafted ?session=
-// or ?clear= values being concatenated into path.join(DIR, sid + '.jsonl').
-function validSessionId(sid: unknown): sid is string {
-  return typeof sid === 'string' && /^[a-zA-Z0-9_-]{1,64}$/.test(sid);
-}
 
 // Un objet exploitable par accès de champ — même garde locale que
 // event-reader.ts, housekeep.ts, transcript.ts et les adaptateurs de
