@@ -84,7 +84,7 @@ function readCopilotFile(file: string): unknown {
 
 // « Ce fichier est un fichier de hooks Copilot » — la FORME seule, sans rien exiger du contenu.
 // C'est la question du refus d'écrasement : une forme étrangère est refusée, un fichier de hooks
-// valide est fusionné, qu'il porte ou non notre entrée, comme `installClaude` avec un settings.json.
+// valide est fusionné, qu'il porte ou non notre entrée, comme l'installateur de Claude avec un settings.json.
 function isCopilotHooksFile(content: unknown): content is CopilotHooksFile {
   return isRecord(content) && content.version === 1 && isRecord(content.hooks);
 }

@@ -40,8 +40,8 @@ export interface ResolvedCommand {
   spec?: string;
 }
 
-// Le sac d'options partagé par toute l'API haut niveau (`auditClaude`,
-// `installClaude`, `findInstalledScopes`, `dispatch`, `install`, …) — un seul
+// Le sac d'options partagé par toute l'API haut niveau (les `audit` et `install`
+// des adaptateurs, `findInstalledScopes`, `dispatch`, …) — un seul
 // type, réutilisé bien au-delà de la deuxième occurrence (précédent du dépôt),
 // parce que ce sont toutes des variations du MÊME sac.
 export interface AgentOpts {
