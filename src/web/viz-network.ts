@@ -24,7 +24,7 @@ import { resetErrors } from './viz-errors.ts';
 // from its own catch-up state.
 
 // Les agents dont la vue sait dessiner le badge ; la classe CSS agent-<nom> porte la couleur.
-const KNOWN_AGENTS = new Set(['claude', 'copilot', 'antigravity']);
+const KNOWN_AGENTS = new Set(['claude', 'copilot', 'antigravity', 'codex']);
 
 // Render a small pill badge identifying the source agent. Returns HTML safe to
 // inline (label comes from KNOWN_AGENTS, no user input).

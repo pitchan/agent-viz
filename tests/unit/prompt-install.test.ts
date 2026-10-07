@@ -2,24 +2,28 @@ import { expect, test } from 'vitest';
 import { PassThrough } from 'node:stream';
 import { pickTargetDefault, promptInstallParams } from '../../src/server/prompt-install.ts';
 
-test('pickTargetDefault: both detected → index 3 (All agents)', () => {
-  expect(pickTargetDefault({ claude: true, copilot: true, antigravity: false })).toBe(3);
+test('pickTargetDefault: both detected → index 4 (All agents)', () => {
+  expect(pickTargetDefault({ claude: true, copilot: true, antigravity: false, codex: false })).toBe(4);
 });
 
 test('pickTargetDefault: only claude detected → index 0', () => {
-  expect(pickTargetDefault({ claude: true, copilot: false, antigravity: false })).toBe(0);
+  expect(pickTargetDefault({ claude: true, copilot: false, antigravity: false, codex: false })).toBe(0);
 });
 
 test('pickTargetDefault: only copilot detected → index 1', () => {
-  expect(pickTargetDefault({ claude: false, copilot: true, antigravity: false })).toBe(1);
+  expect(pickTargetDefault({ claude: false, copilot: true, antigravity: false, codex: false })).toBe(1);
 });
 
 test('pickTargetDefault: only antigravity detected → index 2', () => {
-  expect(pickTargetDefault({ claude: false, copilot: false, antigravity: true })).toBe(2);
+  expect(pickTargetDefault({ claude: false, copilot: false, antigravity: true, codex: false })).toBe(2);
 });
 
-test('pickTargetDefault: nothing detected → index 3 (All agents, lets user pre-install)', () => {
-  expect(pickTargetDefault({ claude: false, copilot: false, antigravity: false })).toBe(3);
+test('pickTargetDefault: only codex detected → index 3', () => {
+  expect(pickTargetDefault({ claude: false, copilot: false, antigravity: false, codex: true })).toBe(3);
+});
+
+test('pickTargetDefault: nothing detected → index 4 (All agents, lets user pre-install)', () => {
+  expect(pickTargetDefault({ claude: false, copilot: false, antigravity: false, codex: false })).toBe(4);
 });
 
 type MockInput = PassThrough & {
@@ -51,7 +55,7 @@ async function tick() { return new Promise((r) => setImmediate(r)); }
 test('promptInstallParams: target=both default, no project → returns user scope without prompt', async () => {
   const io = makeMockIO();
   const promise = promptInstallParams({
-    detected: { claude: true, copilot: true, antigravity: false },
+    detected: { claude: true, copilot: true, antigravity: false, codex: false },
     projectRoot: null,
     io: { input: io.input, output: io.output },
   });
@@ -66,7 +70,7 @@ test('promptInstallParams: target=both default, no project → returns user scop
 test('promptInstallParams: arrow down navigates to "both" (already last index stays put)', async () => {
   const io = makeMockIO();
   const promise = promptInstallParams({
-    detected: { claude: true, copilot: false, antigravity: false },     // default index 0 = claude
+    detected: { claude: true, copilot: false, antigravity: false, codex: false },     // default index 0 = claude
     projectRoot: null,
     io: { input: io.input, output: io.output },
   });
@@ -83,7 +87,7 @@ test('promptInstallParams: arrow down navigates to "both" (already last index st
 test('promptInstallParams: Ctrl+C rejects with aborted', async () => {
   const io = makeMockIO();
   const promise = promptInstallParams({
-    detected: { claude: true, copilot: true, antigravity: false },
+    detected: { claude: true, copilot: true, antigravity: false, codex: false },
     projectRoot: null,
     io: { input: io.input, output: io.output },
   });
@@ -95,7 +99,7 @@ test('promptInstallParams: Ctrl+C rejects with aborted', async () => {
 test('promptInstallParams: detection labels rendered correctly', async () => {
   const io = makeMockIO();
   const promise = promptInstallParams({
-    detected: { claude: true, copilot: false, antigravity: false },
+    detected: { claude: true, copilot: false, antigravity: false, codex: false },
     projectRoot: null,
     io: { input: io.input, output: io.output },
   });
@@ -111,7 +115,7 @@ test('promptInstallParams: detection labels rendered correctly', async () => {
 test('promptInstallParams: with projectRoot, scope prompt asked, default user', async () => {
   const io = makeMockIO();
   const promise = promptInstallParams({
-    detected: { claude: true, copilot: true, antigravity: false },
+    detected: { claude: true, copilot: true, antigravity: false, codex: false },
     projectRoot: '/some/project',
     io: { input: io.input, output: io.output },
   });
@@ -126,7 +130,7 @@ test('promptInstallParams: with projectRoot, scope prompt asked, default user', 
 test('promptInstallParams: scope down twice + enter → local (single agent that supports it)', async () => {
   const io = makeMockIO();
   const promise = promptInstallParams({
-    detected: { claude: true, copilot: false, antigravity: false },
+    detected: { claude: true, copilot: false, antigravity: false, codex: false },
     projectRoot: '/some/project',
     io: { input: io.input, output: io.output },
   });
@@ -145,7 +149,7 @@ test('promptInstallParams: target both → local offered (at least one agent sup
   // Arrange
   const io = makeMockIO();
   const promise = promptInstallParams({
-    detected: { claude: true, copilot: true, antigravity: true },
+    detected: { claude: true, copilot: true, antigravity: true, codex: false },
     projectRoot: '/some/project',
     io: { input: io.input, output: io.output },
   });
@@ -166,7 +170,7 @@ test('promptInstallParams: target both → local offered (at least one agent sup
 test('promptInstallParams: target antigravity → scope options omit local', async () => {
   const io = makeMockIO();
   const promise = promptInstallParams({
-    detected: { claude: false, copilot: false, antigravity: true },
+    detected: { claude: false, copilot: false, antigravity: true, codex: false },
     projectRoot: '/some/project',
     io: { input: io.input, output: io.output },
   });
@@ -199,7 +203,7 @@ test('promptInstallParams: raw mode is toggled exactly once per dialog (not per 
   io.input.unref = function (this: MockInput) { calls.push(['unref']); return this; };
 
   const promise = promptInstallParams({
-    detected: { claude: true, copilot: true, antigravity: false },
+    detected: { claude: true, copilot: true, antigravity: false, codex: false },
     projectRoot: '/some/project',
     io: { input: io.input, output: io.output },
   });

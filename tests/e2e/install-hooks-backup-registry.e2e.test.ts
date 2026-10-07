@@ -19,6 +19,7 @@ const SETTINGS_AVEC_NOTRE_HOOK = json({ model: 'x', hooks: { Stop: [{ hooks: [{ 
 const fichierClaude = (projet: string) => path.join(projet, '.claude', 'settings.json');
 const fichierCopilot = (projet: string) => path.join(projet, '.github', 'hooks', 'agent-viz.json');
 const fichierAntigravity = (projet: string) => path.join(projet, '.agents', 'hooks.json');
+const fichierCodex = (projet: string) => path.join(projet, '.codex', 'hooks.json');
 const NOTRE_ENTREE_ANTIGRAVITY = { type: 'command', command: `${NOTRE_COMMANDE} --event=Stop`, timeout: 10 };
 const ENTREE_TIERCE_ANTIGRAVITY = { type: 'command', command: './lint.sh' };
 
@@ -46,6 +47,12 @@ const MUTATIONS = {
     { nom: 'le retrait Antigravity', fichier: fichierAntigravity,
       avant: json({ 'agent-viz': { Stop: [NOTRE_ENTREE_ANTIGRAVITY] }, 'lint-checker': { Stop: [ENTREE_TIERCE_ANTIGRAVITY] } }),
       agir: uninstall, copieRendue: (r: any) => r.antigravity.results[0].backup, fichierReste: true },
+  ],
+  codex: [
+    { nom: 'l\'installation Codex', fichier: fichierCodex, avant: '{"model":"x"}',
+      agir: install, copieRendue: (r: any) => r.codex.backup, fichierReste: true },
+    { nom: 'le retrait Codex', fichier: fichierCodex, avant: SETTINGS_AVEC_NOTRE_HOOK,
+      agir: uninstall, copieRendue: (r: any) => r.codex.results[0].backup, fichierReste: true },
   ],
 };
 

@@ -128,6 +128,15 @@ test('une charge Copilot passe inchangée', () => {
   expect(evt).toEqual(brut);
 });
 
+test('une charge Codex passe inchangée', () => {
+  // Arrange
+  const brut = { session_id: 's1', hook_event_name: 'PreToolUse', tool_name: 'shell', tool_use_id: 't1' };
+  // Act
+  const evt = NORMALIZERS.codex(brut, undefined);
+  // Assert
+  expect(evt).toEqual(brut);
+});
+
 test('seul Antigravity exige le drapeau --event', () => {
   // Arrange — les sources déclarées
   // Act

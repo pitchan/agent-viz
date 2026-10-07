@@ -40,6 +40,7 @@ export const NORMALIZERS: Record<HookSource, Normalizer> = {
   claude: identity,
   copilot: identity,
   antigravity: normalizeAntigravity,
+  codex: identity,
 };
 
 // Lue des clefs d'une table `Record<HookSource, …>` : un agent oublié ici ne compile pas.
@@ -50,4 +51,5 @@ export const NEEDS_EVENT_FLAG: Record<HookSource, boolean> = {
   claude: false,
   copilot: false,
   antigravity: true,
+  codex: false,
 };

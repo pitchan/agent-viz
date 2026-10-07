@@ -56,6 +56,7 @@ const REPLACERS: Record<HookSource, Replacer | null> = {
   claude: null,
   copilot: null,
   antigravity: antigravityPostInvocation,
+  codex: null,
 };
 
 function parseSource(argv: string[]): HookSource {

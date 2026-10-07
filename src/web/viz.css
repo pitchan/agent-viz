@@ -9,6 +9,7 @@
   --agent: #bc8cff;
   --agent-dim: rgba(188, 140, 255, 0.5);
   --antigravity: #ff7eb6;
+  --codex: #a3e635;
   --tool: #ffbb44;
   --tool-dim: rgba(255, 187, 68, 0.4);
   --complete: #66ffaa;
@@ -125,6 +126,10 @@ body {
 .agent-badge.agent-antigravity {
   color: var(--antigravity);
   background: rgba(255, 126, 182, 0.06);
+}
+.agent-badge.agent-codex {
+  color: var(--codex);
+  background: rgba(163, 230, 53, 0.06);
 }
 .session-card .agent-badge {
   margin-left: 6px;

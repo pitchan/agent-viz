@@ -48,6 +48,16 @@ export const AGENT_CONFIG = {
     localFile: null,
     gitignoreEntry: null,
   },
+  codex: {
+    label: 'Codex',
+    // Les noms que Codex partage avec Claude Code et que la vue sait lire. Codex n'émet
+    // pas de PostToolUseFailure.
+    events: ['UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop', 'SessionStart'],
+    userFile: () => path.join(os.homedir(), '.codex', 'hooks.json'),
+    projectFile: (root) => path.join(root, '.codex', 'hooks.json'),
+    localFile: null,
+    gitignoreEntry: null,
+  },
 } satisfies Record<AgentName, AgentConfigEntry>;
 
 export function eventsFor(agent: AgentName): string[] {
@@ -63,4 +73,5 @@ export const GITIGNORE_EXTRAS: Record<AgentName, string[]> = {
   claude: ['.claude/', '.claude', '.claude/*.local.json', '*.local.json'],
   copilot: ['.github/hooks/', '.github/hooks/*.local.json'],
   antigravity: [],
+  codex: [],
 };
