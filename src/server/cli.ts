@@ -71,6 +71,7 @@ export async function cmdStart(flags: Record<string, any>, packageRoot: string) 
         if (r.backup) console.log(c.dim(`  backup: ${r.backup}`));
         if (r.missing && r.missing.length > 0) console.log(`  added on: ${r.missing.join(', ')}`);
         if (r.updated && r.updated.length > 0) console.log(`  refreshed on (was stale): ${r.updated.join(', ')}`);
+        if (r.note) console.log(`  ${c.warn('!')} ${r.note}`);
         if (r.gitignore && r.gitignore.changed) {
           console.log(`  + .gitignore : added ${r.gitignore.entry}`);
         }
@@ -312,6 +313,7 @@ export async function cmdInstallHooks(flags: Record<string, any>, packageRoot: s
     if (r.gitignore && r.gitignore.changed) {
       console.log(`  + .gitignore : added ${r.gitignore.entry}`);
     }
+    if (r.note) console.log(`  ${c.warn('!')} ${r.note}`);
     if (r.crossScope && r.crossScope.length > 0) {
       const othersScope = r.crossScope.map((s: any) => s.scope).join(', ');
       console.log(`  ${c.warn('!')} hooks also installed in: ${othersScope}`);

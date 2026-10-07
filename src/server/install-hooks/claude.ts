@@ -1,142 +1,21 @@
-// L'adaptateur Claude Code : audit / install / uninstall des hooks dans
-// settings.json, balayage des portées, détection de l'agent sur la machine.
-// Implémente le contrat AgentInstaller — le registre (registry.ts) n'a besoin
-// de rien savoir de plus.
+// L'adaptateur Claude Code : la forme settings.json de la fabrique, plus la détection
+// de l'agent sur la machine. Le registre (registry.ts) n'a besoin de rien savoir de plus.
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import type { AgentOpts, ResolvedTarget, AgentInstaller } from './types.ts';
-import { AGENT_CONFIG, GITIGNORE_EXTRAS, EVENTS } from './config.ts';
-import {
-  readSettings, writeSettings, inspectEvent, refreshStaleCommand, addHook,
-  removeHook, hasHookForEvent,
-  type ClaudeSettings,
-} from './settings-io.ts';
-import { resolveScope, resolveHookCommand, ensureGitignore, findProjectRoot, scanInstalled } from './scopes.ts';
+import type { AgentInstaller } from './types.ts';
+import { EVENTS } from './config.ts';
+import type { ClaudeSettings } from './settings-io.ts';
+import { auditEvents, settingsInstaller } from './settings-installer.ts';
 import { inPath } from './detect.ts';
-import { backupHookFile } from './backup.ts';
 
 export function auditSettings(
   settings: ClaudeSettings, desiredCommand: string | undefined,
 ): Array<{ event: string; installed: boolean; stale: boolean; others: number }> {
-  return EVENTS.map(ev => {
-    const info = inspectEvent(settings, ev, desiredCommand);
-    return { event: ev, installed: info.present, stale: info.stale, others: info.others };
-  });
-}
-
-export function auditClaude({ scope, cwd, packageRoot }: AgentOpts = {}) {
-  const target = resolveScope({ scope, cwd, packageRoot });
-  const settings = readSettings(target.file);
-  const cmd = resolveHookCommand({ packageRoot });
-  return { ...target, audit: auditSettings(settings, cmd.command), command: cmd };
-}
-
-// « Ce fichier porte notre hook » : le prédicat du balayage local des portées
-// et de `installedIn`, que lit le registre.
-function claudeHookIn(file: string): boolean {
-  const settings = readSettings(file);
-  return EVENTS.some(ev => hasHookForEvent(settings, ev));
-}
-
-// Le balayage LOCAL des portées de cet agent (crossScope) : l'adaptateur se
-// connaît lui-même, seul le registre agrège plusieurs agents.
-// `.installed` seul : l'avertissement inter-portées ne parle que des portées qui
-// portent notre hook. Un fichier illisible rencontré ici remonte par `audit`,
-// dont c'est le métier.
-function claudeInstalledScopes(cwd?: string, packageRoot?: string) {
-  return scanInstalled(claudeSweepTargets(cwd, { packageRoot }), claudeHookIn).installed;
-}
-
-// Install / refresh agent-viz hooks. Returns:
-//   action: 'noop' | 'installed' | 'updated' | 'installed+updated'
-//   missing:    events where no agent-viz hook existed (now added)
-//   updated:    events where a stale standard-shape command was rewritten
-//   present:    events where an up-to-date agent-viz hook was already there
-//   coexisting: { event: count } — non-agent-viz hooks sharing the same events
-//                (informational; they will run in parallel, we never touch them)
-export function installClaude({ scope, cwd, packageRoot }: AgentOpts = {}) {
-  const target = resolveScope({ scope, cwd, packageRoot });
-  const settings = readSettings(target.file);
-  const cmd = resolveHookCommand({ packageRoot });
-
-  const missing: string[] = [];
-  const updated: string[] = [];
-  const present: string[] = [];
-  const coexisting: Record<string, number> = {};
-  for (const ev of EVENTS) {
-    const info = inspectEvent(settings, ev, cmd.command);
-    if (info.others > 0) coexisting[ev] = info.others;
-    if (!info.present) missing.push(ev);
-    else if (info.stale) updated.push(ev);
-    else present.push(ev);
-  }
-
-  if (missing.length === 0 && updated.length === 0) {
-    const crossScope = claudeInstalledScopes(cwd, packageRoot)
-      .filter(s => s.scope !== target.scope);
-    return { target, action: 'noop', missing, updated, present, coexisting, command: cmd, backup: null, crossScope };
-  }
-
-  for (const ev of updated) refreshStaleCommand(settings, ev, cmd.command);
-  for (const ev of missing) addHook(settings, ev, cmd.command);
-  const backup = backupHookFile(target.file);
-  writeSettings(target.file, settings);
-
-  let gitignore: ReturnType<typeof ensureGitignore> | null = null;
-  if (target.scope === 'local' && target.projectRoot) {
-    gitignore = ensureGitignore(target.projectRoot, AGENT_CONFIG.claude.gitignoreEntry, GITIGNORE_EXTRAS.claude);
-  }
-
-  let action: string;
-  if (missing.length > 0 && updated.length > 0) action = 'installed+updated';
-  else if (missing.length > 0) action = 'installed';
-  else action = 'updated';
-
-  const crossScope = claudeInstalledScopes(cwd, packageRoot)
-    .filter(s => s.scope !== target.scope);
-
-  return { target, action, missing, updated, present, coexisting, command: cmd, backup, gitignore, crossScope };
-}
-
-export function claudeSweepTargets(cwd: string | undefined, { packageRoot }: { packageRoot?: string } = {}): ResolvedTarget[] {
-  const out: ResolvedTarget[] = [{ scope: 'user', file: AGENT_CONFIG.claude.userFile(), projectRoot: null }];
-  const projectRoot = findProjectRoot(cwd || process.cwd(), { packageRoot });
-  if (projectRoot) {
-    out.push({ scope: 'project', file: AGENT_CONFIG.claude.projectFile(projectRoot), projectRoot });
-    out.push({ scope: 'local', file: AGENT_CONFIG.claude.localFile(projectRoot), projectRoot });
-  }
-  return out;
-}
-
-export function uninstallClaude({ scope, cwd, packageRoot }: AgentOpts = {}) {
-  const targets = scope
-    ? [resolveScope({ scope, cwd, packageRoot })]
-    : claudeSweepTargets(cwd, { packageRoot });
-  const results: Array<ResolvedTarget & { removed: number; exists: boolean; backup: string | null }> = [];
-  for (const t of targets) {
-    if (!fs.existsSync(t.file)) {
-      results.push({ ...t, removed: 0, exists: false, backup: null });
-      continue;
-    }
-    const settings = readSettings(t.file);
-    let total = 0;
-    for (const ev of EVENTS) total += removeHook(settings, ev);
-    let backup: string | null = null;
-    if (total > 0) {
-      backup = backupHookFile(t.file);
-      writeSettings(t.file, settings);
-    }
-    results.push({ ...t, removed: total, exists: true, backup });
-  }
-  return { results };
+  return auditEvents(settings, EVENTS, desiredCommand);
 }
 
 export const claudeInstaller: AgentInstaller = {
-  install: installClaude,
-  uninstall: uninstallClaude,
-  audit: auditClaude,
+  ...settingsInstaller('claude'),
   detect: () => inPath('claude') || fs.existsSync(path.join(os.homedir(), '.claude', 'settings.json')),
-  sweepTargets: claudeSweepTargets,
-  installedIn: claudeHookIn,
 };

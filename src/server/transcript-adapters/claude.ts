@@ -27,6 +27,8 @@ import type { JsonlLine } from '../../engine/core/jsonl.ts';
 interface TokenState {
   main: unknown;
   perAgent: Map<string, unknown>;
+  // Un lecteur le pose quand il refuse un transcript dont les chiffres ne seraient pas fiables.
+  unsupported?: boolean;
 }
 
 // Exporté en TYPE seulement pour que `copilot.ts` partage exactement la même

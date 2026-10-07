@@ -73,10 +73,10 @@ bin/agent-viz.js                  le binaire
 src/server/                       HTTP, SSE, table de routes, tarification d'affichage ;
                                   les commandes du binaire (hook.ts · install-hooks.ts ·
                                   lifecycle.ts · prompt-install.ts) et le démon (server.ts)
-src/server/install-hooks/         l'installation des hooks, par agent (Claude / Copilot / Antigravity) et par portée
+src/server/install-hooks/         l'installation des hooks, par agent (Claude / Copilot / Antigravity / Codex) et par portée
 src/server/observatory/           orchestration des scans, base, provenance
 src/server/observatory/rules/     les règles de conseil, une par fichier
-src/server/transcript-adapters/   Claude / Copilot / Antigravity, un contrat commun : où est le transcript,
+src/server/transcript-adapters/   Claude / Copilot / Antigravity / Codex, un contrat commun : où est le transcript,
                                   quelle est la question, d'où viennent les jetons (transcript ou base d'agy)
 src/server/watchdog/              surveillance et alertes
 ```
@@ -400,7 +400,7 @@ la principale façon de se tromper sur ce produit.
 ### Flux A — la capture temps réel
 
 ```
-Claude Code / Copilot CLI / Antigravity CLI
+Claude Code / Copilot CLI / Antigravity CLI / Codex
    └─ le hook lance `agent-viz hook`
         ├─ écrit  ${tmpdir}/agent-events/<session>.jsonl     (hook.ts : DIR, runHook)
         └─ POST /notify au démon, sans attendre la réponse
@@ -470,7 +470,7 @@ rend `exit 0` sans la nommer. Ce qu'il ne dit pas : que le point d'entrée
 
 | Hook | Commande inscrite | Événement |
 |---|---|---|
-| agent-viz | `node "<abs>/bin/agent-viz.js" hook --source=claude\|copilot` **ou** `npx --yes @vcueto/agent-viz@X.Y.Z hook --source=…` | les événements Claude / Copilot |
+| agent-viz | `node "<abs>/bin/agent-viz.js" hook --source=claude\|copilot\|codex` **ou** `npx --yes @vcueto/agent-viz@X.Y.Z hook --source=…` | les événements Claude / Copilot / Codex |
 | agent-viz | `node <abs>/bin/agent-viz.js hook --source=antigravity --event=<Nom>` (chemin **sans** guillemets) **ou** la forme `npx` suivie de `--event=<Nom>` | les événements Antigravity, **une commande par événement** |
 
 Deux écarts pour Antigravity, dans `src/server/install-hooks/antigravity.ts` :
@@ -484,8 +484,8 @@ chemin** (`resolveHookCommand`, dans `src/server/install-hooks/scopes.ts`).
 L'installation globale ou locale produit la forme absolue ; `npx` produit la
 forme portable.
 
-Ce que ce dépôt n'établit pas : **sous quelle forme Claude Code, Copilot CLI ou
-Antigravity CLI remontent à l'utilisateur l'échec d'un hook** dont la commande ne trouve plus son
+Ce que ce dépôt n'établit pas : **sous quelle forme Claude Code, Copilot CLI,
+Antigravity CLI ou Codex remontent à l'utilisateur l'échec d'un hook** dont la commande ne trouve plus son
 fichier. Rien ici ne le teste.
 
 ### Le produit écrit chez son utilisateur — en deux endroits de natures différentes
@@ -495,7 +495,7 @@ n'y paraît.
 
 | Qui écrit | Où | Chemin absolu ? |
 |---|---|---|
-| `src/server/install-hooks/` | **huit** destinations possibles selon l'agent et la portée : `~/.claude/settings.json`, `<dépôt>/.claude/settings{,.local}.json`, `~/.copilot/hooks/agent-viz.json`, `<dépôt>/.github/hooks/agent-viz{,.local}.json`, `~/.gemini/config/hooks.json`, `<dépôt>/.agents/hooks.json` — Antigravity n'a pas de portée locale | **seulement en mode `absolute`** |
+| `src/server/install-hooks/` | **dix** destinations possibles selon l'agent et la portée : `~/.claude/settings.json`, `<dépôt>/.claude/settings{,.local}.json`, `~/.copilot/hooks/agent-viz.json`, `<dépôt>/.github/hooks/agent-viz{,.local}.json`, `~/.gemini/config/hooks.json`, `<dépôt>/.agents/hooks.json`, `~/.codex/hooks.json`, `<dépôt>/.codex/hooks.json` — Antigravity et Codex n'ont pas de portée locale | **seulement en mode `absolute`** |
 | `src/server/install-hooks/` | ajoute une ligne au **`.gitignore` du dépôt de l'utilisateur**, quand il écrit un fichier de portée locale — jamais n'en crée un (`ensureGitignore`, dans `scopes.ts`) | sans objet |
 
 La deuxième ligne est la plus intrusive des deux : c'est la seule qui touche un
@@ -512,6 +512,10 @@ Pour Antigravity CLI, l'installation ne possède que la clé `agent-viz` du
 `hooks.json` : une commande qui nomme `agent-viz` et `hook` n'est reconnue
 (`isAgentVizCommand`, dans `antigravity.ts`) que sous cette clé, et les autres
 clés du fichier ne sont jamais touchées.
+Pour Codex, le fichier a la forme du `settings.json` de Claude Code : la même
+reconnaissance s'applique (`isAgentVizHook`), par la fabrique de
+`src/server/install-hooks/settings-installer.ts`. Une ligne reconnue qui porte
+`--source=claude` y est une ligne périmée, réécrite en `--source=codex`.
 
 ---
 
@@ -567,15 +571,15 @@ ligne : un ancrage `fichier:ligne` qui a glissé reste vert.
 
 ## 9. La plomberie de test
 
-**Un seul exécuteur, un seul arbre de tests dans 223 fichiers.**
+**Un seul exécuteur, un seul arbre de tests dans 225 fichiers.**
 
 ```
-find tests -name "*.test.ts" | wc -l   → 223
-npx vitest run                          → tous passés, 223 fichiers
+find tests -name "*.test.ts" | wc -l   → 225
+npx vitest run                          → tous passés, 225 fichiers
 ```
 
 vitest est le seul exécuteur (`include: tests/**/*.test.ts` de
-`vitest.config.mts`), et 223 `.test.ts` en sont l'unique dialecte : tous
+`vitest.config.mts`), et 225 `.test.ts` en sont l'unique dialecte : tous
 écrivent l'API de vitest (`import { test, expect } from 'vitest'`). Aucun
 pont, aucun second exécuteur. `tests/repo/architecture-test-counts.test.ts`
 compare ces nombres au disque et nomme l'écart s'il diverge.

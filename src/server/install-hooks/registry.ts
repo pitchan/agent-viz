@@ -14,12 +14,14 @@ import { scanInstalled } from './scopes.ts';
 import { claudeInstaller } from './claude.ts';
 import { copilotInstaller } from './copilot.ts';
 import { antigravityInstaller } from './antigravity.ts';
+import { codexInstaller } from './codex.ts';
 import { AGENT_CONFIG } from './config.ts';
 
 export const INSTALLERS: Record<AgentName, AgentInstaller> = {
   claude: claudeInstaller,
   copilot: copilotInstaller,
   antigravity: antigravityInstaller,
+  codex: codexInstaller,
 };
 
 // Une clef réelle du registre — vit ici, à côté de la constante qu'elle

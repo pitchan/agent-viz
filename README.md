@@ -2,7 +2,7 @@
 
 **Where do your tokens go?** One command, zero runtime dependencies: agent-viz tracks your coding agents live and puts a measured figure on what they waste.
 
-It works with [Claude Code](https://docs.claude.com/en/docs/claude-code), [GitHub Copilot CLI](https://docs.github.com/en/copilot/concepts/agents/about-copilot-cli) and [Antigravity CLI](https://antigravity.google). It reads, measures and advises. It runs nothing on your behalf, and none of your data leaves your machine.
+It works with [Claude Code](https://docs.claude.com/en/docs/claude-code), [GitHub Copilot CLI](https://docs.github.com/en/copilot/concepts/agents/about-copilot-cli), [Antigravity CLI](https://antigravity.google) and [Codex](https://developers.openai.com/codex). It reads, measures and advises. It runs nothing on your behalf, and none of your data leaves your machine.
 
 [![agent-viz in 20 seconds](docs/media/agent-viz-promo.gif)](https://youtu.be/GYJ5cXP6u4w)
 
@@ -41,22 +41,22 @@ agent-viz
 
 ## What works with which agent
 
-| Feature | Claude Code | Copilot CLI | Antigravity CLI |
-|---|:---:|:---:|:---:|
-| **Live view** | | | |
-| Tool calls as they happen | ✅ | ✅ | ✅ |
-| A failed tool shown as an error | ✅ | ❌ ¹ | ⚠️ ² |
-| Subagents in the topology | ✅ | 🚧 | ❌ |
-| Tokens | ✅ | ❌ ³ | ⚠️ ⁴ |
-| Cost | ✅ | ❌ | ❌ ⁵ |
-| Session duration | ✅ | ✅ | ❌ ⁶ |
-| **Live alerts** | | | |
-| Loop | ✅ | ✅ | ✅ |
-| Stuck | ✅ | 🚧 | ✅ |
-| Retry storm | ✅ | ❌ ¹ | ⚠️ ² |
-| Bad invocation | ✅ | ❌ ¹ | 🚧 |
-| **Observatory** | | | |
-| Advice, analysed sessions, tokens & prices, skills | ✅ | ❌ | ❌ |
+| Feature | Claude Code | Copilot CLI | Antigravity CLI | Codex |
+|---|:---:|:---:|:---:|:---:|
+| **Live view** | | | | |
+| Tool calls as they happen | ✅ | ✅ | ✅ | ✅ |
+| A failed tool shown as an error | ✅ | ❌ ¹ | ⚠️ ² | ❌ ⁷ |
+| Subagents in the topology | ✅ | 🚧 | ❌ | ❌ |
+| Tokens | ✅ | ❌ ³ | ⚠️ ⁴ | ✅ |
+| Cost | ✅ | ❌ | ❌ ⁵ | ❌ ⁵ |
+| Session duration | ✅ | ✅ | ❌ ⁶ | 🚧 |
+| **Live alerts** | | | | |
+| Loop | ✅ | ✅ | ✅ | 🚧 |
+| Stuck | ✅ | 🚧 | ✅ | 🚧 |
+| Retry storm | ✅ | ❌ ¹ | ⚠️ ² | ❌ ⁷ |
+| Bad invocation | ✅ | ❌ ¹ | 🚧 | ❌ ⁷ |
+| **Observatory** | | | | |
+| Advice, analysed sessions, tokens & prices, skills | ✅ | ❌ | ❌ | ❌ |
 
 ✅ works · ⚠️ works with a limit · ❌ not available · 🚧 not reliable yet: do not count on it for that agent
 
@@ -64,16 +64,17 @@ agent-viz
 2. Known once the model call ends, not when the tool ends.
 3. Copilot CLI does not expose token usage.
 4. One model call behind during a turn, exact once it ends.
-5. agent-viz has no Gemini price table.
+5. agent-viz has no Gemini or OpenAI price table.
 6. Antigravity sends no session-start event.
+7. Codex sends no tool-failure event.
 
-Codex CLI and Cursor are not supported.
+Cursor is not supported.
 
 ## What it changes on your machine
 
 | What | Where | How to undo |
 |---|---|---|
-| Hook entries, one per captured event | `~/.claude/settings.json`, `~/.copilot/hooks/agent-viz.json`, `~/.gemini/config/hooks.json` — only for the agents found on your machine | `agent-viz stop` removes them; `agent-viz uninstall-hooks` does it without touching the dashboard |
+| Hook entries, one per captured event | `~/.claude/settings.json`, `~/.copilot/hooks/agent-viz.json`, `~/.gemini/config/hooks.json`, `~/.codex/hooks.json` — only for the agents found on your machine | `agent-viz stop` removes them; `agent-viz uninstall-hooks` does it without touching the dashboard |
 | A copy of each hooks file, taken before it is changed | `~/.agent-viz/backups/` | delete the folder |
 | Live events, as the agent sends them: prompts, tool inputs and tool results | `<temp dir>/agent-events/`, one file per session, deleted after 24 hours | `agent-viz` deletes them on its own; the dashboard also has a clear button |
 | The analysis database: counters, sizes, tool names, and [three named exceptions](#observatory-analysis-and-advice) | `~/.agent-viz/observatory.db` | delete the file, it is rebuilt from your transcripts |
@@ -188,7 +189,7 @@ The analysis runs on the netgain engine, which **is part of agent-viz**: same re
 
 ## Multi-agent support
 
-agent-viz captures events from **Claude Code, GitHub Copilot CLI and Antigravity CLI** simultaneously. On first run, it auto-detects which CLI agents are installed locally and registers the appropriate hooks for each. Sessions are tagged in the dashboard with a colored pill badge (cyan for Claude, violet for Copilot, pink for Antigravity).
+agent-viz captures events from **Claude Code, GitHub Copilot CLI, Antigravity CLI and Codex** simultaneously. On first run, it auto-detects which CLI agents are installed locally and registers the appropriate hooks for each. Sessions are tagged in the dashboard with a colored pill badge (cyan for Claude, violet for Copilot, pink for Antigravity, green for Codex).
 
 To force a target explicitly:
 
@@ -196,10 +197,11 @@ To force a target explicitly:
 agent-viz install-hooks --target=claude        # Claude only
 agent-viz install-hooks --target=copilot       # Copilot only
 agent-viz install-hooks --target=antigravity   # Antigravity only
+agent-viz install-hooks --target=codex         # Codex only
 agent-viz install-hooks --target=both          # all agents even if not detected
 ```
 
-Detection: an agent is considered installed if its CLI binary is on your `PATH` (`agy` for Antigravity), or if its config home (`~/.claude/` for Claude, `~/.copilot/` for Copilot, `~/.gemini/antigravity-cli/` for Antigravity) exists with at least one file inside.
+Detection: an agent is considered installed if its CLI binary is on your `PATH` (`agy` for Antigravity), or if its config home (`~/.claude/` for Claude, `~/.copilot/` for Copilot, `~/.gemini/antigravity-cli/` for Antigravity, `~/.codex/` for Codex) exists with at least one file inside.
 
 ### Antigravity CLI
 
@@ -216,6 +218,19 @@ Known limits, all on Antigravity's side:
 - No session duration: Antigravity sends no session-start event.
 - The analysis panels (Conseils, Sessions analysées, Jetons & tarifs, Skills) cover Claude Code sessions only.
 
+### Codex
+
+- agent-viz adds its hook entries to `~/.codex/hooks.json` (or `<repo>/.codex/hooks.json` with `--project`); hooks you wrote in that file are left untouched.
+- There is no `--local` scope for Codex: the interactive prompt does not offer it.
+- Nothing shows up until you trust the hooks in Codex: it asks you to review them the next time it starts. You have to do it again whenever agent-viz rewrites its hook command.
+- If that file already holds an agent-viz command tagged `--source=claude`, the install rewrites it to `--source=codex`. Until then, Codex sessions show up under the Claude badge.
+
+Known limits:
+- Tokens are read from the session transcript under `~/.codex/sessions/`.
+- A thread forked from another one starts with a copy of its parent's history, token lines included, with nothing marking where the copy ends: agent-viz shows "Tokens N/A" for it instead of a figure that would count the parent twice.
+- No cost: agent-viz has no OpenAI price table.
+- Subagent threads are not drawn in the topology.
+
 ## Hook management
 
 The first time you run `agent-viz`, it auto-registers hooks for each detected agent. **The default scope is user-level (global)** — the hook then fires from every directory, so a session launched anywhere is captured:
@@ -225,6 +240,7 @@ The first time you run `agent-viz`, it auto-registers hooks for each detected ag
 | Claude Code | `~/.claude/settings.json` |
 | Copilot CLI | `~/.copilot/hooks/agent-viz.json` |
 | Antigravity CLI | `~/.gemini/config/hooks.json` |
+| Codex | `~/.codex/hooks.json` |
 
 Project scopes are opt-in. You only need the commands below in three situations:
 

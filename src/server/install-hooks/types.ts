@@ -2,14 +2,14 @@
 // communs aux modules de src/server/install-hooks/, dont `Target` que
 // prompt-install.ts importe aussi.
 
-export type AgentName = 'claude' | 'copilot' | 'antigravity';
+export type AgentName = 'claude' | 'copilot' | 'antigravity' | 'codex';
 // Ce que `--target` et l'invite d'installation acceptent : un agent, ou 'both'
 // pour tous les agents du registre.
 export type Target = AgentName | 'both';
 export type Scope = 'user' | 'project' | 'local';
 
 // `localFile` et `gitignoreEntry` valent `null` pour un agent qui n'a pas de fichier de
-// portée locale (Antigravity) : `resolveScope` refuse alors `--local` en le nommant.
+// portée locale (Antigravity, Codex) : `resolveScope` refuse alors `--local` en le nommant.
 export interface AgentConfigEntry {
   label: string;
   events: string[];
@@ -17,6 +17,8 @@ export interface AgentConfigEntry {
   projectFile: (root: string) => string;
   localFile: ((root: string) => string) | null;
   gitignoreEntry: string | null;
+  // Ce que l'utilisateur doit encore faire chez l'agent après une écriture ; `null` s'il n'y a rien.
+  afterInstallNote: string | null;
 }
 
 export interface ResolvedTarget {
@@ -40,8 +42,8 @@ export interface ResolvedCommand {
   spec?: string;
 }
 
-// Le sac d'options partagé par toute l'API haut niveau (`auditClaude`,
-// `installClaude`, `findInstalledScopes`, `dispatch`, `install`, …) — un seul
+// Le sac d'options partagé par toute l'API haut niveau (les `audit` et `install`
+// des adaptateurs, `findInstalledScopes`, `dispatch`, …) — un seul
 // type, réutilisé bien au-delà de la deuxième occurrence (précédent du dépôt),
 // parce que ce sont toutes des variations du MÊME sac.
 export interface AgentOpts {

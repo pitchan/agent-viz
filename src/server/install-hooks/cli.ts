@@ -27,6 +27,7 @@ interface CliInstallResult {
   missing: string[];
   updated: string[];
   backup: string | null;
+  note?: string | null;
   error?: string;
 }
 
@@ -126,6 +127,7 @@ export function cliMain(argv: string[]): void {
     }
     if (r.missing.length > 0) console.log(`[${agent}] ✓ Ajouté sur : ${r.missing.join(', ')}`);
     if (r.updated.length > 0) console.log(`[${agent}] ✓ Rafraîchi sur : ${r.updated.join(', ')}`);
+    if (r.note) console.log(`[${agent}] ! ${r.note}`);
   }
   // Une erreur-valeur ne doit pas perdre le signal d'échec : le code de sortie le porte.
   if (refused) process.exit(1);

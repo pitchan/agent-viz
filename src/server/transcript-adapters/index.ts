@@ -6,9 +6,10 @@
 import * as claude from './claude.ts';
 import * as copilot from './copilot.ts';
 import * as antigravity from './antigravity.ts';
+import * as codex from './codex.ts';
 import type { TranscriptAdapter } from './types.ts';
 
-const TRANSCRIPT_ADAPTERS = { claude, copilot, antigravity } satisfies Record<string, TranscriptAdapter>;
+const TRANSCRIPT_ADAPTERS = { claude, copilot, antigravity, codex } satisfies Record<string, TranscriptAdapter>;
 
 // Garde de type sur les clés réelles du registre — vit ici, à côté de la
 // constante qu'elle protège, plutôt qu'un cast : `Object.hasOwn` seul ne
