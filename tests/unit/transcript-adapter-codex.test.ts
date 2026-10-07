@@ -30,6 +30,23 @@ function jetons(cumul: Compteurs, appel: Compteurs): string {
   });
 }
 
+function meta(forkedFromId?: string): string {
+  const payload: Record<string, unknown> = { id: 's1', cwd: 'C:/projet' };
+  if (forkedFromId !== undefined) payload.forked_from_id = forkedFromId;
+  return JSON.stringify({ timestamp: HORODATAGE, type: 'session_meta', payload });
+}
+
+function questionConsignee(texte: string): string {
+  return JSON.stringify({
+    timestamp: HORODATAGE, type: 'event_msg',
+    payload: { type: 'item_completed', item: { type: 'UserMessage', id: 'u1', content: [{ type: 'text', text: texte, text_elements: [] }] } },
+  });
+}
+
+function messageUtilisateur(texte: string): string {
+  return JSON.stringify({ type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: texte }] } });
+}
+
 function session(): { tokens: any } {
   const rec: { tokens: any } = { tokens: null };
   ensureTokens(rec);
@@ -161,16 +178,71 @@ test('une session Codex trouve son transcript dans le premier événement', () =
   expect(chemin).toBe(premier.transcript_path);
 });
 
-test('la question est le premier texte de l’utilisateur, hors blocs injectés', () => {
+test('un fil dérivé d’un autre ne compte aucun jeton et se déclare non lisible', () => {
   // Arrange
-  const injecte = '<environment_context>\n  <cwd>C:/projet</cwd>\n</environment_context>';
+  const rec = session();
+  // Act
+  const rendus = lis(rec, [meta('parent-1'), tour('gpt-5.5'), jetons(APPEL_1, APPEL_1), jetons(CUMUL_2, APPEL_2)]);
+  // Assert
+  expect(rendus).toEqual([true, false, false, false]);
+  expect(rec.tokens.unsupported).toBe(true);
+  expect(rec.tokens.main.in).toBe(0);
+  expect(rec.tokens.main.out).toBe(0);
+});
+
+test('une session qui n’est pas dérivée compte ses jetons après son session_meta', () => {
+  // Arrange
+  const rec = session();
+  // Act
+  const rendus = lis(rec, [meta(), tour('gpt-5.5'), jetons(APPEL_1, APPEL_1)]);
+  // Assert
+  expect(rendus).toEqual([false, false, true]);
+  expect(rec.tokens.unsupported).not.toBe(true);
+  expect(rec.tokens.main.out).toBe(50);
+});
+
+test('un appel dont le total ne correspond pas à ses compteurs n’est pas compté', () => {
+  // Arrange
+  const rec = session();
+  const incoherent = {
+    input_tokens: 0, cached_input_tokens: 0, cache_write_input_tokens: 0,
+    output_tokens: 0, reasoning_output_tokens: 0, total_tokens: 24621,
+  };
+  // Act
+  const rendus = lis(rec, [tour('gpt-5.5'), jetons(incoherent, incoherent)]);
+  // Assert
+  expect(rendus).toEqual([false, false]);
+  expect(rec.tokens.main.lastIn).toBe(0);
+  expect(rec.tokens.main.in).toBe(0);
+});
+
+test('la question est celle que Codex consigne comme message de l’utilisateur, pas l’en-tête d’AGENTS.md', () => {
+  // Arrange
   const transcript = [
-    JSON.stringify({ type: 'session_meta', payload: { id: 's1', cwd: 'C:/projet' } }),
-    JSON.stringify({ type: 'response_item', payload: { type: 'message', role: 'developer', content: [{ type: 'input_text', text: 'consignes du harnais' }] } }),
-    JSON.stringify({ type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: injecte }, { type: 'input_text', text: 'Corrige le test qui échoue' }] } }),
+    meta(),
+    messageUtilisateur('# AGENTS.md instructions for C:/projet\n\n<INSTRUCTIONS>\nrègles\n</INSTRUCTIONS>'),
+    questionConsignee('Corrige le test qui échoue'),
   ].join('\n');
   // Act
   const question = codex.extractPrompt(transcript);
   // Assert
   expect(question).toBe('Corrige le test qui échoue');
+});
+
+test('une question qui contient des chevrons est rendue telle quelle', () => {
+  // Arrange
+  const transcript = [meta(), questionConsignee('ajoute un <div> dans le header')].join('\n');
+  // Act
+  const question = codex.extractPrompt(transcript);
+  // Assert
+  expect(question).toBe('ajoute un <div> dans le header');
+});
+
+test('sans message de l’utilisateur consigné, il n’y a pas de question', () => {
+  // Arrange
+  const transcript = [meta(), messageUtilisateur('# AGENTS.md instructions for C:/projet')].join('\n');
+  // Act
+  const question = codex.extractPrompt(transcript);
+  // Assert
+  expect(question).toBe(null);
 });

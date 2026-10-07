@@ -225,7 +225,8 @@ Known limits, all on Antigravity's side:
 - If that file already holds an agent-viz command tagged `--source=claude`, the install rewrites it to `--source=codex`. Until then, Codex sessions show up under the Claude badge.
 
 Known limits:
-- Tokens are read from the session transcript under `~/.codex/sessions/`. A thread forked from a parent starts with the parent's running total: that inherited part is not counted.
+- Tokens are read from the session transcript under `~/.codex/sessions/`.
+- A thread forked from another one starts with a copy of its parent's history, token lines included, with nothing marking where the copy ends: agent-viz shows "Tokens N/A" for it instead of a figure that would count the parent twice.
 - No cost: agent-viz has no OpenAI price table.
 - Subagent threads are not drawn in the topology.
 

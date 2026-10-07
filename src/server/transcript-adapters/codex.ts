@@ -3,6 +3,8 @@
 //
 // Une ligne `event_msg` / `token_count` porte le cumul de la session et le dernier appel.
 // Le modèle est sur les lignes `turn_context`, pas sur la ligne de jetons.
+// Un fil dérivé (`session_meta.forked_from_id`) copie l'historique de son parent sans marquer la fin
+// de la copie : ses jetons sont déclarés non lisibles. La question est l'item `UserMessage`.
 
 import { ensureTokens, accumulateUsage } from '../tokens.ts';
 import { decodeJsonlLine } from '../../engine/core/jsonl.ts';
@@ -68,7 +70,8 @@ function stateOf(tokens: object): CodexState {
 }
 
 function parseUsageLine(line: string, rec: UsageRecord): boolean {
-  if (!line || (line.indexOf('"token_count"') === -1 && line.indexOf('"turn_context"') === -1)) return false;
+  if (!line || (line.indexOf('"token_count"') === -1 && line.indexOf('"turn_context"') === -1
+    && line.indexOf('"session_meta"') === -1)) return false;
   const verdict = decodeJsonlLine(line);
   if (!verdict || !verdict.ok) return false;
   const evt = verdict.value;
@@ -77,8 +80,15 @@ function parseUsageLine(line: string, rec: UsageRecord): boolean {
   ensureTokens(rec);
   const tokens = rec.tokens;
   if (!tokens) return false;
+  if (tokens.unsupported) return false;
   const state = stateOf(tokens);
 
+  if (evt.type === 'session_meta') {
+    const parent = asString(evt.payload.forked_from_id);
+    if (!parent) return false;
+    tokens.unsupported = true;
+    return true;
+  }
   if (evt.type === 'turn_context') {
     const model = asString(evt.payload.model);
     if (model) state.model = model;
@@ -94,6 +104,8 @@ function parseUsageLine(line: string, rec: UsageRecord): boolean {
   // Un appel réel fait avancer le cumul de sa propre taille. Un écart nul est une ligne
   // répétée ; un autre écart est un cumul hérité d'un fil parent, dont on ne sait rien.
   if (delta <= 0 || delta !== call.total) return false;
+  // Un total qui contredit ses compteurs ajouterait 0 jeton et remettrait la taille de contexte à 0.
+  if (call.input + call.output !== call.total) return false;
   // Sans modèle le coût passerait pour complet à 0 $ : la ligne attend son `turn_context`.
   if (state.model === null) return false;
 
@@ -103,25 +115,25 @@ function parseUsageLine(line: string, rec: UsageRecord): boolean {
   return true;
 }
 
-// Codex range dans le message de l'utilisateur des blocs balisés qu'il injecte lui-même.
-function cleanUserText(raw: string): string {
-  return raw.replace(/<(\w[\w-]*)[\s>][\s\S]*?<\/\1>/g, '').replace(/<[^>]+>/g, '').trim();
+function userMessageText(item: unknown): string | null {
+  if (!isRecord(item) || item.type !== 'UserMessage' || !Array.isArray(item.content)) return null;
+  for (const block of item.content as unknown[]) {
+    if (!isRecord(block) || block.type !== 'text' || typeof block.text !== 'string') continue;
+    const text = block.text.trim();
+    if (text) return text.slice(0, 120);
+  }
+  return null;
 }
 
 function extractPrompt(content: string): string | null {
   for (const line of content.split('\n')) {
-    if (line.indexOf('"response_item"') === -1) continue;
+    if (line.indexOf('"UserMessage"') === -1) continue;
     const verdict = decodeJsonlLine(line);
     if (!verdict || !verdict.ok) continue;
     const o = verdict.value;
-    if (!isRecord(o) || o.type !== 'response_item' || !isRecord(o.payload)) continue;
-    const { type, role, content: blocks } = o.payload;
-    if (type !== 'message' || role !== 'user' || !Array.isArray(blocks)) continue;
-    for (const block of blocks as unknown[]) {
-      if (!isRecord(block) || block.type !== 'input_text' || typeof block.text !== 'string') continue;
-      const clean = cleanUserText(block.text);
-      if (clean.length > 5) return clean.slice(0, 120);
-    }
+    if (!isRecord(o) || !isRecord(o.payload) || o.payload.type !== 'item_completed') continue;
+    const text = userMessageText(o.payload.item);
+    if (text !== null) return text;
   }
   return null;
 }
