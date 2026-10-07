@@ -104,8 +104,12 @@ function parseUsageLine(line: string, rec: UsageRecord): boolean {
   // Un appel réel fait avancer le cumul de sa propre taille. Un écart nul est une ligne
   // répétée ; un autre écart est un cumul hérité d'un fil parent, dont on ne sait rien.
   if (delta <= 0 || delta !== call.total) return false;
-  // Un total qui contredit ses compteurs ajouterait 0 jeton et remettrait la taille de contexte à 0.
-  if (call.input + call.output !== call.total) return false;
+  // Un total qui contredit ses compteurs ne dit pas ce qu'il contient : la session n'est pas
+  // lisible, un total à 0 passerait pour une mesure.
+  if (call.input + call.output !== call.total) {
+    tokens.unsupported = true;
+    return true;
+  }
   // Sans modèle le coût passerait pour complet à 0 $ : la ligne attend son `turn_context`.
   if (state.model === null) return false;
 

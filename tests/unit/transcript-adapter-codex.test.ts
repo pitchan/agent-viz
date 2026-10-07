@@ -201,7 +201,7 @@ test('une session qui n’est pas dérivée compte ses jetons après son session
   expect(rec.tokens.main.out).toBe(50);
 });
 
-test('un appel dont le total ne correspond pas à ses compteurs n’est pas compté', () => {
+test('un appel dont le total ne correspond pas à ses compteurs n’est pas compté et la session se déclare non lisible', () => {
   // Arrange
   const rec = session();
   const incoherent = {
@@ -211,7 +211,8 @@ test('un appel dont le total ne correspond pas à ses compteurs n’est pas comp
   // Act
   const rendus = lis(rec, [tour('gpt-5.5'), jetons(incoherent, incoherent)]);
   // Assert
-  expect(rendus).toEqual([false, false]);
+  expect(rendus).toEqual([false, true]);
+  expect(rec.tokens.unsupported).toBe(true);
   expect(rec.tokens.main.lastIn).toBe(0);
   expect(rec.tokens.main.in).toBe(0);
 });
