@@ -21,7 +21,10 @@ export function auditEvents(
   });
 }
 
-export function settingsInstaller(agent: AgentName): Omit<AgentInstaller, 'detect'> {
+// Les seuls agents dont le fichier de hooks a cette forme : Copilot et Antigravity écrivent la leur.
+export type SettingsShapeAgent = Extract<AgentName, 'claude' | 'codex'>;
+
+export function settingsInstaller(agent: SettingsShapeAgent): Omit<AgentInstaller, 'detect'> {
   const cfg: AgentConfigEntry = AGENT_CONFIG[agent];
   const events = cfg.events;
 

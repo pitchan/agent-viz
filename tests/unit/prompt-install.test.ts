@@ -184,6 +184,23 @@ test('promptInstallParams: target antigravity → scope options omit local', asy
   expect(io.captured).not.toMatch(/local — this repo only/);
 });
 
+test('promptInstallParams: target codex → scope options omit local', async () => {
+  const io = makeMockIO();
+  const promise = promptInstallParams({
+    detected: { claude: false, copilot: false, antigravity: false, codex: true },
+    projectRoot: '/some/project',
+    io: { input: io.input, output: io.output },
+  });
+  await tick();
+  press(io.input, 'return'); await tick();    // accept Codex (default, single detected)
+  press(io.input, 'down'); await tick();       // user → project
+  press(io.input, 'down'); await tick();       // project (last: local is excluded) → no-op
+  press(io.input, 'return');
+  const result = await promise;
+  expect(result).toEqual({ target: 'codex', scope: 'project' });
+  expect(io.captured).not.toMatch(/local — this repo only/);
+});
+
 // Regression: on Windows real TTY, raw mode was being toggled between the
 // two ask() calls (off → on → off → on). The off→on transition caused the
 // OS to re-deliver a phantom \r in a later macrotask, which auto-resolved

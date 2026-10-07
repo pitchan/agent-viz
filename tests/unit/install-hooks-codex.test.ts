@@ -1,11 +1,10 @@
 // Codex lit un hooks.json de la forme du settings.json de Claude Code. Le cas de départ
 // repris ici est réel : un fichier qui porte déjà la commande agent-viz, étiquetée claude.
-import { expect, test } from 'vitest';
+import { afterEach, expect, onTestFinished, test } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { install, uninstall, findInstalledScopes } from '../../src/server/install-hooks/registry.ts';
-import { AGENT_CONFIG } from '../../src/server/install-hooks/config.ts';
+import { install, uninstall, INSTALLERS } from '../../src/server/install-hooks/registry.ts';
 
 interface HookLine { type: string; command: string; timeout?: number }
 interface HooksFile { hooks: Record<string, Array<{ hooks: HookLine[] }>> }
@@ -16,18 +15,29 @@ interface CodexResult {
   results?: Array<{ removed: number }>;
 }
 
-const EVENEMENTS = AGENT_CONFIG.codex.events;
-const MAL_ETIQUETEE = 'node "F:/DEV/agent-viz/bin/agent-viz.js" hook --source=claude';
+// Écrite en littéral : lue de la config, elle ne rougirait pas quand on en retire un événement.
+const EVENEMENTS = ['UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop', 'SessionStart'];
+const MAL_ETIQUETEE = 'node "C:/outils/agent-viz/bin/agent-viz.js" hook --source=claude';
 const TIERS = 'echo hook-d-un-tiers';
+
+// Chaque dossier créé par projet()/paquet(), retiré au terme du test qui l'a créé.
+const dirsCreated: string[] = [];
+
+afterEach(() => {
+  for (const d of dirsCreated.splice(0)) fs.rmSync(d, { recursive: true, force: true });
+});
 
 function projet(): string {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'avtest-codex-'));
+  dirsCreated.push(root);
   fs.mkdirSync(path.join(root, '.git'));
   return root;
 }
 
 function paquet(): string {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'avtest-pkg-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'avtest-pkg-'));
+  dirsCreated.push(root);
+  return root;
 }
 
 function fichierProjet(root: string): string {
@@ -109,10 +119,20 @@ test('le balayage des portées de Codex ne connaît pas de portée locale', () =
   // Arrange
   const root = projet();
   const packageRoot = paquet();
-  install({ target: 'codex', scope: 'project', cwd: root, packageRoot });
   // Act
-  const portees = findInstalledScopes({ cwd: root, packageRoot, agent: 'codex' }).installed.map(s => s.scope);
+  const portees = INSTALLERS.codex.sweepTargets(root, { packageRoot }).map(t => t.scope);
   // Assert
-  expect(portees).toContain('project');
-  expect(portees).not.toContain('local');
+  expect(portees).toEqual(['user', 'project']);
+});
+
+test('un dossier ~/.codex non vide suffit à détecter Codex', () => {
+  // Arrange
+  const dossier = path.join(os.homedir(), '.codex');
+  onTestFinished(() => fs.rmSync(dossier, { recursive: true, force: true }));
+  fs.mkdirSync(dossier, { recursive: true });
+  fs.writeFileSync(path.join(dossier, 'config.toml'), '');
+  // Act
+  const detecte = INSTALLERS.codex.detect();
+  // Assert
+  expect(detecte).toBe(true);
 });

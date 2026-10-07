@@ -142,6 +142,24 @@ test('une charge Antigravity est écrite normalisée, sous le nom de sa conversa
   }
 });
 
+test('le hook lancé avec --source=codex écrit l’événement tel quel, étiqueté codex', async () => {
+  // Arrange
+  const evt = { session_id: 'sess-codex-1', hook_event_name: 'PreToolUse', tool_name: 'shell', tool_use_id: 'call-codex-1' };
+  // Act
+  const r = await lanceLeHook(JSON.stringify(evt), ['--source=codex']);
+  // Assert
+  try {
+    const ligne = lit(path.join(r.dossier, 'sess-codex-1.jsonl'));
+    expect(ligne, 'aucun .jsonl écrit pour la session Codex').not.toBe(null);
+    const relu = JSON.parse(ligne!.trim());
+    expect(relu._source).toBe('codex');
+    expect(relu.tool_name).toBe('shell');
+    expect(relu.hook_event_name).toBe('PreToolUse');
+  } finally {
+    fs.rmSync(r.racine, { recursive: true, force: true });
+  }
+});
+
 test('une charge Antigravity sans --event est refusée, tracée, jamais écrite', async () => {
   // Arrange
   const charge = { conversationId: 'conv-agy-2', stepIdx: 1 };
