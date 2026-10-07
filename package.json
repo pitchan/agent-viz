@@ -1,6 +1,6 @@
 {
   "name": "@vcueto/agent-viz",
-  "version": "0.45.1",
+  "version": "0.45.2",
   "description": "Where do your tokens go? One command, zero runtime dependencies: agent-viz tracks your coding agents live (Claude Code, GitHub Copilot CLI, Antigravity CLI) and puts a measured figure on what they waste.",
   "bin": {
     "agent-viz": "bin/agent-viz.js",
