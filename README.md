@@ -49,10 +49,10 @@ agent-viz
 | Subagents in the topology | ✅ | 🚧 | ❌ | ❌ |
 | Tokens | ✅ | ❌ ³ | ⚠️ ⁴ | ✅ |
 | Cost | ✅ | ❌ | ❌ ⁵ | ❌ ⁵ |
-| Session duration | ✅ | ✅ | ❌ ⁶ | 🚧 |
+| Session duration | ✅ | ✅ | ❌ ⁶ | ✅ |
 | **Live alerts** | | | | |
-| Loop | ✅ | ✅ | ✅ | 🚧 |
-| Stuck | ✅ | 🚧 | ✅ | 🚧 |
+| Loop | ✅ | ✅ | ✅ | ✅ |
+| Stuck | ✅ | 🚧 | ✅ | ✅ |
 | Retry storm | ✅ | ❌ ¹ | ⚠️ ² | ❌ ⁷ |
 | Bad invocation | ✅ | ❌ ¹ | 🚧 | ❌ ⁷ |
 | **Observatory** | | | | |
