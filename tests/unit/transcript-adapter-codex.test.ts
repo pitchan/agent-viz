@@ -239,6 +239,35 @@ test('une question qui contient des chevrons est rendue telle quelle', () => {
   expect(question).toBe('ajoute un <div> dans le header');
 });
 
+test('avec un fichier joint, la question est ce qui suit l’en-tête des fichiers', () => {
+  // Arrange
+  const texte = '# Files mentioned by the user:\n\n## notes.md: C:/projet/notes.md\n\n## My request:\nRésume ce fichier';
+  const transcript = [meta(), questionConsignee(texte)].join('\n');
+  // Act
+  const question = codex.extractPrompt(transcript);
+  // Assert
+  expect(question).toBe('Résume ce fichier');
+});
+
+test('un fichier joint sans texte ne donne pas de question', () => {
+  // Arrange
+  const texte = '# Files mentioned by the user:\n\n## notes.md: C:/projet/notes.md\n\n## My request:\n';
+  const transcript = [meta(), questionConsignee(texte)].join('\n');
+  // Act
+  const question = codex.extractPrompt(transcript);
+  // Assert
+  expect(question).toBe(null);
+});
+
+test('un fil dérivé n’affiche pas la question copiée de son parent', () => {
+  // Arrange
+  const transcript = [meta('parent-1'), questionConsignee('Question du fil parent')].join('\n');
+  // Act
+  const question = codex.extractPrompt(transcript);
+  // Assert
+  expect(question).toBe(null);
+});
+
 test('sans message de l’utilisateur consigné, il n’y a pas de question', () => {
   // Arrange
   const transcript = [meta(), messageUtilisateur('# AGENTS.md instructions for C:/projet')].join('\n');
