@@ -26,6 +26,7 @@ export const AGENT_CONFIG = {
     projectFile: (root) => path.join(root, '.claude', 'settings.json'),
     localFile: (root) => path.join(root, '.claude', 'settings.local.json'),
     gitignoreEntry: '.claude/settings.local.json',
+    afterInstallNote: null,
   },
   copilot: {
     label: 'Copilot CLI',
@@ -34,6 +35,7 @@ export const AGENT_CONFIG = {
     projectFile: (root) => path.join(root, '.github', 'hooks', 'agent-viz.json'),
     localFile: (root) => path.join(root, '.github', 'hooks', 'agent-viz.local.json'),
     gitignoreEntry: '.github/hooks/agent-viz.local.json',
+    afterInstallNote: null,
   },
   antigravity: {
     label: 'Antigravity CLI',
@@ -47,6 +49,7 @@ export const AGENT_CONFIG = {
     projectFile: (root) => path.join(root, '.agents', 'hooks.json'),
     localFile: null,
     gitignoreEntry: null,
+    afterInstallNote: null,
   },
   codex: {
     label: 'Codex',
@@ -57,6 +60,8 @@ export const AGENT_CONFIG = {
     projectFile: (root) => path.join(root, '.codex', 'hooks.json'),
     localFile: null,
     gitignoreEntry: null,
+    // Codex n'exécute un hook qu'une fois approuvé chez lui, et une commande réécrite est à réapprouver.
+    afterInstallNote: 'Codex runs these hooks only once you have trusted them: it asks you to review them the next time it starts.',
   },
 } satisfies Record<AgentName, AgentConfigEntry>;
 

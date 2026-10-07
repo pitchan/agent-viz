@@ -78,7 +78,7 @@ export function settingsInstaller(agent: SettingsShapeAgent): Omit<AgentInstalle
 
     if (missing.length === 0 && updated.length === 0) {
       const crossScope = otherScopes(target, cwd, packageRoot);
-      return { target, action: 'noop', missing, updated, present, coexisting, command: cmd, backup: null, crossScope };
+      return { target, action: 'noop', missing, updated, present, coexisting, command: cmd, backup: null, crossScope, note: null };
     }
 
     for (const ev of updated) refreshStaleCommand(settings, ev, cmd.command);
@@ -97,7 +97,7 @@ export function settingsInstaller(agent: SettingsShapeAgent): Omit<AgentInstalle
     else action = 'updated';
 
     const crossScope = otherScopes(target, cwd, packageRoot);
-    return { target, action, missing, updated, present, coexisting, command: cmd, backup, gitignore, crossScope };
+    return { target, action, missing, updated, present, coexisting, command: cmd, backup, gitignore, crossScope, note: cfg.afterInstallNote };
   }
 
   function uninstall({ scope, cwd, packageRoot }: AgentOpts = {}) {

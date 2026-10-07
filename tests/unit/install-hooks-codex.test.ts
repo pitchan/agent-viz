@@ -12,6 +12,7 @@ interface CodexResult {
   error?: string;
   action?: string;
   backup?: string | null;
+  note?: string | null;
   results?: Array<{ removed: number }>;
 }
 
@@ -135,4 +136,35 @@ test('un dossier ~/.codex non vide suffit à détecter Codex', () => {
   const detecte = INSTALLERS.codex.detect();
   // Assert
   expect(detecte).toBe(true);
+});
+
+test('après avoir écrit le fichier de Codex, l’installation dit que Codex attend l’approbation des hooks', () => {
+  // Arrange
+  const root = projet();
+  // Act
+  const result = install({ target: 'codex', scope: 'project', cwd: root, packageRoot: paquet() }).codex as CodexResult;
+  // Assert
+  expect(result.note).toMatch(/trust/i);
+});
+
+test('une installation de Codex déjà à jour ne redemande pas d’approbation', () => {
+  // Arrange
+  const root = projet();
+  const packageRoot = paquet();
+  install({ target: 'codex', scope: 'project', cwd: root, packageRoot });
+  // Act
+  const result = install({ target: 'codex', scope: 'project', cwd: root, packageRoot }).codex as CodexResult;
+  // Assert
+  expect(result.action).toBe('noop');
+  expect(result.note).toBe(null);
+});
+
+test('l’installation de Claude Code ne porte aucune note d’approbation', () => {
+  // Arrange
+  const root = projet();
+  // Act
+  const result = install({ target: 'claude', scope: 'project', cwd: root, packageRoot: paquet() }).claude as CodexResult;
+  // Assert
+  expect(result.action).toBe('installed');
+  expect(result.note).toBe(null);
 });

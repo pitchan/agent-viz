@@ -222,6 +222,7 @@ Known limits, all on Antigravity's side:
 
 - agent-viz adds its hook entries to `~/.codex/hooks.json` (or `<repo>/.codex/hooks.json` with `--project`); hooks you wrote in that file are left untouched.
 - There is no `--local` scope for Codex: the interactive prompt does not offer it.
+- Nothing shows up until you trust the hooks in Codex: it asks you to review them the next time it starts. You have to do it again whenever agent-viz rewrites its hook command.
 - If that file already holds an agent-viz command tagged `--source=claude`, the install rewrites it to `--source=codex`. Until then, Codex sessions show up under the Claude badge.
 
 Known limits:

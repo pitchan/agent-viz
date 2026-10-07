@@ -17,6 +17,8 @@ export interface AgentConfigEntry {
   projectFile: (root: string) => string;
   localFile: ((root: string) => string) | null;
   gitignoreEntry: string | null;
+  // Ce que l'utilisateur doit encore faire chez l'agent après une écriture ; `null` s'il n'y a rien.
+  afterInstallNote: string | null;
 }
 
 export interface ResolvedTarget {
