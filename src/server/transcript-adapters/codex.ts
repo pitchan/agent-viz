@@ -110,7 +110,7 @@ function parseUsageLine(line: string, rec: UsageRecord): boolean {
     tokens.unsupported = true;
     return true;
   }
-  // Sans modèle le coût passerait pour complet à 0 $ : la ligne attend son `turn_context`.
+  // Sans modèle le coût passerait pour complet à 0 $ : l'appel n'est pas compté.
   if (state.model === null) return false;
 
   // Le cumul ne baisse jamais et avance à chaque appel : il identifie l'appel, et une
