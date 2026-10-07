@@ -1,6 +1,6 @@
 // Codex lit un hooks.json de la forme du settings.json de Claude Code. Le cas de départ
 // repris ici est réel : un fichier qui porte déjà la commande agent-viz, étiquetée claude.
-import { afterEach, expect, onTestFinished, test } from 'vitest';
+import { afterEach, expect, test } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -128,12 +128,11 @@ test('le balayage des portées de Codex ne connaît pas de portée locale', () =
 
 test('un dossier ~/.codex non vide suffit à détecter Codex', () => {
   // Arrange
-  const dossier = path.join(os.homedir(), '.codex');
-  onTestFinished(() => fs.rmSync(dossier, { recursive: true, force: true }));
-  fs.mkdirSync(dossier, { recursive: true });
-  fs.writeFileSync(path.join(dossier, 'config.toml'), '');
+  const home = paquet();
+  fs.mkdirSync(path.join(home, '.codex'));
+  fs.writeFileSync(path.join(home, '.codex', 'config.toml'), '');
   // Act
-  const detecte = INSTALLERS.codex.detect();
+  const detecte = INSTALLERS.codex.detect(home);
   // Assert
   expect(detecte).toBe(true);
 });

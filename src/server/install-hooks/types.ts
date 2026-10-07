@@ -77,7 +77,7 @@ export interface AgentInstaller {
   install: (opts: AgentOpts) => unknown;
   uninstall: (opts: AgentOpts) => unknown;
   audit: (opts: AgentOpts) => unknown;
-  detect: () => boolean;
+  detect: (home: string) => boolean;
   sweepTargets: (cwd: string | undefined, opts?: { packageRoot?: string }) => ResolvedTarget[];
   installedIn: (file: string) => boolean;
 }
