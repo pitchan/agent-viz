@@ -1,7 +1,7 @@
 {
   "name": "@vcueto/agent-viz",
   "version": "0.45.2",
-  "description": "Where do your tokens go? One command, zero runtime dependencies: agent-viz tracks your coding agents live (Claude Code, GitHub Copilot CLI, Antigravity CLI) and puts a measured figure on what they waste.",
+  "description": "Where do your tokens go? One command, zero runtime dependencies: agent-viz tracks your coding agents live (Claude Code, GitHub Copilot CLI, Antigravity CLI, Codex) and puts a measured figure on what they waste.",
   "bin": {
     "agent-viz": "bin/agent-viz.js",
     "netgain": "dist/engine/cli.js"
@@ -49,6 +49,8 @@
     "copilot-cli",
     "antigravity",
     "antigravity-cli",
+    "codex",
+    "openai-codex",
     "token-usage",
     "cost-tracking",
     "visualizer",
