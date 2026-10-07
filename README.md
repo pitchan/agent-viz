@@ -4,7 +4,7 @@
 
 It works with [Claude Code](https://docs.claude.com/en/docs/claude-code), [GitHub Copilot CLI](https://docs.github.com/en/copilot/concepts/agents/about-copilot-cli) and [Antigravity CLI](https://antigravity.google). It reads, measures and advises. It runs nothing on your behalf, and none of your data leaves your machine.
 
-![agent-viz in 20 seconds](docs/media/agent-viz-promo.gif)
+[![agent-viz in 20 seconds](docs/media/agent-viz-promo.gif)](https://youtu.be/GYJ5cXP6u4w)
 
 - **Live view** — every tool call, every subagent, tokens and cost, as the session runs.
 - **Live alerts** — an agent repeating the same call, failing in a row, or gone silent raises an alert while it happens. No rule to configure.
