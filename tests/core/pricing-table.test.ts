@@ -41,6 +41,17 @@ test('libellés et fenêtres de contexte : les champs que la pastille consomme',
   }
 });
 
+test('Haiku 5.5 porte son tarif des prompts de plus de 100 000 jetons', () => {
+  const haiku = priceTable().entries.find((e) => e.model === 'claude-haiku-5-5');
+  expect(haiku?.longPrompt).toEqual({
+    above: 100_000, prices: { input: 5e-7, output: 2.5e-6, cacheCreate: 6.25e-7, cacheRead: 5e-8 },
+  });
+});
+
+test('un modèle au prix unique n’a pas de tarif de prompt long', () => {
+  expect(priceTable().entries.find((e) => e.model === 'claude-haiku-4-5')?.longPrompt).toBe(null);
+});
+
 test('immuable de fait : muter le retour ne change pas un second appel', () => {
   const reference = JSON.parse(JSON.stringify(priceTable()));
   const t = priceTable();

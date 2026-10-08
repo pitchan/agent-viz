@@ -260,6 +260,8 @@ export interface PriceTableEntry {
   history: PricePeriod[];
   /** Tarif du mode rapide ; null pour un modèle qui n'en a pas. */
   fast: ModelPrices | null;
+  /** Tarif des prompts de plus de `above` jetons ; null pour un modèle au prix unique. */
+  longPrompt: { above: number; prices: ModelPrices } | null;
   /** Présent quand le tarif courant vient de la page des tarifs d'Anthropic. */
   adopted: AdoptionMark | null;
 }
@@ -314,6 +316,7 @@ function tableOf(b: Bareme): PriceTable {
       const info = own(b.info, model);
       const mark = own(b.marks, model);
       const fast = own(FAST_PRICES, model);
+      const long = own(LONG_PROMPT_PRICES, model);
       return {
         model,
         // Un modèle sans descriptif reste visible (libellé = identifiant) ;
@@ -323,6 +326,7 @@ function tableOf(b: Bareme): PriceTable {
         current: { ...prices },
         history: (own(b.history, model) ?? []).map((p) => ({ until: p.until, prices: { ...p.prices } })),
         fast: fast === undefined ? null : { ...fast },
+        longPrompt: long === undefined ? null : { above: long.above, prices: { ...long.prices } },
         adopted: mark === undefined ? null : { ...mark },
       };
     }),

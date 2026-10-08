@@ -168,6 +168,10 @@ test('formatUsdPerMTok speaks per million tokens with a French decimal comma', (
   expect(formatUsdPerMTok(5e-7)).toBe('0,50 $ le million');
 });
 
+test('un prix au million à trois décimales s’affiche entier, sans arrondi', () => {
+  expect(formatUsdPerMTok(1.25e-7)).toBe('0,125 $ le million');
+});
+
 test('formatShare renders a percentage with one decimal, French comma', () => {
   expect(formatShare(0.1234)).toBe('12,3 %');
   expect(formatShare(1)).toBe('100,0 %');

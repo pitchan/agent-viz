@@ -11,7 +11,7 @@ import { getState, subscribe, loadPricing } from './store.ts';
 import {
   formatTokens, formatUsdExact, formatUsdPerMTok, formatShare, modelLabel, adoptionNote,
   driftTitle, ratesPerMTok, vigieStatus, pendingReason, checkOutcome,
-  basisLabel, periodHeader, fastCostCell, fastTotalNote, fastRatesCell, type Period, type SummaryBasis,
+  basisLabel, periodHeader, fastCostCell, fastTotalNote, fastRatesCell, longPromptRatesCell, type Period, type SummaryBasis,
 } from './format.ts';
 import { initPeriodSelector } from './period-selector.ts';
 
@@ -57,6 +57,7 @@ interface TariffEntry {
   maxInput: number;
   history: TariffPeriod[];
   fast: { input: number; output: number; cacheCreate: number; cacheRead: number } | null;
+  longPrompt: { above: number; prices: { input: number; output: number; cacheCreate: number; cacheRead: number } } | null;
   adopted: { source: string; adoptedAt: string; from: string | null } | null;
 }
 
@@ -102,7 +103,7 @@ interface PricingPayload {
 const COST_HEADERS = ['Modèle', 'Entrée', 'Sortie', 'Création de cache',
   'Relecture de cache', 'Jetons nets', 'Coût', 'dont mode rapide', 'Part'];
 const TARIFF_HEADERS = ['Modèle', 'Entrée', 'Sortie', 'Écriture cache 5 min',
-  'Relecture', 'Mode rapide (entrée / sortie)', 'Fenêtre', 'Périodes datées'];
+  'Relecture', 'Mode rapide (entrée / sortie)', 'Prompt long', 'Fenêtre', 'Périodes datées'];
 
 // "tarif inconnu" instead of an amount, a wanted zero says so with no shame:
 // no silent cell, ever.
@@ -168,6 +169,7 @@ function buildTariffTable(priceTable: PriceTable) {
       formatUsdPerMTok(e.current.input), formatUsdPerMTok(e.current.output),
       formatUsdPerMTok(e.current.cacheCreate), formatUsdPerMTok(e.current.cacheRead),
       fastRatesCell(e.fast),
+      longPromptRatesCell(e.longPrompt),
       formatTokens(e.maxInput),
       periodsCell(e.history),
     ], e.model));
