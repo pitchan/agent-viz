@@ -48,7 +48,7 @@ agent-viz
 | A failed tool shown as an error | ✅ | ❌ ¹ | ⚠️ ² | ❌ ⁷ |
 | Subagents in the topology | ✅ | 🚧 | ❌ | ❌ |
 | Tokens | ✅ | ❌ ³ | ⚠️ ⁴ | ⚠️ ⁸ |
-| Cost | ✅ | ❌ | ❌ ⁵ | ⚠️ ⁹ |
+| Cost | ✅ | ❌ | ⚠️ ⁵ | ⚠️ ⁹ |
 | Session duration | ✅ | ✅ | ❌ ⁶ | ✅ |
 | **Live alerts** | | | | |
 | Loop | ✅ | ✅ | ✅ | ✅ |
@@ -64,7 +64,7 @@ agent-viz
 2. Known once the model call ends, not when the tool ends.
 3. Copilot CLI does not expose token usage.
 4. One model call behind during a turn, exact once it ends.
-5. agent-viz has no Gemini price table.
+5. Cost is an estimate from Google's public API prices, not what your Antigravity plan bills.
 6. Antigravity sends no session-start event.
 7. Codex sends no tool-failure event.
 8. No figure for a forked thread, nor for a session written by an older Codex.
@@ -216,7 +216,7 @@ Known limits, all on Antigravity's side:
 - The error text is Antigravity's own sentence; its exit code is not always the command's (`exit 3` is reported as code 1).
 - To read these results, agent-viz also runs on `PostInvocation`: one more hook process per model call.
 - Tokens are read from `~/.gemini/antigravity-cli/conversations/<id>.db` (undocumented). They lag one model call behind during a turn and are exact once it ends. If the format changes, the session shows "Tokens N/A" instead of a wrong figure.
-- No cost: agent-viz has no Gemini price table.
+- Cost is an estimate from Google's public API prices, not what your Antigravity plan bills.
 - No session duration: Antigravity sends no session-start event.
 - The analysis panels (Conseils, Sessions analysées, Jetons & tarifs, Skills) cover Claude Code sessions only.
 

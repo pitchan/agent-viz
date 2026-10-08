@@ -42,6 +42,9 @@ const PRICES: Record<string, ModelPrices> = {
   'gpt-5.6-sol': { input: 4e-6, output: 2e-5, cacheCreate: 5e-6, cacheRead: 4e-7 },
   'gpt-5.6-terra': { input: 2e-6, output: 1.2e-5, cacheCreate: 2.5e-6, cacheRead: 2e-7 },
   'gpt-5.6-luna': { input: 2e-7, output: 1.2e-6, cacheCreate: 2.5e-7, cacheRead: 2e-8 },
+  // Modèle de Google lu dans les sessions Antigravity : tarif payant standard de l'API Gemini.
+  // Google ne facture pas l'écriture de cache à part : elle est au prix de l'entrée.
+  'gemini-3.8-flash': { input: 7.5e-7, output: 3.75e-6, cacheCreate: 7.5e-7, cacheRead: 7.5e-8 },
 };
 
 // Tarif du mode rapide, repris de la page des tarifs d'Anthropic ; les multiplicateurs
@@ -102,6 +105,7 @@ const MODEL_INFO: Record<string, { label: string; maxInput: number }> = {
   'gpt-5.6-sol': { label: 'GPT-5.6 Sol', maxInput: 258_400 },
   'gpt-5.6-terra': { label: 'GPT-5.6 Terra', maxInput: 258_400 },
   'gpt-5.6-luna': { label: 'GPT-5.6 Luna', maxInput: 258_400 },
+  'gemini-3.8-flash': { label: 'Gemini 3.8 Flash', maxInput: 1_048_576 },
 };
 
 /**
