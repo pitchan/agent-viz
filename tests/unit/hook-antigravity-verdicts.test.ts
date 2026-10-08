@@ -1,6 +1,7 @@
 // Les échecs d'outils d'Antigravity, lus dans son transcript à la fin d'un appel au modèle.
 import { expect, test } from 'vitest';
 import { lateFailures } from '../../src/server/hook-antigravity-verdicts.ts';
+import { classify } from '../../src/engine/watchdog/invocation-patterns.ts';
 
 const CONV = '07f1a74b';
 const lignes = (...objets: unknown[]) => objets.map(o => JSON.stringify(o)).join('\n') + '\n';
@@ -20,7 +21,42 @@ function resultat(step_index: number, phrase: string, sortie = 'Stdout:\n\nStder
   };
 }
 
-test('une commande sortie en erreur donne un événement d\'échec qui reprend la phrase d\'agy', () => {
+// Bloc d'erreur rendu par Windows PowerShell 5.1 pour une commande inconnue, accents déjà
+// abîmés comme agy les écrit dans son transcript.
+const COMMANDE_INCONNUE = 'Output:\n'
+  + 'Get-Trucmuche : Le terme �Get-Trucmuche� n\'est pas reconnu comme nom d\'applet de commande, fonction, fichier de script \r\n'
+  + 'ou programme ex�cutable. V�rifiez l\'orthographe du nom, ou si un chemin d\'acc�s existe, v�rifiez que le chemin d\'acc�s \r\n'
+  + 'est correct et r�essayez.\r\n'
+  + 'Au caract�re Ligne:1 : 1\r\n'
+  + '+ Get-Trucmuche -Nom x\r\n'
+  + '+ ~~~~~~~~~~~~~\r\n'
+  + '    + CategoryInfo          : ObjectNotFound: (Get-Trucmuche:String) [], CommandNotFoundException\r\n'
+  + '    + FullyQualifiedErrorId : CommandNotFoundException\r\n'
+  + ' \r\n';
+
+test('une commande PowerShell en échec garde sa sortie, où la mauvaise invocation se reconnaît', () => {
+  // Arrange
+  const evenements = lignes(lance(2, 'run_command', { CommandLine: 'Get-Trucmuche -Nom x' }));
+  const transcript = lignes(resultat(2, 'The command exited with code 1.', COMMANDE_INCONNUE));
+  // Act
+  const echecs = lateFailures(evenements, transcript);
+  // Assert
+  expect(classify(echecs[0]?.error)).toEqual({ id: 'inv-ps-command-not-found', class: 'invocation' });
+});
+
+test('la sortie d\'une commande en échec est bornée, et commence toujours par la phrase d\'agy', () => {
+  // Arrange
+  const sortie = 'Output:\n' + 'x'.repeat(20_000);
+  const evenements = lignes(lance(2));
+  const transcript = lignes(resultat(2, 'The command exited with code 1.', sortie));
+  // Act
+  const erreur = String(lateFailures(evenements, transcript)[0]?.error);
+  // Assert
+  expect(erreur.startsWith('The command exited with code 1.\nOutput:\nxxx')).toBe(true);
+  expect(erreur.length).toBeLessThan(sortie.length);
+});
+
+test('une commande sortie en erreur donne un événement d\'échec qui reprend le texte d\'agy', () => {
   // Arrange
   const evenements = lignes(lance(2));
   const transcript = lignes(resultat(2, 'The command exited with code 1.'));
@@ -34,7 +70,7 @@ test('une commande sortie en erreur donne un événement d\'échec qui reprend l
     tool_use_id: `${CONV}:2`,
     tool_name: 'run_command',
     tool_input: { CommandLine: 'cmd /c exit 3' },
-    error: 'The command exited with code 1.',
+    error: 'The command exited with code 1.\nStdout:\n\nStderr:',
     cwd: 'C:/projet',
     transcript_path: 'C:/t.jsonl',
   }]);

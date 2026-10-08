@@ -213,7 +213,7 @@ Detection: an agent is considered installed if its CLI binary is on your `PATH` 
 
 Known limits, all on Antigravity's side:
 - A failed tool (non-zero exit, or a call rejected before it runs) turns red once the model call ends, not when the tool ends: Antigravity writes the result after its end event.
-- The error text is Antigravity's own sentence; its exit code is not always the command's (`exit 3` is reported as code 1).
+- The error text is Antigravity's own sentence, followed by the command's output; its exit code is not always the command's (`exit 3` is reported as code 1).
 - To read these results, agent-viz also runs on `PostInvocation`: one more hook process per model call.
 - Tokens are read from `~/.gemini/antigravity-cli/conversations/<id>.db` (undocumented). They lag one model call behind during a turn and are exact once it ends. If the format changes, the session shows "Tokens N/A" instead of a wrong figure.
 - Cost is an estimate from Google's public API prices, not what your Antigravity plan bills.

@@ -23,10 +23,13 @@ function jsonLines(text: string): Payload[] {
 }
 
 // Ancrée sur l'en-tête qu'agy pose lui-même : la sortie de la commande, plus bas, ne peut pas l'imiter.
-const EXIT_CODE = /^Created At: [^\n]*\nCompleted At: [^\n]*\n\n(The command exited with code (\d+)\.)/;
-const MAX_ERROR_LENGTH = 500;
+const EXIT_CODE = /^Created At: [^\n]*\nCompleted At: [^\n]*\n\n(The command exited with code (\d+)\.[^]*)/;
+// Un bloc d'erreur PowerShell pose son identifiant après le message et la commande citée :
+// la borne doit laisser passer le bloc entier, c'est lui que lit l'alerte de mauvaise invocation.
+const MAX_ERROR_LENGTH = 4000;
 
-// La phrase d'agy est reprise telle quelle : son code n'est pas toujours celui de la commande.
+// La phrase d'agy est reprise telle quelle, suivie de la sortie de la commande : son code
+// n'est pas toujours celui de la commande.
 function failureOf(toolName: unknown, result: Payload): string | null {
   if (result.status === 'ERROR') {
     const reason = typeof result.error === 'string' && result.error ? result.error : result.content;
@@ -34,7 +37,7 @@ function failureOf(toolName: unknown, result: Payload): string | null {
   }
   if (toolName !== 'run_command' || typeof result.content !== 'string') return null;
   const m = EXIT_CODE.exec(result.content);
-  return m && m[1] && m[2] !== '0' ? m[1] : null;
+  return m && m[1] && m[2] !== '0' ? m[1].slice(0, MAX_ERROR_LENGTH).trimEnd() : null;
 }
 
 /** Les échecs que le transcript révèle et que le fichier d'événements ne porte pas encore. */
