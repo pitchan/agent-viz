@@ -178,6 +178,27 @@ test('une session Codex trouve son transcript dans le premier événement', () =
   expect(chemin).toBe(premier.transcript_path);
 });
 
+test('un appel d’un modèle d’OpenAI tarifé a un coût, au tarif de l’API', () => {
+  // Arrange
+  const rec = session();
+  // Act
+  lis(rec, [tour('gpt-5.6-sol'), jetons(APPEL_1, APPEL_1)]);
+  // Assert
+  expect(rec.tokens.main.costUsd).toBeCloseTo(600 * 4e-6 + 400 * 4e-7 + 50 * 2e-5, 12);
+  expect(rec.tokens.main.costComplete).toBe(true);
+});
+
+test('un appel de codex-auto-review, sans tarif publié, laisse le coût incomplet', () => {
+  // Arrange
+  const rec = session();
+  // Act
+  lis(rec, [tour('codex-auto-review'), jetons(APPEL_1, APPEL_1)]);
+  // Assert
+  expect(rec.tokens.main.costUsd).toBe(0);
+  expect(rec.tokens.main.costComplete).toBe(false);
+  expect(rec.tokens.main.unknownModels).toEqual(['codex-auto-review']);
+});
+
 test('un fil dérivé d’un autre ne compte aucun jeton et se déclare non lisible', () => {
   // Arrange
   const rec = session();

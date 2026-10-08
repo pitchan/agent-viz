@@ -32,6 +32,14 @@ const PRICES: Record<string, ModelPrices> = {
   'claude-sonnet-4-6': { input: 3e-6, output: 1.5e-5, cacheCreate: 3.75e-6, cacheRead: 3e-7 },
   'claude-sonnet-4-5': { input: 3e-6, output: 1.5e-5, cacheCreate: 3.75e-6, cacheRead: 3e-7 },
   'claude-haiku-4-5': { input: 1e-6, output: 5e-6, cacheCreate: 1.25e-6, cacheRead: 1e-7 },
+  // Modèles d'OpenAI lus dans les sessions Codex : tarif standard de la page des tarifs de
+  // l'API, palier d'entrée sous 272 000 jetons — la fenêtre que Codex annonce reste en dessous.
+  'gpt-6-astra': { input: 1e-5, output: 5e-5, cacheCreate: 1.25e-5, cacheRead: 1e-6 },
+  // Relecture de cache à 0,05 × l'entrée, et non 0,1 × comme les autres modèles d'OpenAI.
+  'gpt-6.1-sol': { input: 2e-6, output: 1e-5, cacheCreate: 2.5e-6, cacheRead: 1e-7 },
+  'gpt-5.6-sol': { input: 4e-6, output: 2e-5, cacheCreate: 5e-6, cacheRead: 4e-7 },
+  'gpt-5.6-terra': { input: 2e-6, output: 1.2e-5, cacheCreate: 2.5e-6, cacheRead: 2e-7 },
+  'gpt-5.6-luna': { input: 2e-7, output: 1.2e-6, cacheCreate: 2.5e-7, cacheRead: 2e-8 },
 };
 
 // Tarif du mode rapide, repris de la page des tarifs d'Anthropic ; les multiplicateurs
@@ -78,6 +86,12 @@ const MODEL_INFO: Record<string, { label: string; maxInput: number }> = {
   'claude-sonnet-4-6': { label: 'Sonnet 4.6', maxInput: 1_000_000 },
   'claude-sonnet-4-5': { label: 'Sonnet 4.5', maxInput: 200_000 },
   'claude-haiku-4-5': { label: 'Haiku 4.5', maxInput: 200_000 },
+  // La fenêtre est celle que Codex écrit dans chaque ligne de jetons (`model_context_window`).
+  'gpt-6-astra': { label: 'GPT-6 Astra', maxInput: 258_400 },
+  'gpt-6.1-sol': { label: 'GPT-6.1 Sol', maxInput: 258_400 },
+  'gpt-5.6-sol': { label: 'GPT-5.6 Sol', maxInput: 258_400 },
+  'gpt-5.6-terra': { label: 'GPT-5.6 Terra', maxInput: 258_400 },
+  'gpt-5.6-luna': { label: 'GPT-5.6 Luna', maxInput: 258_400 },
 };
 
 /**
