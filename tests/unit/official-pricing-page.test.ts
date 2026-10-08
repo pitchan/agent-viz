@@ -66,3 +66,23 @@ test('une écriture de cache 1 h qui ne vaut pas 2 × l’entrée écarte le mod
 test('une page sans le tableau des tarifs est une erreur nommée', () => {
   expect(() => parsePricingPage('# Pricing\n\nrien ici')).toThrow(/tableau des tarifs/);
 });
+
+const PAGE_PAR_LONGUEUR = [
+  '## Model pricing',
+  '',
+  '| Model | Base input tokens | 5m cache writes | 1h cache writes | Cache hits and refreshes | Output tokens |',
+  '| :-- | :-- | :-- | :-- | :-- | :-- |',
+  '| Claude Haiku 5.5 (for prompts up to 100,000 tokens) | $0.10 / MTok | $0.125 / MTok | $0.20 / MTok | $0.01 / MTok | $0.50 / MTok |',
+  '| Claude Haiku 5.5 (for prompts over 100,000 tokens) | $0.50 / MTok | $0.625 / MTok | $1 / MTok | $0.05 / MTok | $2.50 / MTok |',
+].join('\n');
+
+test('un modèle tarifé par longueur de prompt se lit à son tarif des prompts courts, sa ligne des prompts longs ne l’écrase pas', () => {
+  // Arrange
+  const page = PAGE_PAR_LONGUEUR;
+
+  // Act
+  const prix = parsePricingPage(page);
+
+  // Assert
+  expect(prix.get('claude-haiku-5-5')).toEqual({ input: 1e-7, output: 5e-7, cacheCreate: 1.25e-7, cacheRead: 1e-8 });
+});

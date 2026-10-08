@@ -4,7 +4,8 @@
 // Une ligne `event_msg` / `token_count` porte le cumul de la session et le dernier appel.
 // Le modèle est sur les lignes `turn_context`, pas sur la ligne de jetons.
 // Un fil dérivé (`session_meta.forked_from_id`) copie l'historique de son parent sans marquer la fin
-// de la copie : ses jetons sont déclarés non lisibles. La question est l'item `UserMessage`.
+// de la copie : ses jetons sont déclarés non lisibles et il n'a pas de question. La question est
+// l'item `UserMessage`.
 
 import { ensureTokens, accumulateUsage } from '../tokens.ts';
 import { decodeJsonlLine } from '../../engine/core/jsonl.ts';
@@ -22,6 +23,10 @@ function asString(v: unknown): string | null {
 function discoverPath(firstEvent: unknown): string | null {
   if (!isRecord(firstEvent)) return null;
   return asString(firstEvent.transcript_path);
+}
+
+function isForkedMeta(evt: Record<string, unknown>): boolean {
+  return evt.type === 'session_meta' && isRecord(evt.payload) && !!asString(evt.payload.forked_from_id);
 }
 
 interface Counters {
@@ -84,8 +89,7 @@ function parseUsageLine(line: string, rec: UsageRecord): boolean {
   const state = stateOf(tokens);
 
   if (evt.type === 'session_meta') {
-    const parent = asString(evt.payload.forked_from_id);
-    if (!parent) return false;
+    if (!isForkedMeta(evt)) return false;
     tokens.unsupported = true;
     return true;
   }
@@ -104,9 +108,13 @@ function parseUsageLine(line: string, rec: UsageRecord): boolean {
   // Un appel réel fait avancer le cumul de sa propre taille. Un écart nul est une ligne
   // répétée ; un autre écart est un cumul hérité d'un fil parent, dont on ne sait rien.
   if (delta <= 0 || delta !== call.total) return false;
-  // Un total qui contredit ses compteurs ajouterait 0 jeton et remettrait la taille de contexte à 0.
-  if (call.input + call.output !== call.total) return false;
-  // Sans modèle le coût passerait pour complet à 0 $ : la ligne attend son `turn_context`.
+  // Un total qui contredit ses compteurs ne dit pas ce qu'il contient : la session n'est pas
+  // lisible, un total à 0 passerait pour une mesure.
+  if (call.input + call.output !== call.total) {
+    tokens.unsupported = true;
+    return true;
+  }
+  // Sans modèle le coût passerait pour complet à 0 $ : l'appel n'est pas compté.
   if (state.model === null) return false;
 
   // Le cumul ne baisse jamais et avance à chaque appel : il identifie l'appel, et une
@@ -115,11 +123,20 @@ function parseUsageLine(line: string, rec: UsageRecord): boolean {
   return true;
 }
 
+// Avec un fichier joint, Codex Desktop écrit la liste des fichiers puis cette ligne : la question
+// est ce qui la suit.
+const REQUEST_HEADING = /^## My request:[ \t]*\r?$/m;
+
+function questionOf(text: string): string {
+  const heading = REQUEST_HEADING.exec(text);
+  return (heading ? text.slice(heading.index + heading[0].length) : text).trim();
+}
+
 function userMessageText(item: unknown): string | null {
   if (!isRecord(item) || item.type !== 'UserMessage' || !Array.isArray(item.content)) return null;
   for (const block of item.content as unknown[]) {
     if (!isRecord(block) || block.type !== 'text' || typeof block.text !== 'string') continue;
-    const text = block.text.trim();
+    const text = questionOf(block.text);
     if (text) return text.slice(0, 120);
   }
   return null;
@@ -127,11 +144,14 @@ function userMessageText(item: unknown): string | null {
 
 function extractPrompt(content: string): string | null {
   for (const line of content.split('\n')) {
-    if (line.indexOf('"UserMessage"') === -1) continue;
+    if (line.indexOf('"UserMessage"') === -1 && line.indexOf('"session_meta"') === -1) continue;
     const verdict = decodeJsonlLine(line);
     if (!verdict || !verdict.ok) continue;
     const o = verdict.value;
-    if (!isRecord(o) || !isRecord(o.payload) || o.payload.type !== 'item_completed') continue;
+    if (!isRecord(o)) continue;
+    // Le premier message d'un fil dérivé est une copie de celui de son parent.
+    if (isForkedMeta(o)) return null;
+    if (!isRecord(o.payload) || o.payload.type !== 'item_completed') continue;
     const text = userMessageText(o.payload.item);
     if (text !== null) return text;
   }

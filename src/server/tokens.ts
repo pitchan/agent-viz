@@ -40,7 +40,7 @@ interface Bucket extends UsageBucket {
 
 /** La tranche `rec.tokens` telle que CE fichier la construit et la lit.
  *  `unsupported` et `transcriptMissing` ne sont jamais posés ICI — ils le
- *  sont par `transcript.ts` sur le même objet ; optionnels côté lecture
+ *  sont par `transcript.ts` et par `transcript-adapters/codex.ts` sur le même objet ; optionnels côté lecture
  *  (`!rec.tokens.unsupported` tolère leur absence). */
 interface TokenState {
   main: Bucket;

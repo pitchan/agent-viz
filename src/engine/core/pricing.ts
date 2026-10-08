@@ -32,6 +32,16 @@ const PRICES: Record<string, ModelPrices> = {
   'claude-sonnet-4-6': { input: 3e-6, output: 1.5e-5, cacheCreate: 3.75e-6, cacheRead: 3e-7 },
   'claude-sonnet-4-5': { input: 3e-6, output: 1.5e-5, cacheCreate: 3.75e-6, cacheRead: 3e-7 },
   'claude-haiku-4-5': { input: 1e-6, output: 5e-6, cacheCreate: 1.25e-6, cacheRead: 1e-7 },
+  // Tarif des prompts jusqu'à 100 000 jetons ; au-delà, LONG_PROMPT_PRICES.
+  'claude-haiku-5-5': { input: 1e-7, output: 5e-7, cacheCreate: 1.25e-7, cacheRead: 1e-8 },
+  // Modèles d'OpenAI lus dans les sessions Codex : tarif standard de la page des tarifs de
+  // l'API, palier d'entrée sous 272 000 jetons — la fenêtre que Codex annonce reste en dessous.
+  'gpt-6-astra': { input: 1e-5, output: 5e-5, cacheCreate: 1.25e-5, cacheRead: 1e-6 },
+  // Relecture de cache à 0,05 × l'entrée, et non 0,1 × comme les autres modèles d'OpenAI.
+  'gpt-6.1-sol': { input: 2e-6, output: 1e-5, cacheCreate: 2.5e-6, cacheRead: 1e-7 },
+  'gpt-5.6-sol': { input: 4e-6, output: 2e-5, cacheCreate: 5e-6, cacheRead: 4e-7 },
+  'gpt-5.6-terra': { input: 2e-6, output: 1.2e-5, cacheCreate: 2.5e-6, cacheRead: 2e-7 },
+  'gpt-5.6-luna': { input: 2e-7, output: 1.2e-6, cacheCreate: 2.5e-7, cacheRead: 2e-8 },
 };
 
 // Tarif du mode rapide, repris de la page des tarifs d'Anthropic ; les multiplicateurs
@@ -41,6 +51,13 @@ const FAST_PRICES: Record<string, ModelPrices> = {
   'claude-opus-5-5': { input: 8e-6, output: 4e-5, cacheCreate: 1e-5, cacheRead: 4e-7 },
   'claude-opus-5': { input: 1e-5, output: 5e-5, cacheCreate: 1.25e-5, cacheRead: 1e-6 },
   'claude-opus-4-8': { input: 1e-5, output: 5e-5, cacheCreate: 1.25e-5, cacheRead: 1e-6 },
+};
+
+// Tarif par longueur de prompt : un appel dont le prompt dépasse `above` jetons paie ces prix
+// sur tous ses jetons, sortie comprise. Le prompt est tout ce que le modèle reçoit : entrée,
+// écritures et relectures de cache.
+const LONG_PROMPT_PRICES: Record<string, { above: number; prices: ModelPrices }> = {
+  'claude-haiku-5-5': { above: 100_000, prices: { input: 5e-7, output: 2.5e-6, cacheCreate: 6.25e-7, cacheRead: 5e-8 } },
 };
 
 // Les périodes datées ANTÉRIEURES au tarif courant, triées par `until` croissant. Chacune
@@ -78,6 +95,13 @@ const MODEL_INFO: Record<string, { label: string; maxInput: number }> = {
   'claude-sonnet-4-6': { label: 'Sonnet 4.6', maxInput: 1_000_000 },
   'claude-sonnet-4-5': { label: 'Sonnet 4.5', maxInput: 200_000 },
   'claude-haiku-4-5': { label: 'Haiku 4.5', maxInput: 200_000 },
+  'claude-haiku-5-5': { label: 'Haiku 5.5', maxInput: 1_000_000 },
+  // La fenêtre est celle que Codex écrit dans chaque ligne de jetons (`model_context_window`).
+  'gpt-6-astra': { label: 'GPT-6 Astra', maxInput: 258_400 },
+  'gpt-6.1-sol': { label: 'GPT-6.1 Sol', maxInput: 258_400 },
+  'gpt-5.6-sol': { label: 'GPT-5.6 Sol', maxInput: 258_400 },
+  'gpt-5.6-terra': { label: 'GPT-5.6 Terra', maxInput: 258_400 },
+  'gpt-5.6-luna': { label: 'GPT-5.6 Luna', maxInput: 258_400 },
 };
 
 /**
@@ -181,8 +205,11 @@ function costWith(
   // champs, et `"cache_creation": null`, du JSON valide, faisait LEVER cette fonction. Le serveur
   // calcule son coût ici lui aussi : sans ces deux gardes, la panne le toucherait.
   const u: RawUsage = isRecord(usage) ? usage : {};
-  const p = norm !== null ? pricesFor(priceAt, norm, at, u.speed) : undefined;
-  if (p === undefined) return { usd: null, known: false, model: norm };
+  const base = norm !== null ? pricesFor(priceAt, norm, at, u.speed) : undefined;
+  if (norm === null || base === undefined) return { usd: null, known: false, model: norm };
+  const long = own(LONG_PROMPT_PRICES, norm);
+  const prompt = countOrZero(u.input_tokens) + countOrZero(u.cache_creation_input_tokens) + countOrZero(u.cache_read_input_tokens);
+  const p = long !== undefined && prompt > long.above ? long.prices : base;
 
   const cc = isRecord(u.cache_creation) ? u.cache_creation : undefined;
   // Un champ brut qui n'est pas un compte (chaîne, Infinity, négatif, décimal)
@@ -233,6 +260,8 @@ export interface PriceTableEntry {
   history: PricePeriod[];
   /** Tarif du mode rapide ; null pour un modèle qui n'en a pas. */
   fast: ModelPrices | null;
+  /** Tarif des prompts de plus de `above` jetons ; null pour un modèle au prix unique. */
+  longPrompt: { above: number; prices: ModelPrices } | null;
   /** Présent quand le tarif courant vient de la page des tarifs d'Anthropic. */
   adopted: AdoptionMark | null;
 }
@@ -287,6 +316,7 @@ function tableOf(b: Bareme): PriceTable {
       const info = own(b.info, model);
       const mark = own(b.marks, model);
       const fast = own(FAST_PRICES, model);
+      const long = own(LONG_PROMPT_PRICES, model);
       return {
         model,
         // Un modèle sans descriptif reste visible (libellé = identifiant) ;
@@ -296,6 +326,7 @@ function tableOf(b: Bareme): PriceTable {
         current: { ...prices },
         history: (own(b.history, model) ?? []).map((p) => ({ until: p.until, prices: { ...p.prices } })),
         fast: fast === undefined ? null : { ...fast },
+        longPrompt: long === undefined ? null : { above: long.above, prices: { ...long.prices } },
         adopted: mark === undefined ? null : { ...mark },
       };
     }),

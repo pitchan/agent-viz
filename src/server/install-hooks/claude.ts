@@ -2,7 +2,6 @@
 // de l'agent sur la machine. Le registre (registry.ts) n'a besoin de rien savoir de plus.
 import fs from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
 import type { AgentInstaller } from './types.ts';
 import { EVENTS } from './config.ts';
 import type { ClaudeSettings } from './settings-io.ts';
@@ -17,5 +16,5 @@ export function auditSettings(
 
 export const claudeInstaller: AgentInstaller = {
   ...settingsInstaller('claude'),
-  detect: () => inPath('claude') || fs.existsSync(path.join(os.homedir(), '.claude', 'settings.json')),
+  detect: home => inPath('claude') || fs.existsSync(path.join(home, '.claude', 'settings.json')),
 };

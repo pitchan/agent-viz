@@ -282,8 +282,11 @@ export function scanProgressLabel(scan: ScanProgress | null | undefined) {
 // ─── « Jetons & tarifs » panel formatters ─────────────────────────────────
 
 // USD per token → per-MTok wording, the unit rate cards are published in.
+// Deux décimales, trois quand le prix en a besoin : 0,125 $ arrondi à 0,13 $ serait un prix faux.
 export function formatUsdPerMTok(perToken: number) {
-  return `${(perToken * 1e6).toFixed(2).replace('.', ',')} $ le million`;
+  const perMillion = perToken * 1e6;
+  const decimals = Number(perMillion.toFixed(2)) === Number(perMillion.toFixed(6)) ? 2 : 3;
+  return `${perMillion.toFixed(decimals).replace('.', ',')} $ le million`;
 }
 
 export function formatShare(ratio: number) {
@@ -308,6 +311,11 @@ export function fastCostCell(fastUsd: number, pricing: string): string {
 
 export function fastTotalNote(fastUsd: number): string {
   return fastUsd > 0 ? ` dont ${formatUsdExact(fastUsd)} en mode rapide` : '';
+}
+
+export function longPromptRatesCell(long: { above: number; prices: { input: number; output: number } } | null): string {
+  if (long === null) return '—';
+  return `au-delà de ${formatTokens(long.above)} jetons de prompt : ${formatUsdPerMTok(long.prices.input)} entrée / ${formatUsdPerMTok(long.prices.output)} sortie`;
 }
 
 export function fastRatesCell(fast: { input: number; output: number } | null): string {

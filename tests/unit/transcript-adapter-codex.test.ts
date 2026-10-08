@@ -178,6 +178,27 @@ test('une session Codex trouve son transcript dans le premier événement', () =
   expect(chemin).toBe(premier.transcript_path);
 });
 
+test('un appel d’un modèle d’OpenAI tarifé a un coût, au tarif de l’API', () => {
+  // Arrange
+  const rec = session();
+  // Act
+  lis(rec, [tour('gpt-5.6-sol'), jetons(APPEL_1, APPEL_1)]);
+  // Assert
+  expect(rec.tokens.main.costUsd).toBeCloseTo(600 * 4e-6 + 400 * 4e-7 + 50 * 2e-5, 12);
+  expect(rec.tokens.main.costComplete).toBe(true);
+});
+
+test('un appel de codex-auto-review, sans tarif publié, laisse le coût incomplet', () => {
+  // Arrange
+  const rec = session();
+  // Act
+  lis(rec, [tour('codex-auto-review'), jetons(APPEL_1, APPEL_1)]);
+  // Assert
+  expect(rec.tokens.main.costUsd).toBe(0);
+  expect(rec.tokens.main.costComplete).toBe(false);
+  expect(rec.tokens.main.unknownModels).toEqual(['codex-auto-review']);
+});
+
 test('un fil dérivé d’un autre ne compte aucun jeton et se déclare non lisible', () => {
   // Arrange
   const rec = session();
@@ -201,7 +222,7 @@ test('une session qui n’est pas dérivée compte ses jetons après son session
   expect(rec.tokens.main.out).toBe(50);
 });
 
-test('un appel dont le total ne correspond pas à ses compteurs n’est pas compté', () => {
+test('un appel dont le total ne correspond pas à ses compteurs n’est pas compté et la session se déclare non lisible', () => {
   // Arrange
   const rec = session();
   const incoherent = {
@@ -211,7 +232,8 @@ test('un appel dont le total ne correspond pas à ses compteurs n’est pas comp
   // Act
   const rendus = lis(rec, [tour('gpt-5.5'), jetons(incoherent, incoherent)]);
   // Assert
-  expect(rendus).toEqual([false, false]);
+  expect(rendus).toEqual([false, true]);
+  expect(rec.tokens.unsupported).toBe(true);
   expect(rec.tokens.main.lastIn).toBe(0);
   expect(rec.tokens.main.in).toBe(0);
 });
@@ -236,6 +258,35 @@ test('une question qui contient des chevrons est rendue telle quelle', () => {
   const question = codex.extractPrompt(transcript);
   // Assert
   expect(question).toBe('ajoute un <div> dans le header');
+});
+
+test('avec un fichier joint, la question est ce qui suit l’en-tête des fichiers', () => {
+  // Arrange
+  const texte = '# Files mentioned by the user:\n\n## notes.md: C:/projet/notes.md\n\n## My request:\nRésume ce fichier';
+  const transcript = [meta(), questionConsignee(texte)].join('\n');
+  // Act
+  const question = codex.extractPrompt(transcript);
+  // Assert
+  expect(question).toBe('Résume ce fichier');
+});
+
+test('un fichier joint sans texte ne donne pas de question', () => {
+  // Arrange
+  const texte = '# Files mentioned by the user:\n\n## notes.md: C:/projet/notes.md\n\n## My request:\n';
+  const transcript = [meta(), questionConsignee(texte)].join('\n');
+  // Act
+  const question = codex.extractPrompt(transcript);
+  // Assert
+  expect(question).toBe(null);
+});
+
+test('un fil dérivé n’affiche pas la question copiée de son parent', () => {
+  // Arrange
+  const transcript = [meta('parent-1'), questionConsignee('Question du fil parent')].join('\n');
+  // Act
+  const question = codex.extractPrompt(transcript);
+  // Assert
+  expect(question).toBe(null);
 });
 
 test('sans message de l’utilisateur consigné, il n’y a pas de question', () => {

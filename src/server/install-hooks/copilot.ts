@@ -5,7 +5,6 @@
 // tolère le reste.
 import fs from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
 import type { AgentOpts, ResolvedTarget, AgentInstaller } from './types.ts';
 import { HOOK_TIMEOUT_SEC } from './types.ts';
 import { AGENT_CONFIG, GITIGNORE_EXTRAS, eventsFor } from './config.ts';
@@ -281,7 +280,7 @@ export const copilotInstaller: AgentInstaller = {
   install: installCopilot,
   uninstall: uninstallCopilot,
   audit: auditCopilot,
-  detect: () => inPath('copilot') || dirHasFiles(path.join(os.homedir(), '.copilot')),
+  detect: home => inPath('copilot') || dirHasFiles(path.join(home, '.copilot')),
   sweepTargets: copilotSweepTargets,
   installedIn: copilotHookIn,
 };

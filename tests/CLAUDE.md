@@ -6,6 +6,8 @@ Outillage imposé : l'API native de vitest (`describe`/`test`/`expect`, `vi.spyO
 
 **Seule l'extension `.test.ts` est lue.** Toute autre extension sous `tests/` ne tournerait jamais, et sa présence se lirait comme une couverture. Le filet `tests/repo/test-file-extensions.test.ts` rougit si une telle extension apparaît sous `tests/`. Un import relatif s'écrit en `.ts` (`'../../src/engine/core/usage.ts'`), jamais en `.js` : vitest résout `.js` vers la source, Node ne le fait pas. Filet : `tests/repo/relative-specifiers-exist.test.ts`.
 
+**Jamais de `npm run build` pendant qu'une suite tourne sur le même arbre** : le build supprime `bin/agent-viz.js` et `dist/` avant de les recréer, et les tests de `tests/repo/` qui les lisent tombent en ENOENT.
+
 ## 1. Structure : AAA, sans exception
 
 Chaque test = trois blocs, dans cet ordre, marqués `// Arrange`, `// Act`, `// Assert`.

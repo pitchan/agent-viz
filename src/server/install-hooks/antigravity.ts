@@ -3,7 +3,6 @@
 // Implémente AgentInstaller ; les autres noms de hook du fichier ne sont jamais touchés.
 import fs from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
 import { isDeepStrictEqual } from 'node:util';
 import type { AgentOpts, ResolvedTarget, ResolvedCommand, AgentInstaller } from './types.ts';
 import { HOOK_TIMEOUT_SEC } from './types.ts';
@@ -183,7 +182,7 @@ export const antigravityInstaller: AgentInstaller = {
   install: installAntigravity,
   uninstall: uninstallAntigravity,
   audit: auditAntigravity,
-  detect: () => inPath('agy') || dirHasFiles(path.join(os.homedir(), '.gemini', 'antigravity-cli')),
+  detect: home => inPath('agy') || dirHasFiles(path.join(home, '.gemini', 'antigravity-cli')),
   sweepTargets: antigravitySweepTargets,
   installedIn: antigravityHookIn,
 };

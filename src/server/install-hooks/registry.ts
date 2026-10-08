@@ -9,6 +9,7 @@
 // undefined → auto-detect; uninstall defaults to ALL agents (don't leave hooks
 // behind if an agent got removed from PATH after install).
 // Returns { <agent>: result, ... } where each side carries the per-agent result.
+import os from 'node:os';
 import type { AgentName, AgentOpts, ScanResult, AgentInstaller, Scope, Target } from './types.ts';
 import { scanInstalled } from './scopes.ts';
 import { claudeInstaller } from './claude.ts';
@@ -43,7 +44,7 @@ export function agentLabel(name: string): string {
 export const TARGETS: readonly Target[] = [...(Object.keys(INSTALLERS) as AgentName[]), 'both'];
 
 type Detect = (agent: AgentName) => boolean;
-const realDetect: Detect = a => INSTALLERS[a].detect();
+const realDetect: Detect = a => INSTALLERS[a].detect(os.homedir());
 
 // Les agents à traiter, et ceux écartés faute de la portée demandée : un écarté est
 // rendu comme donnée, pour que la CLI le nomme au lieu de le taire.
@@ -128,7 +129,7 @@ export function uninstall(opts: AgentOpts = {}): Record<string, unknown> {
 // Back-compat: detectAgents() returns { claude: bool, copilot: bool, ... }
 export function detectAgents(_opts: AgentOpts = {}): Record<string, boolean> {
   const out: Record<string, boolean> = {};
-  for (const a of Object.keys(INSTALLERS) as AgentName[]) out[a] = INSTALLERS[a].detect();
+  for (const a of Object.keys(INSTALLERS) as AgentName[]) out[a] = INSTALLERS[a].detect(os.homedir());
   return out;
 }
 

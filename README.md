@@ -47,12 +47,12 @@ agent-viz
 | Tool calls as they happen | ✅ | ✅ | ✅ | ✅ |
 | A failed tool shown as an error | ✅ | ❌ ¹ | ⚠️ ² | ❌ ⁷ |
 | Subagents in the topology | ✅ | 🚧 | ❌ | ❌ |
-| Tokens | ✅ | ❌ ³ | ⚠️ ⁴ | ✅ |
-| Cost | ✅ | ❌ | ❌ ⁵ | ❌ ⁵ |
-| Session duration | ✅ | ✅ | ❌ ⁶ | 🚧 |
+| Tokens | ✅ | ❌ ³ | ⚠️ ⁴ | ⚠️ ⁸ |
+| Cost | ✅ | ❌ | ❌ ⁵ | ⚠️ ⁹ |
+| Session duration | ✅ | ✅ | ❌ ⁶ | ✅ |
 | **Live alerts** | | | | |
-| Loop | ✅ | ✅ | ✅ | 🚧 |
-| Stuck | ✅ | 🚧 | ✅ | 🚧 |
+| Loop | ✅ | ✅ | ✅ | ✅ |
+| Stuck | ✅ | 🚧 | ✅ | ✅ |
 | Retry storm | ✅ | ❌ ¹ | ⚠️ ² | ❌ ⁷ |
 | Bad invocation | ✅ | ❌ ¹ | 🚧 | ❌ ⁷ |
 | **Observatory** | | | | |
@@ -64,9 +64,11 @@ agent-viz
 2. Known once the model call ends, not when the tool ends.
 3. Copilot CLI does not expose token usage.
 4. One model call behind during a turn, exact once it ends.
-5. agent-viz has no Gemini or OpenAI price table.
+5. agent-viz has no Gemini price table.
 6. Antigravity sends no session-start event.
 7. Codex sends no tool-failure event.
+8. No figure for a forked thread, nor for a session written by an older Codex.
+9. What the session would cost at OpenAI's API rates. A ChatGPT plan is billed differently, and codex-auto-review has no published price.
 
 Cursor is not supported.
 
@@ -228,7 +230,8 @@ Known limits, all on Antigravity's side:
 Known limits:
 - Tokens are read from the session transcript under `~/.codex/sessions/`.
 - A thread forked from another one starts with a copy of its parent's history, token lines included, with nothing marking where the copy ends: agent-viz shows "Tokens N/A" for it instead of a figure that would count the parent twice.
-- No cost: agent-viz has no OpenAI price table.
+- Older Codex builds write token lines with a total and no breakdown. agent-viz shows "Tokens N/A" for those sessions instead of a wrong figure. Seen on 0.135.0-alpha.1, not on 0.147 and later.
+- Cost is what the session would cost at OpenAI's API rates. A ChatGPT plan is billed differently, and codex-auto-review has no published price.
 - Subagent threads are not drawn in the topology.
 
 ## Hook management

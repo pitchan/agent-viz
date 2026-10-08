@@ -48,8 +48,8 @@ interface TranscriptSlice {
 // Frontière avec `tokens.ts` : sa forme précise (`Bucket`,
 // `TokenState`) reste privée à ce module, comme documenté dans son propre
 // commentaire pour `transcript-adapters/claude.ts` — ce fichier-ci reprend le
-// même geste, avec les deux champs supplémentaires que LUI seul pose sur
-// `rec.tokens` (`unsupported`, `transcriptMissing`).
+// même geste, avec les deux champs supplémentaires posés sur `rec.tokens` :
+// `transcriptMissing`, par lui seul, et `unsupported`, aussi par l'adapter Codex.
 interface TokenState {
   main: UsageBucket;
   perAgent: Map<string, UsageBucket>;
