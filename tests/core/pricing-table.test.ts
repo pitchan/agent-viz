@@ -11,6 +11,7 @@ test('source, unité, et les modèles de la table courante', () => {
     'claude-fable-5', 'claude-fable-5-1', 'claude-haiku-4-5', 'claude-haiku-5-5', 'claude-mythos-5', 'claude-mythos-5-1', 'claude-opus-4-5',
     'claude-opus-4-6', 'claude-opus-4-7', 'claude-opus-4-8', 'claude-opus-5', 'claude-opus-5-5',
     'claude-sonnet-4-5', 'claude-sonnet-4-6', 'claude-sonnet-5',
+    'gemini-3.8-flash',
     'gpt-5.6-luna', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-6-astra', 'gpt-6.1-sol',
   ]);
 });

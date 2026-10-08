@@ -49,12 +49,23 @@ test('les appels lus sont cumulés, et le dernier donne la taille du contexte', 
 test('un modèle sans tarif connu laisse le coût incomplet plutôt que nul', () => {
   // Arrange
   const t = jetons();
-  const s = source([{ stamp: 'a', read: { ok: true, calls: [APPEL_1] } }]);
+  const s = source([{ stamp: 'a', read: { ok: true, calls: [{ ...APPEL_1, model: 'modele-sans-tarif' }] } }]);
   // Act
   applyUsageSnapshot('session-1', t, s, '/t.jsonl', () => {});
   // Assert
   expect(t.main.costComplete).toBe(false);
-  expect(t.main.unknownModels).toEqual(['gemini-3.8-flash']);
+  expect(t.main.unknownModels).toEqual(['modele-sans-tarif']);
+});
+
+test('un appel à Gemini 3.8 Flash est chiffré, relecture de cache comprise', () => {
+  // Arrange
+  const t = jetons();
+  const s = source([{ stamp: 'a', read: { ok: true, calls: [APPEL_2] } }]);
+  // Act
+  applyUsageSnapshot('session-1', t, s, '/t.jsonl', () => {});
+  // Assert
+  expect(t.main.costComplete).toBe(true);
+  expect(t.main.costUsd).toBeCloseTo((3044 * 0.75 + 2571 * 3.75 + 16264 * 0.075) / 1e6, 10);
 });
 
 test('relire les mêmes appels avec un appel de plus ne compte que le nouveau', () => {

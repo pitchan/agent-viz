@@ -29,6 +29,7 @@ const TARIFS: Record<string, Tarif> = {
   'gpt-5.6-sol': { entree: 4, sortie: 20, ecritureCache: 5, relectureCache: 0.4 },
   'gpt-5.6-terra': { entree: 2, sortie: 12, ecritureCache: 2.5, relectureCache: 0.2 },
   'gpt-5.6-luna': { entree: 0.2, sortie: 1.2, ecritureCache: 0.25, relectureCache: 0.02 },
+  'gemini-3.8-flash': { entree: 0.75, sortie: 3.75, ecritureCache: 0.75, relectureCache: 0.075 },
 };
 
 // Un million de jetons de prompt dépasse son seuil : ses deux tarifs ont leur propre fichier.

@@ -24,6 +24,7 @@ const FENETRES: Record<string, number> = {
   'gpt-5.6-sol': 258_400,
   'gpt-5.6-terra': 258_400,
   'gpt-5.6-luna': 258_400,
+  'gemini-3.8-flash': 1_048_576,
 };
 
 const MODELES = Object.entries(FENETRES).map(([modele, fenetre]) => ({ modele, fenetre }));
