@@ -11,8 +11,10 @@ const cellsOf = (line: string): string[] => line.split('|').slice(1, -1).map(c =
 
 // « Claude Opus 5.5 ([limited availability](…)) » → claude-opus-5-5. Une ligne qui
 // n'a pas cette forme n'est pas un modèle que la vigie sait nommer : elle est ignorée.
+// « (for prompts up to 100,000 tokens) » est le tarif de base d'un modèle tarifé par longueur
+// de prompt ; sa ligne « over » n'a pas cette forme et reste hors de la vigie.
 function idOfName(cell: string): string | null {
-  const name = cell.replace(/\(\[[^\]]*\]\([^)]*\)\)/g, '').trim();
+  const name = cell.replace(/\(\[[^\]]*\]\([^)]*\)\)/g, '').replace(/\(for prompts up to [\d,]+ tokens\)/, '').trim();
   const m = /^Claude ([A-Z][a-z]+) (\d+)(?:\.(\d+))?$/.exec(name);
   if (!m) return null;
   return `claude-${m[1]!.toLowerCase()}-${m[2]}${m[3] === undefined ? '' : `-${m[3]}`}`;

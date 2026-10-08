@@ -31,6 +31,9 @@ const TARIFS: Record<string, Tarif> = {
   'gpt-5.6-luna': { entree: 0.2, sortie: 1.2, ecritureCache: 0.25, relectureCache: 0.02 },
 };
 
+// Un million de jetons de prompt dépasse son seuil : ses deux tarifs ont leur propre fichier.
+const TARIFES_PAR_LONGUEUR = ['claude-haiku-5-5'];
+
 const MODELES = Object.entries(TARIFS).map(([modele, tarif]) => ({ modele, ...tarif }));
 
 test.each(MODELES)('$modele : un million de jetons d’entrée coûte $entree $', ({ modele, entree }) => {
@@ -73,6 +76,6 @@ test.each(MODELES)('$modele : un appel qui mêle les quatre sortes de jetons co�
   expect(cout.usd).toBeCloseTo(attendu, 12);
 });
 
-test('chaque modèle de la table a son tarif vérifié ici', () => {
-  expect(priceTable().entries.map((e) => e.model).sort()).toEqual(Object.keys(TARIFS).sort());
+test('chaque modèle de la table a son tarif vérifié ici, sauf ceux tarifés par longueur de prompt', () => {
+  expect(priceTable().entries.map((e) => e.model).sort()).toEqual([...Object.keys(TARIFS), ...TARIFES_PAR_LONGUEUR].sort());
 });
