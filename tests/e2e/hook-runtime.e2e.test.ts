@@ -142,6 +142,32 @@ test('une charge Antigravity est écrite normalisée, sous le nom de sa conversa
   }
 });
 
+test('la fin d’un appel au modèle Antigravity écrit le début de session, daté de la première question', async () => {
+  // Arrange
+  const depot = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-viz-agy-transcript-'));
+  const transcriptPath = path.join(depot, 'transcript.jsonl');
+  fs.writeFileSync(transcriptPath, JSON.stringify({
+    step_index: 0, source: 'USER_EXPLICIT', type: 'USER_INPUT', status: 'DONE',
+    created_at: '2026-10-08T20:37:26Z', content: '<USER_REQUEST>\nbonjour\n</USER_REQUEST>',
+  }) + '\n');
+  const charge = { conversationId: 'conv-agy-3', invocationNum: 1, transcriptPath, workspacePaths: ['C:/projet'] };
+  // Act
+  const r = await lanceLeHook(JSON.stringify(charge), ['--source=antigravity', '--event=PostInvocation']);
+  // Assert
+  try {
+    const ligne = lit(path.join(r.dossier, 'conv-agy-3.jsonl'));
+    expect(ligne, 'aucun .jsonl écrit pour la conversation').not.toBe(null);
+    const relu = JSON.parse(ligne!.trim());
+    expect(relu.hook_event_name).toBe('SessionStart');
+    expect(relu.started_at).toBe('2026-10-08T20:37:26Z');
+    expect(relu.transcript_path).toBe(transcriptPath);
+    expect(relu._source).toBe('antigravity');
+  } finally {
+    fs.rmSync(r.racine, { recursive: true, force: true });
+    fs.rmSync(depot, { recursive: true, force: true });
+  }
+});
+
 test('le hook lancé avec --source=codex écrit l’événement tel quel, étiqueté codex', async () => {
   // Arrange
   const evt = { session_id: 'sess-codex-1', hook_event_name: 'PreToolUse', tool_name: 'shell', tool_use_id: 'call-codex-1' };
