@@ -186,6 +186,41 @@ test('le hook lancé avec --source=codex écrit l’événement tel quel, étiqu
   }
 });
 
+test('la fin d’une commande Codex que son transcript dit en échec est écrite comme un échec', async () => {
+  // Arrange
+  const depot = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-viz-codex-transcript-'));
+  const transcriptPath = path.join(depot, 'rollout.jsonl');
+  fs.writeFileSync(transcriptPath, JSON.stringify({
+    type: 'event_msg',
+    payload: {
+      type: 'item_completed',
+      item: {
+        type: 'CommandExecution', id: 'exec-c51101c5', status: 'failed', exit_code: 3,
+        aggregated_output: 'Code de sortie Node : 3\r\n',
+      },
+    },
+  }) + '\n');
+  const evt = {
+    session_id: 'sess-codex-2', hook_event_name: 'PostToolUse', tool_name: 'Bash', tool_use_id: 'exec-c51101c5',
+    tool_input: { command: 'node -e "process.exit(3)"' }, tool_response: 'Code de sortie Node : 3\r\n',
+    transcript_path: transcriptPath,
+  };
+  // Act
+  const r = await lanceLeHook(JSON.stringify(evt), ['--source=codex']);
+  // Assert
+  try {
+    const ligne = lit(path.join(r.dossier, 'sess-codex-2.jsonl'));
+    expect(ligne, 'aucun .jsonl écrit pour la session Codex').not.toBe(null);
+    const relu = JSON.parse(ligne!.trim());
+    expect(relu.hook_event_name).toBe('PostToolUseFailure');
+    expect(relu.error).toBe('Exit code 3\nCode de sortie Node : 3');
+    expect(relu._source).toBe('codex');
+  } finally {
+    fs.rmSync(r.racine, { recursive: true, force: true });
+    fs.rmSync(depot, { recursive: true, force: true });
+  }
+});
+
 test('une charge Antigravity sans --event est refusée, tracée, jamais écrite', async () => {
   // Arrange
   const charge = { conversationId: 'conv-agy-2', stepIdx: 1 };
