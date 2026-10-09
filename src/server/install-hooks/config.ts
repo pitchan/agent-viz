@@ -54,7 +54,7 @@ export const AGENT_CONFIG = {
   codex: {
     label: 'Codex',
     // Les noms que Codex partage avec Claude Code et que la vue sait lire. Codex n'émet
-    // pas de PostToolUseFailure.
+    // pas de PostToolUseFailure : l'échec d'une commande est lu dans son transcript par le hook.
     events: ['UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop', 'SessionStart'],
     userFile: () => path.join(os.homedir(), '.codex', 'hooks.json'),
     projectFile: (root) => path.join(root, '.codex', 'hooks.json'),
