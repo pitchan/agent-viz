@@ -23,6 +23,9 @@ export interface HookEvent extends ToolCallEvent {
   agent_id?: string;
   agent_type?: string;
   subagent_type?: string;
+  // Posés quand l'agent nomme son sous-agent : le nom de la tâche, et le surnom du fil.
+  agent_name?: string;
+  agent_nickname?: string;
   tool_use_id?: string;
   // `isolation` s'ajoute a ToolInput : seul le graphe s'en sert, pour la
   // pastille « worktree » d'un sous-agent isole.
@@ -104,14 +107,19 @@ export function setRunning(id: string, on: boolean) {
   else vis.runningNodes.delete(id);
 }
 
+// Le nom qu'un agent donne à son sous-agent le distingue ; son type, plusieurs le partagent.
+function agentLabel(evt: HookEvent): string {
+  return evt.agent_name || evt.agent_type || evt.subagent_type || 'Agent';
+}
+
 // Lazy-promote a node created by getNode('a:<aid>') with default type='tool'
 // into a real agent node. Claude Code does not emit SubagentStart hooks today,
 // so the first child PreToolUse carrying agent_id is our spawn signal.
 // Child events also carry agent_type, so we have a real label immediately.
 function promoteAgentNode(n: VizNode, evt: HookEvent, sid: string, ts: string) {
   n.type = 'agent';
-  n.label = evt.agent_type || evt.subagent_type || 'Agent';
-  if (!n.sub) n.sub = (evt.agent_id || '').slice(0, 8);
+  n.label = agentLabel(evt);
+  if (!n.sub) n.sub = evt.agent_nickname || (evt.agent_id || '').slice(0, 8);
   n.color = COLORS.agent;
   n.status = 'running';
   if (!n.startTime) n.startTime = ts;
@@ -212,7 +220,7 @@ function onSubagentStart(evt: HookEvent, sid: string, ts: string) {
   const aid = evt.agent_id || sid;
   const n = getNode(`a:${aid}`);
   n.type = 'agent';
-  n.label = evt.agent_type || evt.subagent_type || 'Agent';
+  n.label = agentLabel(evt);
   n.sub = (evt.tool_input && evt.tool_input.description) || aid.slice(0, 8);
   n.color = COLORS.agent; n.data = evt; n.status = 'running'; n.startTime = ts;
   if (evt.tool_input && evt.tool_input.isolation === 'worktree') n.isIsolated = true;
@@ -227,8 +235,8 @@ function onSubagentStop(evt: HookEvent, sid: string, ts: string) {
   const aid = evt.agent_id || sid;
   const n = state.nodes.get(`a:${aid}`);
   if (!n) return;
-  n.status = 'done'; n.data = evt; n.endTime = ts;
-  n.duration = calcDuration(n.startTime, ts);
+  n.status = 'done'; n.data = evt; n.endTime = evt.ended_at || ts;
+  n.duration = calcDuration(n.startTime, n.endTime);
   n.color = COLORS.complete;
   setRunning(n.id, false);
   if (n.parentId) recomputeParallelFlags(n.parentId);

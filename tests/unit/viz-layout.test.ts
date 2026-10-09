@@ -157,6 +157,38 @@ test('un échec annoncé après coup compte la durée jusqu\'à son heure réell
   expect(getErrors()[0]!.ts).toBe('2025-01-01T00:00:00.400Z');
 });
 
+test('un sous-agent que son agent nomme porte ce nom et son surnom, pas son type', () => {
+  // Arrange
+  const sid = 'abc12345-0000-0000-0000-000000000000';
+
+  // Act
+  processEvent({
+    hook_event_name: 'PreToolUse', session_id: sid, tool_name: 'Bash', tool_use_id: 'tu-enfant',
+    agent_id: 'abc12345-9999-0000-0000-000000000000', agent_type: 'default',
+    agent_name: 'child', agent_nickname: 'Avicenna', _ts: '2025-01-01T00:00:00.000Z',
+  });
+
+  // Assert
+  const agent = state.nodes.get('a:abc12345-9999-0000-0000-000000000000')!;
+  expect(agent.label).toBe('child');
+  expect(agent.sub).toBe('Avicenna');
+});
+
+test('un sous-agent dont la fin est annoncée après coup compte la durée jusqu\'à son heure réelle', () => {
+  // Arrange
+  const sid = 'abc12345-0000-0000-0000-000000000000';
+  const aid = 'abc12345-9999-0000-0000-000000000000';
+  processEvent({ hook_event_name: 'PreToolUse', session_id: sid, tool_name: 'Bash', tool_use_id: 'tu-enfant', agent_id: aid, agent_type: 'default', _ts: '2025-01-01T00:00:00.000Z' });
+
+  // Act
+  processEvent({ hook_event_name: 'SubagentStop', session_id: sid, agent_id: aid, ended_at: '2025-01-01T00:00:05.600Z', _ts: '2025-01-01T00:00:06.000Z' });
+
+  // Assert
+  const agent = state.nodes.get(`a:${aid}`)!;
+  expect(agent.status).toBe('done');
+  expect(agent.duration).toBe(calcDuration('2025-01-01T00:00:00.000Z', '2025-01-01T00:00:05.600Z'));
+});
+
 test('un début de session annoncé après coup compte la durée depuis son heure réelle', () => {
   // Arrange — l'outil est déjà passé quand le début de session arrive.
   const sid = 'abc12345-0000-0000-0000-000000000000';

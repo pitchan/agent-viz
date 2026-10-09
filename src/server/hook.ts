@@ -16,6 +16,7 @@ import { HOOK_SOURCES, NORMALIZERS, NEEDS_EVENT_FLAG, type HookSource } from './
 import { lateFailures } from './hook-antigravity-verdicts.ts';
 import { sessionStart } from './hook-antigravity-session-start.ts';
 import { codexEvents } from './hook-codex-verdicts.ts';
+import { agentIdentity, subagentStops } from './hook-codex-subagents.ts';
 import { validSessionId } from './session-id.ts';
 
 // node:http arrive par process.getBuiltinModule, pas par `import` : matérialiser son espace de
@@ -43,18 +44,19 @@ function readText(file: string): string {
   try { return fs.readFileSync(file, 'utf8'); } catch { return ''; }
 }
 
-// Un hook Codex part à chaque outil et un transcript pèse plusieurs mégaoctets : seule la fin
-// est lue. La ligne cherchée vient d'être écrite, et la plus grosse relevée pèse 78 Ko.
+// Un hook Codex part à chaque outil et un transcript pèse plusieurs mégaoctets : seuls ses deux
+// bouts sont lus. La plus grosse ligne de verdict relevée pèse 78 Ko, le plus gros en-tête 23 Ko.
 const TAIL_BYTES = 1024 * 1024;
+const HEAD_BYTES = 256 * 1024;
 
-function readTail(file: string): string {
+function readEdge(file: string, edge: 'head' | 'tail'): string {
   let fd: number | undefined;
   try {
     fd = fs.openSync(file, 'r');
     const size = fs.fstatSync(fd).size;
-    const length = Math.min(size, TAIL_BYTES);
+    const length = Math.min(size, edge === 'head' ? HEAD_BYTES : TAIL_BYTES);
     const buffer = Buffer.alloc(length);
-    fs.readSync(fd, buffer, 0, length, size - length);
+    fs.readSync(fd, buffer, 0, length, edge === 'head' ? 0 : size - length);
     return buffer.toString('utf8');
   } catch {
     return '';
@@ -80,18 +82,22 @@ function antigravityPostInvocation(raw: Payload, event: string | undefined): Pay
 }
 
 // Sans transcript ou sans session lisible, l'événement suit le chemin ordinaire, qui trace le refus.
-function codexVerdicts(raw: Payload, event: string | undefined): Payload[] | null {
+function codexFromTranscript(raw: Payload, event: string | undefined): Payload[] | null {
   const { session_id, transcript_path } = raw;
   if (!validSessionId(session_id) || typeof transcript_path !== 'string') return null;
-  const events = readTail(path.join(DIR, `${session_id}.jsonl`));
-  return codexEvents(NORMALIZERS.codex(raw, event), events, readTail(transcript_path));
+  const events = readEdge(path.join(DIR, `${session_id}.jsonl`), 'tail');
+  const transcript = readEdge(transcript_path, 'tail');
+  const evt = NORMALIZERS.codex(raw, event);
+  // L'événement d'un sous-agent pointe vers le transcript de son propre fil, qui s'ouvre sur son nom.
+  const named = typeof evt.agent_id === 'string' ? { ...evt, ...agentIdentity(readEdge(transcript_path, 'head')) } : evt;
+  return [...subagentStops(named, events, transcript), ...codexEvents(named, events, transcript)];
 }
 
 const REPLACERS: Record<HookSource, Replacer | null> = {
   claude: null,
   copilot: null,
   antigravity: antigravityPostInvocation,
-  codex: codexVerdicts,
+  codex: codexFromTranscript,
 };
 
 function parseSource(argv: string[]): HookSource {

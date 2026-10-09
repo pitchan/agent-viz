@@ -9,7 +9,7 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 }
 
 // Seules les lignes qui portent le marqueur sont décodées : le hook part à chaque outil.
-function records(text: string, marker: string): Payload[] {
+export function records(text: string, marker: string): Payload[] {
   const out: Payload[] = [];
   for (const line of text.split('\n')) {
     if (line.indexOf(marker) === -1) continue;
@@ -78,6 +78,8 @@ export function codexEvents(evt: Payload, eventsText: string, transcriptText: st
       hook_event_name: 'PostToolUseFailure',
       session_id: pre.session_id,
       tool_use_id: id,
+      agent_id: pre.agent_id,
+      agent_type: pre.agent_type,
       tool_name: pre.tool_name,
       tool_input: pre.tool_input,
       error: verdict.error,
