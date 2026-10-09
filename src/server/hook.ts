@@ -14,6 +14,7 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { HOOK_SOURCES, NORMALIZERS, NEEDS_EVENT_FLAG, type HookSource } from './hook-normalize.ts';
 import { lateFailures } from './hook-antigravity-verdicts.ts';
+import { sessionStart } from './hook-antigravity-session-start.ts';
 import { validSessionId } from './session-id.ts';
 
 // node:http arrive par process.getBuiltinModule, pas par `import` : matérialiser son espace de
@@ -49,7 +50,12 @@ function antigravityPostInvocation(raw: Payload, event: string | undefined): Pay
   if (event !== 'PostInvocation') return null;
   const { conversationId, transcriptPath } = raw;
   if (!validSessionId(conversationId) || typeof transcriptPath !== 'string') return [];
-  return lateFailures(readText(path.join(DIR, `${conversationId}.jsonl`)), readText(transcriptPath));
+  const events = readText(path.join(DIR, `${conversationId}.jsonl`));
+  const transcript = readText(transcriptPath);
+  return [
+    ...sessionStart(NORMALIZERS.antigravity(raw, event), events, transcript),
+    ...lateFailures(events, transcript),
+  ];
 }
 
 const REPLACERS: Record<HookSource, Replacer | null> = {

@@ -29,6 +29,8 @@ export interface HookEvent extends ToolCallEvent {
   tool_input?: ToolInput & { isolation?: string };
   tool_response?: { agentId?: string; status?: string };
   message?: string;
+  // Posé par un agent qui n'annonce son début qu'après coup : l'heure réelle du début.
+  started_at?: string;
   _ts?: string;
 }
 
@@ -199,7 +201,7 @@ function ensureSessionParent(sid: string) {
 function onSessionStart(evt: HookEvent, sid: string, ts: string) {
   const n = getNode(`s:${sid}`);
   n.type = 'session'; n.label = 'Session'; n.sub = sid.slice(0, 8);
-  n.color = COLORS.session; n.data = evt; n.status = 'running'; n.startTime = ts;
+  n.color = COLORS.session; n.data = evt; n.status = 'running'; n.startTime = evt.started_at || ts;
   setRunning(n.id, true);
   addTimelineEntry(evt, n.id, 'session', 'Session', sid.slice(0, 8));
 }

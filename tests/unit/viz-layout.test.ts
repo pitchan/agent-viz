@@ -139,6 +139,22 @@ test('quand le registre prévient, le noeud porte DÉJÀ le statut error', () =>
   expect(statutVuParLAbonne).toBe('error');
 });
 
+test('un début de session annoncé après coup compte la durée depuis son heure réelle', () => {
+  // Arrange — l'outil est déjà passé quand le début de session arrive.
+  const sid = 'abc12345-0000-0000-0000-000000000000';
+  processEvent({ hook_event_name: 'PreToolUse', session_id: sid, tool_name: 'run_command', tool_use_id: 'tu-1', _ts: '2025-01-01T00:00:20.000Z' });
+  processEvent({ hook_event_name: 'SessionStart', session_id: sid, started_at: '2025-01-01T00:00:00Z', _ts: '2025-01-01T00:00:30.000Z' });
+
+  // Act
+  processEvent({ hook_event_name: 'Stop', session_id: sid, _ts: '2025-01-01T00:01:30.000Z' });
+
+  // Assert
+  const session = state.nodes.get(`s:${sid}`)!;
+  expect(session.startTime).toBe('2025-01-01T00:00:00Z');
+  expect(session.duration).toBe(calcDuration('2025-01-01T00:00:00Z', '2025-01-01T00:01:30.000Z'));
+  expect(session.children.map(c => c.id)).toEqual(['t:tu-1']);
+});
+
 test('un échec SANS noeud correspondant entre quand même au registre', () => {
   // Arrange — aucun PreToolUse : c'est le cas orphelin.
   const sid = 'abc12345-0000-0000-0000-000000000000';

@@ -8,7 +8,7 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
-function jsonLines(text: string): Payload[] {
+export function jsonLines(text: string): Payload[] {
   const out: Payload[] = [];
   for (const line of text.split('\n')) {
     if (!line.trim()) continue;
