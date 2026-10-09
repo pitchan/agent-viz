@@ -90,3 +90,60 @@ test('une ligne coupée par le début de la fenêtre de lecture n\'empêche pas 
   // Assert
   expect(evenements[0]?.hook_event_name).toBe('PostToolUseFailure');
 });
+
+// Forme relevée sur Codex 0.162 : le bac à sable refuse de lancer la commande, aucun hook de fin.
+const REFUS = 'Failed to create unified exec process: helper_unknown_error: setup refresh had errors';
+
+test('une commande qui n\'a pas démarré est close par un échec, écrit avant l\'événement courant', () => {
+  // Arrange
+  const lancement = hook('PreToolUse', 'exec-c3c5b6d9', { tool_input: { command: 'Write-Output ok-un' } });
+  const arret = { session_id: SESSION, hook_event_name: 'Stop', transcript_path: 'C:/t.jsonl' };
+  const transcript = lignes(execution('exec-c3c5b6d9', 'failed', -1, REFUS));
+  // Act
+  const evenements = codexEvents(arret, lignes(lancement), transcript);
+  // Assert
+  expect(evenements).toEqual([
+    {
+      hook_event_name: 'PostToolUseFailure',
+      session_id: SESSION,
+      tool_use_id: 'exec-c3c5b6d9',
+      tool_name: 'Bash',
+      tool_input: { command: 'Write-Output ok-un' },
+      error: `Exit code -1\n${REFUS}`,
+      cwd: 'C:/projet',
+      transcript_path: 'C:/t.jsonl',
+    },
+    arret,
+  ]);
+});
+
+test('un échec déjà écrit n\'est pas écrit une seconde fois', () => {
+  // Arrange
+  const dejaEcrits = lignes(hook('PreToolUse', 'exec-c3c5b6d9'), hook('PostToolUseFailure', 'exec-c3c5b6d9'));
+  const arret = { session_id: SESSION, hook_event_name: 'Stop' };
+  const transcript = lignes(execution('exec-c3c5b6d9', 'failed', -1, REFUS));
+  // Act
+  const evenements = codexEvents(arret, dejaEcrits, transcript);
+  // Assert
+  expect(evenements).toEqual([arret]);
+});
+
+test('une commande encore en cours, absente du transcript, reste ouverte', () => {
+  // Arrange
+  const arret = { session_id: SESSION, hook_event_name: 'UserPromptSubmit' };
+  const transcript = lignes(execution('exec-autre', 'failed', 1));
+  // Act
+  const evenements = codexEvents(arret, lignes(hook('PreToolUse', 'exec-en-cours')), transcript);
+  // Assert
+  expect(evenements).toEqual([arret]);
+});
+
+test('la commande dont la fin arrive n\'est écrite qu\'une fois, comme échec', () => {
+  // Arrange
+  const fin = hook('PostToolUse', 'exec-c51101c5');
+  const transcript = lignes(execution('exec-c51101c5', 'failed', 3));
+  // Act
+  const evenements = codexEvents(fin, lignes(hook('PreToolUse', 'exec-c51101c5')), transcript);
+  // Assert
+  expect(evenements.map(e => [e.hook_event_name, e.tool_use_id])).toEqual([['PostToolUseFailure', 'exec-c51101c5']]);
+});
