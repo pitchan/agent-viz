@@ -139,6 +139,24 @@ test('quand le registre prévient, le noeud porte DÉJÀ le statut error', () =>
   expect(statutVuParLAbonne).toBe('error');
 });
 
+test('un échec annoncé après coup compte la durée jusqu\'à son heure réelle', () => {
+  // Arrange
+  const sid = 'abc12345-0000-0000-0000-000000000000';
+  processEvent({ hook_event_name: 'PreToolUse', session_id: sid, tool_name: 'Bash', tool_use_id: 'tu-tard', _ts: '2025-01-01T00:00:00.000Z' });
+
+  // Act
+  processEvent({
+    hook_event_name: 'PostToolUseFailure', session_id: sid, tool_name: 'Bash', tool_use_id: 'tu-tard',
+    error: 'Exit code -1', ended_at: '2025-01-01T00:00:00.400Z', _ts: '2025-01-01T00:02:00.000Z',
+  } as HookEvent);
+
+  // Assert
+  const noeud = state.nodes.get('t:tu-tard')!;
+  expect(noeud.endTime).toBe('2025-01-01T00:00:00.400Z');
+  expect(noeud.duration).toBe(calcDuration('2025-01-01T00:00:00.000Z', '2025-01-01T00:00:00.400Z'));
+  expect(getErrors()[0]!.ts).toBe('2025-01-01T00:00:00.400Z');
+});
+
 test('un début de session annoncé après coup compte la durée depuis son heure réelle', () => {
   // Arrange — l'outil est déjà passé quand le début de session arrive.
   const sid = 'abc12345-0000-0000-0000-000000000000';

@@ -191,6 +191,7 @@ test('la fin d’une commande Codex que son transcript dit en échec est écrite
   const depot = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-viz-codex-transcript-'));
   const transcriptPath = path.join(depot, 'rollout.jsonl');
   fs.writeFileSync(transcriptPath, JSON.stringify({
+    timestamp: '2026-10-07T16:31:22.503Z',
     type: 'event_msg',
     payload: {
       type: 'item_completed',
@@ -215,6 +216,36 @@ test('la fin d’une commande Codex que son transcript dit en échec est écrite
     expect(relu.hook_event_name).toBe('PostToolUseFailure');
     expect(relu.error).toBe('Exit code 3\nCode de sortie Node : 3');
     expect(relu._source).toBe('codex');
+  } finally {
+    fs.rmSync(r.racine, { recursive: true, force: true });
+    fs.rmSync(depot, { recursive: true, force: true });
+  }
+});
+
+test('l’échec d’une commande Codex est trouvé à la fin d’un transcript de plusieurs mégaoctets', async () => {
+  // Arrange
+  const depot = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-viz-codex-transcript-'));
+  const transcriptPath = path.join(depot, 'rollout.jsonl');
+  const ancienne = JSON.stringify({ type: 'response_item', payload: { type: 'message', text: 'x'.repeat(1000) } }) + '\n';
+  fs.writeFileSync(transcriptPath, ancienne.repeat(3000) + JSON.stringify({
+    timestamp: '2026-10-07T16:31:22.503Z',
+    type: 'event_msg',
+    payload: {
+      type: 'item_completed',
+      item: { type: 'CommandExecution', id: 'exec-fin', status: 'failed', exit_code: 1, aggregated_output: 'boum' },
+    },
+  }) + '\n');
+  const evt = {
+    session_id: 'sess-codex-3', hook_event_name: 'PostToolUse', tool_name: 'Bash', tool_use_id: 'exec-fin',
+    tool_input: { command: 'exit 1' }, transcript_path: transcriptPath,
+  };
+  // Act
+  const r = await lanceLeHook(JSON.stringify(evt), ['--source=codex']);
+  // Assert
+  try {
+    const relu = JSON.parse(lit(path.join(r.dossier, 'sess-codex-3.jsonl'))!.trim());
+    expect(relu.hook_event_name).toBe('PostToolUseFailure');
+    expect(relu.error).toBe('Exit code 1\nboum');
   } finally {
     fs.rmSync(r.racine, { recursive: true, force: true });
     fs.rmSync(depot, { recursive: true, force: true });

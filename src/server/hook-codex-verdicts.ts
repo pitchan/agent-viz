@@ -26,53 +26,70 @@ function records(text: string, marker: string): Payload[] {
 // La borne laisse passer un bloc d'erreur PowerShell entier, que lit l'alerte de mauvaise invocation.
 const MAX_ERROR_LENGTH = 4000;
 
-/** Le texte d'erreur de chaque commande en échec, par identifiant. */
-function failedCommands(transcriptText: string): Map<string, string> {
-  const failed = new Map<string, string>();
+interface Verdict {
+  error: string;
+  endedAt: string;
+}
+
+/** Le texte d'erreur et l'heure de fin de chaque commande en échec, par identifiant. */
+function failedCommands(transcriptText: string): Map<string, Verdict> {
+  const failed = new Map<string, Verdict>();
   for (const line of records(transcriptText, '"CommandExecution"')) {
     const item = isRecord(line.payload) ? line.payload.item : null;
     if (!isRecord(item) || item.type !== 'CommandExecution' || item.status !== 'failed') continue;
     const { id, exit_code, aggregated_output } = item;
     if (typeof id !== 'string' || typeof exit_code !== 'number' || typeof aggregated_output !== 'string') continue;
-    failed.set(id, `Exit code ${exit_code}\n${aggregated_output}`.slice(0, MAX_ERROR_LENGTH).trimEnd());
+    if (typeof line.timestamp !== 'string') continue;
+    const error = `Exit code ${exit_code}\n${aggregated_output}`.slice(0, MAX_ERROR_LENGTH).trimEnd();
+    failed.set(id, { error, endedAt: line.timestamp });
   }
   return failed;
 }
 
-/** Les lancements de commande que le fichier d'événements n'a pas encore clos, par identifiant. */
-function unfinished(eventsText: string): Map<string, Payload> {
-  const started = new Map<string, Payload>();
+interface ToolStates {
+  unfinished: Map<string, Payload>;
+  failed: Set<string>;
+}
+
+/** Les lancements que le fichier d'événements n'a pas encore clos, et les échecs qu'il porte déjà. */
+function toolStates(eventsText: string): ToolStates {
+  const unfinished = new Map<string, Payload>();
+  const failed = new Set<string>();
   for (const evt of records(eventsText, '"tool_use_id"')) {
     if (typeof evt.tool_use_id !== 'string') continue;
     const name = evt.hook_event_name;
-    if (name === 'PreToolUse') started.set(evt.tool_use_id, evt);
-    else if (name === 'PostToolUse' || name === 'PostToolUseFailure') started.delete(evt.tool_use_id);
+    if (name === 'PreToolUse') unfinished.set(evt.tool_use_id, evt);
+    else if (name === 'PostToolUse' || name === 'PostToolUseFailure') unfinished.delete(evt.tool_use_id);
+    if (name === 'PostToolUseFailure') failed.add(evt.tool_use_id);
   }
-  return started;
+  return { unfinished, failed };
 }
 
 /** Les événements à écrire pour un événement de hook Codex, verdicts du transcript appliqués. */
 export function codexEvents(evt: Payload, eventsText: string, transcriptText: string): Payload[] {
-  const failed = failedCommands(transcriptText);
+  const verdicts = failedCommands(transcriptText);
+  const written = toolStates(eventsText);
   const out: Payload[] = [];
-  for (const [id, pre] of unfinished(eventsText)) {
-    const error = failed.get(id);
+  for (const [id, pre] of written.unfinished) {
+    const verdict = verdicts.get(id);
     // La commande dont la fin arrive est écrite plus bas, une seule fois.
-    if (error === undefined || id === evt.tool_use_id) continue;
+    if (verdict === undefined || id === evt.tool_use_id) continue;
     out.push({
       hook_event_name: 'PostToolUseFailure',
       session_id: pre.session_id,
       tool_use_id: id,
       tool_name: pre.tool_name,
       tool_input: pre.tool_input,
-      error,
+      error: verdict.error,
+      // L'événement est écrit au hook suivant : l'heure réelle de l'échec est celle du transcript.
+      ended_at: verdict.endedAt,
       cwd: pre.cwd,
       transcript_path: pre.transcript_path,
     });
   }
-  const error = evt.hook_event_name === 'PostToolUse' && typeof evt.tool_use_id === 'string'
-    ? failed.get(evt.tool_use_id)
-    : undefined;
-  out.push(error === undefined ? evt : { ...evt, hook_event_name: 'PostToolUseFailure', error });
-  return out;
+  if (evt.hook_event_name !== 'PostToolUse' || typeof evt.tool_use_id !== 'string') return [...out, evt];
+  // Un autre hook de la session a déjà clos cette commande par son échec : sa fin la rouvrirait.
+  if (written.failed.has(evt.tool_use_id)) return out;
+  const verdict = verdicts.get(evt.tool_use_id);
+  return [...out, verdict === undefined ? evt : { ...evt, hook_event_name: 'PostToolUseFailure', error: verdict.error }];
 }

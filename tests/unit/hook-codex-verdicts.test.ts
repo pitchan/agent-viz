@@ -110,6 +110,7 @@ test('une commande qui n\'a pas démarré est close par un échec, écrit avant 
       tool_name: 'Bash',
       tool_input: { command: 'Write-Output ok-un' },
       error: `Exit code -1\n${REFUS}`,
+      ended_at: '2026-10-07T16:31:22.503Z',
       cwd: 'C:/projet',
       transcript_path: 'C:/t.jsonl',
     },
@@ -126,6 +127,17 @@ test('un échec déjà écrit n\'est pas écrit une seconde fois', () => {
   const evenements = codexEvents(arret, dejaEcrits, transcript);
   // Assert
   expect(evenements).toEqual([arret]);
+});
+
+test('la fin d\'une commande dont l\'échec est déjà écrit n\'écrit rien', () => {
+  // Arrange
+  const dejaEcrits = lignes(hook('PreToolUse', 'exec-c51101c5'), hook('PostToolUseFailure', 'exec-c51101c5'));
+  const fin = hook('PostToolUse', 'exec-c51101c5');
+  const transcript = lignes(execution('exec-c51101c5', 'failed', 3));
+  // Act
+  const evenements = codexEvents(fin, dejaEcrits, transcript);
+  // Assert
+  expect(evenements).toEqual([]);
 });
 
 test('une commande encore en cours, absente du transcript, reste ouverte', () => {
