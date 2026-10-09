@@ -46,7 +46,7 @@ agent-viz
 | **Live view** | | | | |
 | Tool calls as they happen | ✅ | ✅ | ✅ | ✅ |
 | A failed tool shown as an error | ✅ | ❌ ¹ | ⚠️ ² | ⚠️ ⁷ |
-| Subagents in the topology | ✅ | 🚧 | ❌ | ❌ |
+| Subagents in the topology | ✅ | 🚧 | ❌ | ⚠️ ¹⁰ |
 | Tokens | ✅ | ❌ ³ | ⚠️ ⁴ | ⚠️ ⁸ |
 | Cost | ✅ | ❌ | ⚠️ ⁵ | ⚠️ ⁹ |
 | Session duration | ✅ | ✅ | ❌ ⁶ | ✅ |
@@ -67,8 +67,9 @@ agent-viz
 5. Cost is an estimate from Google's public API prices, not what your Antigravity plan bills.
 6. Antigravity sends no session-start event.
 7. Shell commands only. Codex sends no tool-failure event, so the failure is read from the session transcript, which older Codex builds do not fill in. A command that never starts turns red at the next Codex event.
-8. No figure for a forked thread, nor for a session written by an older Codex.
+8. No figure for a forked thread, nor for a session written by an older Codex. A subagent's tokens are not counted.
 9. What the session would cost at OpenAI's API rates. A ChatGPT plan is billed differently, and codex-auto-review has no published price.
+10. A subagent appears at its first tool call, not when it is spawned. Its end time is read from the parent's transcript, which older Codex builds do not fill in.
 
 Cursor is not supported.
 
@@ -237,7 +238,10 @@ Known limits:
 - A failed file edit or MCP call is not reported.
 - Older Codex builds do not write the command outcome in their transcript: no failure is shown for those sessions. Seen on 0.155.0-alpha.9.2 and later, not on 0.148.0-alpha.9.
 - Only the last megabyte of the transcript is read on each event: a command whose output line is larger is shown as successful.
-- Subagent threads are not drawn in the topology.
+- A subagent is drawn under its session, named after its task (`/root/child` shows as `child`) with the nickname Codex gives its thread. It appears at its first tool call, not when it is spawned.
+- A subagent's start and end times are read from the transcript of the thread that spawned it. Older Codex builds do not write the end there: the subagent is then closed when its parent's turn ends, and its duration runs from its first tool call to that moment. Seen on 0.162.0-alpha.2, not on 0.148.0-alpha.9.
+- A subagent that receives a follow-up task after it finished is shown as finished while it works again. Once it finishes again, its duration is that of this latest run.
+- The tokens a subagent uses are not counted in the session total.
 
 ## Hook management
 

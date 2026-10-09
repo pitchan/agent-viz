@@ -262,6 +262,59 @@ test('une commande Codex qui n’a pas démarré est close par son échec au hoo
   }
 });
 
+test('un événement de sous-agent Codex est écrit avec le nom et le surnom lus dans son transcript', async () => {
+  // Arrange
+  const depot = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-viz-codex-transcript-'));
+  const transcriptPath = path.join(depot, 'rollout-enfant.jsonl');
+  fs.writeFileSync(transcriptPath, JSON.stringify({
+    timestamp: '2026-10-09T18:50:24.404Z', type: 'session_meta',
+    payload: { id: 'fil-enfant-1', parent_thread_id: 'sess-codex-5', agent_path: '/root/child', agent_nickname: 'Avicenna' },
+  }) + '\n');
+  const evt = {
+    session_id: 'sess-codex-5', hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_use_id: 'exec-enfant',
+    agent_id: 'fil-enfant-1', agent_type: 'default', tool_input: { command: 'Write-Output enfant-un' },
+    transcript_path: transcriptPath,
+  };
+  // Act
+  const r = await lanceLeHook(JSON.stringify(evt), ['--source=codex']);
+  // Assert
+  try {
+    const relu = JSON.parse(lit(path.join(r.dossier, 'sess-codex-5.jsonl'))!.trim());
+    expect(relu).toMatchObject({ hook_event_name: 'PreToolUse', agent_id: 'fil-enfant-1', agent_name: 'child', agent_nickname: 'Avicenna' });
+  } finally {
+    fs.rmSync(r.racine, { recursive: true, force: true });
+    fs.rmSync(depot, { recursive: true, force: true });
+  }
+});
+
+test('la fin d’un sous-agent Codex, écrite dans le transcript de son parent, précède l’événement qui la révèle', async () => {
+  // Arrange
+  const depot = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-viz-codex-transcript-'));
+  const transcriptPath = path.join(depot, 'rollout-parent.jsonl');
+  fs.writeFileSync(transcriptPath, JSON.stringify({
+    timestamp: '2026-10-09T18:50:33.808Z', type: 'event_msg',
+    payload: {
+      type: 'item_completed',
+      item: { type: 'SubAgentActivity', id: 'subagent-completed-1', kind: 'completed', agent_thread_id: 'fil-enfant-1', agent_path: '/root/child' },
+    },
+  }) + '\n');
+  const evt = {
+    session_id: 'sess-codex-6', hook_event_name: 'PostToolUse', tool_name: 'collaborationwait_agent', tool_use_id: 'call_attente',
+    transcript_path: transcriptPath,
+  };
+  // Act
+  const r = await lanceLeHook(JSON.stringify(evt), ['--source=codex']);
+  // Assert
+  try {
+    const ecrits = lit(path.join(r.dossier, 'sess-codex-6.jsonl'))!.trim().split('\n').map(l => JSON.parse(l));
+    expect(ecrits.map(e => e.hook_event_name)).toEqual(['SubagentStop', 'PostToolUse']);
+    expect(ecrits[0]).toMatchObject({ agent_id: 'fil-enfant-1', ended_at: '2026-10-09T18:50:33.808Z', _source: 'codex' });
+  } finally {
+    fs.rmSync(r.racine, { recursive: true, force: true });
+    fs.rmSync(depot, { recursive: true, force: true });
+  }
+});
+
 test('l’échec d’une commande Codex est trouvé à la fin d’un transcript de plusieurs mégaoctets', async () => {
   // Arrange
   const depot = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-viz-codex-transcript-'));
