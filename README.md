@@ -45,7 +45,7 @@ agent-viz
 |---|:---:|:---:|:---:|:---:|
 | **Live view** | | | | |
 | Tool calls as they happen | ✅ | ✅ | ✅ | ✅ |
-| A failed tool shown as an error | ✅ | ❌ ¹ | ⚠️ ² | ❌ ⁷ |
+| A failed tool shown as an error | ✅ | ❌ ¹ | ⚠️ ² | ⚠️ ⁷ |
 | Subagents in the topology | ✅ | 🚧 | ❌ | ❌ |
 | Tokens | ✅ | ❌ ³ | ⚠️ ⁴ | ⚠️ ⁸ |
 | Cost | ✅ | ❌ | ⚠️ ⁵ | ⚠️ ⁹ |
@@ -53,8 +53,8 @@ agent-viz
 | **Live alerts** | | | | |
 | Loop | ✅ | ✅ | ✅ | ✅ |
 | Stuck | ✅ | 🚧 | ✅ | ✅ |
-| Retry storm | ✅ | ❌ ¹ | ⚠️ ² | ❌ ⁷ |
-| Bad invocation | ✅ | ❌ ¹ | 🚧 | ❌ ⁷ |
+| Retry storm | ✅ | ❌ ¹ | ⚠️ ² | ⚠️ ⁷ |
+| Bad invocation | ✅ | ❌ ¹ | 🚧 | ⚠️ ⁷ |
 | **Observatory** | | | | |
 | Advice, analysed sessions, tokens & prices, skills | ✅ | ❌ | ❌ | ❌ |
 
@@ -66,7 +66,7 @@ agent-viz
 4. One model call behind during a turn, exact once it ends.
 5. Cost is an estimate from Google's public API prices, not what your Antigravity plan bills.
 6. Antigravity sends no session-start event.
-7. Codex sends no tool-failure event.
+7. Shell commands only. Codex sends no tool-failure event, so the failure is read from the session transcript, which older Codex builds do not fill in. A command that never starts turns red at the next Codex event.
 8. No figure for a forked thread, nor for a session written by an older Codex.
 9. What the session would cost at OpenAI's API rates. A ChatGPT plan is billed differently, and codex-auto-review has no published price.
 
@@ -232,6 +232,11 @@ Known limits:
 - A thread forked from another one starts with a copy of its parent's history, token lines included, with nothing marking where the copy ends: agent-viz shows "Tokens N/A" for it instead of a figure that would count the parent twice.
 - Older Codex builds write token lines with a total and no breakdown. agent-viz shows "Tokens N/A" for those sessions instead of a wrong figure. Seen on 0.135.0-alpha.1, not on 0.147 and later.
 - Cost is what the session would cost at OpenAI's API rates. A ChatGPT plan is billed differently, and codex-auto-review has no published price.
+- Codex sends no tool-failure event. agent-viz reads the outcome of each shell command from the session transcript: a non-zero exit code, or a command the sandbox refused to start, is shown as a failed tool.
+- A command that never starts sends no end event at all: it turns red at the next Codex event (next tool, next prompt, or end of turn), not at once.
+- A failed file edit or MCP call is not reported.
+- Older Codex builds do not write the command outcome in their transcript: no failure is shown for those sessions. Seen on 0.155.0-alpha.9.2 and later, not on 0.148.0-alpha.9.
+- Only the last megabyte of the transcript is read on each event: a command whose output line is larger is shown as successful.
 - Subagent threads are not drawn in the topology.
 
 ## Hook management
@@ -348,7 +353,7 @@ If you reinstall agent-viz to a different path later (e.g. moved your dev clone)
 
 ## Captured events
 
-`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure` (Claude Code only), `Stop`, `SessionStart`. Events land as JSONL in `${tmpdir}/agent-events/<session_id>.jsonl` and are streamed to the dashboard via Server-Sent Events. Each event carries a `_source: "claude" | "copilot" | "antigravity"` field set by the hook command's `--source` flag.
+`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure` (Claude Code only), `Stop`, `SessionStart`. Antigravity and Codex send no such event: for them, agent-viz writes `PostToolUseFailure` itself, from the tool result the agent reports or from its session transcript. Events land as JSONL in `${tmpdir}/agent-events/<session_id>.jsonl` and are streamed to the dashboard via Server-Sent Events. Each event carries a `_source: "claude" | "copilot" | "antigravity" | "codex"` field set by the hook command's `--source` flag.
 
 ## Configuration
 

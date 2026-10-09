@@ -31,6 +31,8 @@ export interface HookEvent extends ToolCallEvent {
   message?: string;
   // Posé par un agent qui n'annonce son début qu'après coup : l'heure réelle du début.
   started_at?: string;
+  // Posé sur un échec écrit après coup : l'heure réelle de la fin de l'outil.
+  ended_at?: string;
   _ts?: string;
 }
 
@@ -316,7 +318,7 @@ function onPostToolUseFailure(evt: HookEvent, sid: string, ts: string) {
   const n = state.nodes.get(`t:${tid}`);
   if (n) {
     n.status = 'error'; n.color = COLORS.error; n.data = evt;
-    n.endTime = ts; n.duration = calcDuration(n.startTime, ts);
+    n.endTime = evt.ended_at || ts; n.duration = calcDuration(n.startTime, n.endTime);
     setRunning(n.id, false);
   }
   settleAgentFromAgentToolResponse(evt, ts, 'error');

@@ -27,8 +27,11 @@ interface ResultatHook {
 // Lance le hook sur une charge donnée, dans un dossier temporaire isolé.
 // Le port pointe volontairement vers personne : le POST /notify est en
 // « tire et oublie », son échec est déjà avalé par `req.on('error')`.
-function lanceLeHook(charge: string | Buffer, args: string[] = ['--source=claude']): Promise<ResultatHook> {
-  const racine = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-viz-hook-test-'));
+function lanceLeHook(
+  charge: string | Buffer,
+  args: string[] = ['--source=claude'],
+  racine = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-viz-hook-test-')),
+): Promise<ResultatHook> {
   return new Promise<ResultatHook>((resolve, reject) => {
     const enfant = spawn(process.execPath, [HOOK, ...args], {
       env: { ...process.env, TMPDIR: racine, TEMP: racine, TMP: racine, AGENT_VIZ_PORT: '59999' },
@@ -183,6 +186,109 @@ test('le hook lancé avec --source=codex écrit l’événement tel quel, étiqu
     expect(relu.hook_event_name).toBe('PreToolUse');
   } finally {
     fs.rmSync(r.racine, { recursive: true, force: true });
+  }
+});
+
+test('la fin d’une commande Codex que son transcript dit en échec est écrite comme un échec', async () => {
+  // Arrange
+  const depot = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-viz-codex-transcript-'));
+  const transcriptPath = path.join(depot, 'rollout.jsonl');
+  fs.writeFileSync(transcriptPath, JSON.stringify({
+    timestamp: '2026-10-07T16:31:22.503Z',
+    type: 'event_msg',
+    payload: {
+      type: 'item_completed',
+      item: {
+        type: 'CommandExecution', id: 'exec-c51101c5', status: 'failed', exit_code: 3,
+        aggregated_output: 'Code de sortie Node : 3\r\n',
+      },
+    },
+  }) + '\n');
+  const evt = {
+    session_id: 'sess-codex-2', hook_event_name: 'PostToolUse', tool_name: 'Bash', tool_use_id: 'exec-c51101c5',
+    tool_input: { command: 'node -e "process.exit(3)"' }, tool_response: 'Code de sortie Node : 3\r\n',
+    transcript_path: transcriptPath,
+  };
+  // Act
+  const r = await lanceLeHook(JSON.stringify(evt), ['--source=codex']);
+  // Assert
+  try {
+    const ligne = lit(path.join(r.dossier, 'sess-codex-2.jsonl'));
+    expect(ligne, 'aucun .jsonl écrit pour la session Codex').not.toBe(null);
+    const relu = JSON.parse(ligne!.trim());
+    expect(relu.hook_event_name).toBe('PostToolUseFailure');
+    expect(relu.error).toBe('Exit code 3\nCode de sortie Node : 3');
+    expect(relu._source).toBe('codex');
+  } finally {
+    fs.rmSync(r.racine, { recursive: true, force: true });
+    fs.rmSync(depot, { recursive: true, force: true });
+  }
+});
+
+test('une commande Codex qui n’a pas démarré est close par son échec au hook suivant de la session', async () => {
+  // Arrange
+  const depot = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-viz-codex-transcript-'));
+  const transcriptPath = path.join(depot, 'rollout.jsonl');
+  fs.writeFileSync(transcriptPath, JSON.stringify({
+    timestamp: '2026-10-09T17:39:01.403Z',
+    type: 'event_msg',
+    payload: {
+      type: 'item_completed',
+      item: {
+        type: 'CommandExecution', id: 'exec-refus', status: 'failed', exit_code: -1,
+        aggregated_output: 'Failed to create unified exec process',
+      },
+    },
+  }) + '\n');
+  const lancement = {
+    session_id: 'sess-codex-4', hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_use_id: 'exec-refus',
+    tool_input: { command: 'Write-Output ok-un' }, transcript_path: transcriptPath,
+  };
+  const arret = { session_id: 'sess-codex-4', hook_event_name: 'Stop', transcript_path: transcriptPath };
+  const premier = await lanceLeHook(JSON.stringify(lancement), ['--source=codex']);
+  // Act
+  const r = await lanceLeHook(JSON.stringify(arret), ['--source=codex'], premier.racine);
+  // Assert
+  try {
+    const ecrits = lit(path.join(r.dossier, 'sess-codex-4.jsonl'))!.trim().split('\n').map(l => JSON.parse(l));
+    expect(ecrits.map(e => e.hook_event_name)).toEqual(['PreToolUse', 'PostToolUseFailure', 'Stop']);
+    expect(ecrits[1]).toMatchObject({
+      tool_use_id: 'exec-refus', error: 'Exit code -1\nFailed to create unified exec process',
+      ended_at: '2026-10-09T17:39:01.403Z', _source: 'codex',
+    });
+  } finally {
+    fs.rmSync(r.racine, { recursive: true, force: true });
+    fs.rmSync(depot, { recursive: true, force: true });
+  }
+});
+
+test('l’échec d’une commande Codex est trouvé à la fin d’un transcript de plusieurs mégaoctets', async () => {
+  // Arrange
+  const depot = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-viz-codex-transcript-'));
+  const transcriptPath = path.join(depot, 'rollout.jsonl');
+  const ancienne = JSON.stringify({ type: 'response_item', payload: { type: 'message', text: 'x'.repeat(1000) } }) + '\n';
+  fs.writeFileSync(transcriptPath, ancienne.repeat(3000) + JSON.stringify({
+    timestamp: '2026-10-07T16:31:22.503Z',
+    type: 'event_msg',
+    payload: {
+      type: 'item_completed',
+      item: { type: 'CommandExecution', id: 'exec-fin', status: 'failed', exit_code: 1, aggregated_output: 'boum' },
+    },
+  }) + '\n');
+  const evt = {
+    session_id: 'sess-codex-3', hook_event_name: 'PostToolUse', tool_name: 'Bash', tool_use_id: 'exec-fin',
+    tool_input: { command: 'exit 1' }, transcript_path: transcriptPath,
+  };
+  // Act
+  const r = await lanceLeHook(JSON.stringify(evt), ['--source=codex']);
+  // Assert
+  try {
+    const relu = JSON.parse(lit(path.join(r.dossier, 'sess-codex-3.jsonl'))!.trim());
+    expect(relu.hook_event_name).toBe('PostToolUseFailure');
+    expect(relu.error).toBe('Exit code 1\nboum');
+  } finally {
+    fs.rmSync(r.racine, { recursive: true, force: true });
+    fs.rmSync(depot, { recursive: true, force: true });
   }
 });
 

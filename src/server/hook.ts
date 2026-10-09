@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 import { HOOK_SOURCES, NORMALIZERS, NEEDS_EVENT_FLAG, type HookSource } from './hook-normalize.ts';
 import { lateFailures } from './hook-antigravity-verdicts.ts';
 import { sessionStart } from './hook-antigravity-session-start.ts';
+import { codexEvents } from './hook-codex-verdicts.ts';
 import { validSessionId } from './session-id.ts';
 
 // node:http arrive par process.getBuiltinModule, pas par `import` : matérialiser son espace de
@@ -42,6 +43,26 @@ function readText(file: string): string {
   try { return fs.readFileSync(file, 'utf8'); } catch { return ''; }
 }
 
+// Un hook Codex part à chaque outil et un transcript pèse plusieurs mégaoctets : seule la fin
+// est lue. La ligne cherchée vient d'être écrite, et la plus grosse relevée pèse 78 Ko.
+const TAIL_BYTES = 1024 * 1024;
+
+function readTail(file: string): string {
+  let fd: number | undefined;
+  try {
+    fd = fs.openSync(file, 'r');
+    const size = fs.fstatSync(fd).size;
+    const length = Math.min(size, TAIL_BYTES);
+    const buffer = Buffer.alloc(length);
+    fs.readSync(fd, buffer, 0, length, size - length);
+    return buffer.toString('utf8');
+  } catch {
+    return '';
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd);
+  }
+}
+
 // Un événement d'agent qui n'est pas écrit tel quel : il est remplacé par ceux qu'on en déduit.
 // `null` quand l'événement suit le chemin ordinaire.
 type Replacer = (raw: Payload, event: string | undefined) => Payload[] | null;
@@ -58,11 +79,19 @@ function antigravityPostInvocation(raw: Payload, event: string | undefined): Pay
   ];
 }
 
+// Sans transcript ou sans session lisible, l'événement suit le chemin ordinaire, qui trace le refus.
+function codexVerdicts(raw: Payload, event: string | undefined): Payload[] | null {
+  const { session_id, transcript_path } = raw;
+  if (!validSessionId(session_id) || typeof transcript_path !== 'string') return null;
+  const events = readTail(path.join(DIR, `${session_id}.jsonl`));
+  return codexEvents(NORMALIZERS.codex(raw, event), events, readTail(transcript_path));
+}
+
 const REPLACERS: Record<HookSource, Replacer | null> = {
   claude: null,
   copilot: null,
   antigravity: antigravityPostInvocation,
-  codex: null,
+  codex: codexVerdicts,
 };
 
 function parseSource(argv: string[]): HookSource {

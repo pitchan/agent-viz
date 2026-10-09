@@ -26,6 +26,8 @@ interface HookFailureEvent extends ToolCallEvent {
   error?: string;
   session_id?: string;
   agent_id?: string;
+  // Posé sur un échec écrit après coup : l'heure réelle de l'échec.
+  ended_at?: string;
   _ts?: string;
 }
 
@@ -111,7 +113,7 @@ export function recordError(evt: HookFailureEvent | null | undefined): ErrorReco
     // La ligne rejoint sa DERNIERE occurrence : heure, message, noeud — et la
     // continuite repart de la, sinon « N reussis depuis » mentirait sur un
     // echec qui vient de revenir.
-    existing.ts = evt._ts || new Date().toISOString();
+    existing.ts = evt.ended_at || evt._ts || new Date().toISOString();
     existing.message = message;
     existing.toolUseId = toolUseId;
     existing.nodeId = toolUseId ? `t:${toolUseId}` : null;
@@ -125,7 +127,7 @@ export function recordError(evt: HookFailureEvent | null | undefined): ErrorReco
     sig,
     count: 1,
     successesAt: _successCount,
-    ts: evt._ts || new Date().toISOString(),
+    ts: evt.ended_at || evt._ts || new Date().toISOString(),
     toolName: evt.tool_name || '',
     subject,
     message,
