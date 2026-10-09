@@ -1,7 +1,7 @@
 // start, status et stop parlent à de vrais processus sur de vrais ports : chaque
 // test charge une copie de lifecycle.ts à côté d'un faux server.js, son port par
 // défaut remplacé par un port de test, pour ne jamais sonder ni arrêter un démon réel.
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
@@ -232,8 +232,10 @@ test('stop sans argument vise le port du fichier de pid et le retire', async () 
 });
 
 // Sous Windows, un dossier ne se renomme pas tant qu'un fichier qu'il contient
-// reste ouvert : la suppression, elle, réussit malgré un descripteur ouvert.
-test('après start puis stop, le processus qui a lancé le démon ne tient plus le journal : son dossier se renomme du premier coup', async () => {
+// reste ouvert. Le démon tient le journal par sa sortie standard jusqu'à la fin
+// de sa mort, quelques millisecondes après que stop a rendu la main : le renommage
+// se retente. Un descripteur gardé par le lanceur, lui, ne se relâche jamais.
+test('après start puis stop, le processus qui a lancé le démon ne tient plus le journal : son dossier se renomme une fois le démon mort', async () => {
   // Arrange
   const [port, portParDefaut] = await portsLibres(2);
   const montage = await chargeLifecycle({ portParDefaut, serveur: SERVEUR_QUI_ECOUTE });
@@ -244,8 +246,9 @@ test('après start puis stop, le processus qui a lancé le démon ne tient plus 
     await montage.lifecycle.stop();
 
     // Act
-    let erreur: NodeJS.ErrnoException | null = null;
-    try { fs.renameSync(dossierJournal, renomme); } catch (e) { erreur = e as NodeJS.ErrnoException; }
+    const erreur: NodeJS.ErrnoException | null = await vi
+      .waitFor(() => fs.renameSync(dossierJournal, renomme), { timeout: 2000 })
+      .then(() => null, e => e);
 
     // Assert
     expect(erreur, `renommage refusé : ${erreur?.code} sur ${erreur?.path}`).toBe(null);
