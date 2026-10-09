@@ -174,14 +174,17 @@ test('un sous-agent que son agent nomme porte ce nom et son surnom, pas son type
   expect(agent.sub).toBe('Avicenna');
 });
 
-test('un sous-agent dont la fin est annoncée après coup compte la durée jusqu\'à son heure réelle', () => {
-  // Arrange
+test('un sous-agent dont la fin porte ses heures réelles compte sa durée du lancement à la fin', () => {
+  // Arrange — le premier outil du sous-agent part 4 s après son lancement.
   const sid = 'abc12345-0000-0000-0000-000000000000';
   const aid = 'abc12345-9999-0000-0000-000000000000';
-  processEvent({ hook_event_name: 'PreToolUse', session_id: sid, tool_name: 'Bash', tool_use_id: 'tu-enfant', agent_id: aid, agent_type: 'default', _ts: '2025-01-01T00:00:00.000Z' });
+  processEvent({ hook_event_name: 'PreToolUse', session_id: sid, tool_name: 'Bash', tool_use_id: 'tu-enfant', agent_id: aid, agent_type: 'default', _ts: '2025-01-01T00:00:04.000Z' });
 
   // Act
-  processEvent({ hook_event_name: 'SubagentStop', session_id: sid, agent_id: aid, ended_at: '2025-01-01T00:00:05.600Z', _ts: '2025-01-01T00:00:06.000Z' });
+  processEvent({
+    hook_event_name: 'SubagentStop', session_id: sid, agent_id: aid,
+    started_at: '2025-01-01T00:00:00.000Z', ended_at: '2025-01-01T00:00:05.600Z', _ts: '2025-01-01T00:00:06.000Z',
+  });
 
   // Assert
   const agent = state.nodes.get(`a:${aid}`)!;

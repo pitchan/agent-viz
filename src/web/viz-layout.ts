@@ -235,6 +235,8 @@ function onSubagentStop(evt: HookEvent, sid: string, ts: string) {
   const aid = evt.agent_id || sid;
   const n = state.nodes.get(`a:${aid}`);
   if (!n) return;
+  // Le noeud est né au premier outil du sous-agent : l'heure réelle de son lancement le corrige.
+  if (evt.started_at) n.startTime = evt.started_at;
   n.status = 'done'; n.data = evt; n.endTime = evt.ended_at || ts;
   n.duration = calcDuration(n.startTime, n.endTime);
   n.color = COLORS.complete;

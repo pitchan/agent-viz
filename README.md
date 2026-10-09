@@ -239,7 +239,8 @@ Known limits:
 - Older Codex builds do not write the command outcome in their transcript: no failure is shown for those sessions. Seen on 0.155.0-alpha.9.2 and later, not on 0.148.0-alpha.9.
 - Only the last megabyte of the transcript is read on each event: a command whose output line is larger is shown as successful.
 - A subagent is drawn under its session, named after its task (`/root/child` shows as `child`) with the nickname Codex gives its thread. It appears at its first tool call, not when it is spawned.
-- A subagent's end time is read from the transcript of the thread that spawned it. Older Codex builds do not write it there: the subagent then stays open until the session ends. Seen on 0.162.0-alpha.2, not on 0.148.0-alpha.9.
+- A subagent's start and end times are read from the transcript of the thread that spawned it. Older Codex builds do not write the end there: the subagent is then closed when its parent's turn ends, and its duration runs from its first tool call to that moment. Seen on 0.162.0-alpha.2, not on 0.148.0-alpha.9.
+- A subagent that receives a follow-up task after it finished is shown as finished while it works again. Once it finishes again, its duration is that of this latest run.
 - The tokens a subagent uses are not counted in the session total.
 
 ## Hook management

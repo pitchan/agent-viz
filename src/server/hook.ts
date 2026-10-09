@@ -45,7 +45,7 @@ function readText(file: string): string {
 }
 
 // Un hook Codex part à chaque outil et un transcript pèse plusieurs mégaoctets : seuls ses deux
-// bouts sont lus. La plus grosse ligne de verdict relevée pèse 78 Ko, le plus gros en-tête 23 Ko.
+// bouts sont lus. La plus grosse ligne de verdict relevée pèse 78 Ko, le plus gros en-tête 49 Ko.
 const TAIL_BYTES = 1024 * 1024;
 const HEAD_BYTES = 256 * 1024;
 

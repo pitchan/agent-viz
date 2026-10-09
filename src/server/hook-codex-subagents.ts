@@ -31,19 +31,30 @@ export function subagentStops(evt: Payload, eventsText: string, transcriptText: 
   const written = new Set<unknown>();
   for (const stop of records(eventsText, '"SubagentStop"')) written.add(stop.activity_id);
 
+  // Le début du passage en cours de chaque sous-agent : son lancement, ou le message qui le
+  // relance une fois fini. Un message reçu en plein travail ne déplace pas ce début.
+  const runStart = new Map<string, string>();
   const out: Payload[] = [];
   for (const line of records(transcriptText, '"SubAgentActivity"')) {
     const item = isRecord(line.payload) ? line.payload.item : null;
-    if (!isRecord(item) || item.type !== 'SubAgentActivity' || item.kind !== 'completed') continue;
-    const { id, agent_thread_id } = item;
+    if (!isRecord(item) || item.type !== 'SubAgentActivity') continue;
+    const { id, kind, agent_thread_id } = item;
     if (typeof id !== 'string' || typeof agent_thread_id !== 'string' || typeof line.timestamp !== 'string') continue;
+    if (kind === 'started' || (kind === 'interacted' && !runStart.has(agent_thread_id))) {
+      runStart.set(agent_thread_id, line.timestamp);
+    }
+    if (kind !== 'completed') continue;
+    const started_at = runStart.get(agent_thread_id);
+    runStart.delete(agent_thread_id);
     if (written.has(id)) continue;
     out.push({
       hook_event_name: 'SubagentStop',
       session_id: evt.session_id,
       agent_id: agent_thread_id,
       activity_id: id,
-      // L'événement est écrit au hook suivant : l'heure réelle de la fin est celle du transcript.
+      // Le hook ne voit le sous-agent qu'à son premier outil, et sa fin qu'au hook suivant :
+      // les heures réelles du passage sont celles du transcript.
+      started_at,
       ended_at: line.timestamp,
       transcript_path: evt.transcript_path,
     });

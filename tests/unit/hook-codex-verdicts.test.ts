@@ -121,10 +121,10 @@ test('une commande qui n\'a pas démarré est close par un échec, écrit avant 
 test('l\'échec d\'une commande de sous-agent qui n\'a pas démarré reste attribué au sous-agent', () => {
   // Arrange
   const lancement = hook('PreToolUse', 'exec-enfant', { agent_id: '01a12200-8ec7', agent_type: 'default' });
-  const arret = { session_id: SESSION, hook_event_name: 'Stop' };
+  const suivant = hook('PreToolUse', 'exec-enfant-2', { agent_id: '01a12200-8ec7', agent_type: 'default' });
   const transcript = lignes(execution('exec-enfant', 'failed', -1, REFUS));
   // Act
-  const evenements = codexEvents(arret, lignes(lancement), transcript);
+  const evenements = codexEvents(suivant, lignes(lancement), transcript);
   // Assert
   expect(evenements[0]).toMatchObject({ hook_event_name: 'PostToolUseFailure', agent_id: '01a12200-8ec7', agent_type: 'default' });
 });
