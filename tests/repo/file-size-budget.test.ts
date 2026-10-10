@@ -22,10 +22,6 @@ const LISTE_BLANCHE = new Map([
     "Un seul métier : détecter les motifs toxiques dans le flux d'événements. La table des détecteurs "
     + "et la fabrique qui les fait tourner partagent le même état de session ; ajouter un détecteur "
     + "ajoute une entrée à la table, et le fichier grossit d'autant."],
-  ['src/web/viz-layout.ts',
-    "Deux métiers dans un fichier : transformer chaque événement hook en nœuds du graphe (création, "
-    + "parenté, fin), et placer ces nœuds en orbite autour de leur parent. Chaque métier change pour "
-    + "sa propre raison ; c'est une dette."],
   ['src/web/viz-canvas.ts',
     "Un seul métier : la toile où le graphe s'affiche — sa taille à l'écran, la caméra (déplacement "
     + "et zoom), le nœud sous la souris, les particules et la boucle qui repeint. Le dessin de chaque "
