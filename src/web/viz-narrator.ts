@@ -10,7 +10,7 @@ import { FILE_TOOLS } from '../engine/core/tool-subject.ts';
 import type { VizNode, TimelineEntry } from './viz-state.ts';
 
 // Ce module PUR ne recoit jamais `state`/`vis` par import (pas de cycle avec
-// viz-layout.ts) : seulement en parametres, ci-dessous.
+// viz-graph.ts) : seulement en parametres, ci-dessous.
 interface NarratorState {
   nodes: Map<string, VizNode>;
   timelineEntries: TimelineEntry[];

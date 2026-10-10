@@ -121,7 +121,7 @@ find src/web -type f ! -name "*.ts"   → src/web/viz.css
 ```
 
 ```
-src/web/               viz-state · viz-canvas · viz-layout · viz-ui · viz-network
+src/web/               viz-state · viz-canvas · viz-graph · viz-layout · viz-ui · viz-network
 src/web/observatory/   les quatre vues d'analyse : conseils, sessions, tarifs, skills
                        (quatre vues d'un seul document — il n'y a qu'un `.html`)
 ```

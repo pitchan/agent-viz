@@ -1,7 +1,7 @@
 // viz-ui.ts — feed panel, detail popup, stats, fitView, toolbar, keyboard,
 // live durations ticker. All DOM-side presentation concerns.
 //
-// Wires itself into viz-canvas (pointer-click callbacks) and viz-layout
+// Wires itself into viz-canvas (pointer-click callbacks) and viz-graph
 // (feed-cursor adjust hook) at module load. Circular imports with viz-network
 // are fine — all cross-calls happen inside event handlers, after both modules
 // are fully initialized.
@@ -13,9 +13,8 @@ import {
   type VizNode, type TokenBucket, type TimelineEntry,
 } from './viz-state.ts';
 import { countOrZero } from '../engine/core/usage.ts';
-import {
-  layout, matchesFilter, markLayoutFullDirty, setFeedCursorAdjust,
-} from './viz-layout.ts';
+import { setFeedCursorAdjust } from './viz-graph.ts';
+import { layout, matchesFilter, markLayoutFullDirty } from './viz-layout.ts';
 import * as canvasMod from './viz-canvas.ts';
 import { setCanvasCallbacks } from './viz-canvas.ts';
 import {
