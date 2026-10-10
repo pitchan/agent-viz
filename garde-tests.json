@@ -1,8 +1,14 @@
 {
-  "dispositif": ["tests/**", "test-support/**", "vitest.config.mts"],
-  "surveilles": ["package.json", "package-lock.json"],
-  "hygiene": ["tests/repo/**"],
-  "preparer": "npm ci",
-  "tester": "npx vitest run --reporter=json --outputFile={sortie}",
-  "format": "vitest-json"
+  "suites": [
+    {
+      "nom": "agent-viz",
+      "dossier": ".",
+      "dispositif": ["tests/**", "test-support/**", "vitest.config.mts"],
+      "surveilles": ["package.json", "package-lock.json"],
+      "hygiene": ["tests/repo/**"],
+      "preparer": "npm ci",
+      "tester": "npx vitest run --reporter=json --outputFile={sortie}",
+      "format": "vitest-json"
+    }
+  ]
 }
