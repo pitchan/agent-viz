@@ -2,11 +2,12 @@
 //
 // Owns the server connection (EventSource + poll loop), the current session
 // selection, and the pause/resume lifecycle. Events come in here, are handed
-// to viz-layout (processEvent, layout), and trigger viz-ui (renderFeed,
+// to viz-graph (processEvent) then viz-layout (layout), and trigger viz-ui (renderFeed,
 // updateStats, fitView) via `scheduleRender` which coalesces bursts.
 
 import { state, vis, markDirty, esc, tokensApplyTo, type TokenBucket } from './viz-state.ts';
-import { processEvent, layout, resetLayout } from './viz-layout.ts';
+import { processEvent } from './viz-graph.ts';
+import { layout, resetLayout } from './viz-layout.ts';
 import {
   renderFeed, updateStats, updateBudget, fitView, startDurationsTicker, stopDurationsTicker,
 } from './viz-ui.ts';

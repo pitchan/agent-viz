@@ -59,7 +59,7 @@ export interface TokenBucket {
   malformedUsageMessages?: number;
 }
 
-// Un nœud du graphe (state.nodes) — construit par viz-layout.ts, lu par
+// Un nœud du graphe (state.nodes) — construit par viz-graph.ts, lu par
 // viz-drawers.ts et viz-narrator.ts. `_visible` n'existe que sur un nœud
 // posé par le layout orbital ; absent avant le premier passage.
 export interface VizNode {

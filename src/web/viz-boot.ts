@@ -2,15 +2,16 @@
 // index.html : la politique de la page n'exécute que les scripts servis par le
 // serveur.
 //
-// Order: state → canvas (registers tick) → layout → ui → network.
+// Order: state → canvas (registers tick) → layout → graph → ui → network.
 // viz-ui and viz-network have a benign import cycle; ES modules handle it
 // because all cross-calls happen inside event handlers.
 import './viz-state.ts';
 import './viz-canvas.ts';
 import './viz-layout.ts';
+import './viz-graph.ts';
 import './viz-ui.ts';
 import { loadSessions, connectSSE, poll } from './viz-network.ts';
-import { garbageCollect } from './viz-layout.ts';
+import { garbageCollect } from './viz-graph.ts';
 import { requestRender } from './viz-state.ts';
 import { initAdvisor } from './observatory/advisor-view.ts';
 import { initAnalysis } from './observatory/analysis-view.ts';
