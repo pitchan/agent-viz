@@ -1,5 +1,5 @@
 // Filet de CARACTÉRISATION pour src/server/session-index.ts : `indexSessionInitial`
-// décode la première ligne (4 premiers Ko) pour en tirer `_source`, et
+// décode la première ligne pour en tirer `_source`, et
 // `countNewlinesStreaming` compte les sauts de ligne.
 //
 // `sessionFilePath`, `latestSession` et la branche de création de `touchIndex`
@@ -141,17 +141,18 @@ test('CARACTÉRISATION — une première ligne illisible laisse toujours une tra
   expect(erreurs[0], 'la trace doit nommer la cause').toMatch(/première ligne illisible/);
 });
 
-test('CARACTÉRISATION — une première ligne de plus de 4 Ko est tronquée, donc illisible', async () => {
-  // La sonde ne lit que les 4096 premiers octets : une première ligne plus
-  // longue est coupée au milieu et ne peut plus être analysée.
+// Un fichier compacté commence par un événement quelconque, souvent une grosse
+// sortie d'outil : la taille de la première ligne ne coûte pas la source.
+test('une première ligne de plus de 4 Ko garde agentSource', async () => {
+  // Arrange
   const bourrage = 'x'.repeat(5000);
-  const { fp, id } = poseUnFichier(evenement({ _source: 'copilot', bourrage }) + '\n');
-  expect(fs.statSync(fp).size > 4096, 'la première ligne doit bien dépasser 4 Ko').toBe(true);
+  const { fp, id } = poseUnFichier(evenement({ bourrage, _source: 'copilot' }) + '\n');
 
+  // Act
   await indexSessionInitial(fp);
 
-  expect(sessionIndex.get(id)!.agentSource, 'comportement ACTUEL : au-delà de 4 Ko la première ligne est tronquée et _source est perdu, ' +
-    'même s’il est présent dans le fichier. Limite de la sonde, pas du format.').toBe(undefined);
+  // Assert
+  expect(sessionIndex.get(id)!.agentSource).toBe('copilot');
 });
 
 test('CARACTÉRISATION — un fichier vide est indexé sans erreur et sans source', async () => {

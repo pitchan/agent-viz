@@ -64,7 +64,7 @@ function inventaireWeb(dir: string): string[] {
 function pointsDEntree() {
   const html = readFileSync(path.join(ROOT, 'index.html'), 'utf8');
   return [...html.matchAll(/<script\b[^>]*type="module"[^>]*src="([^"]+)"/g)]
-    .map(m => path.resolve(ROOT, m[1]));
+    .map(m => path.resolve(ROOT, m[1]!));
 }
 
 const MODULES = webModules();
