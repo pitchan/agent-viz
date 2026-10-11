@@ -91,34 +91,49 @@ function countNewlinesStreaming(fp: string, bytes: number): Promise<number> {
   });
 }
 
+// La première ligne ENTIÈRE, quelle que soit sa taille : un fichier compacté
+// commence par un événement quelconque, et une sortie d'outil dépasse vite un
+// bloc de lecture. Une ligne coupée ne se décode pas.
+async function readFirstLine(fp: string, size: number): Promise<string> {
+  const fh = await fsp.open(fp, 'r');
+  try {
+    const chunks: Buffer[] = [];
+    for (let pos = 0; pos < size;) {
+      const buf = Buffer.alloc(Math.min(4096, size - pos));
+      const { bytesRead } = await fh.read(buf, 0, buf.length, pos);
+      if (bytesRead === 0) break;
+      const chunk = buf.subarray(0, bytesRead);
+      const eol = chunk.indexOf(0x0a);
+      if (eol !== -1) { chunks.push(chunk.subarray(0, eol)); break; }
+      chunks.push(chunk);
+      pos += bytesRead;
+    }
+    return Buffer.concat(chunks).toString('utf8');
+  } finally {
+    await fh.close();
+  }
+}
+
 async function indexSessionInitial(fp: string): Promise<void> {
   const id = idFromPath(fp);
   if (sessionIndex.has(id)) return;
   try {
     const stat = await fsp.stat(fp);
     const eventCount = await countNewlinesStreaming(fp, stat.size);
-    // Backfill agentSource from the first event's _source (first 4 KB). Undefined when the field
+    // Backfill agentSource from the first event's _source. Undefined when the field
     // is missing: hook.ts stamps _source on every event, so absence means a file written without
     // that stamp or by a foreign producer. Don't silently coerce to 'claude'.
     let agentSource: string | undefined;
     try {
-      const fh = await fsp.open(fp, 'r');
-      const buf = Buffer.alloc(Math.min(4096, stat.size));
-      await fh.read(buf, 0, buf.length, 0);
-      await fh.close();
-      // `split('\n')` rend toujours au moins un élément — l'index 0 existe en
-      // pratique ; le repli sur '' ne sert que `noUncheckedIndexedAccess`.
-      const firstLine = buf.toString('utf8').split('\n')[0] ?? '';
+      const firstLine = await readFirstLine(fp, stat.size);
       // Verdict rendu par la primitive commune, qui ne lève pas : un échec se lit, il ne
       // s'attrape pas. Une première ligne préfixée d'un BOM est décodée ; un JSON.parse local
       // y perdait `_source` sans rien de réparable.
       const verdict: JsonlLine | null = decodeJsonlLine(firstLine);
       if (verdict && !verdict.ok) {
-        // La trace nomme la cause la plus probable, que la sonde ne distingue pas d'un fichier
-        // corrompu : au-delà de 4 Ko, la première ligne arrive coupée en plein milieu.
         console.error(
           `[session-index] ${id.slice(0, 8)}: sonde agentSource — première ligne illisible ` +
-          `(${verdict.rawLength} caractères ; au-delà de ${buf.length} octets lus, elle arrive tronquée)`,
+          `(${verdict.rawLength} caractères)`,
         );
       }
       const evt: unknown = verdict && verdict.ok ? verdict.value : null;
