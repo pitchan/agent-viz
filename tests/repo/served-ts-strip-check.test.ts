@@ -1,6 +1,6 @@
 // La doc Node dit que `stripTypeScriptTypes` n'est pas stable d'une version
-// à l'autre : ce test rejoue, sur les 36 vrais fichiers servis au navigateur
-// (33 modules + 3 primitives du moteur), le même retrait que le serveur.
+// à l'autre : ce test rejoue, sur chaque .ts présent sous src/web et sur les
+// 3 primitives du moteur, le même retrait que le serveur.
 import { afterAll, expect, test } from 'vitest';
 import { readdirSync, statSync, readFileSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
@@ -45,14 +45,55 @@ function webModules() {
   return out.sort();
 }
 
+// Second inventaire de src/web, écrit sans l'option `recursive` : il ne
+// partage avec `webModules()` ni l'appel ni la reconstruction des chemins,
+// pour qu'une faute de l'un ne soit pas aussi celle de l'autre.
+function inventaireWeb(dir: string): string[] {
+  const out: string[] = [];
+  for (const nom of readdirSync(dir)) {
+    const p = path.join(dir, nom);
+    const s = statSync(p);
+    if (s.isDirectory()) out.push(...inventaireWeb(p));
+    else if (s.isFile() && nom.endsWith('.ts')) out.push(p);
+  }
+  return out;
+}
+
+// Deux inventaires vides seraient égaux : les points d'entrée que la page
+// déclare, lus dans index.html, prouvent que la boucle n'est pas vide.
+function pointsDEntree() {
+  const html = readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  return [...html.matchAll(/<script\b[^>]*type="module"[^>]*src="([^"]+)"/g)]
+    .map(m => path.resolve(ROOT, m[1]));
+}
+
 const MODULES = webModules();
 const PRIMITIVES = enginePrimitives();
 const SERVED = [...MODULES, ...PRIMITIVES];
 
-test('la liste blanche sert exactement 36 fichiers (33 modules + 3 primitives du moteur)', () => {
-  expect(MODULES.length, `ASSIETTE : ${MODULES.length} module(s) .ts sous src/web, attendu 33.`).toBe(33);
+test('la boucle parcourt chaque .ts présent sous src/web, et les 3 primitives du moteur', () => {
+  // Arrange
+  const relatif = (abs: string) => path.relative(ROOT, abs).replaceAll('\\', '/');
+  const web = path.join(ROOT, 'src', 'web') + path.sep;
+  const surDisque = inventaireWeb(path.join(ROOT, 'src', 'web'));
+  const entrees = pointsDEntree();
+
+  // Act — ce que la boucle plus bas parcourt réellement.
+  const parcourus = SERVED.filter(p => p.startsWith(web));
+  const horsWeb = SERVED.filter(p => !p.startsWith(web));
+
+  // Assert
+  const oublies = surDisque.filter(p => !parcourus.includes(p)).map(relatif);
+  const inconnus = parcourus.filter(p => !surDisque.includes(p)).map(relatif);
+  const entreesOubliees = entrees.filter(p => !SERVED.includes(p)).map(relatif);
+  expect(oublies, `ASSIETTE : ${oublies.length} .ts de src/web sur ${surDisque.length} `
+    + `échappe(nt) à la boucle :\n  ${oublies.join('\n  ')}`).toEqual([]);
+  expect(inconnus, `ASSIETTE : la boucle parcourt des chemins absents du disque :\n  ${inconnus.join('\n  ')}`).toEqual([]);
+  expect(entrees.length, 'ASSIETTE : index.html ne déclare aucun <script type="module">.').toBeGreaterThan(0);
+  expect(entreesOubliees, `ASSIETTE : point(s) d'entrée de index.html absent(s) de la boucle :\n  ${entreesOubliees.join('\n  ')}`).toEqual([]);
   expect(PRIMITIVES.length, `ASSIETTE : ${PRIMITIVES.length} primitive(s) du moteur en liste blanche, attendu 3.`).toBe(3);
-  expect(SERVED.length).toBe(36);
+  expect(horsWeb.map(relatif), 'ASSIETTE : hors de src/web, la boucle parcourt exactement les primitives du moteur.')
+    .toEqual(PRIMITIVES.map(relatif));
 });
 
 test('aucun prefixe de route ne recouvre /src/engine/ : le filtre ci-dessus ne saute rien', () => {
