@@ -43,7 +43,8 @@ Les modules de haut niveau ne dépendent pas des modules de bas niveau ; les deu
 - **Garde-fou mesuré des commentaires** : un commentaire dit POURQUOI le code est ainsi, au présent, en trois lignes au plus — jamais un récit, ni un renvoi à un plan, une étape, une date ou un document numéroté.
   - `tests/repo/no-narrative-comments.test.ts` échoue si un commentaire de `src/`, `bin/`, `tests/`, `test-support/` ou `vitest.config.mts` porte un de ces marqueurs sans entrée justifiée dans sa liste `LISTE_BLANCHE`, ou si un bloc de commentaire dépasse 30 lignes.
   - Cette liste blanche n'admet qu'une donnée datée, jamais un récit : une entrée qui ne couvre plus rien doit en sortir.
-- Quand un refactor SOLID dépasse le scope du ticket en cours, **ouvre une note / TODO** — n'élargis pas une PR de bugfix en chantier de redesign sans validation explicite.
+- Quand un refactor SOLID dépasse le scope du ticket en cours, **ouvre un ticket** — n'élargis pas une PR de bugfix en chantier de redesign sans validation explicite.
+- **Le suivi des chantiers se tient en tickets GitHub** sur `pitchan/agent-viz` (`gh issue`) : un chantier, un bogue relevé ou une erreur hors chantier = un ticket ; le commit qui fait le travail le ferme (`closes #N`). Le dépôt est public : ni chemin local, ni identifiant de session, ni donnée personnelle dans un ticket.
 - Si un test ne passe plus, comprend pourquoi avant de corriger quoi que ce soit
 
 ## En cas de doute
