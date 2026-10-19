@@ -88,23 +88,23 @@ Chaque règle porte sa source :
 | *Je l'adopte*, carte chiffrée | « La carte part au journal. Si le coût regrossit malgré tout, elle reviendra te demander si le geste a vraiment pris. » | vu |
 | *Je l'adopte*, carte non chiffrée | « La carte part au journal. » | vu |
 | *Plus tard*, carte dont le coût est au-dessus de 0 | « Revient d'elle-même si le coût regrossit de moitié. » | vu |
-| *Plus tard*, carte dont le coût vaut 0 | « Revient d'elle-même dès qu'un coût apparaît. » | #15 |
-| *Non merci* | « Dis pourquoi ; c'est consigné au journal et ne sera plus proposé. » | #17 |
+| *Plus tard*, carte dont le coût vaut 0 | « Revient d'elle-même dès qu'un coût apparaît. » | voulu |
+| *Non merci* | « Dis pourquoi ; c'est consigné au journal et ne sera plus proposé. » | vu |
 
 ### Après une réponse
 
 | # | Règle | Source |
 |---|---|---|
 | R13 | *Je l'adopte* et *Plus tard* agissent aussitôt, sans demande de confirmation : la carte quitte la liste et rejoint le journal. | relevé |
-| R14 | *Non merci* déplie un champ « Pourquoi ? » et un bouton *Consigner*. Tant que le champ est vide, *Consigner* est grisé. | #16, #17 |
-| R15 | *Consigner* envoie la carte au journal avec la raison écrite. La raison n'a pas de longueur imposée. | relevé, #17 |
+| R14 | *Non merci* déplie un champ « Pourquoi ? » et un bouton *Consigner*. Tant que le champ est vide, *Consigner* est grisé. | vu |
+| R15 | *Consigner* envoie la carte au journal avec la raison écrite. La raison n'a pas de longueur imposée. | relevé |
 | R16 | Au moment de la réponse, l'application retient la date et le coût de la carte ce jour-là. Ce coût sert de point de comparaison pour un retour (R17). | relevé |
 | R17 | Une carte adoptée ou mise à plus tard revient dans la liste quand son coût atteint une fois et demie le coût retenu (+50 %). Si le coût retenu valait 0, elle revient dès qu'un coût apparaît. Une carte non chiffrée ne revient jamais d'elle-même. | relevé |
 | R18 | Une carte refusée (*Non merci*) ne revient jamais d'elle-même. | relevé |
 | R19 | Une carte revenue affiche un bandeau au-dessus de ses chiffres, puis repropose ses boutons. Une nouvelle réponse remplace la date et le coût retenus. | relevé |
 | R20 | Une nouvelle analyse met à jour les chiffres des cartes, sans jamais annuler une réponse déjà donnée. | relevé |
 | R21 | Un projet déplacé ou renommé est un nouveau projet : sa carte réapparaît comme neuve, et l'ancienne réponse reste attachée à l'ancien emplacement. | voulu |
-| R22 | Si une réponse ne s'enregistre pas, la carte affiche « Décision non enregistrée : » suivi de la cause, et garde ses boutons pour réessayer. Le reste de la page ne bouge pas. | #18 |
+| R22 | Si une réponse ne s'enregistre pas, la carte affiche « Décision non enregistrée : » suivi de la cause, et garde ses boutons pour réessayer. Le reste de la page ne bouge pas. | vu |
 
 Texte du bandeau d'une carte revenue (R19) :
 
@@ -129,7 +129,7 @@ Texte du bandeau d'une carte revenue (R19) :
 | *Non merci* | « Refusé le JJ/MM/AAAA » | la raison écrite | vu |
 | *Je l'adopte*, carte chiffrée | « Adopté le JJ/MM/AAAA » | « reviendra si le coût regrossit malgré tout » | relevé |
 | *Plus tard*, coût retenu au-dessus de 0 | « Mis en veille le JJ/MM/AAAA » | « reviendra si le coût regrossit de moitié » | relevé |
-| *Plus tard*, coût retenu à 0 | « Mis en veille le JJ/MM/AAAA » | « reviendra dès qu'un coût apparaît » | #15 |
+| *Plus tard*, coût retenu à 0 | « Mis en veille le JJ/MM/AAAA » | « reviendra dès qu'un coût apparaît » | voulu |
 | *Je l'adopte*, carte non chiffrée | « Adopté le JJ/MM/AAAA » | rien | relevé |
 
 ## Critères d'acceptation

@@ -191,6 +191,9 @@ const DECISION_WATCH: Record<string, string> = {
   accepted: 'reviendra si le coût regrossit malgré tout',
   ignored: 'reviendra si le coût regrossit de moitié',
 };
+// À coût figé nul, « de moitié » ne veut rien dire : la carte revient au
+// premier coût (isEligible, ranking.ts).
+const ZERO_COST_IGNORED_WATCH = 'reviendra dès qu’un coût apparaît';
 
 // Le seul appelant reel passe un DecidedRecommendation {id, title, costBasis}
 // (decisions-view.ts) — repris a l'identique, plus les quatre champs que
@@ -202,6 +205,7 @@ interface DecisionFields {
   statusAt?: string | null;
   statusReason?: string | null;
   costBasis?: string;
+  costAtStatusUsd?: number | null;
 }
 
 function decidedWhen(rec: DecisionFields) {
@@ -214,9 +218,16 @@ function decidedWhen(rec: DecisionFields) {
 // non-chiffré ne revient jamais tout seul (isEligible, ranking.ts, exige un
 // coût mesuré) : pas de veille à annoncer.
 export function decisionLine(rec: DecisionFields) {
-  const watch = isUnpricedBasis(rec.costBasis ?? '') ? null : DECISION_WATCH[rec.status ?? ''] ?? null;
+  const watch = isUnpricedBasis(rec.costBasis ?? '') ? null
+    : rec.status === 'ignored' && rec.costAtStatusUsd === 0 ? ZERO_COST_IGNORED_WATCH
+      : DECISION_WATCH[rec.status ?? ''] ?? null;
   const tail = rec.statusReason ?? watch;
   return tail ? `${decidedWhen(rec)} — ${tail}` : decidedWhen(rec);
+}
+
+/** Posé sur la carte dont la réponse n'a pas été enregistrée, cause comprise. */
+export function decisionErrorLabel(message: string) {
+  return `Décision non enregistrée : ${message}`;
 }
 
 // Banner of a decided card that crossed its return threshold and surfaced

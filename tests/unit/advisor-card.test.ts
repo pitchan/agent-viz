@@ -63,8 +63,20 @@ test('trois intentions, dans cet ordre, chacune avec sa conséquence écrite des
   expect(legendes).toEqual([
     'La carte part au journal. Si le coût regrossit malgré tout, elle reviendra te demander si le geste a vraiment pris.',
     'Revient d’elle-même si le coût regrossit de moitié.',
-    'Dis pourquoi en une ligne ; c’est consigné au journal et ne sera plus proposé.',
+    'Dis pourquoi ; c’est consigné au journal et ne sera plus proposé.',
   ]);
+});
+
+test('une carte à coût nul promet son retour dès qu’un coût apparaît, pas « de moitié »', () => {
+  // Arrange
+  const rec = carte({ estimatedCostUsd: 0 });
+  // Act
+  const node = recommendationCard(rec, { actionable: true });
+  // Assert
+  const plusTard = parClasse(node, 'advisor-choice')
+    .find(c => parClasse(c, 'obs-btn')[0].textContent === 'Plus tard');
+  expect(parClasse(plusTard, 'advisor-choice-caption')[0].textContent)
+    .toBe('Revient d’elle-même dès qu’un coût apparaît.');
 });
 
 test('une carte informative ne propose pas « Je l’adopte » — rien à adopter', () => {

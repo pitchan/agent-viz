@@ -10,7 +10,7 @@ import { getState, subscribe, loadAdvisor, changeStatus, applyScanEvent } from '
 import {
   confidenceLabel, costLabel, basisTitle, periodLabel, basisLabel, periodHeader,
   scanProgressLabel, summaryHeadline, summaryDetails, returnBanner, isUnpricedBasis,
-  type Recommendation, type Summary, type ScanProgress,
+  decisionErrorLabel, type Recommendation, type Summary, type ScanProgress,
 } from './format.ts';
 import { evidenceLines } from './evidence.ts';
 import { initPeriodSelector } from './period-selector.ts';
@@ -47,8 +47,12 @@ function el(tag: string, className?: string | null, text?: string): HTMLElement 
 const CHOICE_CAPTIONS = {
   accepted: 'La carte part au journal. Si le coût regrossit malgré tout, elle reviendra te demander si le geste a vraiment pris.',
   ignored: 'Revient d’elle-même si le coût regrossit de moitié.',
-  refuse: 'Dis pourquoi en une ligne ; c’est consigné au journal et ne sera plus proposé.',
+  refuse: 'Dis pourquoi ; c’est consigné au journal et ne sera plus proposé.',
 };
+
+// À coût nul, « de moitié » ne veut rien dire : la carte revient au premier
+// coût (isEligible, ranking.ts), la légende le dit tel quel.
+const ZERO_COST_IGNORED_CAPTION = 'Revient d’elle-même dès qu’un coût apparaît.';
 
 // Un non-chiffré ne revient jamais tout seul (isEligible, ranking.ts, exige
 // un coût mesuré pour réarmer une carte décidée) : la légende d'adoption ne
@@ -106,8 +110,9 @@ export function recommendationCard(rec: Recommendation, { actionable }: { action
       const btn = el('button', 'obs-btn', label) as HTMLButtonElement;
       btn.type = 'button';
       btn.dataset.status = status;
-      const caption = status === 'accepted' && basisKey === 'unpriced'
-        ? UNPRICED_ACCEPTED_CAPTION : CHOICE_CAPTIONS[status];
+      const caption = status === 'accepted' && basisKey === 'unpriced' ? UNPRICED_ACCEPTED_CAPTION
+        : status === 'ignored' && rec.estimatedCostUsd === 0 ? ZERO_COST_IGNORED_CAPTION
+          : CHOICE_CAPTIONS[status];
       buttons.appendChild(choice(btn, caption));
     }
     // « Non merci » : câblé avec sa raison — il ne passe pas par la
@@ -175,6 +180,11 @@ function render() {
   const progress = scanProgressLabel(state.scan);
   if (progress) head.appendChild(el('div', 'advisor-scan-progress', progress));
   renderList(list, state.recommendations as RecommendationGroups);
+  const failed = state.decisionError;
+  if (failed) {
+    list.querySelector(`.advisor-card[data-rec-id="${failed.id}"]`)!
+      .appendChild(el('div', 'advisor-card-error', decisionErrorLabel(failed.message)));
+  }
 }
 
 // L'acquittement d'un groupe : la route est unitaire, la serie est ici.

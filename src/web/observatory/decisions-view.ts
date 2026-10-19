@@ -66,8 +66,12 @@ export function refusalControls(onRefuse: (value: string) => void): HTMLElement 
   const form = el('div', 'advisor-refuse-form');
   const reason = el('input', 'advisor-refuse-reason') as HTMLInputElement;
   reason.type = 'text';
-  reason.setAttribute('placeholder', 'Pourquoi ? (une ligne)');
-  const submit = button('obs-btn', 'Consigner');
+  reason.setAttribute('placeholder', 'Pourquoi ?');
+  const submit = button('obs-btn', 'Consigner') as HTMLButtonElement;
+  // Grisé tant que la raison est blanche : un clic sans effet ni message se
+  // lirait comme un bouton cassé.
+  submit.disabled = true;
+  reason.addEventListener('input', () => { submit.disabled = !reason.value.trim(); });
 
   toggle.addEventListener('click', () => wrap.classList.toggle('armed'));
   submit.addEventListener('click', () => {
