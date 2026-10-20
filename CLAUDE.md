@@ -45,6 +45,7 @@ Les modules de haut niveau ne dépendent pas des modules de bas niveau ; les deu
   - Cette liste blanche n'admet qu'une donnée datée, jamais un récit : une entrée qui ne couvre plus rien doit en sortir.
 - Quand un refactor SOLID dépasse le scope du ticket en cours, **ouvre un ticket** — n'élargis pas une PR de bugfix en chantier de redesign sans validation explicite.
 - **Le suivi des chantiers se tient en tickets GitHub** sur `pitchan/agent-viz` (`gh issue`) : un chantier, un bogue relevé ou une erreur hors chantier = un ticket ; le commit qui fait le travail le ferme (`closes #N`). Le dépôt est public : ni chemin local, ni identifiant de session, ni donnée personnelle dans un ticket.
+- **Les specs fonctionnelles de `docs/usages/` font foi** : un écart se corrige dans le code, un changement de comportement passe d'abord par la spec, avec l'accord du mainteneur. Un écart relevé = un ticket, cité dans la règle. Un changement visible met à jour sa spec dans le même commit, et ses critères d'acceptation se revérifient à l'écran.
 - Si un test ne passe plus, comprend pourquoi avant de corriger quoi que ce soit
 
 ## En cas de doute

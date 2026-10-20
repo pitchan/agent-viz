@@ -96,6 +96,34 @@ test('changeStatus transmet la raison d’arbitrage au client HTTP', async () =>
   expect(got).toEqual({ id: 4, status: 'arbitrated', reason: 'déjà pesé' });
 });
 
+test('une décision non enregistrée reste rattachée à sa carte, la page garde ses conseils', async () => {
+  // Arrange
+  resetStore();
+  const api = fakeApi({ setRecommendationStatus: async () => { throw new Error('HTTP 500'); } });
+  await loadAdvisor(api);
+  // Act
+  await changeStatus(api, 4, 'ignored');
+  // Assert
+  expect(getState().error).toBe(null);
+  expect(getState().decisionError).toEqual({ id: 4, message: 'HTTP 500' });
+  expect(getState().recommendations).toBe(RECS);
+});
+
+test('une décision enregistrée efface l’échec précédent', async () => {
+  // Arrange
+  resetStore();
+  let echoue = true;
+  const api = fakeApi({
+    setRecommendationStatus: async () => { if (echoue) throw new Error('HTTP 500'); return {}; },
+  });
+  await changeStatus(api, 4, 'ignored');
+  echoue = false;
+  // Act
+  await changeStatus(api, 4, 'ignored');
+  // Assert
+  expect(getState().decisionError).toBe(null);
+});
+
 test('loadAdvisor passes the selected window and toggle to the api', async () => {
   resetStore();
   const calls: WindowOpts[] = [];

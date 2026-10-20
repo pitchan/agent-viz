@@ -16,6 +16,7 @@ export interface ObservatoryState {
   scanJustFinished: boolean;
   loading: boolean;
   error: string | null;
+  decisionError: { id: number; message: string } | null;
   periodDays: number;
   includeMachine: boolean;
   modelCosts: unknown;
@@ -33,6 +34,7 @@ const EMPTY = (): ObservatoryState => ({
   scanJustFinished: false,
   loading: false,
   error: null,
+  decisionError: null,
   periodDays: 30,
   includeMachine: false,
   modelCosts: null,
@@ -142,11 +144,17 @@ export const loadSkills = (api: ApiClient) => run(async () => {
 
 // After a status change the server decides what the list becomes — the page
 // never patches a recommendation locally, or the +50 % and freshness rules
-// would be re-implemented in two places.
-export const changeStatus = (api: ApiClient, id: number, status: string, reason?: string) => run(async () => {
-  await api.setRecommendationStatus(id, status, reason);
-  return { recommendations: await api.fetchRecommendations() };
-});
+// would be re-implemented in two places. A refused write belongs to its card,
+// not to the page: the list stays, the card says why its answer was lost.
+export async function changeStatus(api: ApiClient, id: number, status: string, reason?: string) {
+  try {
+    await api.setRecommendationStatus(id, status, reason);
+  } catch (err) {
+    patch({ decisionError: { id, message: err instanceof Error ? err.message : String(err) } });
+    return;
+  }
+  await run(async () => ({ decisionError: null, recommendations: await api.fetchRecommendations() }));
+}
 
 interface ScanEventMessage {
   phase: string;

@@ -102,7 +102,41 @@ test('le champ raison ne se montre qu’après « Non merci »', () => {
   // Assert
   expect(wrap.classList.contains('armed')).toBe(true);
   const [champ] = parClasse(wrap, 'advisor-refuse-reason');
-  expect(champ.attrs.placeholder).toBe('Pourquoi ? (une ligne)');
+  expect(champ.attrs.placeholder).toBe('Pourquoi ?');
+});
+
+test('Consigner est grisé tant que la raison est vide', () => {
+  // Arrange + Act
+  const wrap = refusalControls(() => {});
+  // Assert
+  const [consigner] = parClasse(wrap, 'obs-btn').filter(b => b.textContent === 'Consigner');
+  expect(consigner.disabled).toBe(true);
+});
+
+test('Consigner s’active dès qu’un caractère visible est saisi', () => {
+  // Arrange
+  const wrap = refusalControls(() => {});
+  const [champ] = parClasse(wrap, 'advisor-refuse-reason');
+  const [consigner] = parClasse(wrap, 'obs-btn').filter(b => b.textContent === 'Consigner');
+  champ.value = ' x ';
+  // Act
+  champ.handlers.input();
+  // Assert
+  expect(consigner.disabled).toBe(false);
+});
+
+test('Consigner redevient grisé quand la raison ne contient plus que des espaces', () => {
+  // Arrange
+  const wrap = refusalControls(() => {});
+  const [champ] = parClasse(wrap, 'advisor-refuse-reason');
+  const [consigner] = parClasse(wrap, 'obs-btn').filter(b => b.textContent === 'Consigner');
+  champ.value = 'x';
+  champ.handlers.input();
+  champ.value = '   ';
+  // Act
+  champ.handlers.input();
+  // Assert
+  expect(consigner.disabled).toBe(true);
 });
 
 test('Consigner sans raison ne consigne rien', () => {

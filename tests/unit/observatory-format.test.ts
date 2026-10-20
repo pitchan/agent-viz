@@ -4,7 +4,7 @@ import {
   formatUsd, formatBytes, formatDuration, confidenceLabel, costBasisLabel, costLabel, basisTitle,
   formatDayMonth, periodLabel, basisLabel, periodHeader, scanProgressLabel, formatTokens,
   formatUsdPerMTok, formatShare, formatUsdExact, modelLabel, summaryHeadline, summaryDetails,
-  decisionLine, returnBanner,
+  decisionLine, returnBanner, decisionErrorLabel,
 } from '../../src/web/observatory/format.ts';
 import type { Recommendation, Summary } from '../../src/web/observatory/format.ts';
 
@@ -229,6 +229,14 @@ test('decisionLine : une adoption annonce sa surveillance', () => {
 
 test('decisionLine : une mise en veille annonce son seuil de retour', () => {
   expect(decisionLine({ status: 'ignored', statusAt: '2026-08-08T12:00:00.000Z', statusReason: null } as DecisionRec)).toBe('Mis en veille le 08/08/2026 — reviendra si le coût regrossit de moitié');
+});
+
+test('decisionLine : une mise en veille à coût nul revient dès qu’un coût apparaît', () => {
+  expect(decisionLine({ status: 'ignored', statusAt: '2026-08-08T12:00:00.000Z', statusReason: null, costAtStatusUsd: 0 } as DecisionRec)).toBe('Mis en veille le 08/08/2026 — reviendra dès qu’un coût apparaît');
+});
+
+test('decisionErrorLabel : une décision non enregistrée le dit, avec sa cause', () => {
+  expect(decisionErrorLabel('HTTP 500')).toBe('Décision non enregistrée : HTTP 500');
 });
 
 test('decisionLine sans raison consignée n’invente rien', () => {
