@@ -269,8 +269,14 @@ function settleAgentFromAgentToolResponse(evt: HookEvent, ts: string, terminalSt
 }
 
 // L'échec l'emporte : Antigravity annonce la fin d'un outil, puis son échec lu plus tard
-// dans le transcript ; une fin qui suit un échec ne le rouvre pas.
+// dans le transcript ; une fin qui suit un échec ne le rouvre pas. Sans identifiant,
+// rien ne relie deux fins : chacune est un appel distinct.
 function countToolEnd(tid: string, outcome: 'done' | 'error') {
+  if (tid === '') {
+    state.toolsCompleted++;
+    if (outcome === 'error') state.toolsFailed++;
+    return;
+  }
   const prev = state.toolOutcomes.get(tid);
   if (prev === 'error' || prev === outcome) return;
   if (prev === undefined) state.toolsCompleted++;

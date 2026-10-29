@@ -6,13 +6,13 @@ import { processEvent, type HookEvent } from '../../src/web/viz-graph.ts';
 import { resetErrors } from '../../src/web/viz-errors.ts';
 
 const SID = 'aaaa1111-0000-0000-0000-000000000000';
-// Chaque test prend ses propres identifiants d'outil : aucun ne lit ce qu'un autre a terminé.
 
 beforeEach(() => {
   state.nodes.clear();
   state.timelineEntries.length = 0;
   state.toolsCompleted = 0;
   state.toolsFailed = 0;
+  state.toolOutcomes.clear();
   vis.nodes.clear();
   vis.runningNodes.clear();
   resetErrors();
@@ -57,6 +57,28 @@ test('une fin reçue deux fois ne compte qu une fois', () => {
   for (const e of evenements) processEvent(e);
   // Assert
   expect([state.toolsCompleted, state.toolsFailed]).toEqual([1, 1]);
+});
+
+test('une fin réussie qui suit un échec ne le rouvre pas', () => {
+  // Arrange
+  const evenements = [
+    evt('PreToolUse', 'ko-3'),
+    evt('PostToolUseFailure', 'ko-3', { error: 'x' }), evt('PostToolUse', 'ko-3'),
+    evt('PostToolUseFailure', 'ko-3', { error: 'x' }),
+  ];
+  // Act
+  for (const e of evenements) processEvent(e);
+  // Assert
+  expect([state.toolsCompleted, state.toolsFailed]).toEqual([1, 1]);
+});
+
+test('deux fins sans identifiant font deux outils', () => {
+  // Arrange
+  const evenements = [evt('PostToolUse', ''), evt('PostToolUseFailure', '', { error: 'x' }), evt('PostToolUse', '')];
+  // Act
+  for (const e of evenements) processEvent(e);
+  // Assert
+  expect([state.toolsCompleted, state.toolsFailed]).toEqual([3, 1]);
 });
 
 test('un échec dont le lancement n a pas été reçu compte aussi, comme le registre des erreurs', () => {
