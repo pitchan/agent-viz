@@ -143,18 +143,20 @@ function agentSpan(n: VizNode): [number, number] {
 }
 
 // Deux agents frères sont parallèles quand leurs passages se chevauchent. Un début corrigé
-// après coup (heure réelle lue à la fin) compte : un agent né à son premier outil peut avoir
-// été lancé bien avant. Collant : un agent marqué le reste.
-export function recomputeParallelFlags(sessionId: string) {
-  const session = state.nodes.get(sessionId);
-  if (!session) return;
-  const agents = session.children.filter(c => c.type === 'agent');
-  for (const a of agents) {
-    const [aStart, aEnd] = agentSpan(a);
-    for (const b of agents) {
-      if (a === b) continue;
-      const [bStart, bEnd] = agentSpan(b);
-      if (aStart < bEnd && bStart < aEnd) { a.isParallel = true; b.isParallel = true; }
+// après coup compte (un agent né à son premier outil peut avoir été lancé bien avant), et le
+// drapeau suit les frères actuels : un agent changé de parent est réévalué.
+export function recomputeParallelFlags(parentId: string) {
+  const parent = state.nodes.get(parentId);
+  if (!parent) return;
+  const agents = parent.children.filter(c => c.type === 'agent');
+  const spans = agents.map(agentSpan);
+  for (const a of agents) a.isParallel = false;
+  // `i` et `j` restent sous la longueur commune des deux tableaux : les cases existent.
+  for (let i = 0; i < agents.length; i++) {
+    const [aStart, aEnd] = spans[i]!;
+    for (let j = i + 1; j < agents.length; j++) {
+      const [bStart, bEnd] = spans[j]!;
+      if (aStart < bEnd && bStart < aEnd) { agents[i]!.isParallel = true; agents[j]!.isParallel = true; }
     }
   }
 }
