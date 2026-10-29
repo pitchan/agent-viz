@@ -63,6 +63,9 @@ const _listeners = new Set<ErrorListener>();
 // sont des faits de SESSION que chaque ligne lit au moment ou on l'affiche.
 let _successCount = 0;
 let _lastFailed = false;
+// Le rang de chaque succes compte, par outil : Antigravity annonce une fin sans verdict
+// puis, a la fin de l'appel au modele, l'echec du meme outil, qui retire ce succes.
+const _successRanks = new Map<string, number>();
 
 // La raison accompagne la liste parce que les abonnes n'ont pas tous le meme
 // prix : sur `error` le bandeau reconstruit tout le flux (rare, justifie) ;
@@ -106,7 +109,9 @@ export function recordError(evt: HookFailureEvent | null | undefined): ErrorReco
   // Le sujet identifie la repetition ; a defaut, le message. Sans quoi tous
   // les echecs d'un outil hors du tableau des sujets s'empileraient ensemble.
   const sig = `${evt.tool_name || ''}\u0000${subject || message}`;
-  _lastFailed = true;
+  const at = retractSuccess(toolUseId);
+  // Un echec tardif suivi d'autres succes n'est pas le dernier verdict.
+  _lastFailed = _lastFailed || at === _successCount;
   const existing = _errors.find(r => r.sig === sig);
   if (existing) {
     existing.count += 1;
@@ -117,7 +122,7 @@ export function recordError(evt: HookFailureEvent | null | undefined): ErrorReco
     existing.message = message;
     existing.toolUseId = toolUseId;
     existing.nodeId = toolUseId ? `t:${toolUseId}` : null;
-    existing.successesAt = _successCount;
+    existing.successesAt = at;
     _errors.splice(_errors.indexOf(existing), 1);
     _errors.push(existing);
     notify('error');
@@ -126,7 +131,7 @@ export function recordError(evt: HookFailureEvent | null | undefined): ErrorReco
   const rec = {
     sig,
     count: 1,
-    successesAt: _successCount,
+    successesAt: at,
     ts: evt.ended_at || evt._ts || new Date().toISOString(),
     toolName: evt.tool_name || '',
     subject,
@@ -145,11 +150,24 @@ export function recordError(evt: HookFailureEvent | null | undefined): ErrorReco
   return rec;
 }
 
+// Rend le rang ou l'echec s'insere dans la suite des succes. Un succes deja compte pour cet
+// outil en sort, et les rangs qui le suivaient reculent d'un cran.
+function retractSuccess(toolUseId: string): number {
+  const at = _successRanks.get(toolUseId);
+  if (at === undefined) return _successCount;
+  _successRanks.delete(toolUseId);
+  _successCount -= 1;
+  for (const [id, rank] of _successRanks) if (rank > at) _successRanks.set(id, rank - 1);
+  for (const rec of _errors) if (rec.successesAt > at) rec.successesAt -= 1;
+  return at;
+}
+
 // La porte d'entree des succes — le fait de continuite. Silencieuse tant
 // qu'aucune erreur n'est enregistree : le cas de tres loin le plus frequent
 // (une session sans echec) ne paie pas une repeinture par appel d'outil.
 export function recordSuccess(evt: HookFailureEvent | null | undefined): void {
   if (!evt || evt.hook_event_name !== 'PostToolUse') return;
+  if (evt.tool_use_id) _successRanks.set(evt.tool_use_id, _successCount);
   _successCount += 1;
   _lastFailed = false;
   if (_errors.length) notify('success');
@@ -157,6 +175,7 @@ export function recordSuccess(evt: HookFailureEvent | null | undefined): void {
 
 export function resetErrors() {
   _errors.length = 0;
+  _successRanks.clear();
   _successCount = 0;
   _lastFailed = false;
   // Prevenir meme quand il n'y avait rien : la pastille et le point du flux
