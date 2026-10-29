@@ -325,6 +325,8 @@ body {
 }
 .stat-button:hover { border-color: var(--error); }
 .stat-button:focus-visible { outline: 2px solid var(--error); outline-offset: 2px; }
+.stat-part { display: flex; align-items: center; gap: 6px; }
+.stat-part[hidden] { display: none; }
 .stat-dot { width: 6px; height: 6px; border-radius: 50%; }
 .stat-val { font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums; }
 /* Deux etats, decides par viz-topbar-status sur les faits du registre :

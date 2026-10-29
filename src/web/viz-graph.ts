@@ -268,15 +268,25 @@ function settleAgentFromAgentToolResponse(evt: HookEvent, ts: string, terminalSt
   if (an.parentId) recomputeParallelFlags(an.parentId);
 }
 
+// L'échec l'emporte : Antigravity annonce la fin d'un outil, puis son échec lu plus tard
+// dans le transcript ; une fin qui suit un échec ne le rouvre pas.
+function countToolEnd(tid: string, outcome: 'done' | 'error') {
+  const prev = state.toolOutcomes.get(tid);
+  if (prev === 'error' || prev === outcome) return;
+  if (prev === undefined) state.toolsCompleted++;
+  if (outcome === 'error') state.toolsFailed++;
+  state.toolOutcomes.set(tid, outcome);
+}
+
 function onPostToolUse(evt: HookEvent, sid: string, ts: string) {
   const tid = evt.tool_use_id || '';
   const n = state.nodes.get(`t:${tid}`);
   if (n) {
     n.status = 'done'; n.data = evt; n.endTime = ts;
     n.duration = calcDuration(n.startTime, ts);
-    state.toolsCompleted++;
     setRunning(n.id, false);
   }
+  countToolEnd(tid, 'done');
   settleAgentFromAgentToolResponse(evt, ts, 'done');
   // Skill fork → record the parent mapping and reparent the forked sub-agent
   // under its launching agent. The child's first PreToolUse arrives before
@@ -306,6 +316,7 @@ function onPostToolUseFailure(evt: HookEvent, sid: string, ts: string) {
     setRunning(n.id, false);
   }
   settleAgentFromAgentToolResponse(evt, ts, 'error');
+  countToolEnd(tid, 'error');
   // HORS du `if (n)` : un echec dont le noeud manque (PreToolUse non recu, noeud deja
   // ramasse) se compte aussi. Et EN DERNIER : l'abonne de `recordError`, synchrone, repeint
   // le flux d'apres le STATUT des noeuds, qui doit deja porter la mutation ci-dessus.
