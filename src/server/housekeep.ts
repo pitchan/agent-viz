@@ -16,6 +16,7 @@ import {
   COMPACT_THRESHOLD_BYTES, COMPACT_KEEP_EVENTS,
   sessionIndex,
   idFromPath, indexSessionInitial,
+  type SessionRecord,
 } from './session-index.ts';
 import { broadcastSessionsChanged } from './sse.ts';
 import {
@@ -24,6 +25,7 @@ import {
 } from './event-reader.ts';
 import { ensureTranscriptWatcher } from './transcript.ts';
 import { decodeJsonlLine } from '../engine/core/jsonl.ts';
+import { withSessionLock } from './session-lock.ts';
 
 // Un objet exploitable par accès de champ — même garde locale que
 // session-index.ts et les adaptateurs de transcript : `decodeJsonlLine` ne
@@ -49,10 +51,16 @@ interface SessionSummary {
 
 // For large files: read all events, keep the last COMPACT_KEEP_EVENTS, write a
 // companion .summary.json with session metadata, then rewrite the JSONL.
+// Le verrou couvre de la lecture à la remise du curseur : un hook qui ajoute une ligne
+// entre-temps la verrait effacée par la réécriture, ou sautée par le lecteur vif.
 async function compactSession(fp: string): Promise<void> {
   const id = idFromPath(fp);
   const rec = sessionIndex.get(id);
   if (!rec) return;
+  await withSessionLock(fp, () => compactLocked(fp, id, rec));
+}
+
+async function compactLocked(fp: string, id: string, rec: SessionRecord): Promise<void> {
   let content: string;
   try { content = await fsp.readFile(fp, 'utf8'); } catch { return; }
   const allLines = content.trim().split('\n');
