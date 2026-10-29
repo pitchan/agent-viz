@@ -1,8 +1,8 @@
 'use strict';
 // Transcript reader — locates a session's transcript via the per-agent
 // adapter, scans for the first user prompt (cached), and tails the main
-// transcript plus every sub-agent transcript (<session>/subagents/agent-*.jsonl)
-// for events that adapters convert into per-bucket token usage.
+// transcript plus every sub-agent transcript (<session>/subagents/agent-*.jsonl,
+// or the one a hook event names) for events that adapters convert into per-bucket token usage.
 
 import fs from 'node:fs';
 const fsp = fs.promises;
@@ -30,6 +30,8 @@ import type { UsageBucket } from '../engine/core/usage.ts';
 // de l'appel) — voir `watchTail`.
 interface Tail {
   path: string;
+  // Le sous-agent dont c'est le transcript propre ; `null` pour celui de la session.
+  agentId: string | null;
   offset: number;
   leftover: string;
   watcher: fs.FSWatcher | null;
@@ -41,6 +43,8 @@ interface Tail {
 interface TranscriptSlice {
   main: Tail | null;
   subagents: Map<string, Tail>;
+  // Octets du fichier d'événements déjà parcourus à la recherche de transcripts de sous-agents.
+  eventsOffset: number;
   _mainPending: boolean;
   _closed: boolean;
 }
@@ -204,11 +208,11 @@ async function ensureFirstPrompt(sessionFile: string): Promise<string | null> {
 
 // Dispatch a single transcript line to the per-agent adapter. Returns true
 // when a token bucket was updated.
-function parseTranscriptEvent(line: string, rec: SessionWithSlices): boolean {
+function parseTranscriptEvent(line: string, rec: SessionWithSlices, agentId: string | null = null): boolean {
   // `UsageRecord` (transcript-adapters/claude.ts, exporté) : `rec` porte
   // toujours au moins sa forme (mêmes deux champs `main`/`perAgent`, plus les
   // nôtres en plus) — cast à cette frontière plutôt qu'un troisième type local.
-  return getAdapter(rec.agentSource).parseUsageLine(line, rec as UsageRecord);
+  return getAdapter(rec.agentSource).parseUsageLine(line, rec as UsageRecord, agentId ?? undefined);
 }
 
 // A "tail" tracks the append-only streaming of one JSONL file. A session has
@@ -216,9 +220,9 @@ function parseTranscriptEvent(line: string, rec: SessionWithSlices): boolean {
 // transcript — same read/watch machinery for both, since each parsed line is
 // self-describing (it carries isSidechain + agentId) and routes itself to the
 // right token bucket.
-function makeTail(filePath: string): Tail {
+function makeTail(filePath: string, agentId: string | null = null): Tail {
   return {
-    path: filePath, offset: 0, leftover: '',
+    path: filePath, agentId, offset: 0, leftover: '',
     watcher: null,
     _readInFlight: false, _readPending: false, _watchTimer: null,
   };
@@ -232,6 +236,7 @@ function ensureTranscriptSlice(rec: SessionWithSlices): TranscriptSlice {
     rec.transcript = {
       main: null,             // tail | null
       subagents: new Map(),   // agentId → tail
+      eventsOffset: 0,
       _mainPending: false, _closed: false,
     };
   }
@@ -271,7 +276,7 @@ async function readTailDelta(tail: Tail, rec: SessionWithSlices): Promise<void> 
     let changed = false;
     for (const line of lines) {
       if (!line) continue;
-      if (parseTranscriptEvent(line, rec)) changed = true;
+      if (parseTranscriptEvent(line, rec, tail.agentId)) changed = true;
     }
     if (changed) scheduleTokensBroadcast(rec.id, rec as TokensCarrierLike);
   } catch {
@@ -328,8 +333,39 @@ async function ensureSubagentTails(tr: TranscriptSlice, rec: SessionWithSlices):
     // pour `noUncheckedIndexedAccess` sans changer d'issue.
     const agentId = m[1] ?? '';
     if (tr.subagents.has(agentId)) continue;
-    const tail = makeTail(path.join(subDir, f));
+    const tail = makeTail(path.join(subDir, f), agentId);
     tr.subagents.set(agentId, tail);
+    watchTail(tail, rec);
+    fresh.push(tail);
+  }
+  await Promise.all(fresh.map(t => readTailDelta(t, rec)));
+}
+
+// Les agents dont l'événement du hook désigne le transcript propre d'un sous-agent (Codex).
+// Seules les lignes complètes ajoutées depuis le dernier passage sont lues ; un fichier compacté,
+// plus court que le curseur, est relu depuis le début. Le transcript de la session n'en est pas un.
+async function ensureEventSubagentTails(sessionFile: string, tr: TranscriptSlice, rec: SessionWithSlices): Promise<void> {
+  const adapter = getAdapter(rec.agentSource);
+  let text: string;
+  try {
+    const size = (await fsp.stat(sessionFile)).size;
+    const from = size < tr.eventsOffset ? 0 : tr.eventsOffset;
+    const buf = Buffer.alloc(size - from);
+    const fh = await fsp.open(sessionFile, 'r');
+    try { await fh.read(buf, 0, buf.length, from); } finally { await fh.close(); }
+    const end = buf.lastIndexOf(0x0a) + 1;
+    text = buf.toString('utf8', 0, end);
+    tr.eventsOffset = from + end;
+  } catch { return; } // fichier d'événements supprimé entre-temps : la session part avec lui
+  const fresh: Tail[] = [];
+  for (const line of text.split('\n')) {
+    if (line.indexOf('"agent_id"') === -1) continue;
+    const verdict = decodeJsonlLine(line);
+    if (!verdict || !verdict.ok) continue;
+    const found = adapter.subagentTranscript(verdict.value);
+    if (!found || found.path === tr.main?.path || tr.subagents.has(found.agentId)) continue;
+    const tail = makeTail(found.path, found.agentId);
+    tr.subagents.set(found.agentId, tail);
     watchTail(tail, rec);
     fresh.push(tail);
   }
@@ -404,6 +440,7 @@ async function ensureTranscriptWatcher(sessionFile: string): Promise<void> {
   }
 
   await ensureSubagentTails(tr, rec);
+  if (tr.main) await ensureEventSubagentTails(sessionFile, tr, rec);
 }
 
 // Jetons tenus hors du transcript : relus à chaque événement du hook, sans watcher.
