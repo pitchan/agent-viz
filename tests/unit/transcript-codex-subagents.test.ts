@@ -183,3 +183,67 @@ test('un sous-agent apparu après la première lecture est rattrapé, sans recom
     await s.fin();
   }
 });
+
+test('la fin d’un petit-enfant, écrite avec le transcript de son parent sous-agent, ne fait pas compter ce transcript au petit-enfant', async () => {
+  // Arrange — le petit-enfant n'a appelé aucun outil : sa fin est sa seule ligne avec son agent_id
+  const s = await session();
+  const PETIT_ENFANT = '01a189d1-6bc8-7000-8000-000000006bc8';
+  await ecrireJsonl(s.enfantA, [metaEnfant(ENFANT_A), tour(1), jetons(2, A1, A1)]);
+  await ecrireJsonl(s.evenements, [
+    evenement('SessionStart', s.parent),
+    evenement('PreToolUse', s.enfantA, ENFANT_A),
+    evenement('SubagentStop', s.enfantA, PETIT_ENFANT),
+  ]);
+  try {
+    // Act
+    await ensureTranscriptWatcher(s.evenements);
+    // Assert
+    const snap = tokensSnapshot(s.rec)!;
+    expect(tokenSum(snap.perAgent[ENFANT_A])).toBe(A1.total_tokens);
+    expect(tokenSum(snap.perAgent[PETIT_ENFANT])).toBe(0);
+  } finally {
+    await s.fin();
+  }
+});
+
+test('la fin d’un sous-agent, écrite avec le transcript de la session, ne fait pas compter ce transcript au sous-agent', async () => {
+  // Arrange — le sous-agent n'a appelé aucun outil : sa fin est sa seule ligne avec son agent_id
+  const s = await session();
+  await ecrireJsonl(s.evenements, [evenement('SessionStart', s.parent), evenement('SubagentStop', s.parent, ENFANT_A)]);
+  try {
+    // Act
+    await ensureTranscriptWatcher(s.evenements);
+    // Assert
+    const snap = tokensSnapshot(s.rec)!;
+    expect(tokenSum(snap.main)).toBe(P_CUMUL.total_tokens);
+    expect(tokenSum(snap.perAgent[ENFANT_A])).toBe(0);
+  } finally {
+    await s.fin();
+  }
+});
+
+test('un sous-agent dérivé sans fin de copie déclarée ne compte rien, sans couper les jetons du reste de la session', async () => {
+  // Arrange — en-tête dérivé sans `subagent_history_start_ordinal` : la copie n'a pas de fin connue
+  const s = await session();
+  const meta = JSON.parse(metaEnfant(ENFANT_A, { debut: 3 }));
+  delete meta.payload.subagent_history_start_ordinal;
+  await ecrireJsonl(s.enfantA, [JSON.stringify(meta), tour(1), jetons(2, A1, A1)]);
+  await ecrireJsonl(s.enfantB, [metaEnfant(ENFANT_B), tour(1), jetons(2, B1, B1)]);
+  await ecrireJsonl(s.evenements, [
+    evenement('SessionStart', s.parent),
+    evenement('PreToolUse', s.enfantA, ENFANT_A),
+    evenement('PreToolUse', s.enfantB, ENFANT_B),
+  ]);
+  try {
+    // Act
+    await ensureTranscriptWatcher(s.evenements);
+    // Assert
+    const snap = tokensSnapshot(s.rec)!;
+    expect(snap.tokensSupported).toBe(true);
+    expect(tokenSum(snap.main)).toBe(P_CUMUL.total_tokens);
+    expect(tokenSum(snap.perAgent[ENFANT_A])).toBe(0);
+    expect(tokenSum(snap.perAgent[ENFANT_B])).toBe(B1.total_tokens);
+  } finally {
+    await s.fin();
+  }
+});

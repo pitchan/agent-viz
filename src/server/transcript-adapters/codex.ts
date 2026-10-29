@@ -27,9 +27,10 @@ function discoverPath(firstEvent: unknown): string | null {
   return asString(firstEvent.transcript_path);
 }
 
-// Les événements du hook lancés par un sous-agent portent son fil et son transcript propre.
+// Les événements du hook lancés par un sous-agent portent son fil et son transcript propre. La fin
+// d'un sous-agent, elle, est écrite avec le transcript du fil qui l'a lancé.
 function subagentTranscript(evt: unknown): SubagentTranscript | null {
-  if (!isRecord(evt)) return null;
+  if (!isRecord(evt) || evt.hook_event_name === 'SubagentStop') return null;
   const agentId = asString(evt.agent_id);
   const path = asString(evt.transcript_path);
   return agentId && path ? { agentId, path } : null;
@@ -71,6 +72,8 @@ interface CodexState {
   cumul: number;
   // Ordinal de la première ligne propre d'un sous-agent ; les lignes d'avant sont la copie du parent.
   historyStart: number;
+  // Sous-agent dérivé sans fin de copie déclarée : aucune de ses lignes n'est comptée.
+  unreadable: boolean;
 }
 
 const MAIN = '';
@@ -87,7 +90,7 @@ function stateOf(tokens: object, thread: string): CodexState {
   }
   let state = threads.get(thread);
   if (!state) {
-    state = { model: null, cumul: 0, historyStart: 0 };
+    state = { model: null, cumul: 0, historyStart: 0, unreadable: false };
     threads.set(thread, state);
   }
   return state;
@@ -103,14 +106,18 @@ function bucketOf(tokens: NonNullable<UsageRecord['tokens']>, agentId: string | 
   return bucket;
 }
 
-// Un sous-agent qui hérite déclare où finit la copie ; un autre fil dérivé ne le dit pas.
-function readMeta(evt: Record<string, unknown>, state: CodexState, agentId: string | undefined): 'lisible' | 'non-lisible' {
+// Un sous-agent qui hérite déclare où finit la copie ; un autre fil dérivé ne le dit pas. Un
+// sous-agent illisible n'est pas compté, le fil de la session illisible rend la session illisible.
+// Rend `false` quand c'est la session entière qui n'est pas lisible.
+function readMeta(evt: Record<string, unknown>, state: CodexState, agentId: string | undefined): boolean {
+  if (agentId === undefined) return !isForkedMeta(evt);
   const start = isRecord(evt.payload) ? evt.payload.subagent_history_start_ordinal : undefined;
-  if (agentId !== undefined && typeof start === 'number') {
-    state.historyStart = start;
-    return 'lisible';
+  if (typeof start === 'number') state.historyStart = start;
+  else if (isForkedMeta(evt)) {
+    state.unreadable = true;
+    console.error(`[codex] sous-agent ${agentId.slice(-8)} : fil dérivé sans fin de copie, ses jetons ne sont pas comptés`);
   }
-  return isForkedMeta(evt) ? 'non-lisible' : 'lisible';
+  return true;
 }
 
 function parseUsageLine(line: string, rec: UsageRecord, agentId?: string): boolean {
@@ -127,9 +134,10 @@ function parseUsageLine(line: string, rec: UsageRecord, agentId?: string): boole
   if (tokens.unsupported) return false;
   const state = stateOf(tokens, agentId ?? MAIN);
 
+  if (state.unreadable) return false;
   if (typeof evt.ordinal === 'number' && evt.ordinal < state.historyStart) return false;
   if (evt.type === 'session_meta') {
-    if (readMeta(evt, state, agentId) === 'lisible') return false;
+    if (readMeta(evt, state, agentId)) return false;
     tokens.unsupported = true;
     return true;
   }
