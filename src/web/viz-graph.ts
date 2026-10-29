@@ -136,16 +136,26 @@ function reparentNode(n: VizNode, newParentId: string) {
   markLayoutDirty(n);
 }
 
-// Mark all running agents under this session as parallel if 2+ run at once.
-// Sticky: once flagged, an agent keeps isParallel=true for the rest of its life.
+// Le passage d'un agent, en millisecondes ; un agent en cours court jusqu'à maintenant.
+function agentSpan(n: VizNode): [number, number] {
+  const end = n.status === 'running' ? Infinity : Date.parse(n.endTime ?? '');
+  return [Date.parse(n.startTime ?? ''), end];
+}
+
+// Deux agents frères sont parallèles quand leurs passages se chevauchent. Un début corrigé
+// après coup (heure réelle lue à la fin) compte : un agent né à son premier outil peut avoir
+// été lancé bien avant. Collant : un agent marqué le reste.
 export function recomputeParallelFlags(sessionId: string) {
   const session = state.nodes.get(sessionId);
   if (!session) return;
-  const runningAgents = session.children.filter(c =>
-    c.type === 'agent' && c.status === 'running'
-  );
-  if (runningAgents.length >= 2) {
-    for (const a of runningAgents) a.isParallel = true;
+  const agents = session.children.filter(c => c.type === 'agent');
+  for (const a of agents) {
+    const [aStart, aEnd] = agentSpan(a);
+    for (const b of agents) {
+      if (a === b) continue;
+      const [bStart, bEnd] = agentSpan(b);
+      if (aStart < bEnd && bStart < aEnd) { a.isParallel = true; b.isParallel = true; }
+    }
   }
 }
 
