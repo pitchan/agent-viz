@@ -16,7 +16,7 @@ import { HOOK_SOURCES, NORMALIZERS, NEEDS_EVENT_FLAG, type HookSource } from './
 import { lateFailures } from './hook-antigravity-verdicts.ts';
 import { sessionStart } from './hook-antigravity-session-start.ts';
 import { codexEvents } from './hook-codex-verdicts.ts';
-import { agentIdentity, subagentStops } from './hook-codex-subagents.ts';
+import { agentIdentity, parentAgent, subagentStops } from './hook-codex-subagents.ts';
 import { validSessionId } from './session-id.ts';
 
 // node:http arrive par process.getBuiltinModule, pas par `import` : matérialiser son espace de
@@ -88,8 +88,10 @@ function codexFromTranscript(raw: Payload, event: string | undefined): Payload[]
   const events = readEdge(path.join(DIR, `${session_id}.jsonl`), 'tail');
   const transcript = readEdge(transcript_path, 'tail');
   const evt = NORMALIZERS.codex(raw, event);
-  // L'événement d'un sous-agent pointe vers le transcript de son propre fil, qui s'ouvre sur son nom.
-  const named = typeof evt.agent_id === 'string' ? { ...evt, ...agentIdentity(readEdge(transcript_path, 'head')) } : evt;
+  // L'événement d'un sous-agent pointe vers le transcript de son propre fil, qui s'ouvre sur son nom
+  // et sur le fil qui l'a lancé.
+  const head = typeof evt.agent_id === 'string' ? readEdge(transcript_path, 'head') : '';
+  const named = head ? { ...evt, ...agentIdentity(head), ...parentAgent(head) } : evt;
   return [...subagentStops(named, events, transcript), ...codexEvents(named, events, transcript)];
 }
 
