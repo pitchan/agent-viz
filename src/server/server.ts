@@ -60,8 +60,9 @@ async function boot(): Promise<void> {
     sessionFileChanged(path.join(DIR, filename))
       .catch(err => console.error(`[housekeep] sessionFileChanged ${filename} failed: ${err.message}`));
   });
-  // Purge old/empty sessions + compact large files on boot.
-  await housekeep();
+  // Purge old/empty sessions + compact large files on boot. Un ménage en échec se journalise
+  // comme le passage horaire : il ne fait pas tomber le démarrage.
+  await housekeep().catch(err => console.error('[housekeep] boot run failed:', err.message));
   // Analysis scan: fire-and-forget so a large first scan never delays the
   // dashboard, and a failed scan is logged without stopping the server.
   const runAnalysisScan = () => getObservatoryService().scan()

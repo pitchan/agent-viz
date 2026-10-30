@@ -18,6 +18,7 @@ import { sessionStart } from './hook-antigravity-session-start.ts';
 import { codexEvents } from './hook-codex-verdicts.ts';
 import { agentIdentity, subagentStops } from './hook-codex-subagents.ts';
 import { validSessionId } from './session-id.ts';
+import { SessionLockError, withSessionLockSync } from './session-lock.ts';
 
 // node:http arrive par process.getBuiltinModule, pas par `import` : matérialiser son espace de
 // noms ESM se paie à chaque processus de hook, donc à chaque événement. getBuiltinModule rend le
@@ -158,7 +159,8 @@ function runHook(): void {
       }
       const ts = new Date().toISOString();
       const lines = events.map(evt => JSON.stringify({ ...evt, _ts: ts, _source: source }) + '\n');
-      fs.appendFileSync(path.join(DIR, `${sid}.jsonl`), lines.join(''));
+      const file = path.join(DIR, `${sid}.jsonl`);
+      withSessionLockSync(file, () => fs.appendFileSync(file, lines.join('')));
 
       const body = JSON.stringify({ session: sid });
       const req = http.request({
@@ -174,7 +176,8 @@ function runHook(): void {
       // JSON.parse en echec ne laissait AUCUNE trace. On sort toujours en 0 — on ne bloque
       // jamais l'agent — mais jamais sans trace.
       const message = err instanceof Error ? err.message : String(err);
-      logHookError(`payload rejected: ${message} source=${source}`);
+      // Une panne du verrou n'accuse pas la charge : elle se nomme pour ce qu'elle est.
+      logHookError(err instanceof SessionLockError ? `${message} source=${source}` : `payload rejected: ${message} source=${source}`);
     }
     process.exit(0);
   });
