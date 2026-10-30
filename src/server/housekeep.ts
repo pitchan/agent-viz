@@ -20,7 +20,7 @@ import {
 } from './session-index.ts';
 import { broadcastSessionsChanged } from './sse.ts';
 import {
-  watchSession, unwatchSession, isWatched, resetFileOffset, deleteSession,
+  watchSession, unwatchSession, isWatched, rebaseFileOffset, deleteSession,
   readAndBroadcast,
 } from './event-reader.ts';
 import { ensureTranscriptWatcher } from './transcript.ts';
@@ -32,6 +32,12 @@ import { withSessionLock } from './session-lock.ts';
 // promet qu'un JSON valide, pas un objet.
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
+function countNewlines(buf: Buffer): number {
+  let n = 0;
+  for (const b of buf) if (b === 0x0a) n++;
+  return n;
 }
 
 interface CompactedTool {
@@ -51,18 +57,20 @@ interface SessionSummary {
 
 // For large files: read all events, keep the last COMPACT_KEEP_EVENTS, write a
 // companion .summary.json with session metadata, then rewrite the JSONL.
-// Le verrou couvre de la lecture à la remise du curseur : un hook qui ajoute une ligne
-// entre-temps la verrait effacée par la réécriture, ou sautée par le lecteur vif.
-async function compactSession(fp: string): Promise<void> {
+// `readFile` is injected so a test can make the hook write between the read and the rewrite.
+async function compactSession(
+  fp: string,
+  readFile: (p: string) => Promise<string> = p => fsp.readFile(p, 'utf8'),
+): Promise<void> {
   const id = idFromPath(fp);
   const rec = sessionIndex.get(id);
   if (!rec) return;
-  await withSessionLock(fp, () => compactLocked(fp, id, rec));
+  await withSessionLock(fp, () => compactLocked(fp, id, rec, readFile));
 }
 
-async function compactLocked(fp: string, id: string, rec: SessionRecord): Promise<void> {
+async function compactLocked(fp: string, id: string, rec: SessionRecord, readFile: (p: string) => Promise<string>): Promise<void> {
   let content: string;
-  try { content = await fsp.readFile(fp, 'utf8'); } catch { return; }
+  try { content = await readFile(fp); } catch { return; }
   const allLines = content.trim().split('\n');
   if (allLines.length <= COMPACT_KEEP_EVENTS) return;
 
@@ -87,13 +95,19 @@ async function compactLocked(fp: string, id: string, rec: SessionRecord): Promis
   const summaryPath = fp.replace('.jsonl', '.summary.json');
   try {
     await fsp.writeFile(summaryPath, JSON.stringify(summary, null, 2));
-    await fsp.writeFile(fp, kept.join('\n') + '\n');
-    // Update index to reflect new file size.
-    const stat = await fsp.stat(fp);
-    rec.size = stat.size;
-    rec.eventCount = kept.length;
-    // Reset the read offset so readAndBroadcast doesn't skip the new smaller file.
-    resetFileOffset(fp, stat.size);
+    // Synchrone jusqu'au nouveau curseur : ce que le hook a écrit depuis la lecture
+    // est recopié, et aucune lecture vive ne démarre entre la réécriture et le curseur.
+    const sizeBefore = fs.statSync(fp).size;
+    const readBytes = Buffer.byteLength(content);
+    const appended = Buffer.alloc(sizeBefore - readBytes);
+    const fd = fs.openSync(fp, 'r');
+    try { fs.readSync(fd, appended, 0, appended.length, readBytes); } finally { fs.closeSync(fd); }
+    const rewritten = Buffer.concat([Buffer.from(kept.join('\n') + '\n'), appended]);
+    fs.writeFileSync(fp, rewritten);
+    // L'index compte ce que le lecteur a déjà lu : il reprend là où le curseur reprend.
+    const offset = rebaseFileOffset(fp, sizeBefore, rewritten.length);
+    rec.size = offset;
+    rec.eventCount = countNewlines(rewritten.subarray(0, offset));
     console.log(`[housekeep] compacted ${id}: ${allLines.length} → ${kept.length} events, summary at ${path.basename(summaryPath)}`);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
