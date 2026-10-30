@@ -58,6 +58,9 @@ function discoverPath(firstEvent: unknown): string | null {
   return asString(firstEvent.transcript_path);
 }
 
+// Les transcripts des sous-agents de Claude Code se trouvent par leur dossier, pas par les événements.
+function subagentTranscript(_evt: unknown): null { return null; }
+
 interface ExtractedUsage {
   usage: unknown;
   model: string | null;
@@ -207,6 +210,7 @@ const usageSnapshot = null;
 export {
   tokensSupported,
   discoverPath,
+  subagentTranscript,
   extractPrompt,
   parseUsageLine,
   usageSnapshot,

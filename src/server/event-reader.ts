@@ -22,6 +22,7 @@ import {
   ensureFirstPrompt, ensureTranscriptWatcher, closeTranscriptResources,
 } from './transcript.ts';
 import { getWatchdogService } from './watchdog/index.ts';
+import { removeLock } from './session-lock.ts';
 
 // Un objet exploitable par accès de champ — même garde locale que
 // session-index.ts et les autres fichiers du serveur : `decodeJsonlLine` ne
@@ -217,8 +218,7 @@ function unwatchSession(fp: string): void {
 
 function isWatched(fp: string): boolean { return watchers.has(fp); }
 
-// Reset the read offset for a file — used by housekeep.compactSession after
-// rewriting a smaller version of the JSONL so we don't skip the new content.
+// Set the read offset for a file whose layout has changed under the reader.
 //
 // The hand-off byte goes with it. The file has just been rewritten shorter, so
 // the old byte points into a layout that no longer exists — keeping it would
@@ -227,6 +227,16 @@ function isWatched(fp: string): boolean { return watchers.has(fp); }
 function resetFileOffset(fp: string, size: number): void {
   fileOffsets.set(fp, size);
   fedFrom.delete(fp);
+}
+
+// A compaction keeps the tail of the file, so what the reader had not read yet
+// is still its end: the reader resumes the same number of bytes before the end.
+// A file nobody follows has nothing unread. Returns the new offset.
+function rebaseFileOffset(fp: string, sizeBefore: number, sizeAfter: number): number {
+  const unread = sizeBefore - (fileOffsets.get(fp) ?? sizeBefore);
+  const offset = Math.max(0, sizeAfter - unread);
+  resetFileOffset(fp, offset);
+  return offset;
 }
 
 // Delete a session file + summary + clean everything related.
@@ -253,6 +263,12 @@ async function deleteSession(fp: string): Promise<void> {
       console.error(`[event-reader] unlink ${fp} failed: ${message}`);
     }
   }
+  // Le verrou d'une session supprimée ne garde plus rien.
+  try { removeLock(fp); }
+  catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[event-reader] remove lock failed: ${message}`);
+  }
   // Also remove companion summary if it exists.
   try { await fsp.unlink(fp.replace('.jsonl', '.summary.json')); }
   catch (err: unknown) {
@@ -266,6 +282,6 @@ async function deleteSession(fp: string): Promise<void> {
 export {
   readAndBroadcast,
   watchSession, unwatchSession, isWatched,
-  resetFileOffset, liveHandoffOffset,
+  resetFileOffset, rebaseFileOffset, liveHandoffOffset,
   deleteSession,
 };

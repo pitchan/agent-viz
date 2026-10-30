@@ -55,6 +55,8 @@ test('Claude Code : le petit-fils se range sous le sous-agent qui l\'a lancé, a
   expect(enfant.children).toContain(petitFils);
   expect(state.nodes.get(`s:${SID}`)!.children).not.toContain(petitFils);
   expect(petitFils.children.map(c => c.label)).toEqual(['Read']);
+  expect(enfant.isParallel).toBe(false);
+  expect(petitFils.isParallel).toBe(false);
 });
 
 test('Claude Code : le petit-fils est terminé à la fin de l\'outil Agent de son parent', () => {
@@ -107,4 +109,6 @@ test('Codex : le petit-fils se range sous le sous-agent qui l\'a lancé, termin�
   expect(petitFils.status).toBe('done');
   expect(petitFils.duration).toBe('8.2s');
   expect(enfant.status).toBe('running');
+  expect(enfant.isParallel).toBe(false);
+  expect(petitFils.isParallel).toBe(false);
 });
