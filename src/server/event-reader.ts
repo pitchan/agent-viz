@@ -119,7 +119,8 @@ async function readAndBroadcast(filePath: string): Promise<void> {
     touchIndex(filePath, len, newlines);
     if (newRecord) broadcastSessionsChanged();
     const sessionName = path.basename(filePath, '.jsonl');
-    const lines = text.trim().split('\n');
+    const layout = fileLayout(filePath);
+    let lineEnd = offset;
     const rec = sessionIndex.get(sessionName);
     // Read once, before the loop: nothing awaits inside it, so the service
     // cannot appear or vanish half-way through. And the first read that has a
@@ -135,7 +136,10 @@ async function readAndBroadcast(filePath: string): Promise<void> {
     // the sweep would re-read bytes already fed. Keep them adjacent.
     const wd = getWatchdogService();
     if (wd && !fedFrom.has(filePath)) fedFrom.set(filePath, offset);
-    for (const line of lines) {
+    for (const line of text.split('\n')) {
+      // The page moves its read cursor to the end of each line it is sent live,
+      // so that coming back to a hidden tab resumes after it.
+      lineEnd = Math.min(lineEnd + Buffer.byteLength(line) + 1, newStat.size);
       // Le verdict sur une ligne vient de la primitive commune du moteur. C'est le chemin de
       // CAPTURE VIVE : une ligne préfixée d'un BOM y était perdue en silence, ni diffusée au
       // canevas ni donnée au chien de garde, donc invisible ET indétectable.
@@ -147,7 +151,7 @@ async function readAndBroadcast(filePath: string): Promise<void> {
         if (rec && !rec.agentSource && isRecord(evt) && typeof evt._source === 'string') {
           rec.agentSource = evt._source;
         }
-        broadcastSSE({ type: 'event', session: sessionName, event: evt });
+        broadcastSSE({ type: 'event', session: sessionName, event: evt, offset: lineEnd, layout });
         // The watchdog sees the same stream as the canvas but draws something
         // else from it: what deserves to be recorded. `onEvent` returns only
         // facts it has never seen, so re-reading a file broadcasts nothing.
@@ -233,10 +237,45 @@ function resetFileOffset(fp: string, size: number): void {
 // is still its end: the reader resumes the same number of bytes before the end.
 // A file nobody follows has nothing unread. Returns the new offset.
 function rebaseFileOffset(fp: string, sizeBefore: number, sizeAfter: number): number {
-  const unread = sizeBefore - (fileOffsets.get(fp) ?? sizeBefore);
-  const offset = Math.max(0, sizeAfter - unread);
+  const offset = rebased(sizeBefore - (fileOffsets.get(fp) ?? sizeBefore), sizeAfter);
   resetFileOffset(fp, offset);
+  compactions.set(fp, [...(compactions.get(fp) ?? []), { sizeBefore, sizeAfter }]);
   return offset;
+}
+
+function rebased(unread: number, sizeAfter: number): number {
+  return Math.max(0, sizeAfter - unread);
+}
+
+// Every compaction of a file, in order. A page's cursor is a byte offset in
+// one layout of the file — layout N is the file after N compactions — so a
+// cursor from an older layout is carried through each compaction since.
+const compactions = new Map<string, { sizeBefore: number; sizeAfter: number }[]>();
+
+function fileLayout(fp: string): number {
+  return compactions.get(fp)?.length ?? 0;
+}
+
+// What a page that has read `fp` up to `cursor`, in layout `layout`, has not
+// read yet, plus the size and layout that make its new cursor. A file that
+// cannot be read answers as empty: the page asks again at its next poll.
+async function readUnread(fp: string, cursor: number, layout: number): Promise<{ data: string; size: number; layout: number }> {
+  let fh;
+  try {
+    const { size } = await fsp.stat(fp);
+    const since = compactions.get(fp)?.slice(layout) ?? [];
+    const offset = since.reduce((o, c) => rebased(c.sizeBefore - o, c.sizeAfter), cursor);
+    const now = fileLayout(fp);
+    if (offset >= size) return { data: '', size, layout: now };
+    const buf = Buffer.alloc(size - offset);
+    fh = await fsp.open(fp, 'r');
+    await fh.read(buf, 0, buf.length, offset);
+    return { data: buf.toString('utf8'), size, layout: now };
+  } catch {
+    return { data: '', size: 0, layout: fileLayout(fp) };
+  } finally {
+    if (fh) { try { await fh.close(); } catch {} }
+  }
 }
 
 // Delete a session file + summary + clean everything related.
@@ -253,6 +292,7 @@ async function deleteSession(fp: string): Promise<void> {
     clearTokensTimer(rec as Parameters<typeof clearTokensTimer>[0]);
   }
   unwatchSession(fp);
+  compactions.delete(fp);
   sessionIndex.delete(id);
   readInFlight.delete(fp);
   readPending.delete(fp);
@@ -283,5 +323,5 @@ export {
   readAndBroadcast,
   watchSession, unwatchSession, isWatched,
   resetFileOffset, rebaseFileOffset, liveHandoffOffset,
-  deleteSession,
+  readUnread, deleteSession,
 };
