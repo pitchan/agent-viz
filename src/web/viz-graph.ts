@@ -29,6 +29,8 @@ export interface HookEvent extends ToolCallEvent {
   // Posés quand l'agent nomme son sous-agent : le nom de la tâche, et le surnom du fil.
   agent_name?: string;
   agent_nickname?: string;
+  // Posé quand l'agent dit quel sous-agent a lancé celui-ci.
+  parent_agent_id?: string;
   tool_use_id?: string;
   // `isolation` s'ajoute a ToolInput : seul le graphe s'en sert, pour la
   // pastille « worktree » d'un sous-agent isole.
@@ -183,11 +185,11 @@ function onSubagentStart(evt: HookEvent, sid: string, ts: string) {
   const n = getNode(`a:${aid}`);
   n.type = 'agent';
   n.label = agentLabel(evt);
-  n.sub = (evt.tool_input && evt.tool_input.description) || aid.slice(0, 8);
-  n.color = COLORS.agent; n.data = evt; n.status = 'running'; n.startTime = ts;
+  n.sub = evt.agent_nickname || (evt.tool_input && evt.tool_input.description) || aid.slice(0, 8);
+  n.color = COLORS.agent; n.data = evt; n.status = 'running'; n.startTime = evt.started_at || ts;
   if (evt.tool_input && evt.tool_input.isolation === 'worktree') n.isIsolated = true;
   setRunning(n.id, true);
-  const parent = ensureSessionParent(sid);
+  const parent = evt.parent_agent_id ? getNode(`a:${evt.parent_agent_id}`) : ensureSessionParent(sid);
   if (!n.parentId) { n.parentId = parent.id; parent.children.push(n); }
   recomputeParallelFlags(parent.id);
   addTimelineEntry(evt, n.id, 'agent', n.label, n.sub);

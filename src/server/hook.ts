@@ -16,7 +16,8 @@ import { HOOK_SOURCES, NORMALIZERS, NEEDS_EVENT_FLAG, type HookSource } from './
 import { lateFailures } from './hook-antigravity-verdicts.ts';
 import { sessionStart } from './hook-antigravity-session-start.ts';
 import { codexEvents } from './hook-codex-verdicts.ts';
-import { agentIdentity, subagentStops } from './hook-codex-subagents.ts';
+import { agentIdentity, subagentStarts, subagentStops } from './hook-codex-subagents.ts';
+import { codexChildTranscript } from './codex-child-transcript.ts';
 import { validSessionId } from './session-id.ts';
 import { SessionLockError, withSessionLockSync } from './session-lock.ts';
 
@@ -91,7 +92,15 @@ function codexFromTranscript(raw: Payload, event: string | undefined): Payload[]
   const evt = NORMALIZERS.codex(raw, event);
   // L'événement d'un sous-agent pointe vers le transcript de son propre fil, qui s'ouvre sur son nom.
   const named = typeof evt.agent_id === 'string' ? { ...evt, ...agentIdentity(readEdge(transcript_path, 'head')) } : evt;
-  return [...subagentStops(named, events, transcript), ...codexEvents(named, events, transcript)];
+  const child = (threadId: string, startedAt: string) => {
+    const found = codexChildTranscript(transcript_path, threadId, startedAt);
+    return found ? { path: found, head: readEdge(found, 'head') } : null;
+  };
+  return [
+    ...subagentStarts(named, events, transcript, child),
+    ...subagentStops(named, events, transcript),
+    ...codexEvents(named, events, transcript),
+  ];
 }
 
 const REPLACERS: Record<HookSource, Replacer | null> = {
