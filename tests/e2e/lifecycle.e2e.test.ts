@@ -307,11 +307,15 @@ test('stop sans fichier de pid vise le port demandé et y envoie POST /shutdown 
   const montage = await chargeLifecycle({ portParDefaut });
   const demon = await demonFactice(port);
   try {
+    const debut = Date.now();
+
     // Act
     const resultat = await montage.lifecycle.stop({ port, shutdownTimeoutMs: 500 });
 
     // Assert
+    const duree = Date.now() - debut;
     expect(resultat).toEqual({ stopped: false, port, why: 'still-answering' });
+    expect(duree < 2000, `abandon attendu avant les 2 000 ms du délai par défaut, obtenu en ${duree} ms`).toBeTruthy();
     expect(demon.requetes.includes('POST /shutdown'), JSON.stringify(demon.requetes)).toBeTruthy();
   } finally {
     await demon.ferme();
@@ -362,11 +366,15 @@ test('stop sur un port où un serveur étranger répond sans sortir : rien n\'es
   const intrus = spawn(process.execPath, ['-e', 'setInterval(() => {}, 60000)'], { stdio: 'ignore' });
   fs.writeFileSync(montage.lifecycle.PID_FILE, `${intrus.pid}\n${port}\n2026-01-01T00:00:00.000Z\n`);
   try {
+    const debut = Date.now();
+
     // Act
     const resultat = await montage.lifecycle.stop({ shutdownTimeoutMs: 500 });
 
     // Assert
+    const duree = Date.now() - debut;
     expect(resultat).toEqual({ stopped: false, port, why: 'still-answering' });
+    expect(duree < 2000, `abandon attendu avant les 2 000 ms du délai par défaut, obtenu en ${duree} ms`).toBeTruthy();
     expect(demon.requetes.includes('POST /shutdown'), JSON.stringify(demon.requetes)).toBeTruthy();
     expect({ exitCode: intrus.exitCode, signalCode: intrus.signalCode }).toEqual({ exitCode: null, signalCode: null });
     expect(fs.existsSync(montage.lifecycle.PID_FILE), 'rien n\'a été arrêté : le fichier de pid reste').toBe(true);
