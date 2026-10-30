@@ -4,7 +4,6 @@
 // créé en mode exclusif ('wx'), atomique sous Windows comme sous POSIX, qui porte son détenteur.
 
 import fs from 'node:fs';
-import { randomUUID } from 'node:crypto';
 
 // Un verrou se rend en le renommant, jamais en le supprimant sur place : sous Windows, un nom en
 // cours de suppression refuse toute ouverture par EPERM, et serait pris pour un refus de droits.
@@ -12,6 +11,9 @@ const WAIT_MS = 3000;
 const POLL_MS = 5;
 // Un verrou vide est celui d'un détenteur mort entre la création et l'écriture de son nom.
 const EMPTY_STALE_MS = 2000;
+// Une prise légitime dure quelques millisecondes : au-delà, le verrou est abandonné même si son
+// pid répond, car Windows a pu redonner ce pid à un processus durable.
+const STALE_MS = 30_000;
 
 class SessionLockError extends Error {}
 
@@ -38,18 +40,26 @@ function processAlive(pid: number): boolean {
 }
 
 function abandoned(lock: string, holder: string): boolean {
-  const pid = parseInt(holder, 10);
-  if (Number.isInteger(pid) && pid > 0) return !processAlive(pid);
-  try { return Date.now() - fs.statSync(lock).mtimeMs > EMPTY_STALE_MS; } catch (err: unknown) {
+  let age: number;
+  try { age = Date.now() - fs.statSync(lock).mtimeMs; } catch (err: unknown) {
     if (errorCode(err) === 'ENOENT') return false;
     throw err;
   }
+  if (age > STALE_MS) return true;
+  const pid = parseInt(holder, 10);
+  if (Number.isInteger(pid) && pid > 0) return !processAlive(pid);
+  return age > EMPTY_STALE_MS;
+}
+
+// Unique entre processus et entre appels, sans node:crypto : ce module se charge à chaque hook.
+function uniqueSuffix(): string {
+  return `${process.pid}-${process.hrtime.bigint()}-${Math.random().toString(36).slice(2)}`;
 }
 
 // Le renommage vers un nom unique n'aboutit que pour un seul processus : deux preneurs ne
 // suppriment pas ensemble le même verrou abandonné.
 function discard(lock: string): void {
-  const moved = `${lock}.${randomUUID()}`;
+  const moved = `${lock}.${uniqueSuffix()}`;
   try { fs.renameSync(lock, moved); } catch (err: unknown) {
     if (errorCode(err) === 'ENOENT') return;
     throw err;
@@ -77,7 +87,12 @@ function unlock(file: string, token: string): void {
 }
 
 function newToken(): string {
-  return `${process.pid} ${randomUUID()}`;
+  return `${process.pid} ${uniqueSuffix()}`;
+}
+
+// Retire le verrou d'une session supprimée, par le même renommage que la reprise.
+function removeLock(file: string): void {
+  discard(lockPath(file));
 }
 
 // Une panne du verrou se nomme comme telle : l'appelant la distingue d'une panne de son travail.
@@ -115,4 +130,4 @@ async function withSessionLock<T>(file: string, fn: () => Promise<T>): Promise<T
   try { return await fn(); } finally { asLockError(file, () => unlock(file, token)); }
 }
 
-export { SessionLockError, lockPath, withSessionLock, withSessionLockSync };
+export { SessionLockError, removeLock, withSessionLock, withSessionLockSync };

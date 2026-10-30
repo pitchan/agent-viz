@@ -94,8 +94,9 @@ async function compactSession(
   const kept = allLines.slice(-COMPACT_KEEP_EVENTS);
   const summaryPath = fp.replace('.jsonl', '.summary.json');
   try {
-    await fsp.writeFile(summaryPath, JSON.stringify(summary, null, 2));
     await withSessionLock(fp, async () => rewriteTail(fp, rec, kept, Buffer.byteLength(content)));
+    // Après la réécriture : le tableau de bord affiche « compactée » toute session qui a un résumé.
+    await fsp.writeFile(summaryPath, JSON.stringify(summary, null, 2));
     console.log(`[housekeep] compacted ${id}: ${allLines.length} → ${kept.length} events, summary at ${path.basename(summaryPath)}`);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
