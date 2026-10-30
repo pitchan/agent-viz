@@ -574,7 +574,7 @@ ligne : un ancrage `fichier:ligne` qui a glissé reste vert.
 **Un seul exécuteur, un seul arbre de tests dans 255 fichiers.**
 
 ```
-find tests -name "*.test.ts" | wc -l   → 252
+find tests -name "*.test.ts" | wc -l   → 255
 npx vitest run                          → tous passés, 255 fichiers
 ```
 
