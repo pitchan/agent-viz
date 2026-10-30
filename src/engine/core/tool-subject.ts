@@ -23,6 +23,10 @@ export interface ToolInput {
   CommandLine?: string;
   AbsolutePath?: string;
   TargetFile?: string;
+  // Outil web de Codex : une liste de requêtes, de pages ouvertes ou de motifs cherchés.
+  search_query?: { q?: string }[];
+  open?: { ref_id?: string }[];
+  find?: { pattern?: string }[];
 }
 
 export interface ToolCallEvent {
@@ -58,6 +62,8 @@ const TOOL_SUBJECT: Record<string, SubjectPicker> = {
   view_file: ti => ti.AbsolutePath && basename(ti.AbsolutePath),
   write_to_file: ti => ti.TargetFile && basename(ti.TargetFile),
   replace_file_content: ti => ti.TargetFile && basename(ti.TargetFile),
+  // Outil web de Codex, relevé sur une session réelle : la première cible suffit à l'étiquette.
+  'web.run': ti => ti.search_query?.[0]?.q ?? ti.open?.[0]?.ref_id ?? ti.find?.[0]?.pattern,
 };
 
 // Les outils dont le sujet est un fichier, tous agents confondus.
