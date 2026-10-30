@@ -1,5 +1,5 @@
-// Codex nomme un sous-agent dans la première ligne de son transcript, et écrit sa fin dans celui
-// du fil qui l'a lancé. Le hook ne porte ni le nom ni la fin. Pur.
+// Codex nomme un sous-agent dans la première ligne de son transcript, et écrit son lancement et sa
+// fin dans celui du fil qui l'a lancé. Le hook ne porte ni le nom, ni le début, ni la fin. Pur.
 
 import { records } from './hook-codex-verdicts.ts';
 
@@ -72,6 +72,37 @@ export function subagentStops(evt: Payload, eventsText: string, transcriptText: 
       started_at,
       ended_at: line.timestamp,
       transcript_path: evt.transcript_path,
+    });
+  }
+  return out;
+}
+
+/** Le transcript propre d'un fil et son en-tête ; `null` quand il est introuvable. */
+export type ChildTranscript = (threadId: string, startedAt: string) => { path: string; head: string } | null;
+
+/** Les débuts de sous-agent que le transcript révèle et que le fichier d'événements ne porte pas encore. */
+export function subagentStarts(evt: Payload, eventsText: string, transcriptText: string, childTranscript: ChildTranscript): Payload[] {
+  const written = new Set<unknown>();
+  for (const start of records(eventsText, '"SubagentStart"')) written.add(start.activity_id);
+
+  const out: Payload[] = [];
+  for (const line of records(transcriptText, '"SubAgentActivity"')) {
+    const item = isRecord(line.payload) ? line.payload.item : null;
+    if (!isRecord(item) || item.type !== 'SubAgentActivity' || item.kind !== 'started') continue;
+    const { id, agent_thread_id, agent_path } = item;
+    if (typeof id !== 'string' || typeof agent_thread_id !== 'string' || typeof agent_path !== 'string'
+      || typeof line.timestamp !== 'string' || written.has(id)) continue;
+    // Le nom vient de la ligne de lancement ; le surnom, le lanceur et les jetons, du transcript
+    // propre du sous-agent, que le serveur suit dès ce début.
+    const child = childTranscript(agent_thread_id, line.timestamp);
+    out.push({
+      hook_event_name: 'SubagentStart',
+      session_id: evt.session_id,
+      agent_id: agent_thread_id,
+      activity_id: id,
+      started_at: line.timestamp,
+      agent_name: agent_path.slice(agent_path.lastIndexOf('/') + 1),
+      ...(child && { ...agentIdentity(child.head), ...parentAgent(child.head), transcript_path: child.path }),
     });
   }
   return out;
