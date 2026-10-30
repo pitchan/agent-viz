@@ -14,15 +14,30 @@ export interface AgentIdentity {
   agent_nickname: string;
 }
 
-/** Le nom et le surnom d'un sous-agent, lus dans l'en-tête de son transcript ; `null` pour un fil qui n'en a pas. */
-export function agentIdentity(transcriptHead: string): AgentIdentity | null {
+function sessionMeta(transcriptHead: string): Record<string, unknown> | null {
   const end = transcriptHead.indexOf('\n');
   if (end === -1) return null;
   const meta: unknown = JSON.parse(transcriptHead.slice(0, end));
   if (!isRecord(meta) || meta.type !== 'session_meta' || !isRecord(meta.payload)) return null;
-  const { agent_path, agent_nickname } = meta.payload;
+  return meta.payload;
+}
+
+/** Le nom et le surnom d'un sous-agent, lus dans l'en-tête de son transcript ; `null` pour un fil qui n'en a pas. */
+export function agentIdentity(transcriptHead: string): AgentIdentity | null {
+  const meta = sessionMeta(transcriptHead);
+  if (!meta) return null;
+  const { agent_path, agent_nickname } = meta;
   if (typeof agent_path !== 'string' || typeof agent_nickname !== 'string') return null;
   return { agent_name: agent_path.slice(agent_path.lastIndexOf('/') + 1), agent_nickname };
+}
+
+/** Le sous-agent qui a lancé ce fil ; `null` quand c'est le fil principal qui l'a lancé. */
+export function parentAgent(transcriptHead: string): { parent_agent_id: string } | null {
+  const meta = sessionMeta(transcriptHead);
+  if (!meta) return null;
+  const { parent_thread_id, session_id } = meta;
+  if (typeof parent_thread_id !== 'string' || parent_thread_id === session_id) return null;
+  return { parent_agent_id: parent_thread_id };
 }
 
 /** Les fins de sous-agent que le transcript révèle et que le fichier d'événements ne porte pas encore. */

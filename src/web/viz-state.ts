@@ -150,10 +150,9 @@ export const state = {
     tokensSupported: null as boolean | null,
     transcriptMissing: false,
   },
-  // Map<forkedChildAgentId, parentAgentId>. Filled by PostToolUse(Skill) events
-  // with tool_response.status === 'forked'. Used to attach forked sub-agents
-  // under their launching agent instead of the session root — the forked
-  // child's own PreToolUse events carry no parent_agent_id.
+  // Sous-agent → sous-agent qui l'a lancé, appris au retour de l'outil qui l'a lancé (Agent, ou
+  // Skill en fork) quand ses propres événements ne portent pas de parent_agent_id ; ses
+  // événements suivants le rangent sous son lanceur plutôt que sous la session.
   forkedAgentParents: new Map<string, string>(),
 };
 

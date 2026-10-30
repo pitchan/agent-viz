@@ -17,6 +17,7 @@ import type { SubagentTranscript, UsageSnapshotSource } from './transcript-adapt
 import { subagentFilesBeside, subagentsNamedByEvents } from './subagent-transcripts.ts';
 import type { EventsCursor } from './subagent-transcripts.ts';
 import { applyUsageSnapshot } from './usage-snapshot.ts';
+import { transcriptOnDisk, readArchivedTranscript } from './transcript-archive.ts';
 // Type partagé du contrat de Liskov des adaptateurs : ce que
 // `parseUsageLine`/`discoverPath` attendent réellement pour `rec`. Emprunté par
 // nom plutôt que redéclaré localement.
@@ -35,6 +36,8 @@ interface Tail {
   agentId: string | null;
   offset: number;
   leftover: string;
+  // Lu en entier depuis sa version compressée, qui ne grossit plus.
+  archived: boolean;
   watcher: fs.FSWatcher | null;
   _readInFlight: boolean;
   _readPending: boolean;
@@ -183,7 +186,7 @@ async function ensureFirstPrompt(sessionFile: string): Promise<string | null> {
   if (typeof rec.promptCache === 'string') return rec.promptCache;
   const tp = await getTranscriptPath(sessionFile);
   if (!tp) { rec.promptCache = null; return null; }
-  try { await fsp.access(tp); } catch { rec.promptCache = null; return null; }
+  try { await fsp.access(tp); } catch { return promptFromArchive(tp, rec); }
 
   // First attempt: 256 KB. Widen to 1 MB on miss.
   const windows = [256 * 1024, 1024 * 1024];
@@ -204,6 +207,15 @@ async function ensureFirstPrompt(sessionFile: string): Promise<string | null> {
   return null;
 }
 
+// Un transcript compressé ne grossit plus : il se lit en entier, sans fenêtre.
+async function promptFromArchive(tp: string, rec: SessionRecord): Promise<string | null> {
+  const text = await readArchivedTranscript(tp);
+  const prompt = text === null ? null : getAdapter(rec.agentSource).extractPrompt(text);
+  rec.promptCache = prompt;
+  if (prompt) broadcastSessionsChanged();
+  return prompt;
+}
+
 // ── Token-usage transcript tailing ──
 
 // Dispatch a single transcript line to the per-agent adapter. Returns true
@@ -222,7 +234,7 @@ function parseTranscriptEvent(line: string, rec: SessionWithSlices, agentId: str
 // right token bucket.
 function makeTail(filePath: string, agentId: string | null = null): Tail {
   return {
-    path: filePath, agentId, offset: 0, leftover: '',
+    path: filePath, agentId, offset: 0, leftover: '', archived: false,
     watcher: null,
     _readInFlight: false, _readPending: false, _watchTimer: null,
   };
@@ -256,7 +268,9 @@ async function readTailDelta(tail: Tail, rec: SessionWithSlices): Promise<void> 
   tail._readInFlight = true;
   let fh;
   try {
-    const stat = await fsp.stat(tail.path);
+    if (tail.archived) return;
+    const stat = await fsp.stat(tail.path).catch(() => null);
+    if (!stat) { await readArchivedTail(tail, rec); return; }
     const offset = tail.offset || 0;
     if (stat.size <= offset) return;
     const len = stat.size - offset;
@@ -273,12 +287,7 @@ async function readTailDelta(tail: Tail, rec: SessionWithSlices): Promise<void> 
     // ne peut donc jamais rendre `undefined` ici ; le repli documente
     // l'invariant pour `noUncheckedIndexedAccess` sans changer d'issue.
     tail.leftover = lines.pop() ?? ''; // possibly incomplete tail
-    let changed = false;
-    for (const line of lines) {
-      if (!line) continue;
-      if (parseTranscriptEvent(line, rec, tail.agentId)) changed = true;
-    }
-    if (changed) scheduleTokensBroadcast(rec.id, rec as TokensCarrierLike);
+    parseTailLines(lines, tail, rec);
   } catch {
     if (fh) { try { await fh.close(); } catch {} }
   } finally {
@@ -288,6 +297,22 @@ async function readTailDelta(tail: Tail, rec: SessionWithSlices): Promise<void> 
       setImmediate(() => readTailDelta(tail, rec).catch(err => console.error(`[transcript] ${rec.id.slice(0, 8)}: re-read failed: ${err.message}`)));
     }
   }
+}
+
+function parseTailLines(lines: string[], tail: Tail, rec: SessionWithSlices): void {
+  let changed = false;
+  for (const line of lines) {
+    if (line && parseTranscriptEvent(line, rec, tail.agentId)) changed = true;
+  }
+  if (changed) scheduleTokensBroadcast(rec.id, rec as TokensCarrierLike);
+}
+
+// Un transcript compressé ne grossit plus : il se lit une fois, en entier.
+async function readArchivedTail(tail: Tail, rec: SessionWithSlices): Promise<void> {
+  const text = await readArchivedTranscript(tail.path);
+  if (text === null) return;
+  tail.archived = true;
+  parseTailLines(text.split('\n'), tail, rec);
 }
 
 // Open an fs.watch on a tail's file for live updates, debounced 50ms (Windows
@@ -371,8 +396,7 @@ async function ensureTranscriptWatcher(sessionFile: string): Promise<void> {
       // The transcript file is often not on disk yet when SessionStart is
       // processed — treat a miss as transient (the next event retries),
       // never as a permanent failure.
-      try { await fsp.access(tp); }
-      catch {
+      if (!await transcriptOnDisk(tp)) {
         console.error(`[tokens] ${id.slice(0,8)}: transcript not on disk yet at ${tp}`);
         flagTranscriptMissing(rec, id);
         return;
