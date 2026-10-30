@@ -2,7 +2,7 @@
 // Append-only tail reader for per-session JSONL files + the fs.watch glue
 // that drives it + session deletion.
 //
-// Owns: watchers, fileOffsets, debounceTimers, readInFlight, readPending.
+// Owns: watchers, fileOffsets, generations, debounceTimers, readInFlight, readPending.
 // Calls into: session-index (touchIndex, sessionIndex), sse (broadcastSSE),
 // tokens (clearTokensTimer), transcript
 // (ensureTranscriptWatcher, ensureFirstPrompt, closeTranscriptResources).
@@ -33,6 +33,8 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 
 const watchers = new Map<string, fs.FSWatcher>();
 const fileOffsets = new Map<string, number>();
+// Bumped each time a file's layout changes under the reader.
+const generations = new Map<string, number>();
 const debounceTimers = new Map<string, NodeJS.Timeout>();
 const readInFlight = new Set<string>();
 const readPending = new Set<string>();
@@ -104,24 +106,28 @@ async function readAndBroadcast(
   readInFlight.add(filePath);
   let fh;
   try {
-    const cursor = fileOffsets.get(filePath);
-    const offset = cursor || 0;
-    const newStat = await stat(filePath);
-    if (newStat.size <= offset) return;
-    const len = newStat.size - offset;
-    const buf = Buffer.alloc(len);
-    fh = await fsp.open(filePath, 'r');
-    await fh.read(buf, 0, len, offset);
-    await fh.close();
-    fh = null;
-    // A compaction that ran during the awaits moved the cursor: these bytes come from
-    // a layout that no longer exists, and the new cursor still counts them as unread.
-    // An unwatch dropped it: nobody follows the file any more.
-    if (fileOffsets.get(filePath) !== cursor) {
-      if (fileOffsets.has(filePath)) readPending.add(filePath);
-      return;
+    let offset: number;
+    let buf: Buffer;
+    // A compaction that runs during an await rewrites the file under this read: what
+    // was measured or read belongs to a layout that no longer exists. Its new cursor
+    // still counts those bytes as unread, so the read starts over from there.
+    for (;;) {
+      const generation = generations.get(filePath);
+      offset = fileOffsets.get(filePath) || 0;
+      const newStat = await stat(filePath);
+      if (generations.get(filePath) !== generation) continue;
+      if (newStat.size <= offset) return;
+      buf = Buffer.alloc(newStat.size - offset);
+      fh = await fsp.open(filePath, 'r');
+      const { bytesRead } = await fh.read(buf, 0, buf.length, offset);
+      await fh.close();
+      fh = null;
+      if (generations.get(filePath) !== generation) continue;
+      buf = buf.subarray(0, bytesRead);
+      break;
     }
-    fileOffsets.set(filePath, newStat.size);
+    const len = buf.length;
+    fileOffsets.set(filePath, offset + len);
     const text = buf.toString('utf8');
     // Count newlines so we can update the in-memory index cheaply.
     let newlines = 0;
@@ -214,6 +220,7 @@ function unwatchSession(fp: string): void {
   const w = watchers.get(fp);
   if (w) { w.close(); watchers.delete(fp); }
   fileOffsets.delete(fp);
+  generations.delete(fp);
   // No live path left on this file, so no hand-off byte either — the sweep is
   // on its own again. Keeping a stale one would fence off a stretch of file
   // that nobody reads any more.
@@ -239,6 +246,7 @@ function isWatched(fp: string): boolean { return watchers.has(fp); }
 // boundary until the live path feeds again, which is exactly what it means.
 function resetFileOffset(fp: string, size: number): void {
   fileOffsets.set(fp, size);
+  generations.set(fp, (generations.get(fp) ?? 0) + 1);
   fedFrom.delete(fp);
 }
 

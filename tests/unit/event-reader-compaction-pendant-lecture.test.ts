@@ -95,3 +95,48 @@ test('une lecture interrompue par la compaction ne fige pas le direct et ne perd
   expect(finsRecues(recus, 'avant'), 'l’événement écrit avant la compaction n’a pas été diffusé une fois').toBe(1);
   expect(finsRecues(recus, 'apres'), 'le direct est figé : l’événement écrit après la compaction n’est pas diffusé').toBe(1);
 });
+
+// Une session dont le lecteur n'a encore rien lu : la compaction lui laisse le curseur à 0.
+function sessionPasLue(nom: string) {
+  const fp = sessionLue(nom);
+  sessionIndex.set(nom, { ...sessionIndex.get(nom), size: 0, eventCount: 0 } as SessionRecord);
+  resetFileOffset(fp, 0);
+  return fp;
+}
+
+test('une lecture interrompue par la compaction ne fige pas le direct d une session pas encore lue', async () => {
+  // Arrange
+  const fp = sessionPasLue('compaction-curseur-zero');
+  fs.appendFileSync(fp, fin('avant-zero'));
+  const recus = ecouterSSE();
+  await readAndBroadcast(fp, mesurePuisCompaction(fp));
+  fs.appendFileSync(fp, fin('apres-zero'));
+
+  // Act
+  await readAndBroadcast(fp);
+
+  // Assert
+  expect(finsRecues(recus, 'avant-zero'), 'l’événement écrit avant la compaction n’a pas été diffusé une fois').toBe(1);
+  expect(finsRecues(recus, 'apres-zero'), 'le direct est figé : l’événement écrit après la compaction n’est pas diffusé').toBe(1);
+});
+
+// La compaction réécrit le fichier, puis la lecture mesure le fichier raccourci.
+function compactionPuisMesure(fp: string) {
+  return async (p: string) => {
+    await compactSession(fp);
+    return fs.promises.stat(p);
+  };
+}
+
+test('une lecture qui mesure le fichier tout juste compacte diffuse ce qui restait a lire', async () => {
+  // Arrange
+  const fp = sessionLue('compaction-avant-mesure');
+  fs.appendFileSync(fp, fin('avant-mesure'));
+  const recus = ecouterSSE();
+
+  // Act
+  await readAndBroadcast(fp, compactionPuisMesure(fp));
+
+  // Assert
+  expect(finsRecues(recus, 'avant-mesure'), 'l’événement non lu attend une écriture suivante').toBe(1);
+});
