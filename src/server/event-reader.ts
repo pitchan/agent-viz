@@ -93,22 +93,48 @@ function liveHandoffOffset(fp: string): number | null {
   return sessionIndex.has(idFromPath(fp)) ? null : 0;
 }
 
+// Bytes of `fp` from `offset` into `buf`; returns how many were read.
+async function readRange(fp: string, buf: Buffer, offset: number): Promise<number> {
+  const fh = await fsp.open(fp, 'r');
+  try { return (await fh.read(buf, 0, buf.length, offset)).bytesRead; }
+  finally { await fh.close(); }
+}
+
 // Read new bytes from a session file and broadcast via SSE.
-async function readAndBroadcast(filePath: string): Promise<void> {
+// `stat` and `read` are injected so a test can make the compaction run during
+// either await.
+async function readAndBroadcast(
+  filePath: string,
+  stat: (p: string) => Promise<{ size: number }> = p => fsp.stat(p),
+  read: (p: string, buf: Buffer, offset: number) => Promise<number> = readRange,
+): Promise<void> {
   if (readInFlight.has(filePath)) { readPending.add(filePath); return; }
   readInFlight.add(filePath);
-  let fh;
   try {
-    const newStat = await fsp.stat(filePath);
-    const offset = fileOffsets.get(filePath) || 0;
-    if (newStat.size <= offset) return;
-    const len = newStat.size - offset;
-    const buf = Buffer.alloc(len);
-    fh = await fsp.open(filePath, 'r');
-    await fh.read(buf, 0, len, offset);
-    await fh.close();
-    fh = null;
-    fileOffsets.set(filePath, newStat.size);
+    let offset: number;
+    let buf: Buffer;
+    let layout: number;
+    // A compaction that runs during an await rewrites the file under this read: what
+    // was measured or read belongs to a layout that no longer exists. Its new cursor
+    // still counts those bytes as unread, so the read starts over from there.
+    for (;;) {
+      const cursor = fileOffsets.get(filePath);
+      layout = fileLayout(filePath);
+      offset = cursor || 0;
+      const newStat = await stat(filePath);
+      // Unwatched meanwhile: nobody follows the file any more.
+      if (cursor !== undefined && !fileOffsets.has(filePath)) return;
+      if (fileLayout(filePath) !== layout) continue;
+      if (newStat.size <= offset) return;
+      buf = Buffer.alloc(newStat.size - offset);
+      const bytesRead = await read(filePath, buf, offset);
+      if (cursor !== undefined && !fileOffsets.has(filePath)) return;
+      if (fileLayout(filePath) !== layout) continue;
+      buf = buf.subarray(0, bytesRead);
+      break;
+    }
+    const len = buf.length;
+    fileOffsets.set(filePath, offset + len);
     const text = buf.toString('utf8');
     // Count newlines so we can update the in-memory index cheaply.
     let newlines = 0;
@@ -119,7 +145,6 @@ async function readAndBroadcast(filePath: string): Promise<void> {
     touchIndex(filePath, len, newlines);
     if (newRecord) broadcastSessionsChanged();
     const sessionName = path.basename(filePath, '.jsonl');
-    const layout = fileLayout(filePath);
     let lineEnd = offset;
     const rec = sessionIndex.get(sessionName);
     // Read once, before the loop: nothing awaits inside it, so the service
@@ -139,7 +164,7 @@ async function readAndBroadcast(filePath: string): Promise<void> {
     for (const line of text.split('\n')) {
       // The page moves its read cursor to the end of each line it is sent live,
       // so that coming back to a hidden tab resumes after it.
-      lineEnd = Math.min(lineEnd + Buffer.byteLength(line) + 1, newStat.size);
+      lineEnd = Math.min(lineEnd + Buffer.byteLength(line) + 1, offset + len);
       // Le verdict sur une ligne vient de la primitive commune du moteur. C'est le chemin de
       // CAPTURE VIVE : une ligne préfixée d'un BOM y était perdue en silence, ni diffusée au
       // canevas ni donnée au chien de garde, donc invisible ET indétectable.
@@ -171,7 +196,6 @@ async function readAndBroadcast(filePath: string): Promise<void> {
     // Discover transcript_path and start watching it for token usage.
     ensureTranscriptWatcher(filePath).catch(err => console.error('[event-reader] ensureTranscriptWatcher:', err.message));
   } catch {
-    if (fh) { try { await fh.close(); } catch {} }
   } finally {
     readInFlight.delete(filePath);
     if (readPending.has(filePath)) {
