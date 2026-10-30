@@ -281,17 +281,21 @@ test('start dont le serveur meurt au démarrage : rejette tout de suite en le di
   }
 });
 
-test('start dont le serveur vit sans écouter : rejette au bout de 3 s en disant qu\'il n\'a pas répondu', async () => {
+test('start dont le serveur vit sans écouter : rejette au bout du délai demandé en disant qu\'il n\'a pas répondu', async () => {
   // Arrange
   const [port, portParDefaut] = await portsLibres(2);
   const montage = await chargeLifecycle({ portParDefaut, serveur: SERVEUR_MUET });
   try {
+    const debut = Date.now();
+
     // Act
-    const erreur = await montage.lifecycle.start({ port }).then(() => null, (e: any) => e);
+    const erreur = await montage.lifecycle.start({ port, startupTimeoutMs: 500 }).then(() => null, (e: any) => e);
 
     // Assert
+    const duree = Date.now() - debut;
     expect(erreur, 'start aurait dû lever').toBeTruthy();
-    expect(erreur.message.includes('did not answer within 3s'), erreur.message).toBeTruthy();
+    expect(duree < 3000, `rejet attendu avant les 3 000 ms du délai par défaut, obtenu en ${duree} ms`).toBeTruthy();
+    expect(erreur.message.includes('did not answer within 0.5s'), erreur.message).toBeTruthy();
   } finally {
     nettoie(montage);
   }
@@ -304,7 +308,7 @@ test('stop sans fichier de pid vise le port demandé et y envoie POST /shutdown 
   const demon = await demonFactice(port);
   try {
     // Act
-    const resultat = await montage.lifecycle.stop({ port });
+    const resultat = await montage.lifecycle.stop({ port, shutdownTimeoutMs: 500 });
 
     // Assert
     expect(resultat).toEqual({ stopped: false, port, why: 'still-answering' });
@@ -359,7 +363,7 @@ test('stop sur un port où un serveur étranger répond sans sortir : rien n\'es
   fs.writeFileSync(montage.lifecycle.PID_FILE, `${intrus.pid}\n${port}\n2026-01-01T00:00:00.000Z\n`);
   try {
     // Act
-    const resultat = await montage.lifecycle.stop();
+    const resultat = await montage.lifecycle.stop({ shutdownTimeoutMs: 500 });
 
     // Assert
     expect(resultat).toEqual({ stopped: false, port, why: 'still-answering' });
