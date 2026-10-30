@@ -253,18 +253,20 @@ async function eventsGetHandler(_req: IncomingMessage, res: ServerResponse, url:
     return;
   }
   const offset = parseInt(url.searchParams.get('offset') || '0', 10);
+  const layout = parseInt(url.searchParams.get('layout') || '0', 10);
   const sessionFile = sessionParam
     ? sessionFilePath(sessionParam)
     : latestSession();
 
-  const { data, size } = sessionFile ? await readUnread(sessionFile, offset) : { data: '', size: 0 };
+  const { data, size, layout: now } = sessionFile ? await readUnread(sessionFile, offset, layout) : { data: '', size: 0, layout: 0 };
   const sessionId = sessionFile ? path.basename(sessionFile, '.jsonl') : '';
   res.writeHead(200, {
     'Content-Type': 'application/x-ndjson',
     'Cache-Control': 'no-cache',
     'X-File-Size': String(size),
     'X-Session-Id': sessionId,
-    'Access-Control-Expose-Headers': 'X-File-Size, X-Session-Id',
+    'X-File-Layout': String(now),
+    'Access-Control-Expose-Headers': 'X-File-Size, X-Session-Id, X-File-Layout',
   });
   res.end(data);
 }

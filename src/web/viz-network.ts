@@ -223,17 +223,18 @@ export async function poll(force?: boolean) {
   if (clearing || (!force && sseConnected)) return;
   try {
     const sp = currentSessionId ? `&session=${currentSessionId}` : '';
-    const res = await fetch(`/events?offset=${state.cursor.offset}${sp}`);
+    const res = await fetch(`/events?offset=${state.cursor.offset}&layout=${state.cursor.layout}${sp}`);
     const size = parseInt(res.headers.get('X-File-Size') || '0', 10);
+    const layout = parseInt(res.headers.get('X-File-Layout') || '0', 10);
     const serverId = res.headers.get('X-Session-Id') || '';
     const body = new Uint8Array(await res.arrayBuffer());
-    if (!new TextDecoder().decode(body).trim()) return;
+    if (!body.length) return;
     if (!currentSessionId && state._lastServerId && state._lastServerId !== serverId) {
       clearState(); firstBatch = true;
     }
     if (!currentSessionId && state._lastServerId !== serverId) adoptLiveSession(serverId);
     state._lastServerId = serverId;
-    const { lines, cursor } = catchUp(state.cursor, body, size);
+    const { lines, cursor } = catchUp(state.cursor, body, size, layout);
     state.cursor = cursor;
     for (const line of lines) {
       try { const evt = JSON.parse(line); state.eventSeq++; processEvent(evt); } catch {}
