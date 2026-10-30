@@ -239,6 +239,25 @@ function rebaseFileOffset(fp: string, sizeBefore: number, sizeAfter: number): nu
   return offset;
 }
 
+// What a page that has read `fp` up to `offset` has not read yet, and the
+// file size that becomes its new cursor. A file that cannot be read answers
+// as empty: the page keeps its cursor and asks again at its next poll.
+async function readUnread(fp: string, offset: number): Promise<{ data: string; size: number }> {
+  let fh;
+  try {
+    const { size } = await fsp.stat(fp);
+    if (offset >= size) return { data: '', size };
+    const buf = Buffer.alloc(size - offset);
+    fh = await fsp.open(fp, 'r');
+    await fh.read(buf, 0, buf.length, offset);
+    return { data: buf.toString('utf8'), size };
+  } catch {
+    return { data: '', size: 0 };
+  } finally {
+    if (fh) { try { await fh.close(); } catch {} }
+  }
+}
+
 // Delete a session file + summary + clean everything related.
 async function deleteSession(fp: string): Promise<void> {
   const id = idFromPath(fp);
@@ -283,5 +302,5 @@ export {
   readAndBroadcast,
   watchSession, unwatchSession, isWatched,
   resetFileOffset, rebaseFileOffset, liveHandoffOffset,
-  deleteSession,
+  readUnread, deleteSession,
 };

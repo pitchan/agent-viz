@@ -5,6 +5,7 @@
 // stateless helpers are also exported.
 
 import { countOrZero } from '../engine/core/usage.ts';
+import { START } from './viz-event-cursor.ts';
 
 // ─── Palette ──────────────────────────────────────────────────────────────
 export const COLORS = {
@@ -132,7 +133,7 @@ export interface TimelineEntry {
 
 // ─── App state ────────────────────────────────────────────────────────────
 export const state = {
-  eventSeq: 0, offset: 0, nodes: new Map<string, VizNode>(), selected: null as string | null,
+  eventSeq: 0, cursor: START, nodes: new Map<string, VizNode>(), selected: null as string | null,
   // Appels d'outil terminés, réussis ou non, dont `toolsFailed` en échec. `toolOutcomes`
   // garde l'issue de chaque appel : une fin reçue deux fois ne compte qu'une fois.
   toolsCompleted: 0, toolsFailed: 0, toolOutcomes: new Map<string, 'done' | 'error'>(),

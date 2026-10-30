@@ -19,6 +19,7 @@ import { readAlert } from './viz-alert-shape.ts';
 import { pricingAdoptedAlert } from './viz-pricing-adopted-alert.ts';
 import { connectionPresentation } from './viz-topbar-status.ts';
 import { resetErrors } from './viz-errors.ts';
+import { START, afterLiveEvent, catchUp } from './viz-event-cursor.ts';
 
 // Nothing here tells the watchdog whether we can still hear the agent: detection runs on
 // the server, which keeps listening whether or not a tab is open and answers that question
@@ -156,6 +157,7 @@ export function connectSSE() {
         if (!target || data.session === target) {
           if (!currentSessionId && !state._lastServerId) adoptLiveSession(data.session);
           state.eventSeq++;
+          state.cursor = afterLiveEvent(state.cursor, data);
           processEvent(data.event);
           if (state.autoFit && (firstBatch || state.nodes.size)) _pendingFitView = true;
           scheduleRender();
@@ -221,18 +223,18 @@ export async function poll(force?: boolean) {
   if (clearing || (!force && sseConnected)) return;
   try {
     const sp = currentSessionId ? `&session=${currentSessionId}` : '';
-    const res = await fetch(`/events?offset=${state.offset}${sp}`);
+    const res = await fetch(`/events?offset=${state.cursor.offset}${sp}`);
     const size = parseInt(res.headers.get('X-File-Size') || '0', 10);
     const serverId = res.headers.get('X-Session-Id') || '';
-    const text = await res.text();
-    if (!text.trim()) return;
+    const body = new Uint8Array(await res.arrayBuffer());
+    if (!new TextDecoder().decode(body).trim()) return;
     if (!currentSessionId && state._lastServerId && state._lastServerId !== serverId) {
       clearState(); firstBatch = true;
     }
     if (!currentSessionId && state._lastServerId !== serverId) adoptLiveSession(serverId);
     state._lastServerId = serverId;
-    state.offset = size;
-    const lines = text.trim().split('\n');
+    const { lines, cursor } = catchUp(state.cursor, body, size);
+    state.cursor = cursor;
     for (const line of lines) {
       try { const evt = JSON.parse(line); state.eventSeq++; processEvent(evt); } catch {}
     }
@@ -329,7 +331,7 @@ document.getElementById('sessions-list')!.addEventListener('click', e => {
 
 // ─── Clear / reset ────────────────────────────────────────────────────────
 export function clearState() {
-  state.eventSeq = 0; state.offset = 0; state.nodes.clear();
+  state.eventSeq = 0; state.cursor = START; state.nodes.clear();
   state.selected = null; state.toolsCompleted = 0; state.toolsFailed = 0; state.toolOutcomes.clear();
   state.timelineEntries = []; state.startTimes.clear();
   state._lastServerId = null;

@@ -20,7 +20,7 @@ import { sseClients, broadcastSessionsChanged } from './sse.ts';
 import { tokensMessage } from './tokens.ts';
 import { ensureFirstPrompt } from './transcript.ts';
 import {
-  readAndBroadcast, watchSession, deleteSession,
+  readAndBroadcast, watchSession, deleteSession, readUnread,
 } from './event-reader.ts';
 import { rescanSessions } from './housekeep.ts';
 import { sameOrigin, localHost } from './request-guards.ts';
@@ -257,26 +257,8 @@ async function eventsGetHandler(_req: IncomingMessage, res: ServerResponse, url:
     ? sessionFilePath(sessionParam)
     : latestSession();
 
-  let data = '', size = 0, sessionId = '';
-  if (sessionFile) {
-    sessionId = path.basename(sessionFile, '.jsonl');
-    let fh;
-    try {
-      const stat = await fsp.stat(sessionFile);
-      size = stat.size;
-      if (offset < size) {
-        const len = size - offset;
-        const buf = Buffer.alloc(len);
-        fh = await fsp.open(sessionFile, 'r');
-        await fh.read(buf, 0, len, offset);
-        await fh.close();
-        fh = null;
-        data = buf.toString('utf8');
-      }
-    } catch {
-      if (fh) { try { await fh.close(); } catch {} }
-    }
-  }
+  const { data, size } = sessionFile ? await readUnread(sessionFile, offset) : { data: '', size: 0 };
+  const sessionId = sessionFile ? path.basename(sessionFile, '.jsonl') : '';
   res.writeHead(200, {
     'Content-Type': 'application/x-ndjson',
     'Cache-Control': 'no-cache',
