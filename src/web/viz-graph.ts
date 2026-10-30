@@ -191,6 +191,8 @@ function onSessionStart(evt: HookEvent, sid: string, ts: string) {
 
 function onSubagentStart(evt: HookEvent, sid: string, ts: string) {
   const aid = evt.agent_id || sid;
+  // Un début réécrit ne rouvre pas un sous-agent déjà au graphe : une relance s'annonce autrement.
+  if (state.nodes.get(`a:${aid}`)?.type === 'agent') return;
   const n = getNode(`a:${aid}`);
   n.type = 'agent';
   n.label = agentLabel(evt);
@@ -198,7 +200,8 @@ function onSubagentStart(evt: HookEvent, sid: string, ts: string) {
   n.color = COLORS.agent; n.data = evt; n.status = 'running'; n.startTime = evt.started_at || ts;
   if (evt.tool_input && evt.tool_input.isolation === 'worktree') n.isIsolated = true;
   setRunning(n.id, true);
-  const parent = evt.parent_agent_id ? getNode(`a:${evt.parent_agent_id}`) : ensureSessionParent(sid);
+  const launcher = evt.parent_agent_id ? state.nodes.get(`a:${evt.parent_agent_id}`) : undefined;
+  const parent = launcher || ensureSessionParent(sid);
   if (!n.parentId) { n.parentId = parent.id; parent.children.push(n); }
   recomputeParallelFlags(parent.id);
   addTimelineEntry(evt, n.id, 'agent', n.label, n.sub);
@@ -241,6 +244,9 @@ function onPreToolUse(evt: HookEvent, sid: string, ts: string) {
     parent.type = 'session'; parent.label = parent.label || 'Session'; parent.color = COLORS.session;
   } else if (parent.type !== 'agent') {
     promoteAgentNode(parent, evt, sid, ts);
+  } else if (evt.agent_nickname && parent.sub === (evt.agent_id || '').slice(0, 8)) {
+    // Né d'un début sans surnom (transcript introuvable) : le surnom arrive avec ses outils.
+    parent.sub = evt.agent_nickname;
   }
   if (!n.parentId) { n.parentId = parent.id; parent.children.push(n); }
   addTimelineEntry(evt, n.id, n.type, n.label, n.sub);
