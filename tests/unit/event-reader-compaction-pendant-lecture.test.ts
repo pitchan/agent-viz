@@ -18,7 +18,7 @@ process.env.TMPDIR = BAC;
 
 const { sseClients } = await import('../../src/server/sse.ts');
 const { DIR, sessionIndex, COMPACT_KEEP_EVENTS } = await import('../../src/server/session-index.ts');
-const { readAndBroadcast, resetFileOffset, unwatchSession } = await import('../../src/server/event-reader.ts');
+const { readAndBroadcast, resetFileOffset, unwatchSession, liveHandoffOffset } = await import('../../src/server/event-reader.ts');
 const { compactSession } = await import('../../src/server/housekeep.ts');
 
 const suivis: string[] = [];
@@ -139,4 +139,41 @@ test('une lecture qui mesure le fichier tout juste compacte diffuse ce qui resta
 
   // Assert
   expect(finsRecues(recus, 'avant-mesure'), 'l’événement non lu attend une écriture suivante').toBe(1);
+});
+
+// La lecture mesure la taille, puis le fichier cesse d'être suivi avant qu'elle reprenne.
+function mesurePuisAbandon(fp: string) {
+  return async (p: string) => {
+    const mesure = await fs.promises.stat(p);
+    unwatchSession(fp);
+    return mesure;
+  };
+}
+
+const outilsRecus = (recus: any[]) =>
+  recus.filter(m => m.type === 'event' && m.event.hook_event_name === 'PreToolUse').length;
+
+test('une lecture dont le fichier cesse d etre suivi ne rediffuse rien', async () => {
+  // Arrange
+  const fp = sessionLue('abandon-pendant-lecture');
+  fs.appendFileSync(fp, fin('abandon'));
+  const recus = ecouterSSE();
+
+  // Act
+  await readAndBroadcast(fp, mesurePuisAbandon(fp));
+
+  // Assert
+  expect(outilsRecus(recus), 'le fichier déjà lu a été rediffusé').toBe(0);
+});
+
+test('une lecture dont le fichier cesse d etre suivi ne lui repose pas de curseur', async () => {
+  // Arrange
+  const fp = sessionLue('abandon-sans-curseur');
+  fs.appendFileSync(fp, fin('abandon'));
+
+  // Act
+  await readAndBroadcast(fp, mesurePuisAbandon(fp));
+
+  // Assert
+  expect(liveHandoffOffset(fp), 'un curseur a été reposé sur un fichier que plus personne ne suit').toBeNull();
 });
