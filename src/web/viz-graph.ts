@@ -255,6 +255,10 @@ function settleAgentFromAgentToolResponse(evt: HookEvent, ts: string, terminalSt
   const aid = evt.tool_response && evt.tool_response.agentId;
   const an = aid ? state.nodes.get(`a:${aid}`) : null;
   if (!an || an.status !== 'running') return;
+  // Le noeud est né au premier outil du sous-agent : le lancement de l'outil Agent, connu
+  // seulement maintenant qu'il nomme son sous-agent, est son vrai début.
+  const launcher = state.nodes.get(`t:${evt.tool_use_id}`);
+  if (launcher) an.startTime = launcher.startTime;
   an.status = terminalStatus;
   an.endTime = ts;
   an.duration = calcDuration(an.startTime, ts);
