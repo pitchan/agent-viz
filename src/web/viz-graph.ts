@@ -103,7 +103,7 @@ function promoteAgentNode(n: VizNode, evt: HookEvent, sid: string, ts: string) {
   setRunning(n.id, true);
   if (!n.parentId) {
     const aid = (evt.agent_id || n.id.slice(2));
-    const forkedParentAid = state.forkedAgentParents.get(aid);
+    const forkedParentAid = evt.parent_agent_id || state.forkedAgentParents.get(aid);
     const forkedParent = forkedParentAid ? state.nodes.get(`a:${forkedParentAid}`) : null;
     let parent;
     if (forkedParent) {
@@ -137,6 +137,15 @@ function reparentNode(n: VizNode, newParentId: string) {
   if (oldParent) recomputeParallelFlags(oldParent.id);
   recomputeParallelFlags(newParent.id);
   markLayoutDirty(n);
+}
+
+// Un sous-agent lancé par un sous-agent (outil Agent, ou Skill en fork) ne se dit qu'au retour
+// de l'outil, après son premier PreToolUse : il quitte alors la session pour son lanceur, et
+// ses événements suivants l'y retrouvent.
+function adoptSubagent(childAid: string, parentAid: string) {
+  state.forkedAgentParents.set(childAid, parentAid);
+  const childNode = state.nodes.get(`a:${childAid}`);
+  if (childNode) reparentNode(childNode, `a:${parentAid}`);
 }
 
 // On SessionEnd, close every descendant that was still running so particle
@@ -284,19 +293,10 @@ function onPostToolUse(evt: HookEvent, sid: string, ts: string) {
   }
   countToolEnd(tid, 'done');
   settleAgentFromAgentToolResponse(evt, ts, 'done');
-  // Skill fork → record the parent mapping and reparent the forked sub-agent
-  // under its launching agent. The child's first PreToolUse arrives before
-  // this PostToolUse, so the child is initially attached to the session by
-  // promoteAgentNode and must be moved retroactively here.
-  if (evt.tool_name === 'Skill' && evt.tool_response
-      && evt.tool_response.status === 'forked' && evt.tool_response.agentId
-      && evt.agent_id) {
-    const childAid = evt.tool_response.agentId;
-    const parentAid = evt.agent_id;
-    state.forkedAgentParents.set(childAid, parentAid);
-    const childNode = state.nodes.get(`a:${childAid}`);
-    if (childNode) reparentNode(childNode, `a:${parentAid}`);
-  }
+  const childAid = evt.tool_response && evt.tool_response.agentId;
+  const launched = evt.tool_name === 'Agent'
+    || (evt.tool_name === 'Skill' && evt.tool_response && evt.tool_response.status === 'forked');
+  if (evt.agent_id && childAid && launched) adoptSubagent(childAid, evt.agent_id);
   // EN DERNIER, comme recordError dans le pendant echec : l'abonne repeint de
   // facon synchrone, il doit lire des noeuds deja a jour. C'est le fait de
   // continuite de la pastille — combien d'outils ont reussi depuis un echec.

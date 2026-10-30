@@ -5,6 +5,7 @@
 // stateless helpers are also exported.
 
 import { countOrZero } from '../engine/core/usage.ts';
+import { START } from './viz-event-cursor.ts';
 
 // ─── Palette ──────────────────────────────────────────────────────────────
 export const COLORS = {
@@ -132,7 +133,7 @@ export interface TimelineEntry {
 
 // ─── App state ────────────────────────────────────────────────────────────
 export const state = {
-  eventSeq: 0, offset: 0, nodes: new Map<string, VizNode>(), selected: null as string | null,
+  eventSeq: 0, cursor: START, nodes: new Map<string, VizNode>(), selected: null as string | null,
   // Appels d'outil terminés, réussis ou non, dont `toolsFailed` en échec. `toolOutcomes`
   // garde l'issue de chaque appel : une fin reçue deux fois ne compte qu'une fois.
   toolsCompleted: 0, toolsFailed: 0, toolOutcomes: new Map<string, 'done' | 'error'>(),
@@ -150,10 +151,9 @@ export const state = {
     tokensSupported: null as boolean | null,
     transcriptMissing: false,
   },
-  // Map<forkedChildAgentId, parentAgentId>. Filled by PostToolUse(Skill) events
-  // with tool_response.status === 'forked'. Used to attach forked sub-agents
-  // under their launching agent instead of the session root — the forked
-  // child's own PreToolUse events carry no parent_agent_id.
+  // Sous-agent → sous-agent qui l'a lancé, appris au retour de l'outil qui l'a lancé (Agent, ou
+  // Skill en fork) quand ses propres événements ne portent pas de parent_agent_id ; ses
+  // événements suivants le rangent sous son lanceur plutôt que sous la session.
   forkedAgentParents: new Map<string, string>(),
 };
 
