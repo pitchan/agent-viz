@@ -45,7 +45,7 @@ agent-viz
 |---|:---:|:---:|:---:|:---:|
 | **Live view** | | | | |
 | Tool calls as they happen | ✅ | ✅ | ✅ | ✅ |
-| A failed tool shown as an error | ✅ | ❌ ¹ | ⚠️ ² | ⚠️ ⁷ |
+| A failed tool shown as an error | ✅ | ⚠️ ¹ | ⚠️ ² | ⚠️ ⁷ |
 | Subagents in the topology | ✅ | 🚧 | ❌ | ⚠️ ¹⁰ |
 | Tokens | ✅ | ❌ ³ | ⚠️ ⁴ | ⚠️ ⁸ |
 | Cost | ✅ | ❌ | ⚠️ ⁵ | ⚠️ ⁹ |
@@ -53,14 +53,14 @@ agent-viz
 | **Live alerts** | | | | |
 | Loop | ✅ | ✅ | ✅ | ✅ |
 | Stuck | ✅ | 🚧 | ✅ | ✅ |
-| Retry storm | ✅ | ❌ ¹ | ⚠️ ² | ⚠️ ⁷ |
-| Bad invocation | ✅ | ❌ ¹ | 🚧 | ⚠️ ⁷ |
+| Retry storm | ✅ | 🚧 ¹ | ⚠️ ² | ⚠️ ⁷ |
+| Bad invocation | ✅ | 🚧 ¹ | 🚧 | ⚠️ ⁷ |
 | **Observatory** | | | | |
 | Advice, analysed sessions, tokens & prices, skills | ✅ | ❌ | ❌ | ❌ |
 
 ✅ works · ⚠️ works with a limit · ❌ not available · 🚧 not reliable yet: do not count on it for that agent
 
-1. Copilot CLI sends no tool-failure event.
+1. Counted in the header and listed in the error register, from the tool-failure event Copilot CLI documents; not yet checked on a real Copilot session. Copilot sends no call identifier, so the failed tool's node in the graph does not turn red.
 2. Known once the model call ends, not when the tool ends.
 3. Copilot CLI does not expose token usage.
 4. One model call behind during a turn, exact once it ends.
@@ -358,7 +358,7 @@ If you reinstall agent-viz to a different path later (e.g. moved your dev clone)
 
 ## Captured events
 
-`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure` (Claude Code only), `Stop`, `SessionStart`. Antigravity and Codex send no such event: for them, agent-viz writes `PostToolUseFailure` itself, from the tool result the agent reports or from its session transcript. Events land as JSONL in `${tmpdir}/agent-events/<session_id>.jsonl` and are streamed to the dashboard via Server-Sent Events. Each event carries a `_source: "claude" | "copilot" | "antigravity" | "codex"` field set by the hook command's `--source` flag.
+`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `Stop`, `SessionStart`. Antigravity and Codex send no such event: for them, agent-viz writes `PostToolUseFailure` itself, from the tool result the agent reports or from its session transcript. Events land as JSONL in `${tmpdir}/agent-events/<session_id>.jsonl` and are streamed to the dashboard via Server-Sent Events. Each event carries a `_source: "claude" | "copilot" | "antigravity" | "codex"` field set by the hook command's `--source` flag.
 
 ## Configuration
 
