@@ -94,13 +94,19 @@ function liveHandoffOffset(fp: string): number | null {
 }
 
 // Read new bytes from a session file and broadcast via SSE.
-async function readAndBroadcast(filePath: string): Promise<void> {
+// `stat` is injected so a test can make the compaction run between the size
+// measurement and the cursor update.
+async function readAndBroadcast(
+  filePath: string,
+  stat: (p: string) => Promise<{ size: number }> = p => fsp.stat(p),
+): Promise<void> {
   if (readInFlight.has(filePath)) { readPending.add(filePath); return; }
   readInFlight.add(filePath);
   let fh;
   try {
-    const newStat = await fsp.stat(filePath);
-    const offset = fileOffsets.get(filePath) || 0;
+    const cursor = fileOffsets.get(filePath);
+    const offset = cursor || 0;
+    const newStat = await stat(filePath);
     if (newStat.size <= offset) return;
     const len = newStat.size - offset;
     const buf = Buffer.alloc(len);
@@ -108,6 +114,13 @@ async function readAndBroadcast(filePath: string): Promise<void> {
     await fh.read(buf, 0, len, offset);
     await fh.close();
     fh = null;
+    // A compaction that ran during the awaits moved the cursor: these bytes come from
+    // a layout that no longer exists, and the new cursor still counts them as unread.
+    // An unwatch dropped it: nobody follows the file any more.
+    if (fileOffsets.get(filePath) !== cursor) {
+      if (fileOffsets.has(filePath)) readPending.add(filePath);
+      return;
+    }
     fileOffsets.set(filePath, newStat.size);
     const text = buf.toString('utf8');
     // Count newlines so we can update the in-memory index cheaply.
