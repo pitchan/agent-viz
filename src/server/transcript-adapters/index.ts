@@ -23,6 +23,7 @@ function isAdapterKey(key: string): key is keyof typeof TRANSCRIPT_ADAPTERS {
 const UNKNOWN_SOURCE: TranscriptAdapter = {
   tokensSupported: false,
   discoverPath: () => null,
+  subagentTranscript: () => null,
   extractPrompt: () => null,
   parseUsageLine: () => false,
   usageSnapshot: null,

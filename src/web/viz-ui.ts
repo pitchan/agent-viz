@@ -30,7 +30,7 @@ import {
 import {
   alertActorLine, alertDetailLines, notificationPayload, truncate,
 } from './viz-alert-format.ts';
-import { watchdogPresentation, errorsPresentation } from './viz-topbar-status.ts';
+import { watchdogPresentation, errorsPresentation, toolsPresentation } from './viz-topbar-status.ts';
 import { budgetPresentation } from './viz-budget-format.ts';
 import { errorRow, errorsPanelTitle } from './viz-error-format.ts';
 import { getErrors, getErrorsSummary, onErrorsChanged } from './viz-errors.ts';
@@ -325,6 +325,9 @@ export function updateStats() {
     if (n.status === 'running') running++;
   }
   document.getElementById('stat-tools')!.textContent = String(state.toolsCompleted);
+  const { failedText } = toolsPresentation(state.toolsFailed);
+  document.getElementById('stat-tools-failed-part')!.hidden = failedText === null;
+  document.getElementById('stat-tools-failed')!.textContent = failedText ?? '';
   document.getElementById('stat-agents')!.textContent = String(agents);
 
   const runEl = document.getElementById('stat-running')!;

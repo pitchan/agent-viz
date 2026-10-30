@@ -15,6 +15,7 @@ import { markNarratorDirty } from './viz-narrator.ts';
 import { toolSubject, type ToolCallEvent, type ToolInput } from '../engine/core/tool-subject.ts';
 import { formatDuration } from './viz-duration.ts';
 import { recordError, recordSuccess } from './viz-errors.ts';
+import { recomputeParallelFlags } from './viz-parallel.ts';
 
 // L'evenement hook tel que ce module le lit : les champs de ToolCallEvent
 // (moteur, deja type) plus ceux que la carte du graphe consomme. Tous
@@ -136,19 +137,6 @@ function reparentNode(n: VizNode, newParentId: string) {
   markLayoutDirty(n);
 }
 
-// Mark all running agents under this session as parallel if 2+ run at once.
-// Sticky: once flagged, an agent keeps isParallel=true for the rest of its life.
-export function recomputeParallelFlags(sessionId: string) {
-  const session = state.nodes.get(sessionId);
-  if (!session) return;
-  const runningAgents = session.children.filter(c =>
-    c.type === 'agent' && c.status === 'running'
-  );
-  if (runningAgents.length >= 2) {
-    for (const a of runningAgents) a.isParallel = true;
-  }
-}
-
 // On SessionEnd, close every descendant that was still running so particle
 // generation (which iterates vis.runningNodes) stops immediately.
 export function cascadeTerminate(rootNodeId: string, ts: string) {
@@ -268,15 +256,31 @@ function settleAgentFromAgentToolResponse(evt: HookEvent, ts: string, terminalSt
   if (an.parentId) recomputeParallelFlags(an.parentId);
 }
 
+// L'échec l'emporte : Antigravity annonce la fin d'un outil, puis son échec lu plus tard
+// dans le transcript ; une fin qui suit un échec ne le rouvre pas. Sans identifiant,
+// rien ne relie deux fins : chacune est un appel distinct.
+function countToolEnd(tid: string, outcome: 'done' | 'error') {
+  if (tid === '') {
+    state.toolsCompleted++;
+    if (outcome === 'error') state.toolsFailed++;
+    return;
+  }
+  const prev = state.toolOutcomes.get(tid);
+  if (prev === 'error' || prev === outcome) return;
+  if (prev === undefined) state.toolsCompleted++;
+  if (outcome === 'error') state.toolsFailed++;
+  state.toolOutcomes.set(tid, outcome);
+}
+
 function onPostToolUse(evt: HookEvent, sid: string, ts: string) {
   const tid = evt.tool_use_id || '';
   const n = state.nodes.get(`t:${tid}`);
   if (n) {
     n.status = 'done'; n.data = evt; n.endTime = ts;
     n.duration = calcDuration(n.startTime, ts);
-    state.toolsCompleted++;
     setRunning(n.id, false);
   }
+  countToolEnd(tid, 'done');
   settleAgentFromAgentToolResponse(evt, ts, 'done');
   // Skill fork → record the parent mapping and reparent the forked sub-agent
   // under its launching agent. The child's first PreToolUse arrives before
@@ -306,6 +310,7 @@ function onPostToolUseFailure(evt: HookEvent, sid: string, ts: string) {
     setRunning(n.id, false);
   }
   settleAgentFromAgentToolResponse(evt, ts, 'error');
+  countToolEnd(tid, 'error');
   // HORS du `if (n)` : un echec dont le noeud manque (PreToolUse non recu, noeud deja
   // ramasse) se compte aussi. Et EN DERNIER : l'abonne de `recordError`, synchrone, repeint
   // le flux d'apres le STATUT des noeuds, qui doit deja porter la mutation ci-dessus.

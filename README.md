@@ -67,7 +67,7 @@ agent-viz
 5. Cost is an estimate from Google's public API prices, not what your Antigravity plan bills.
 6. Antigravity sends no session-start event.
 7. Shell commands only. Codex sends no tool-failure event, so the failure is read from the session transcript, which older Codex builds do not fill in. A command that never starts turns red at the next Codex event.
-8. No figure for a forked thread, nor for a session written by an older Codex. A subagent's tokens are not counted.
+8. No figure for a forked thread, nor for a session written by an older Codex. A subagent's tokens are counted from its first tool call.
 9. What the session would cost at OpenAI's API rates. A ChatGPT plan is billed differently, and codex-auto-review has no published price.
 10. A subagent appears at its first tool call, not when it is spawned. Its end time is read from the parent's transcript, which older Codex builds do not fill in.
 
@@ -241,7 +241,8 @@ Known limits:
 - A subagent is drawn under its session, named after its task (`/root/child` shows as `child`) with the nickname Codex gives its thread. It appears at its first tool call, not when it is spawned.
 - A subagent's start and end times are read from the transcript of the thread that spawned it. Older Codex builds do not write the end there: the subagent is then closed when its parent's turn ends, and its duration runs from its first tool call to that moment. Seen on 0.162.0-alpha.2, not on 0.148.0-alpha.9.
 - A subagent that receives a follow-up task after it finished is shown as finished while it works again. Once it finishes again, its duration is that of this latest run.
-- The tokens a subagent uses are not counted in the session total.
+- Each subagent's tokens are read from its own transcript and added to the session total, as for a Claude Code subagent. They show up at the subagent's first tool call: a subagent that calls no tool is not counted. The server finds them in the session's event file: past 500 KB that file keeps only its last 100 events, and a server restart then loses the tokens of a subagent none of whose events are left in it.
+- A subagent that starts with a copy of its parent's history counts only its own lines. A subagent transcript rewritten by a newer Codex holds nothing but that copy: its tokens are not shown. Seen on 0.147 and 0.148 transcripts. A subagent copied from another thread without saying where the copy ends is not counted; the rest of the session still is.
 
 ## Hook management
 
