@@ -143,12 +143,19 @@ function spawnForeground(port: number): Promise<number> {
   });
 }
 
+// Les délais d'attente ne servent qu'aux tests : la CLI garde les valeurs par
+// défaut, les tests passent des délais courts pour ne pas attendre plusieurs secondes.
 interface StartOptions extends PortOptions {
   foreground?: boolean;
+  startupTimeoutMs?: number;
+}
+
+interface StopOptions extends PortOptions {
+  shutdownTimeoutMs?: number;
 }
 
 // Idempotent start. Resolves with { alreadyRunning, pid, port }.
-async function start({ port = DEFAULT_PORT, foreground = false }: StartOptions = {}) {
+async function start({ port = DEFAULT_PORT, foreground = false, startupTimeoutMs = 3000 }: StartOptions = {}) {
   // 1. Check existing instance via PID file.
   const existing = await status({ port });
   if (existing.running) {
@@ -166,8 +173,7 @@ async function start({ port = DEFAULT_PORT, foreground = false }: StartOptions =
   }
 
   const pid = await spawnDetached(port);
-  // Poll for readiness up to 3 s.
-  const deadline = Date.now() + 3000;
+  const deadline = Date.now() + startupTimeoutMs;
   while (Date.now() < deadline) {
     if (await probe(port, 200)) {
       writePidFile(pid, port);
@@ -182,7 +188,7 @@ async function start({ port = DEFAULT_PORT, foreground = false }: StartOptions =
     const logContent = fs.readFileSync(LOG_FILE, 'utf8');
     tail = logContent.split('\n').slice(-20).join('\n');
   } catch {}
-  const why = isPidAlive(pid) ? 'did not answer within 3s' : 'exited during startup';
+  const why = isPidAlive(pid) ? `did not answer within ${startupTimeoutMs / 1000}s` : 'exited during startup';
   throw new Error(`agent-viz ${why} (pid ${pid}, port ${port}).\nLog tail:\n${tail}`);
 }
 
@@ -193,7 +199,7 @@ type StopResult =
 // stop ne signale jamais un pid : le démon ne retire pas son fichier de pid en
 // mourant et Windows réattribue un pid en quelques secondes, donc le pid du
 // fichier peut désigner n'importe quel processus. La preuve d'arrêt est le port.
-async function stop({ port = DEFAULT_PORT }: PortOptions = {}): Promise<StopResult> {
+async function stop({ port = DEFAULT_PORT, shutdownTimeoutMs = 2000 }: StopOptions = {}): Promise<StopResult> {
   const rec = readPidFile();
   // Le fichier de pid dit où le démon écoute réellement : il l'emporte sur le
   // port demandé.
@@ -204,8 +210,8 @@ async function stop({ port = DEFAULT_PORT }: PortOptions = {}): Promise<StopResu
   }
   // La réponse au POST ne prouve rien (un serveur étranger répond 200 aussi) :
   // seul le port qui se tait compte.
-  await postShutdown(cible, 2000);
-  const deadline = Date.now() + 2000;
+  await postShutdown(cible, shutdownTimeoutMs);
+  const deadline = Date.now() + shutdownTimeoutMs;
   while (Date.now() < deadline) {
     if (!(await probe(cible, 200))) {
       removePidFile();
