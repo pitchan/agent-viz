@@ -89,10 +89,9 @@ function agentLabel(evt: HookEvent): string {
   return evt.agent_name || evt.agent_type || evt.subagent_type || 'Agent';
 }
 
-// Lazy-promote a node created by getNode('a:<aid>') with default type='tool'
-// into a real agent node. Claude Code does not emit SubagentStart hooks today,
-// so the first child PreToolUse carrying agent_id is our spawn signal.
-// Child events also carry agent_type, so we have a real label immediately.
+// Le premier outil d'un sous-agent le fait naître : agent-viz n'installe pas le hook SubagentStart,
+// qui ne porte d'ailleurs pas d'heure. Faute d'autre lien plus tôt, son début n'est corrigé
+// qu'au retour de l'outil Agent qui le nomme.
 function promoteAgentNode(n: VizNode, evt: HookEvent, sid: string, ts: string) {
   n.type = 'agent';
   n.label = agentLabel(evt);

@@ -33,11 +33,12 @@ const CLAUDE: HookEvent[] = [
 
 test('Claude Code : le sous-agent dure autant que l\'outil Agent de la session qui l\'a lancé', () => {
   // Arrange
-  rejouer(CLAUDE);
+  const evenements = CLAUDE;
   // Act
+  rejouer(evenements);
+  // Assert
   const enfant = state.nodes.get(`a:${ENFANT}`)!;
   const outil = state.nodes.get('t:toolu_racine')!;
-  // Assert
   expect(enfant.startTime).toBe('2026-10-29T22:37:47.153Z');
   expect(enfant.duration).toBe(outil.duration);
   expect(enfant.duration).toBe('8.1s');
@@ -45,11 +46,12 @@ test('Claude Code : le sous-agent dure autant que l\'outil Agent de la session q
 
 test('Claude Code : le petit-fils dure autant que l\'outil Agent du sous-agent qui l\'a lancé', () => {
   // Arrange
-  rejouer(CLAUDE);
+  const evenements = CLAUDE;
   // Act
+  rejouer(evenements);
+  // Assert
   const petitFils = state.nodes.get(`a:${PETIT_FILS}`)!;
   const outil = state.nodes.get('t:toolu_enfant')!;
-  // Assert
   expect(petitFils.startTime).toBe('2026-10-29T22:37:50.231Z');
   expect(petitFils.duration).toBe(outil.duration);
   expect(petitFils.duration).toBe('3.7s');
