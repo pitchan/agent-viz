@@ -29,17 +29,15 @@ test('le README « Captured events » nomme exactement les événements du hook 
   expect(nommes, texte).toEqual(attendus);
 });
 
-test('le README marque « Claude Code only » chaque événement que Copilot ne capture pas', () => {
+test('le README marque « Claude Code only » exactement les événements que Copilot ne capture pas', () => {
   // Arrange
   const copilot = new Set(AGENT_CONFIG.copilot.events);
-  const propresAClaude = AGENT_CONFIG.claude.events.filter(ev => !copilot.has(ev));
+  const attendus = AGENT_CONFIG.claude.events.filter(ev => !copilot.has(ev)).sort();
   // Act
   const texte = section(readme(), 'Captured events');
+  const marques = [...texte.matchAll(/`([A-Za-z]+)` \(Claude Code only\)/g)].map(m => m[1]).sort();
   // Assert
-  expect(propresAClaude.length > 0, 'aucun événement propre à Claude Code : le test ne vérifie plus rien').toBeTruthy();
-  for (const ev of propresAClaude) {
-    expect(texte.includes(`\`${ev}\` (Claude Code only)`), `« \`${ev}\` (Claude Code only) » attendu :\n${texte}`).toBeTruthy();
-  }
+  expect(marques, texte).toEqual(attendus);
 });
 
 test('le README « Hook management » annonce le nombre de copies que garde le module', () => {
