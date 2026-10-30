@@ -18,7 +18,7 @@ process.env.TMPDIR = BAC;
 
 const { sseClients } = await import('../../src/server/sse.ts');
 const { DIR, sessionIndex, COMPACT_KEEP_EVENTS } = await import('../../src/server/session-index.ts');
-const { readAndBroadcast, resetFileOffset, unwatchSession, liveHandoffOffset } = await import('../../src/server/event-reader.ts');
+const { readAndBroadcast, readUnread, resetFileOffset, unwatchSession, liveHandoffOffset } = await import('../../src/server/event-reader.ts');
 const { compactSession } = await import('../../src/server/housekeep.ts');
 
 const suivis: string[] = [];
@@ -176,4 +176,30 @@ test('une lecture dont le fichier cesse d etre suivi ne lui repose pas de curseu
 
   // Assert
   expect(liveHandoffOffset(fp), 'un curseur a été reposé sur un fichier que plus personne ne suit').toBeNull();
+});
+
+// La lecture lit ses octets, puis la compaction réécrit le fichier avant qu'elle reprenne.
+function lecturePuisCompaction(fp: string) {
+  return async (p: string, buf: Buffer, offset: number) => {
+    const fh = await fs.promises.open(p, 'r');
+    const { bytesRead } = await fh.read(buf, 0, buf.length, offset);
+    await fh.close();
+    await compactSession(fp);
+    return bytesRead;
+  };
+}
+
+test('un evenement lu pendant une compaction donne a la page un curseur qui tient dans le fichier compacte', async () => {
+  // Arrange
+  const fp = sessionLue('compaction-pendant-octets');
+  fs.appendFileSync(fp, fin('paire'));
+  const recus = ecouterSSE();
+
+  // Act
+  await readAndBroadcast(fp, undefined, lecturePuisCompaction(fp));
+
+  // Assert
+  const m = recus.find(r => r.type === 'event' && r.event.agent_id === 'paire');
+  const reprise = await readUnread(fp, m.offset, m.layout);
+  expect([m.offset, reprise.data], 'la page reprendrait ailleurs qu’après l’événement').toEqual([fs.statSync(fp).size, '']);
 });
