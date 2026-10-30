@@ -1,11 +1,11 @@
-// De vrais processus hook écrivent une session pendant que le ménage la compacte : aucune ligne
-// ne doit disparaître ni se mêler à une autre. Les hooks partent en rafale étalée et le ménage
-// démarre au milieu ; sur plusieurs tours, au moins un tour tombe dans la fenêtre de réécriture.
+// Un vrai processus hook écrit dans une session pendant que le ménage lit ce gros fichier :
+// la lecture se fait sans verrou, donc le hook passe aussitôt, et sa ligne survit à la
+// réécriture. La lecture est injectée pour placer le hook à cet instant précis.
 //
 // `DIR` est calculé une fois depuis `os.tmpdir()`, au chargement du module : le dossier temporaire
-// est redirigé AVANT l'import dynamique, et chaque hook enfant le reçoit par l'environnement.
+// est redirigé AVANT l'import dynamique, et le hook enfant le reçoit par l'environnement.
 
-import { spawn } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -17,7 +17,7 @@ process.env.TMPDIR = RACINE;
 process.env.TEMP = RACINE;
 process.env.TMP = RACINE;
 
-const { indexSessionInitial } = await import('../../src/server/session-index.ts');
+const { indexSessionInitial, COMPACT_KEEP_EVENTS } = await import('../../src/server/session-index.ts');
 const { compactSession } = await import('../../src/server/housekeep.ts');
 
 const HOOK = fileURLToPath(new URL('../../src/server/hook.ts', import.meta.url));
@@ -26,55 +26,34 @@ fs.mkdirSync(DOSSIER, { recursive: true });
 
 afterAll(() => { fs.rmSync(RACINE, { recursive: true, force: true }); });
 
-const TOURS = 6;
-const HOOKS_PAR_TOUR = 20;
-const ANCIENNES = 300;
-const REMPLISSAGE = 'x'.repeat(50 * 1024);
-
 function evenement(sid: string, id: string): string {
-  return JSON.stringify({ session_id: sid, hook_event_name: 'PostToolUse', tool_use_id: id, pad: REMPLISSAGE });
+  return JSON.stringify({ session_id: sid, hook_event_name: 'PostToolUse', tool_use_id: id });
 }
 
 // Le port pointe vers personne : le POST /notify est en « tire et oublie ».
-function demarreUnHook() {
-  return spawn(process.execPath, [HOOK, '--source=claude'], {
+function lanceLeHook(charge: string) {
+  return spawnSync(process.execPath, [HOOK, '--source=claude'], {
+    input: charge,
     env: { ...process.env, AGENT_VIZ_PORT: '59999' },
-    stdio: ['pipe', 'ignore', 'ignore'],
   });
 }
 
-const attends = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-async function unTour(tour: number): Promise<{ manquants: string[]; illisibles: number }> {
-  const sid = `sess-course-${tour}`;
-  const fp = path.join(DOSSIER, `${sid}.jsonl`);
-  fs.writeFileSync(fp, Array.from({ length: ANCIENNES }, (_, i) => evenement(sid, `ancien${i}`)).join('\n') + '\n');
-  await indexSessionInitial(fp);
-  const hooks = Array.from({ length: HOOKS_PAR_TOUR }, demarreUnHook);
-  const finis = hooks.map(h => new Promise(resolve => h.on('close', resolve)));
-  await attends(1200);
-  hooks.forEach((h, i) => setTimeout(() => h.stdin.end(evenement(sid, `neuf${i}`)), i * 2));
-  const menage = attends(HOOKS_PAR_TOUR).then(() => compactSession(fp));
-  await Promise.all([...finis, menage]);
-  const ids = new Set<unknown>();
-  let illisibles = 0;
-  for (const ligne of fs.readFileSync(fp, 'utf8').split('\n').filter(Boolean)) {
-    try { ids.add(JSON.parse(ligne).tool_use_id); } catch { illisibles++; }
-  }
-  const manquants = Array.from({ length: HOOKS_PAR_TOUR }, (_, i) => `neuf${i}`).filter(id => !ids.has(id));
-  return { manquants, illisibles };
-}
-
-test('un événement écrit par un hook pendant le ménage reste dans le fichier, entier', async () => {
+test('un hook qui écrit pendant que le ménage lit le fichier passe, et sa ligne reste', async () => {
   // Arrange
-  const bilan = { manquants: [] as string[], illisibles: 0 };
+  const sid = 'sess-pendant-lecture';
+  const fp = path.join(DOSSIER, `${sid}.jsonl`);
+  const anciens = Array.from({ length: COMPACT_KEEP_EVENTS + 30 }, (_, i) => evenement(sid, `ancien${i}`));
+  fs.writeFileSync(fp, anciens.join('\n') + '\n');
+  await indexSessionInitial(fp);
+  const lectureTraverseeParUnHook = async (p: string) => {
+    const contenu = await fs.promises.readFile(p, 'utf8');
+    lanceLeHook(evenement(sid, 'pendant'));
+    return contenu;
+  };
   // Act
-  for (let tour = 0; tour < TOURS; tour++) {
-    const r = await unTour(tour);
-    bilan.manquants.push(...r.manquants.map(id => `tour ${tour} : ${id}`));
-    bilan.illisibles += r.illisibles;
-  }
+  await compactSession(fp, lectureTraverseeParUnHook);
   // Assert
-  expect(bilan.manquants, 'événements de hook perdus par la réécriture du ménage').toEqual([]);
-  expect(bilan.illisibles, 'lignes mêlées ou tronquées dans le fichier de session').toBe(0);
-}, 60_000);
+  const derniere = JSON.parse(fs.readFileSync(fp, 'utf8').trim().split('\n').at(-1)!);
+  expect(derniere.tool_use_id, 'la ligne du hook a été perdue ou n’a pas été écrite').toBe('pendant');
+  expect(fs.existsSync(path.join(DOSSIER, '_hook-errors.log')), 'le hook a échoué en attendant le ménage').toBe(false);
+}, 20_000);

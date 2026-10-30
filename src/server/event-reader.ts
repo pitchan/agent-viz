@@ -22,6 +22,7 @@ import {
   ensureFirstPrompt, ensureTranscriptWatcher, closeTranscriptResources,
 } from './transcript.ts';
 import { getWatchdogService } from './watchdog/index.ts';
+import { lockPath } from './session-lock.ts';
 
 // Un objet exploitable par accès de champ — même garde locale que
 // session-index.ts et les autres fichiers du serveur : `decodeJsonlLine` ne
@@ -260,6 +261,14 @@ async function deleteSession(fp: string): Promise<void> {
     if (!(err instanceof Error && 'code' in err && err.code === 'ENOENT')) {
       const message = err instanceof Error ? err.message : String(err);
       console.error(`[event-reader] unlink ${fp} failed: ${message}`);
+    }
+  }
+  // Le verrou d'une session supprimée ne garde plus rien.
+  try { await fsp.unlink(lockPath(fp)); }
+  catch (err: unknown) {
+    if (!(err instanceof Error && 'code' in err && err.code === 'ENOENT')) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`[event-reader] unlink lock failed: ${message}`);
     }
   }
   // Also remove companion summary if it exists.
