@@ -330,7 +330,7 @@ document.getElementById('sessions-list')!.addEventListener('click', e => {
 // ─── Clear / reset ────────────────────────────────────────────────────────
 export function clearState() {
   state.eventSeq = 0; state.offset = 0; state.nodes.clear();
-  state.selected = null; state.toolsCompleted = 0;
+  state.selected = null; state.toolsCompleted = 0; state.toolsFailed = 0; state.toolOutcomes.clear();
   state.timelineEntries = []; state.startTimes.clear();
   state._lastServerId = null;
   state.tokens.main = null;
