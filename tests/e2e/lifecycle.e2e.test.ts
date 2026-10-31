@@ -85,9 +85,9 @@ async function demonFactice(port: number) {
   return { requetes, ferme };
 }
 
-// PID_FILE et LOG_FILE se calculent au chargement depuis os.tmpdir() : le
-// dossier temporaire est redirigé le temps de l'import, pour que chaque copie
-// ait les siens.
+// Chaque copie reçoit son propre dossier pour le fichier de pid et le journal :
+// aucune variable d'environnement n'est touchée, un test encore en cours ne
+// déplace pas les fichiers du suivant.
 async function chargeLifecycle(
   { portParDefaut, serveur = SERVEUR_QUI_SORT }: { portParDefaut: number; serveur?: string },
 ) {
@@ -100,17 +100,8 @@ async function chargeLifecycle(
   fs.writeFileSync(path.join(dossier, 'server.js'), serveur);
   const tmp = path.join(dossier, 'tmp');
   fs.mkdirSync(tmp);
-  const avant = { TEMP: process.env.TEMP, TMP: process.env.TMP, TMPDIR: process.env.TMPDIR };
-  Object.assign(process.env, { TEMP: tmp, TMP: tmp, TMPDIR: tmp });
-  let lifecycle;
-  try {
-    lifecycle = await import(pathToFileURL(path.join(dossier, 'lifecycle.ts')).href);
-  } finally {
-    for (const [cle, valeur] of Object.entries(avant)) {
-      if (valeur === undefined) delete process.env[cle];
-      else process.env[cle] = valeur;
-    }
-  }
+  const module = await import(pathToFileURL(path.join(dossier, 'lifecycle.ts')).href);
+  const lifecycle = module.creerLifecycle(tmp);
   if (path.dirname(lifecycle.PID_FILE) !== tmp) throw new Error(`PID_FILE hors du dossier du test : ${lifecycle.PID_FILE}`);
   return { lifecycle, dossier };
 }
