@@ -18,6 +18,7 @@ import { sessionStart } from './hook-antigravity-session-start.ts';
 import { codexEvents } from './hook-codex-verdicts.ts';
 import { agentIdentity, parentAgent, subagentStarts, subagentStops } from './hook-codex-subagents.ts';
 import { codexChildTranscript } from './codex-child-transcript.ts';
+import { copilotToolIds } from './hook-copilot-tool-ids.ts';
 import { validSessionId } from './session-id.ts';
 import { SessionLockError, withSessionLockSync } from './session-lock.ts';
 
@@ -112,6 +113,17 @@ const REPLACERS: Record<HookSource, Replacer | null> = {
   codex: codexFromTranscript,
 };
 
+// Un événement complété d'après ce que le fichier de sa session porte déjà. Lu et écrit sous le
+// même verrou : deux hooks simultanés de la session ne liraient pas le même état.
+type Pairer = (evt: Payload, eventsText: string) => Payload;
+
+const PAIRERS: Record<HookSource, Pairer | null> = {
+  claude: null,
+  copilot: copilotToolIds,
+  antigravity: null,
+  codex: null,
+};
+
 function parseSource(argv: string[]): HookSource {
   for (const a of argv) {
     if (a.startsWith('--source=')) {
@@ -169,9 +181,13 @@ function runHook(): void {
         process.exit(0);
       }
       const ts = new Date().toISOString();
-      const lines = events.map(evt => JSON.stringify({ ...evt, _ts: ts, _source: source }) + '\n');
       const file = path.join(DIR, `${sid}.jsonl`);
-      withSessionLockSync(file, () => fs.appendFileSync(file, lines.join('')));
+      const pair = PAIRERS[source];
+      withSessionLockSync(file, () => {
+        const written = pair ? events.map(evt => pair(evt, readEdge(file, 'tail'))) : events;
+        const lines = written.map(evt => JSON.stringify({ ...evt, _ts: ts, _source: source }) + '\n');
+        fs.appendFileSync(file, lines.join(''));
+      });
 
       const body = JSON.stringify({ session: sid });
       const req = http.request({
