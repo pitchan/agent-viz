@@ -44,7 +44,7 @@ agent-viz
 | Feature | Claude Code | Copilot CLI | Antigravity CLI | Codex |
 |---|:---:|:---:|:---:|:---:|
 | **Live view** | | | | |
-| Tool calls as they happen | ✅ | ✅ | ✅ | ✅ |
+| Tool calls as they happen | ✅ | ⚠️ ¹¹ | ✅ | ✅ |
 | A failed tool shown as an error | ✅ | ⚠️ ¹ | ⚠️ ² | ⚠️ ⁷ |
 | Subagents in the topology | ✅ | 🚧 | ❌ | ⚠️ ¹⁰ |
 | Tokens | ✅ | ❌ ³ | ⚠️ ⁴ | ⚠️ ⁸ |
@@ -60,7 +60,7 @@ agent-viz
 
 ✅ works · ⚠️ works with a limit · ❌ not available · 🚧 not reliable yet: do not count on it for that agent
 
-1. Counted in the header and listed in the error register, from the tool-failure event Copilot CLI documents; not yet checked on a real Copilot session. Copilot sends no call identifier, so the failed tool's node in the graph does not turn red.
+1. Counted in the header and listed in the error register, from the tool-failure event Copilot CLI documents; not yet checked on a real Copilot session.
 2. Known once the model call ends, not when the tool ends.
 3. Copilot CLI does not expose token usage.
 4. One model call behind during a turn, exact once it ends.
@@ -70,6 +70,7 @@ agent-viz
 8. No figure for a forked thread, nor for a session written by an older Codex. A subagent's tokens are counted from its first tool call.
 9. What the session would cost at OpenAI's API rates. A ChatGPT plan is billed differently, and codex-auto-review has no published price.
 10. A subagent appears at its first tool call, not when it is spawned. Its end time is read from the parent's transcript, which older Codex builds do not fill in.
+11. Copilot CLI sends no call identifier: agent-viz pairs each tool's end with the oldest unfinished start of the same tool with the same arguments in the session. Built from what Copilot CLI documents; not yet checked on a real Copilot session.
 
 Cursor is not supported.
 
