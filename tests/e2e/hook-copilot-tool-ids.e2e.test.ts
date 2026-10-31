@@ -136,6 +136,36 @@ test('un début resté sans fin ne capte pas la fin de l’outil suivant', async
   expect(fin?.tool_use_id).toBe(bash?.tool_use_id);
 });
 
+test('la fin d’un outil reprend le début aux mêmes arguments, pas un autre début du même outil', async () => {
+  // Arrange
+  const racine = racineIsolee();
+  await enchaine(racine, [
+    charge('PreToolUse', 'view', { path: '/projet/A.md' }),
+    charge('PreToolUse', 'view', { path: '/projet/B.md' }),
+  ]);
+  // Act
+  await lanceLeHook(racine, charge('PostToolUse', 'view', { path: '/projet/B.md' }));
+  // Assert
+  const [debutA, debutB, fin] = ecrits(racine);
+  expect(debutA?.tool_use_id).not.toBe(debutB?.tool_use_id);
+  expect(fin?.tool_use_id).toBe(debutB?.tool_use_id);
+});
+
+test('de deux débuts identiques encore ouverts, la fin reprend le plus ancien', async () => {
+  // Arrange
+  const racine = racineIsolee();
+  await enchaine(racine, [
+    charge('PreToolUse', 'view', VIEW),
+    charge('PreToolUse', 'view', VIEW),
+  ]);
+  // Act
+  await lanceLeHook(racine, charge('PostToolUse', 'view', VIEW));
+  // Assert
+  const [premier, second, fin] = ecrits(racine);
+  expect(premier?.tool_use_id).not.toBe(second?.tool_use_id);
+  expect(fin?.tool_use_id).toBe(premier?.tool_use_id);
+});
+
 test('deux sessions Copilot ne mélangent ni leurs identifiants ni leurs fins', async () => {
   // Arrange
   const racine = racineIsolee();
