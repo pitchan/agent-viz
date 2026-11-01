@@ -251,16 +251,22 @@ function onPreToolUse(evt: HookEvent, sid: string, ts: string) {
   addTimelineEntry(evt, n.id, n.type, n.label, n.sub);
 }
 
-// Subagent completion: PostToolUse on the main-thread Agent tool carries
-// tool_response.agentId. This is the canonical "subagent done" signal,
-// since SubagentStop hooks are not reliably emitted. terminalStatus is
-// 'done' (PostToolUse) or 'error' (PostToolUseFailure).
-function settleAgentFromAgentToolResponse(evt: HookEvent, ts: string, terminalStatus: 'done' | 'error') {
-  if (evt.tool_name !== 'Agent') return;
+// L'outil Agent et le Skill en fork rendent la main quand leur sous-agent a fini, et le nomment
+// alors dans tool_response.agentId.
+function launchesSubagent(evt: HookEvent): boolean {
+  return evt.tool_name === 'Agent'
+    || (evt.tool_name === 'Skill' && evt.tool_response?.status === 'forked');
+}
+
+// Subagent completion: the end of its launching tool carries tool_response.agentId. This is
+// the canonical "subagent done" signal, since SubagentStop hooks are not installed.
+// terminalStatus is 'done' (PostToolUse) or 'error' (PostToolUseFailure).
+function settleLaunchedSubagent(evt: HookEvent, ts: string, terminalStatus: 'done' | 'error') {
+  if (!launchesSubagent(evt)) return;
   const aid = evt.tool_response && evt.tool_response.agentId;
   const an = aid ? state.nodes.get(`a:${aid}`) : null;
   if (!an || an.status !== 'running') return;
-  // Le noeud est né au premier outil du sous-agent : le lancement de l'outil Agent, connu
+  // Le noeud est né au premier outil du sous-agent : le lancement de l'outil lanceur, connu
   // seulement maintenant qu'il nomme son sous-agent, est son vrai début.
   const launcher = state.nodes.get(`t:${evt.tool_use_id}`);
   if (launcher) an.startTime = launcher.startTime;
@@ -301,11 +307,9 @@ function onPostToolUse(evt: HookEvent, sid: string, ts: string) {
     setRunning(n.id, false);
   }
   countToolEnd(tid, 'done');
-  settleAgentFromAgentToolResponse(evt, ts, 'done');
+  settleLaunchedSubagent(evt, ts, 'done');
   const childAid = evt.tool_response && evt.tool_response.agentId;
-  const launched = evt.tool_name === 'Agent'
-    || (evt.tool_name === 'Skill' && evt.tool_response && evt.tool_response.status === 'forked');
-  if (evt.agent_id && childAid && launched) adoptSubagent(childAid, evt.agent_id);
+  if (evt.agent_id && childAid && launchesSubagent(evt)) adoptSubagent(childAid, evt.agent_id);
   // EN DERNIER, comme recordError dans le pendant echec : l'abonne repeint de
   // facon synchrone, il doit lire des noeuds deja a jour. C'est le fait de
   // continuite de la pastille — combien d'outils ont reussi depuis un echec.
@@ -320,7 +324,7 @@ function onPostToolUseFailure(evt: HookEvent, sid: string, ts: string) {
     n.endTime = evt.ended_at || ts; n.duration = calcDuration(n.startTime, n.endTime);
     setRunning(n.id, false);
   }
-  settleAgentFromAgentToolResponse(evt, ts, 'error');
+  settleLaunchedSubagent(evt, ts, 'error');
   countToolEnd(tid, 'error');
   // HORS du `if (n)` : un echec dont le noeud manque (PreToolUse non recu, noeud deja
   // ramasse) se compte aussi. Et EN DERNIER : l'abonne de `recordError`, synchrone, repeint
