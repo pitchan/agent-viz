@@ -91,7 +91,7 @@ function agentLabel(evt: HookEvent): string {
 
 // Le premier outil d'un sous-agent le fait naître : agent-viz n'installe pas le hook SubagentStart,
 // qui ne porte d'ailleurs pas d'heure. Faute d'autre lien plus tôt, son début n'est corrigé
-// qu'au retour de l'outil Agent qui le nomme.
+// qu'au retour de l'outil qui le nomme : outil Agent, ou Skill en fork.
 function promoteAgentNode(n: VizNode, evt: HookEvent, sid: string, ts: string) {
   n.type = 'agent';
   n.label = agentLabel(evt);
