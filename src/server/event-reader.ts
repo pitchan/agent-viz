@@ -283,22 +283,24 @@ function fileLayout(fp: string): number {
 // What a page that has read `fp` up to `cursor`, in layout `layout`, has not
 // read yet, plus the size and layout that make its new cursor. A file that
 // cannot be read answers as empty: the page asks again at its next poll.
-async function readUnread(fp: string, cursor: number, layout: number): Promise<{ data: string; size: number; layout: number }> {
-  let fh;
+// `stat` and `read` are injected so a test can make the compaction run during
+// either await.
+async function readUnread(
+  fp: string, cursor: number, layout: number,
+  stat: (p: string) => Promise<{ size: number }> = p => fsp.stat(p),
+  read: (p: string, buf: Buffer, offset: number) => Promise<number> = readRange,
+): Promise<{ data: string; size: number; layout: number }> {
   try {
-    const { size } = await fsp.stat(fp);
+    const { size } = await stat(fp);
     const since = compactions.get(fp)?.slice(layout) ?? [];
     const offset = since.reduce((o, c) => rebased(c.sizeBefore - o, c.sizeAfter), cursor);
     const now = fileLayout(fp);
     if (offset >= size) return { data: '', size, layout: now };
     const buf = Buffer.alloc(size - offset);
-    fh = await fsp.open(fp, 'r');
-    await fh.read(buf, 0, buf.length, offset);
+    await read(fp, buf, offset);
     return { data: buf.toString('utf8'), size, layout: now };
   } catch {
     return { data: '', size: 0, layout: fileLayout(fp) };
-  } finally {
-    if (fh) { try { await fh.close(); } catch {} }
   }
 }
 
