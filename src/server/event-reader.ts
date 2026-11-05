@@ -100,39 +100,52 @@ async function readRange(fp: string, buf: Buffer, offset: number): Promise<numbe
   finally { await fh.close(); }
 }
 
+type Stat = (p: string) => Promise<{ size: number }>;
+type Read = (p: string, buf: Buffer, offset: number) => Promise<number>;
+
+// The bytes of `fp` from `start()` to its end, all from one layout of the file.
+// A compaction that runs during an await rewrites the file under this read, so it
+// starts over from where `start()` places it in the new layout. null once `gone()`.
+async function readInOneLayout(
+  fp: string, start: () => number, gone: () => boolean, stat: Stat, read: Read,
+): Promise<{ offset: number; size: number; layout: number; bytes: Buffer } | null> {
+  for (;;) {
+    const layout = fileLayout(fp);
+    const offset = start();
+    const { size } = await stat(fp);
+    if (gone()) return null;
+    if (fileLayout(fp) !== layout) continue;
+    if (size <= offset) return { offset, size, layout, bytes: Buffer.alloc(0) };
+    const buf = Buffer.alloc(size - offset);
+    const bytesRead = await read(fp, buf, offset);
+    if (gone()) return null;
+    if (fileLayout(fp) !== layout) continue;
+    return { offset, size, layout, bytes: buf.subarray(0, bytesRead) };
+  }
+}
+
 // Read new bytes from a session file and broadcast via SSE.
 // `stat` and `read` are injected so a test can make the compaction run during
 // either await.
 async function readAndBroadcast(
   filePath: string,
-  stat: (p: string) => Promise<{ size: number }> = p => fsp.stat(p),
-  read: (p: string, buf: Buffer, offset: number) => Promise<number> = readRange,
+  stat: Stat = p => fsp.stat(p),
+  read: Read = readRange,
 ): Promise<void> {
   if (readInFlight.has(filePath)) { readPending.add(filePath); return; }
   readInFlight.add(filePath);
   try {
-    let offset: number;
-    let buf: Buffer;
-    let layout: number;
-    // A compaction that runs during an await rewrites the file under this read: what
-    // was measured or read belongs to a layout that no longer exists. Its new cursor
-    // still counts those bytes as unread, so the read starts over from there.
-    for (;;) {
-      const cursor = fileOffsets.get(filePath);
-      layout = fileLayout(filePath);
-      offset = cursor || 0;
-      const newStat = await stat(filePath);
+    // A compaction's new cursor still counts what this read had not taken as unread.
+    let cursor: number | undefined;
+    const got = await readInOneLayout(
+      filePath,
+      () => { cursor = fileOffsets.get(filePath); return cursor || 0; },
       // Unwatched meanwhile: nobody follows the file any more.
-      if (cursor !== undefined && !fileOffsets.has(filePath)) return;
-      if (fileLayout(filePath) !== layout) continue;
-      if (newStat.size <= offset) return;
-      buf = Buffer.alloc(newStat.size - offset);
-      const bytesRead = await read(filePath, buf, offset);
-      if (cursor !== undefined && !fileOffsets.has(filePath)) return;
-      if (fileLayout(filePath) !== layout) continue;
-      buf = buf.subarray(0, bytesRead);
-      break;
-    }
+      () => cursor !== undefined && !fileOffsets.has(filePath),
+      stat, read,
+    );
+    if (!got || got.size <= got.offset) return;
+    const { offset, layout, bytes: buf } = got;
     const len = buf.length;
     fileOffsets.set(filePath, offset + len);
     const text = buf.toString('utf8');
@@ -287,18 +300,20 @@ function fileLayout(fp: string): number {
 // either await.
 async function readUnread(
   fp: string, cursor: number, layout: number,
-  stat: (p: string) => Promise<{ size: number }> = p => fsp.stat(p),
-  read: (p: string, buf: Buffer, offset: number) => Promise<number> = readRange,
+  stat: Stat = p => fsp.stat(p),
+  read: Read = readRange,
 ): Promise<{ data: string; size: number; layout: number }> {
   try {
-    const { size } = await stat(fp);
-    const since = compactions.get(fp)?.slice(layout) ?? [];
-    const offset = since.reduce((o, c) => rebased(c.sizeBefore - o, c.sizeAfter), cursor);
-    const now = fileLayout(fp);
-    if (offset >= size) return { data: '', size, layout: now };
-    const buf = Buffer.alloc(size - offset);
-    await read(fp, buf, offset);
-    return { data: buf.toString('utf8'), size, layout: now };
+    const got = await readInOneLayout(
+      fp,
+      () => (compactions.get(fp)?.slice(layout) ?? []).reduce((o, c) => rebased(c.sizeBefore - o, c.sizeAfter), cursor),
+      () => false,
+      stat, read,
+    );
+    // Never null: nothing ends a page's read before it answers.
+    const { offset, size, layout: now, bytes } = got!;
+    if (size <= offset) return { data: '', size, layout: now };
+    return { data: bytes.toString('utf8'), size: offset + bytes.length, layout: now };
   } catch {
     return { data: '', size: 0, layout: fileLayout(fp) };
   }
