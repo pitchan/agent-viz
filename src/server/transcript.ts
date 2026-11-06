@@ -9,7 +9,7 @@ const fsp = fs.promises;
 
 import { sessionIndex, idFromPath } from './session-index.ts';
 import type { SessionRecord } from './session-index.ts';
-import { iterJsonlLines } from '../engine/core/jsonl.ts';
+import { decodeJsonlLine, iterJsonlLines } from '../engine/core/jsonl.ts';
 import { ensureTokens, scheduleTokensBroadcast, tokenSum } from './tokens.ts';
 import { broadcastSessionsChanged } from './sse.ts';
 import { getAdapter } from './transcript-adapters/index.ts';
@@ -112,30 +112,53 @@ function readFirstLine(filePath: string, cap: number = 8 * 1024 * 1024): Promise
   });
 }
 
-// Ask the per-agent adapter, event by event, where the session's transcript
-// lives: an event can name another transcript (a Codex sub-agent's), and then
-// the adapter gives no path for it. Lines are read in full regardless of size.
+function discoverPath(evt: unknown): string | null {
+  return getAdapter(isRecord(evt) ? evt._source : undefined).discoverPath(evt);
+}
+
+// Un événement de sous-agent dont l'adaptateur refuse le chemin ne dit rien de la session.
+function saysNothingOfSession(evt: unknown, found: string | null): boolean {
+  return found === null && isRecord(evt) && evt.agent_id !== undefined;
+}
+
+async function discoverPathAfterFirstLine(sessionFile: string): Promise<string | null> {
+  let first = true;
+  for await (const verdict of iterJsonlLines(sessionFile)) {
+    if (first) { first = false; continue; }
+    if (!verdict.ok) continue;
+    const found = discoverPath(verdict.value);
+    if (!saysNothingOfSession(verdict.value, found)) return found;
+  }
+  return null;
+}
+
+// Read the first event of a session file and ask the per-agent adapter where
+// the transcript lives. Adapters know whether their source stamps
+// `transcript_path` on the first event. The first line is read in full
+// regardless of size — a long UserPromptSubmit event can push it well past
+// any fixed buffer, and `transcript_path` sits at its end.
 async function getTranscriptPath(sessionFile: string): Promise<string | null> {
   try {
-    let first = true;
-    for await (const verdict of iterJsonlLines(sessionFile)) {
-      // Le décodage ne lève pas : le `catch` ci-dessous n'est pas son filet, donc la trace d'une
-      // première ligne illisible s'écrit ici. Une ligne préfixée d'un BOM est décodée.
-      if (first && !verdict.ok) {
-        console.error(
-          `[transcript] ${idFromPath(sessionFile).slice(0, 8)}: unreadable first line ` +
-          `(${verdict.rawLength} chars) — cannot extract transcript_path`,
-        );
-        return null;
-      }
-      first = false;
-      if (!verdict.ok) continue;
-      const evt = verdict.value;
-      const found = getAdapter(isRecord(evt) ? evt._source : undefined).discoverPath(evt);
-      if (found) return found;
+    const firstLine = await readFirstLine(sessionFile);
+    // Le verdict vient de la primitive commune, qui ne lève pas : le `catch` ci-dessous n'est pas
+    // le filet du décodage, donc la trace d'une première ligne illisible s'écrit ici. Une première
+    // ligne préfixée d'un BOM est décodée au lieu de coûter le transcript entier.
+    const verdict = decodeJsonlLine(firstLine);
+    if (verdict === null) {
+      console.error(`[transcript] ${idFromPath(sessionFile).slice(0, 8)}: empty session file — cannot extract transcript_path`);
+      return null;
     }
-    if (first) console.error(`[transcript] ${idFromPath(sessionFile).slice(0, 8)}: empty session file — cannot extract transcript_path`);
-    return null;
+    if (!verdict.ok) {
+      console.error(
+        `[transcript] ${idFromPath(sessionFile).slice(0, 8)}: unreadable first line ` +
+        `(${verdict.rawLength} chars) — cannot extract transcript_path`,
+      );
+      return null;
+    }
+    const found = discoverPath(verdict.value);
+    if (!saysNothingOfSession(verdict.value, found)) return found;
+    // `await` garde une erreur de lecture de la suite sous le `catch` ci-dessous.
+    return await discoverPathAfterFirstLine(sessionFile);
   } catch (err: unknown) {
     // Ne couvre que la lecture disque et l'adaptateur : le décodage, lui,
     // ne lève pas.
