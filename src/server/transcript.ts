@@ -116,9 +116,10 @@ function discoverPath(evt: unknown): string | null {
   return getAdapter(isRecord(evt) ? evt._source : undefined).discoverPath(evt);
 }
 
-// Un événement de sous-agent dont l'adaptateur refuse le chemin ne dit rien de la session.
+// Un événement de sous-agent qui nomme un transcript refusé par l'adaptateur ne dit rien de la session.
 function saysNothingOfSession(evt: unknown, found: string | null): boolean {
-  return found === null && isRecord(evt) && evt.agent_id !== undefined;
+  return found === null && isRecord(evt) && typeof evt.agent_id === 'string' && evt.agent_id !== ''
+    && typeof evt.transcript_path === 'string';
 }
 
 async function discoverPathAfterFirstLine(sessionFile: string): Promise<string | null> {
@@ -133,8 +134,8 @@ async function discoverPathAfterFirstLine(sessionFile: string): Promise<string |
 }
 
 // Read the first event of a session file and ask the per-agent adapter where
-// the transcript lives. Adapters know whether their source stamps
-// `transcript_path` on the first event. The first line is read in full
+// the transcript lives; a sub-agent event whose transcript the adapter refuses
+// hands the question to the next event. The first line is read in full
 // regardless of size — a long UserPromptSubmit event can push it well past
 // any fixed buffer, and `transcript_path` sits at its end.
 async function getTranscriptPath(sessionFile: string): Promise<string | null> {

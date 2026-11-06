@@ -25,7 +25,7 @@ function asString(v: unknown): string | null {
 // Un événement de sous-agent porte le transcript de ce sous-agent, ou celui du fil qui l'a lancé
 // (sa fin) : aucun des deux n'est sûrement celui de la session.
 function discoverPath(evt: unknown): string | null {
-  if (!isRecord(evt) || evt.agent_id !== undefined) return null;
+  if (!isRecord(evt) || asString(evt.agent_id)) return null;
   return asString(evt.transcript_path);
 }
 
