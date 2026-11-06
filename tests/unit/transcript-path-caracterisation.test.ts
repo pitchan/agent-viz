@@ -14,6 +14,7 @@ const SESSION = 'abcdef12-3456-7890-abcd-ef1234567890';
 const PREFIXE = SESSION.slice(0, 8);
 const PRINCIPAL = 'C:/transcripts/rollout-principal.jsonl';
 const SOUS_AGENT = 'C:/transcripts/rollout-sous-agent.jsonl';
+const AUTRE = 'C:/transcripts/rollout-autre.jsonl';
 const AGENT = 'agent-0001';
 
 // `lit` : l'adaptateur rend `transcript_path` quand c'est une chaîne (claude, codex, antigravity ;
@@ -51,9 +52,6 @@ const traceInconnue = (nom: unknown) =>
   `[transcript-adapters] unknown agentSource "${String(nom)}" — its transcript is not read. Add an adapter under src/server/transcript-adapters/.`;
 
 const ILLISIBLE = '{pas du json';
-// Les flux de lecture rendent des morceaux de 64 Kio : la lecture s'arrête au premier morceau
-// qui fait dépasser 8 Mio, soit 129 morceaux ASCII.
-const COUPE_8_MIO = 129 * 64 * 1024;
 
 interface Forme {
   nom: string;
@@ -62,7 +60,7 @@ interface Forme {
   rendu: string | null;
   // La première ligne est décodée en JSON : l'adaptateur est alors choisi, et une source inconnue tracée.
   decodee: boolean;
-  trace: string[];
+  trace: unknown[];
   // Le transcript rendu pour codex quand il diffère : un événement de sous-agent n'en donne aucun.
   codex?: string | null;
 }
@@ -106,16 +104,19 @@ const FORMES: Forme[] = [
   { nom: 'première ligne sans transcript_path puis ligne avec',
     contenu: c => lignes(evt(c, 'SessionStart'), principal(c)),
     rendu: null, decodee: true, trace: [] },
-  { nom: 'agent_id null en tête', contenu: c => lignes(evt(c, 'PreToolUse', PRINCIPAL, null), principal(c)),
+  { nom: 'agent_id null en tête', contenu: c => lignes(evt(c, 'PreToolUse', PRINCIPAL, null), evt(c, 'UserPromptSubmit', AUTRE)),
     rendu: PRINCIPAL, decodee: true, trace: [] },
-  { nom: 'agent_id chaîne vide en tête', contenu: c => lignes(evt(c, 'PreToolUse', PRINCIPAL, ''), principal(c)),
+  { nom: 'agent_id chaîne vide en tête', contenu: c => lignes(evt(c, 'PreToolUse', PRINCIPAL, ''), evt(c, 'UserPromptSubmit', AUTRE)),
     rendu: PRINCIPAL, decodee: true, trace: [] },
+  { nom: 'événement de sous-agent sans transcript_path en tête puis principal',
+    contenu: c => lignes(evt(c, 'PreToolUse', undefined, AGENT), principal(c)),
+    rendu: null, decodee: true, trace: [] },
   { nom: 'première ligne de 3 Mio, lue en entier',
     contenu: c => lignes(JSON.stringify({ ...c, hook_event_name: 'UserPromptSubmit', prompt: GROS, transcript_path: PRINCIPAL }), principal(c)),
     rendu: PRINCIPAL, decodee: true, trace: [] },
   { nom: 'première ligne de 9 Mio, coupée à la limite de 8 Mio',
     contenu: c => lignes(JSON.stringify({ ...c, hook_event_name: 'UserPromptSubmit', prompt: TRES_GROS, transcript_path: PRINCIPAL }), principal(c)),
-    rendu: null, decodee: false, trace: [traceIllisible(COUPE_8_MIO)] },
+    rendu: null, decodee: false, trace: [expect.stringMatching(/^\[transcript\] \w+: unreadable first line \(\d+ chars\)/)] },
   { nom: 'fichier sans saut de ligne final', contenu: c => principal(c),
     rendu: PRINCIPAL, decodee: true, trace: [] },
   // JSON valide mais pas un objet : aucun _source lisible → adaptateur claude, qui rend null.
@@ -156,7 +157,7 @@ for (const [numero, forme] of FORMES.entries()) {
       if (forme.decodee && source.inconnue) tracesAttendues.push(traceInconnue(champs._source));
       if (forme.nom === 'fichier absent') {
         expect(traces).toHaveLength(1);
-        expect(traces[0]?.startsWith(tracesAttendues[0] ?? '')).toBe(true);
+        expect(traces[0]?.startsWith(String(tracesAttendues[0]))).toBe(true);
       } else {
         expect(traces).toEqual(tracesAttendues);
       }
