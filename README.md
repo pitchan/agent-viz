@@ -314,7 +314,7 @@ Claude Code:
   settings : /home/me/.claude/settings.json  (scope: user)
   hook cmd : node "<package dir>/bin/agent-viz.js" hook --source=claude  (mode: absolute)
   backup   : /home/me/.agent-viz/backups/-home-me-.claude-settings.json/2026-09-14T10-05-07.123Z.json
-  ✓ added: UserPromptSubmit, PreToolUse, PostToolUse, PostToolUseFailure, Stop, SessionStart
+  ✓ added: UserPromptSubmit, PreToolUse, PostToolUse, PostToolUseFailure, Stop, SessionStart, SessionEnd
   Coexisting hooks (run in parallel, untouched):
     - PreToolUse: 1 other(s)
 ```
@@ -359,7 +359,7 @@ If you reinstall agent-viz to a different path later (e.g. moved your dev clone)
 
 ## Captured events
 
-`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `Stop`, `SessionStart`. Antigravity and Codex send no such event: for them, agent-viz writes `PostToolUseFailure` itself, from the tool result the agent reports or from its session transcript. Events land as JSONL in `${tmpdir}/agent-events/<session_id>.jsonl` and are streamed to the dashboard via Server-Sent Events. Each event carries a `_source: "claude" | "copilot" | "antigravity" | "codex"` field set by the hook command's `--source` flag.
+`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `Stop`, `SessionStart`, `SessionEnd` (Claude Code only). Antigravity and Codex send no such event: for them, agent-viz writes `PostToolUseFailure` itself, from the tool result the agent reports or from its session transcript. Events land as JSONL in `${tmpdir}/agent-events/<session_id>.jsonl` and are streamed to the dashboard via Server-Sent Events. Each event carries a `_source: "claude" | "copilot" | "antigravity" | "codex"` field set by the hook command's `--source` flag.
 
 ## Configuration
 

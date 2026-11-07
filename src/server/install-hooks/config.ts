@@ -18,7 +18,8 @@ export const AGENT_CONFIG = {
     // PostToolUse ne se declenche que sur un succes. Sans cet abonnement, une
     // commande qui echoue ne laisse qu'un PreToolUse orphelin — un trou, que
     // rien ne distingue d'un outil encore en vol.
-    events: ['UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'Stop', 'SessionStart'],
+    // SessionEnd ferme les sous-agents en arriere-plan que le dernier Stop a laisses ouverts.
+    events: ['UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'Stop', 'SessionStart', 'SessionEnd'],
     userFile: () => path.join(os.homedir(), '.claude', 'settings.json'),
     projectFile: (root) => path.join(root, '.claude', 'settings.json'),
     localFile: (root) => path.join(root, '.claude', 'settings.local.json'),
