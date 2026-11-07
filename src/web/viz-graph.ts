@@ -13,9 +13,10 @@ import {
 import { layoutDirtyRoots, markLayoutDirty } from './viz-layout.ts';
 import { markNarratorDirty } from './viz-narrator.ts';
 import { toolSubject, type ToolCallEvent, type ToolInput } from '../engine/core/tool-subject.ts';
-import { formatDuration } from './viz-duration.ts';
+import { calcDuration } from './viz-duration.ts';
 import { recordError, recordSuccess } from './viz-errors.ts';
 import { recomputeParallelFlags } from './viz-parallel.ts';
+import { launchesSubagent, settleLaunchedSubagent, settleStoppedSubagent } from './viz-subagent-end.ts';
 
 // L'evenement hook tel que ce module le lit : les champs de ToolCallEvent
 // (moteur, deja type) plus ceux que la carte du graphe consomme. Tous
@@ -34,8 +35,14 @@ export interface HookEvent extends ToolCallEvent {
   tool_use_id?: string;
   // `isolation` s'ajoute a ToolInput : seul le graphe s'en sert, pour la
   // pastille « worktree » d'un sous-agent isole.
-  tool_input?: ToolInput & { isolation?: string };
-  tool_response?: { agentId?: string; status?: string };
+  // `run_in_background` (Agent) et `task_id` (TaskStop) arrivent aussi : la fin d'un sous-agent
+  // se lit sur la réponse de l'outil, pas sur ces entrées.
+  tool_input?: ToolInput & { isolation?: string; run_in_background?: boolean; task_id?: string };
+  // Réponse de TaskStop : la tâche arrêtée et son type ; `message` et `command` la décrivent.
+  tool_response?: {
+    agentId?: string; status?: string;
+    task_id?: string; task_type?: string; message?: string; command?: string;
+  };
   message?: string;
   // Posé par un agent qui n'annonce son début qu'après coup : l'heure réelle du début.
   started_at?: string;
@@ -251,37 +258,6 @@ function onPreToolUse(evt: HookEvent, sid: string, ts: string) {
   addTimelineEntry(evt, n.id, n.type, n.label, n.sub);
 }
 
-// L'outil Agent et le Skill en fork rendent la main quand leur sous-agent a fini, et le nomment
-// alors dans tool_response.agentId.
-function launchesSubagent(evt: HookEvent): boolean {
-  return evt.tool_name === 'Agent'
-    || (evt.tool_name === 'Skill' && evt.tool_response?.status === 'forked');
-}
-
-// Subagent completion: the end of its launching tool carries tool_response.agentId. This is
-// the canonical "subagent done" signal, since SubagentStop hooks are not installed.
-// terminalStatus is 'done' (PostToolUse) or 'error' (PostToolUseFailure).
-function settleLaunchedSubagent(evt: HookEvent, ts: string, terminalStatus: 'done' | 'error') {
-  if (!launchesSubagent(evt)) return;
-  const aid = evt.tool_response && evt.tool_response.agentId;
-  const an = aid ? state.nodes.get(`a:${aid}`) : null;
-  if (!an || an.status !== 'running') return;
-  // Le noeud est né au premier outil du sous-agent : le lancement de l'outil lanceur, connu
-  // seulement maintenant qu'il nomme son sous-agent, est son vrai début.
-  const launcher = state.nodes.get(`t:${evt.tool_use_id}`);
-  if (launcher) an.startTime = launcher.startTime;
-  an.status = terminalStatus;
-  an.endTime = ts;
-  an.duration = calcDuration(an.startTime, ts);
-  an.color = terminalStatus === 'error' ? COLORS.error : COLORS.complete;
-  setRunning(an.id, false);
-  if (terminalStatus === 'done') {
-    const desc = evt.tool_input && evt.tool_input.description;
-    if (desc) an.sub = desc.slice(0, 45);
-  }
-  if (an.parentId) recomputeParallelFlags(an.parentId);
-}
-
 // L'échec l'emporte : Antigravity annonce la fin d'un outil, puis son échec lu plus tard
 // dans le transcript ; une fin qui suit un échec ne le rouvre pas. Sans identifiant,
 // rien ne relie deux fins : chacune est un appel distinct.
@@ -308,6 +284,7 @@ function onPostToolUse(evt: HookEvent, sid: string, ts: string) {
   }
   countToolEnd(tid, 'done');
   settleLaunchedSubagent(evt, ts, 'done');
+  settleStoppedSubagent(evt, ts);
   const childAid = evt.tool_response && evt.tool_response.agentId;
   if (evt.agent_id && childAid && launchesSubagent(evt)) adoptSubagent(childAid, evt.agent_id);
   // EN DERNIER, comme recordError dans le pendant echec : l'abonne repeint de
@@ -381,13 +358,8 @@ export function processEvent(evt: HookEvent) {
   markNarratorDirty();
 }
 
-// Le format vit dans viz-duration.ts ; ici on ne garde que la
-// traduction de « pas de durée » propre à la carte du graphe : `null`, que
-// `viz-canvas` et le panneau de détail savent déjà taire.
-export function calcDuration(start: string | null | undefined, end: string | null | undefined): string | null {
-  if (!start || !end) return null;
-  return formatDuration(new Date(end).getTime() - new Date(start).getTime());
-}
+// Les cartes du graphe et leurs lecteurs prennent la durée ici, avec les noeuds.
+export { calcDuration };
 
 // Feed label: the shared subject rule, cut to the width the feed column can
 // show. The rule itself lives in the engine's tool-subject.ts — the watchdog

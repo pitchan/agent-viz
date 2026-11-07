@@ -20,3 +20,10 @@ export function formatDuration(ms: number): string | null {
   if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
   return `${(ms / 60_000).toFixed(1)}m`;
 }
+
+// La durée d'une carte du graphe, entre deux horodatages : une borne manquante n'en
+// donne pas, et la carte tait `null`.
+export function calcDuration(start: string | null | undefined, end: string | null | undefined): string | null {
+  if (!start || !end) return null;
+  return formatDuration(new Date(end).getTime() - new Date(start).getTime());
+}
