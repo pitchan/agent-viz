@@ -96,7 +96,7 @@ test('install: refreshes existing hook whose timeout drifted (5 → 10)', () => 
   // 6e est posé au passage — d'où 'installed+updated' et non 'updated'.
   expect(r.action, `expected action='installed+updated', got '${r.action}'`).toBe('installed+updated');
   expect(r.updated?.length, `expected all 5 events refreshed, got ${r.updated?.length}`).toBe(5);
-  expect(r.missing, 'seul le nouvel evenement doit manquer').toEqual(['PostToolUseFailure']);
+  expect(r.missing, 'seul le nouvel evenement doit manquer').toEqual(['PostToolUseFailure', 'SessionEnd']);
 
   const persisted = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
   for (const ev of ['UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop', 'SessionStart']) {
@@ -223,5 +223,5 @@ test('install: une configuration aux 5 anciens evenements ne gagne que le nouvea
   const missing = _internals.auditSettings(settings, cmd)
     .filter(a => !a.installed)
     .map(a => a.event);
-  expect(missing, 'la migration doit ajouter le nouvel evenement sans doublonner les autres').toEqual(['PostToolUseFailure']);
+  expect(missing, 'la migration doit ajouter le nouvel evenement sans doublonner les autres').toEqual(['PostToolUseFailure', 'SessionEnd']);
 });
