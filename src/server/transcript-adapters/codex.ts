@@ -22,9 +22,11 @@ function asString(v: unknown): string | null {
   return typeof v === 'string' ? v : null;
 }
 
-function discoverPath(firstEvent: unknown): string | null {
-  if (!isRecord(firstEvent)) return null;
-  return asString(firstEvent.transcript_path);
+// Un événement de sous-agent porte le transcript de ce sous-agent, ou celui du fil qui l'a lancé
+// (sa fin) : aucun des deux n'est sûrement celui de la session.
+function discoverPath(evt: unknown): string | null {
+  if (!isRecord(evt) || asString(evt.agent_id)) return null;
+  return asString(evt.transcript_path);
 }
 
 // Les événements du hook lancés par un sous-agent portent son fil et son transcript propre. La fin

@@ -9,7 +9,7 @@ const fsp = fs.promises;
 
 import { sessionIndex, idFromPath } from './session-index.ts';
 import type { SessionRecord } from './session-index.ts';
-import { decodeJsonlLine } from '../engine/core/jsonl.ts';
+import { decodeJsonlLine, iterJsonlLines } from '../engine/core/jsonl.ts';
 import { ensureTokens, scheduleTokensBroadcast, tokenSum } from './tokens.ts';
 import { broadcastSessionsChanged } from './sse.ts';
 import { getAdapter } from './transcript-adapters/index.ts';
@@ -112,9 +112,30 @@ function readFirstLine(filePath: string, cap: number = 8 * 1024 * 1024): Promise
   });
 }
 
+function discoverPath(evt: unknown): string | null {
+  return getAdapter(isRecord(evt) ? evt._source : undefined).discoverPath(evt);
+}
+
+// Un événement de sous-agent qui nomme un transcript refusé par l'adaptateur ne dit rien de la session.
+function saysNothingOfSession(evt: unknown, found: string | null): boolean {
+  return found === null && isRecord(evt) && typeof evt.agent_id === 'string' && evt.agent_id !== ''
+    && typeof evt.transcript_path === 'string';
+}
+
+async function discoverPathAfterFirstLine(sessionFile: string): Promise<string | null> {
+  let first = true;
+  for await (const verdict of iterJsonlLines(sessionFile)) {
+    if (first) { first = false; continue; }
+    if (!verdict.ok) continue;
+    const found = discoverPath(verdict.value);
+    if (!saysNothingOfSession(verdict.value, found)) return found;
+  }
+  return null;
+}
+
 // Read the first event of a session file and ask the per-agent adapter where
-// the transcript lives. Adapters know whether their source stamps
-// `transcript_path` on the first event. The first line is read in full
+// the transcript lives; a sub-agent event whose transcript the adapter refuses
+// hands the question to the next event. The first line is read in full
 // regardless of size — a long UserPromptSubmit event can push it well past
 // any fixed buffer, and `transcript_path` sits at its end.
 async function getTranscriptPath(sessionFile: string): Promise<string | null> {
@@ -135,9 +156,10 @@ async function getTranscriptPath(sessionFile: string): Promise<string | null> {
       );
       return null;
     }
-    const evt = verdict.value;
-    const adapter = getAdapter(isRecord(evt) ? evt._source : undefined);
-    return adapter.discoverPath(evt);
+    const found = discoverPath(verdict.value);
+    if (!saysNothingOfSession(verdict.value, found)) return found;
+    // `await` garde une erreur de lecture de la suite sous le `catch` ci-dessous.
+    return await discoverPathAfterFirstLine(sessionFile);
   } catch (err: unknown) {
     // Ne couvre que la lecture disque et l'adaptateur : le décodage, lui,
     // ne lève pas.
