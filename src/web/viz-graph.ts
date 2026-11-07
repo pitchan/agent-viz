@@ -16,7 +16,9 @@ import { toolSubject, type ToolCallEvent, type ToolInput } from '../engine/core/
 import { calcDuration } from './viz-duration.ts';
 import { recordError, recordSuccess } from './viz-errors.ts';
 import { recomputeParallelFlags } from './viz-parallel.ts';
-import { launchesSubagent, settleLaunchedSubagent, settleStoppedSubagent } from './viz-subagent-end.ts';
+import {
+  launchesSubagent, settleLaunchedSubagent, settleReportedSubagent, settleStoppedSubagent, stillRunningSubagents,
+} from './viz-subagent-end.ts';
 
 // L'evenement hook tel que ce module le lit : les champs de ToolCallEvent
 // (moteur, deja type) plus ceux que la carte du graphe consomme. Tous
@@ -44,6 +46,9 @@ export interface HookEvent extends ToolCallEvent {
     task_id?: string; task_type?: string; message?: string; command?: string;
   };
   message?: string;
+  // Fin du tour (Stop) : les tâches en arrière-plan encore en vol. Message (UserPromptSubmit) : son texte.
+  background_tasks?: Array<{ id: string; type: string; status: string }>;
+  prompt?: string;
   // Posé par un agent qui n'annonce son début qu'après coup : l'heure réelle du début.
   started_at?: string;
   // Posé sur un échec écrit après coup : l'heure réelle de la fin de l'outil.
@@ -155,14 +160,16 @@ function adoptSubagent(childAid: string, parentAid: string) {
 }
 
 // On SessionEnd, close every descendant that was still running so particle
-// generation (which iterates vis.runningNodes) stops immediately.
-export function cascadeTerminate(rootNodeId: string, ts: string) {
+// generation (which iterates vis.runningNodes) stops immediately. `spared` nodes keep
+// working past this end, with their whole subtree.
+export function cascadeTerminate(rootNodeId: string, ts: string, spared: Set<string>) {
   const root = state.nodes.get(rootNodeId);
   if (!root) return;
   const stack = [...(root.children || [])];
   while (stack.length) {
     // La condition de boucle dit que la pile n'est pas vide : `pop` rend un noeud.
     const n = stack.pop()!;
+    if (spared.has(n.id)) continue;
     if (n.status === 'running') {
       n.status = 'done';
       n.endTime = ts;
@@ -326,7 +333,7 @@ function onSessionEnd(evt: HookEvent, sid: string, ts: string) {
   n.duration = calcDuration(n.startTime, ts);
   n.color = COLORS.complete;
   setRunning(n.id, false);
-  cascadeTerminate(n.id, ts);
+  cascadeTerminate(n.id, ts, stillRunningSubagents(evt));
 }
 
 type EventHandler = (evt: HookEvent, sid: string, ts: string) => void;
@@ -339,6 +346,7 @@ const EVENT_HANDLERS: Record<string, EventHandler> = {
   PostToolUse: onPostToolUse,
   PostToolUseFailure: onPostToolUseFailure,
   Notification: onNotification,
+  UserPromptSubmit: (evt, _sid, ts) => settleReportedSubagent(evt, ts),
   Stop: onSessionEnd,
   SessionEnd: onSessionEnd,
 };

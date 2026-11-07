@@ -1,7 +1,8 @@
-// viz-subagent-end.ts — la fin d'un sous-agent, lue sur un outil de l'agent qui le pilote.
+// viz-subagent-end.ts — la fin d'un sous-agent, lue sur un événement de l'agent qui le pilote.
 //
 // agent-viz n'installe pas le hook SubagentStop : un sous-agent se termine quand l'outil qui
-// l'a lancé rend la main, ou quand un outil d'arrêt le nomme. Ce module ferme alors son noeud.
+// l'a lancé rend la main, quand un outil d'arrêt le nomme, ou quand un message du fil principal
+// annonce sa fin. Ce module ferme alors son noeud.
 
 import { COLORS, state, vis, type VizNode } from './viz-state.ts';
 import { calcDuration } from './viz-duration.ts';
@@ -51,6 +52,28 @@ const SUBAGENT_STOPPERS: Record<string, (r: NonNullable<HookEvent['tool_response
 export function settleStoppedSubagent(evt: HookEvent, ts: string) {
   const stopped = evt.tool_name ? SUBAGENT_STOPPERS[evt.tool_name] : undefined;
   const aid = stopped && evt.tool_response ? stopped(evt.tool_response) : undefined;
+  const an = aid ? state.nodes.get(`a:${aid}`) : undefined;
+  if (an && an.status === 'running') endAgentNode(an, 'done', ts);
+}
+
+// La fin du tour liste dans background_tasks ce qui travaille encore : un sous-agent lancé en
+// arrière-plan y figure, et sa fin arrive plus tard.
+export function stillRunningSubagents(evt: HookEvent): Set<string> {
+  return new Set((evt.background_tasks || [])
+    .filter(t => t.type === 'subagent' && t.status === 'running')
+    .map(t => `a:${t.id}`));
+}
+
+// Messages du fil principal qui annoncent la fin d'un sous-agent en arrière-plan : son compte
+// rendu de fin, ou la notification de fin de sa tâche (seule trace d'un sous-agent interrompu).
+const SUBAGENT_END_MESSAGES: RegExp[] = [
+  /^<agent-message from="([^"]+)">\s*\[Subagent hand-back\]/,
+  /^<task-notification>\s*<task-id>([^<]+)<\/task-id>/,
+];
+
+export function settleReportedSubagent(evt: HookEvent, ts: string) {
+  const prompt = evt.prompt || '';
+  const aid = SUBAGENT_END_MESSAGES.map(re => prompt.match(re)?.[1]).find(Boolean);
   const an = aid ? state.nodes.get(`a:${aid}`) : undefined;
   if (an && an.status === 'running') endAgentNode(an, 'done', ts);
 }
