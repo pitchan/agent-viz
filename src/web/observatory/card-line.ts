@@ -1,7 +1,5 @@
-// card-line.ts — ce que dit la ligne d'une carte conseil fermee. Module pur.
-//
-// Le detail complet reste dans la carte ouverte ; cette ligne ne fait que
-// resumer des champs deja presents, elle n'en calcule aucun.
+// card-line.ts — ce que dit la ligne d'une carte conseil fermee. Module pur : elle
+// resume des champs deja presents dans la carte ouverte, elle n'en calcule aucun.
 
 import { formatUsd, isUnpricedBasis, type Recommendation } from './format.ts';
 

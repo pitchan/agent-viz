@@ -1,8 +1,6 @@
 // overview-view.ts — le haut de la page Conseils : la phrase-bilan et les trois
-// compteurs, qui servent d'onglets.
-//
-// Rendu seulement : les comptes viennent de failures-tools.ts et
-// overview-format.ts, et le choix d'onglet sort d'ici comme une intention.
+// compteurs, qui servent d'onglets. Rendu seulement : les comptes viennent de
+// failures-tools.ts et overview-format.ts, le choix d'onglet sort comme une intention.
 
 import { causeName, causeTool, toolDisplayName, type PannesLayout } from './failures-tools.ts';
 import { bilanSentence, appearancesLabel, type Tab } from './overview-format.ts';

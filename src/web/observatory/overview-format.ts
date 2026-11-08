@@ -1,7 +1,5 @@
 // overview-format.ts — le haut de la page Conseils : la phrase-bilan, les
 // comptes des compteurs-onglets, l'onglet ouvert par defaut. Module pur.
-//
-// Les textes sont ceux de la spec docs/usages/conseils-vue-d-ensemble.md.
 
 import { returnBanner, type Recommendation } from './format.ts';
 import { gravity } from './failures-tools.ts';
