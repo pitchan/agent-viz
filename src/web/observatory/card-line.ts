@@ -22,8 +22,8 @@ export function projectBadge(project: string) {
 }
 
 // La fin de la premiere proposition : « : » ou « ; » suivi d'un blanc, ou point
-// de fin de phrase (jamais celui de « SKILL.md »), hors parentheses, crochets et
-// code entre accents graves — une coupe la laisserait une valeur ou une parenthese ouverte.
+// de fin de phrase (jamais celui de « SKILL.md »), hors de ( ), [ ] et du code
+// entre accents graves — y couper laisserait une valeur ou une parenthese ouverte.
 function firstClauseEnd(text: string) {
   let depth = 0;
   let inCode = false;
