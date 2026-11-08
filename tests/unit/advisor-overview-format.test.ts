@@ -1,6 +1,5 @@
 // Le haut de la page Conseils : la phrase-bilan, les comptes des
-// compteurs-onglets et l'onglet ouvert par defaut. Textes voulus par le
-// mainteneur le 20/10/2026.
+// compteurs-onglets et l'onglet ouvert par defaut. Textes voulus par le mainteneur.
 import { expect, test } from 'vitest';
 import { bilanSentence, defaultTab, conseilsCounts, appearancesLabel } from '../../src/web/observatory/overview-format.ts';
 import type { Recommendation } from '../../src/web/observatory/format.ts';
@@ -65,7 +64,12 @@ test('un seul conseil revenu s accorde au singulier', () => {
 });
 
 test('ni panne ni conseil : la phrase reprend le texte de R6', () => {
-  expect(bilanSentence(rien)).toBe('Aucune recommandation sur la période — rien à corriger.');
+  // Arrange
+  const etat = rien;
+  // Act
+  const phrase = bilanSentence(etat);
+  // Assert
+  expect(phrase).toBe('Aucune recommandation sur la période — rien à corriger.');
 });
 
 test('pannes indisponibles : la phrase ne dit rien des pannes, plutot que d en inventer', () => {
@@ -78,11 +82,21 @@ test('pannes indisponibles : la phrase ne dit rien des pannes, plutot que d en i
 });
 
 test.each([[1, 'pannes'], [0, 'conseils']])('%i panne(s) a traiter : l onglet ouvert par defaut est %s', (n, onglet) => {
-  expect(defaultTab(n)).toBe(onglet);
+  // Arrange
+  const pannesATraiter = n;
+  // Act
+  const ouvert = defaultTab(pannesATraiter);
+  // Assert
+  expect(ouvert).toBe(onglet);
 });
 
 test.each([[0, ''], [1, 'apparue 1 fois'], [30, 'apparues 30 fois']])('%i apparitions se disent « %s »', (n, texte) => {
-  expect(appearancesLabel(n)).toBe(texte);
+  // Arrange
+  const apparitions = n;
+  // Act
+  const libelle = appearancesLabel(apparitions);
+  // Assert
+  expect(libelle).toBe(texte);
 });
 
 const rec = (sur: Partial<Recommendation> = {}): Recommendation => ({

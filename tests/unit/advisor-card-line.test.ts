@@ -5,13 +5,21 @@ import { splitProjectTitle, projectBadge, gestureHead, compactCost } from '../..
 import type { Recommendation } from '../../src/web/observatory/format.ts';
 
 test('le projet accole au titre par le serveur sort du titre', () => {
-  expect(splitProjectTitle('Sessions laissant des modifications non vérifiées — projet F:\\DEV\\agent-viz'))
-    .toEqual({ headline: 'Sessions laissant des modifications non vérifiées', project: 'F:\\DEV\\agent-viz' });
+  // Arrange
+  const titre = 'Sessions laissant des modifications non vérifiées — projet F:\\DEV\\agent-viz';
+  // Act
+  const parts = splitProjectTitle(titre);
+  // Assert
+  expect(parts).toEqual({ headline: 'Sessions laissant des modifications non vérifiées', project: 'F:\\DEV\\agent-viz' });
 });
 
 test('un titre sans projet reste entier', () => {
-  expect(splitProjectTitle('Skill « docx » présent 2 fois dans la liste'))
-    .toEqual({ headline: 'Skill « docx » présent 2 fois dans la liste', project: null });
+  // Arrange
+  const titre = 'Skill « docx » présent 2 fois dans la liste';
+  // Act
+  const parts = splitProjectTitle(titre);
+  // Assert
+  expect(parts).toEqual({ headline: 'Skill « docx » présent 2 fois dans la liste', project: null });
 });
 
 test.each([
@@ -19,7 +27,12 @@ test.each([
   ['/home/v/projets/site/', 'site'],
   ['F--DEV-AIRBNB-PRECHAC', 'F--DEV-AIRBNB-PRECHAC'],
 ])('la pastille du projet %s montre « %s »', (projet, pastille) => {
-  expect(projectBadge(projet)).toBe(pastille);
+  // Arrange
+  const chemin = projet;
+  // Act
+  const badge = projectBadge(chemin);
+  // Assert
+  expect(badge).toBe(pastille);
 });
 
 test.each([
@@ -36,11 +49,21 @@ test.each([
     + '(effet non mesuré : action à tester)'],
   ['Relire [la note ; puis la suite] avant de clore', 'Relire [la note ; puis la suite] avant de clore'],
 ])('le geste « %s » se resume a sa premiere proposition', (geste, tete) => {
-  expect(gestureHead(geste)).toBe(tete);
+  // Arrange
+  const action = geste;
+  // Act
+  const ligne = gestureHead(action);
+  // Assert
+  expect(ligne).toBe(tete);
 });
 
 test('une carte sans geste le dit sur sa ligne', () => {
-  expect(gestureHead(null)).toBe('aucun geste — carte informative');
+  // Arrange
+  const action = null;
+  // Act
+  const ligne = gestureHead(action);
+  // Assert
+  expect(ligne).toBe('aucun geste — carte informative');
 });
 
 const rec = (sur: Partial<Recommendation> = {}): Recommendation => ({
@@ -53,7 +76,12 @@ test.each([
   [rec({ costBasis: 'non-chiffre' }), 'non chiffré'],
   [rec({ evidence: { sessions: [], costComplete: false } }), '≥ 20,38 $'],
 ])('le cout compact de la carte %# se lit « %s »', (carte, texte) => {
-  expect(compactCost(carte)).toBe(texte);
+  // Arrange
+  const recommandation = carte;
+  // Act
+  const cout = compactCost(recommandation);
+  // Assert
+  expect(cout).toBe(texte);
 });
 
 test('sans fin de proposition hors parentheses, un geste trop long est tronque avec « … »', () => {
