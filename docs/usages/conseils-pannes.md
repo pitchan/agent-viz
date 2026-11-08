@@ -15,17 +15,18 @@
 | Chiffre de gravité | le gros « 11× » : le nombre d'apparitions de la panne sur la période |
 | Acquitter | dire qu'on a vu et traité une panne ; elle quitte la liste des pannes à traiter |
 | Remède | le réglage proposé pour éviter la panne, avec un extrait à copier |
+| Serveur MCP | un module branché sur l'agent qui lui apporte des outils en plus (par exemple l'accès à un service en ligne) ; ses outils s'affichent avec le nom du serveur |
 
 ## Ce que l'écran montre
 
 ```
 LES PLUS FRÉQUENTES
-  [11×] Même appel répété à l'identique     [3×] Une commande que…     [3×] Échecs à la suite
+  [11×] Même appel répété à l’identique     [3×] Une commande que…     [3×] Échecs à la suite
         Shell (Bash) · dernière le 19/10         PowerShell · …              Shell (Bash) · …
 TOUTES LES PANNES, PAR OUTIL
   ▾ [15×] Shell (Bash)                                          Tout acquitter (15)
           3 sortes de pannes · dernière le 19/10
-      ▸ [11×] Même appel répété à l'identique                   dernière 19/10 21:48
+      ▸ [11×] Même appel répété à l’identique                   dernière 19/10 21:48
               Bash · même commande répétée                      ← nom technique, en petit
       ▸ [3×] Échecs à la suite                                   …
   ▸ [4×] Lecture de page web
@@ -50,7 +51,7 @@ Sources : **vu**, **relevé**, **voulu** (confirmé par le mainteneur le 20/10/2
 |---|---|---|
 | P1 | Une panne à traiter a au moins une apparition non acquittée sur la période. Une panne dont toutes les apparitions sont acquittées va sous *Déjà acquittées (n)*, repliée, en bas de l'onglet. | voulu |
 | P2 | Les silences (un outil encore en cours depuis longtemps) ne sont pas des pannes : ils ne sont ni affichés ni comptés. | relevé |
-| P3 | Sans aucune panne sur la période, l'onglet dit : « Aucune panne sur la période. Ce bloc garde ce qui s'est produit même quand personne ne regardait. » | vu |
+| P3 | Sans aucune panne sur la période, l'onglet dit : « Aucune panne sur la période. Ce bloc garde ce qui s’est produit même quand personne ne regardait. » | vu |
 
 ### Le chiffre de gravité
 
@@ -76,7 +77,8 @@ Sources : **vu**, **relevé**, **voulu** (confirmé par le mainteneur le 20/10/2
 | P11 | La ligne d'un outil montre son chiffre, son nom, « k sortes de pannes · dernière le JJ/MM » et *Tout acquitter (n)*, où n compte les apparitions non acquittées de l'outil. | voulu |
 | P12 | Les outils dont le chiffre vaut 1 sont réunis dans un dernier groupe, *Vues une seule fois*, qui nomme ces outils ; chacune de ses pannes nomme aussi son outil. | voulu |
 | P13 | Un appel mal formé se range sous le shell que nomme son motif : PowerShell pour une commande ou un paramètre PowerShell, Shell (Bash) pour un chemin, un guillemet ou une syntaxe de shell POSIX — même si l'appel est passé par un autre outil. | voulu |
-| P14 | Une panne dépliée montre son remède quand il en existe un (consigne, extrait, *Copier*), puis ses apparitions : date et heure, projet, faits de l'apparition, commande complète. | vu |
+| P13b | Un appel mal formé dont le motif ne relève ni de PowerShell ni de Bash se range sous l'outil de ses apparitions quand elles sont toutes passées par le même outil ; sinon, sous le groupe *Autres appels mal formés*. | relevé |
+| P14 | Une panne dépliée montre ses apparitions (date et heure, projet, faits de l'apparition, commande complète), puis son remède quand il en existe un (consigne, extrait, *Copier*). | vu |
 
 ### Les noms
 
@@ -86,7 +88,7 @@ Sources : **vu**, **relevé**, **voulu** (confirmé par le mainteneur le 20/10/2
 
 | Panne | Nom lisible | Source |
 |---|---|---|
-| même appel répété | « Même appel répété à l'identique » | voulu |
+| même appel répété | « Même appel répété à l’identique » | voulu |
 | échecs consécutifs | « Échecs à la suite » | voulu |
 | appel mal formé | la phrase de son motif, avec une majuscule (« Un guillemet double non fermé — typiquement un chemin Windows terminé par un antislash ») | voulu |
 
@@ -97,6 +99,7 @@ Sources : **vu**, **relevé**, **voulu** (confirmé par le mainteneur le 20/10/2
 | Read / Edit / Write | Lecture de fichier / Modification de fichier / Écriture de fichier | voulu |
 | SendUserFile / SubagentHandback | Envoi de fichier / Retour de sous-agent | voulu |
 | outil d'un serveur MCP | « {outil} (serveur {serveur}) » | voulu |
+| appels mal formés passés par plusieurs outils (P13b) | Autres appels mal formés | relevé |
 | tout autre outil | son nom tel quel | voulu |
 
 ### Acquitter
@@ -122,3 +125,4 @@ Sources : **vu**, **relevé**, **voulu** (confirmé par le mainteneur le 20/10/2
 
 - La détection des pannes et ce qui en fait une apparition.
 - La pastille d'alerte en direct et les notifications du bureau.
+- Le compteur *pannes à traiter*, la phrase-bilan et l'onglet ouvert par défaut : spec [conseils-vue-d-ensemble.md](conseils-vue-d-ensemble.md).

@@ -20,7 +20,7 @@
 
 ```
 CONSEILS                      7 j | 30 j | 90 j     Relancer l'analyse
-Une panne revient souvent : Même appel répété à l'identique — Shell (Bash) (11 fois).
+Une panne revient souvent : Même appel répété à l’identique — Shell (Bash) (11 fois).
 17 conseils attendent ta réponse.
 ▸ Détail de la période                               ← replié
 ┌───────────────────┐ ┌───────────────────┐ ┌───────────────────┐
