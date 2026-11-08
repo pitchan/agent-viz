@@ -5,7 +5,6 @@
 // not comparable with the other — and no total anywhere, because a same
 // session feeds several rules.
 
-import * as api from './api.ts';
 import { getState, subscribe, loadAdvisor, changeStatus, applyScanEvent } from './store.ts';
 import {
   confidenceLabel, costLabel, basisTitle, periodLabel, basisLabel, periodHeader,
@@ -23,9 +22,10 @@ import { renderOverview } from './overview-view.ts';
 import { renderDecisions, refusalControls } from './decisions-view.ts';
 import type { Alert } from '../../engine/watchdog/detector.ts';
 
-// Le client HTTP tel qu'importe ici (`import * as api`) — meme motif que
-// store.ts (non exporte de la, un alias local par consommateur).
+// Le client HTTP — meme motif que store.ts (non exporte de la, un alias local
+// par consommateur). Il est passe par initAdvisor : la page ne choisit pas son reseau.
 type ApiClient = typeof import('./api.ts');
+let api: ApiClient;
 
 // Ce que le magasin rend pour la liste (store.ts type `recommendations` en
 // `unknown` : ce fichier est celui qui sait lire sa forme reelle).
@@ -106,14 +106,14 @@ function cardLine(rec: Recommendation) {
 
 // Exported for its tests: the card IS the page's contract with the user —
 // the labels and captions are behavior here, not decoration.
-export function recommendationCard(rec: Recommendation, { actionable, open = false }: { actionable: boolean; open?: boolean }) {
+export function recommendationCard(rec: Recommendation, { actionable, open }: { actionable: boolean; open?: boolean }) {
   const card = el('details', 'advisor-card') as HTMLDetailsElement;
   card.dataset.recId = String(rec.id);
   // Une carte décidée qui re-surface dit son histoire avant ses mesures :
   // le statut choisit le bandeau (adoption interpellée, veille constatée).
-  // Elle s'ouvre d'elle-même : c'est elle qui demande une réponse.
+  // Elle s'ouvre d'elle-même, sauf si l'appelant dit ce que l'utilisateur en a fait.
   const banner = returnBanner(rec);
-  card.open = open || banner !== '';
+  card.open = open ?? banner !== '';
   card.appendChild(cardLine(rec));
   const body = el('div', 'advisor-card-body');
   card.appendChild(body);
@@ -161,8 +161,10 @@ export function recommendationCard(rec: Recommendation, { actionable, open = fal
 const page = {
   alerts: undefined as Alert[] | null | undefined,
   tab: null as Tab | null,
-  openCards: new Set<number>(),
+  // Ce que l'utilisateur a fait de chaque carte : une carte revenue refermee le reste.
+  cardOpen: new Map<number, boolean>(),
   periodOpen: false,
+  decisionsOpen: false,
 };
 
 function rememberOpen(node: HTMLElement, onToggle: (open: boolean) => void) {
@@ -187,8 +189,8 @@ function renderSummary(node: HTMLElement, summary: Summary | null | undefined) {
 }
 
 function listCard(rec: Recommendation, actionable: boolean) {
-  const card = recommendationCard(rec, { actionable, open: page.openCards.has(rec.id) });
-  rememberOpen(card, open => { if (open) page.openCards.add(rec.id); else page.openCards.delete(rec.id); });
+  const card = recommendationCard(rec, { actionable, open: page.cardOpen.get(rec.id) });
+  rememberOpen(card, open => { page.cardOpen.set(rec.id, open); });
   return card;
 }
 
@@ -241,7 +243,11 @@ function renderList(node: HTMLElement, { groups, stale, decided }: Recommendatio
   }
   // Dernière section, repliée mais jamais silencieuse : le compte reste
   // visible depuis la vue principale, la décision et sa date dans le dépliage.
-  renderDecisions(node, decided);
+  const section = renderDecisions(node, decided);
+  if (section) {
+    section.open = page.decisionsOpen;
+    rememberOpen(section, open => { page.decisionsOpen = open; });
+  }
 }
 
 function render() {
@@ -317,7 +323,8 @@ async function loadFailures() {
   renderTop();
 }
 
-export function initAdvisor() {
+export function initAdvisor(apiClient: ApiClient) {
+  api = apiClient;
   const panel = document.getElementById('advisor-overlay')!;
   subscribe(() => { if (panel.classList.contains('visible')) render(); });
 
@@ -330,8 +337,8 @@ export function initAdvisor() {
     panel.classList.toggle('visible');
     if (panel.classList.contains('visible')) {
       // Une page rouverte se presente comme neuve : onglet par defaut, cartes fermees.
-      Object.assign(page, { alerts: undefined, tab: null, periodOpen: false });
-      page.openCards.clear();
+      Object.assign(page, { alerts: undefined, tab: null, periodOpen: false, decisionsOpen: false });
+      page.cardOpen.clear();
       loadAdvisor(api);
       loadFailures();
     }
