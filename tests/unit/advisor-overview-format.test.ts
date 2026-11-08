@@ -97,7 +97,7 @@ test('les conseils a traiter comptent les cartes de tous les blocs ; une carte r
     { basis: 'non-chiffre', priority: [], all: [rec({ id: 3, costBasis: 'non-chiffre' })] },
   ];
   // Act
-  const comptes = conseilsCounts(groups);
+  const comptes = conseilsCounts(groups, []);
   // Assert
   expect(comptes).toEqual({ toTreat: 3, returned: 1 });
 });

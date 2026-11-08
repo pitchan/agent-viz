@@ -52,8 +52,9 @@ export function appearancesLabel(n: number) {
 }
 
 // Les cartes qui attendent une reponse, tous blocs confondus : un compte de
-// cartes, jamais une somme de couts (les blocs ne se comparent pas, R2).
-export function conseilsCounts(groups: { all: Recommendation[] }[]) {
+// cartes, jamais une somme de couts (les blocs ne se comparent pas, R2). Une
+// carte revenue compte la ou elle est rangee : c'est son bandeau qui la dit revenue.
+export function conseilsCounts(groups: { all: Recommendation[] }[], stale: Recommendation[]) {
   const all = groups.flatMap(g => g.all);
-  return { toTreat: all.length, returned: all.filter(r => returnBanner(r) !== '').length };
+  return { toTreat: all.length, returned: [...all, ...stale].filter(r => returnBanner(r) !== '').length };
 }

@@ -73,7 +73,7 @@ Sources : **vu** (constaté à l'écran), **relevé** (constaté dans le comport
 | V5 | Trois compteurs, dans cet ordre : *pannes à traiter*, *conseils à traiter*, *conseils revenus*. | voulu |
 | V6 | *Pannes à traiter* compte les pannes dont au moins une apparition n'est pas acquittée. Dessous : « apparues N fois », la somme des apparitions de ces pannes. | voulu |
 | V7 | *Conseils à traiter* compte les cartes qui proposent des boutons de réponse, tous blocs confondus. Les cartes *Ne se produit plus* n'y sont pas. C'est un nombre de cartes, jamais une somme de coûts. | voulu |
-| V8 | *Conseils revenus* compte les cartes qui portent le bandeau de retour. | voulu |
+| V8 | *Conseils revenus* compte les cartes qui portent le bandeau de retour, où qu'elles soient rangées, y compris sous *Ne se produit plus*. La phrase-bilan compte les mêmes cartes. | voulu |
 | V9 | Un clic sur *pannes à traiter* ouvre l'onglet Pannes ; un clic sur *conseils à traiter* ou *conseils revenus* ouvre l'onglet Conseils. Le compteur de l'onglet ouvert est souligné. | voulu |
 | V10 | À l'ouverture de la page, l'onglet ouvert est Pannes s'il reste une panne à traiter, sinon Conseils. Il ne change plus tant que la page reste ouverte, sauf par un clic. | voulu |
 | V11 | Les compteurs n'apparaissent qu'une fois les pannes et les conseils chargés. Si les pannes n'ont pas pu l'être, leur compteur affiche « — » et « pannes indisponibles ». | voulu |

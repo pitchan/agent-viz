@@ -210,9 +210,9 @@ function renderTop() {
   // L'onglet par defaut se fixe au premier rendu : acquitter la derniere panne
   // ne fait pas basculer la page.
   const tab = page.tab ??= defaultTab(layout ? layout.toTreatCount : 0);
-  const { groups } = state.recommendations as RecommendationGroups;
+  const { groups, stale } = state.recommendations as RecommendationGroups;
   renderOverview(document.getElementById('advisor-bilan')!, document.getElementById('advisor-tabs')!,
-    { layout, conseils: conseilsCounts(groups) }, tab, chosen => { page.tab = chosen; renderTop(); });
+    { layout, conseils: conseilsCounts(groups, stale) }, tab, chosen => { page.tab = chosen; renderTop(); });
   document.getElementById('advisor-tab-pannes')!.hidden = tab !== 'pannes';
   document.getElementById('advisor-tab-conseils')!.hidden = tab !== 'conseils';
 }
