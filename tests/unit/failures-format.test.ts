@@ -4,7 +4,7 @@
 // diverger de ce que le detecteur a reellement mesure.
 
 import { expect, test } from 'vitest';
-import { failureLine, projectLabel, failuresSummary, groupKey, groupAlerts, causeLabel, episodeLabel, panelAlerts } from '../../src/web/observatory/failures-format.ts';
+import { failureLine, projectLabel, groupKey, groupAlerts, causeLabel, episodeLabel, panelAlerts } from '../../src/web/observatory/failures-format.ts';
 import { _DETECTOR_TYPES, type Alert } from '../../src/engine/watchdog/detector.ts';
 import { readAlert } from '../../src/web/viz-alert-shape.ts';
 
@@ -166,20 +166,6 @@ test('tout type d alerte du detecteur a sa formulation francaise', () => {
     const headline = failureLine({ ...invocation, type: type as Alert['type'] }).headline;
     expect(headline, `${type} n a pas de formulation francaise : le bloc afficherait son nom de type`).not.toBe(type);
   }
-});
-
-// Le bloc est la MEMOIRE des pannes, pas leur vivacite : sur 30 jours, « non
-// acquittees » et « en cours » different, et c'est la pastille qui dit la
-// seconde (`standing` -> activeIds, evenementiel -> fraicheur).
-//
-// Mutation attrapee : remplacer le libelle par un quantificateur de vivacite.
-test('le resume compte les non acquittees, il ne prononce pas « en cours »', () => {
-  expect(failuresSummary([])).toBe('aucune');
-  expect(failuresSummary([alerte({ acknowledged: true })])).toBe('aucune');
-  expect(failuresSummary([alerte({ acknowledged: false })])).toBe('1 non acquittée');
-  expect(
-    failuresSummary([alerte({ acknowledged: false }), alerte({ acknowledged: true }), alerte({ acknowledged: false })]),
-  ).toBe('2 non acquittées');
 });
 
 // ── Ce que le panneau accepte de montrer : des fautes, pas des etats ───────

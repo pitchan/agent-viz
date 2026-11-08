@@ -80,17 +80,22 @@ test('une alerte stuck ne s affiche pas : le bloc ne montre que des fautes', () 
   expect(parClasse(node, 'failure-cause')[0].textContent.includes('en vol')).toBe(false);
 });
 
-test('le compteur du bloc ignore les stuck non acquittes', () => {
+test('un stuck non acquitte n est pas montre a cote d une vraie panne', () => {
+  // Arrange
   const node = fauxElement('div');
+  // Act
   renderFailures(node, [invocation(), stuck()]);
-  expect(parClasse(node, 'failures-count')[0].textContent).toBe('1 non acquittée');
+  // Assert
+  const textes = aPlat(node).map(n => n.textContent).join('\n');
+  expect(parClasse(node, 'failure-episode').length, 'seule la panne non-stuck est rendue').toBe(1);
+  expect(textes.includes('npm run build'), 'aucune commande du stuck').toBe(false);
+  expect(textes.includes('en vol'), 'aucune phrase du stuck').toBe(false);
 });
 
 test('rien que des stuck = le bloc dit « aucune panne », pas un bloc vide', () => {
   const node = fauxElement('div');
   renderFailures(node, [stuck(), stuck({ createdAt: T0 - 1000 })]);
   expect(parClasse(node, 'failure-group').length).toBe(0);
-  expect(parClasse(node, 'failures-count')[0].textContent).toBe('aucune');
   expect(parClasse(node, 'failures-empty').length,
     'un bloc vide sans un mot serait indiscernable d un bug du panneau').toBe(1);
 });

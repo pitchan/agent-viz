@@ -119,23 +119,6 @@ export function failureLine(alert: Alert) {
   };
 }
 
-// Ce que le titre du bloc a le droit de dire, et rien de plus.
-//
-// Ce bloc est la MEMOIRE des pannes : il rend ce qui a ete consigne sur la
-// fenetre, sans aucune notion de vivacite — le journal n'en a pas. « Encore en
-// cours » se decide ailleurs, a la pastille, et par une regle que ce bloc ne
-// peut pas rejouer sans la dupliquer : `standing` -> `activeIds`, evenementiel
-// -> fraicheur de deux minutes. Sur trente jours, une boucle non acquittee de
-// la semaine derniere n'est pas un incident en cours ; l'annoncer comme tel
-// confondrait la memoire des pannes avec l'etat present.
-//
-// Donc un compte, et le mot exact de ce qui est compte.
-export function failuresSummary(alerts: Alert[]) {
-  const n = alerts.filter(a => !a.acknowledged).length;
-  if (n === 0) return 'aucune';
-  return `${n} non acquittée${n > 1 ? 's' : ''}`;
-}
-
 // ── Ce que le panneau accepte de montrer ───────────────────────────────────
 //
 // Des FAUTES, pas des etats passagers. `stuck` decrit un etat qui se resout
