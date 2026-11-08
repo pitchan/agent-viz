@@ -101,3 +101,13 @@ test('les conseils a traiter comptent les cartes de tous les blocs ; une carte r
   // Assert
   expect(comptes).toEqual({ toTreat: 3, returned: 1 });
 });
+
+test('une carte revenue rangee sous « Ne se produit plus » compte comme revenue, pas comme a traiter', () => {
+  // Arrange
+  const groups = [{ basis: 'jetons-mesures', priority: [], all: [rec({ id: 1 })] }];
+  const stale = [rec({ id: 2, status: 'ignored', costAtStatusUsd: 4 }), rec({ id: 3 })];
+  // Act
+  const comptes = conseilsCounts(groups, stale);
+  // Assert
+  expect(comptes).toEqual({ toTreat: 1, returned: 1 });
+});
