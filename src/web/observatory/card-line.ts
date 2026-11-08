@@ -21,13 +21,34 @@ export function projectBadge(project: string) {
   return parts[parts.length - 1] ?? project;
 }
 
-// Coupe au premier « : » ou « ; » suivi d'un blanc, ou au premier point de fin
-// de phrase — jamais au point d'un nom de fichier (« SKILL.md »).
-const FIRST_CLAUSE_END = /\s*[:;](?=\s)|\.(?=\s|$)/;
+// La fin de la premiere proposition : « : » ou « ; » suivi d'un blanc, ou point
+// de fin de phrase (jamais celui de « SKILL.md »), hors parentheses, crochets et
+// code entre accents graves — une coupe la laisserait une valeur ou une parenthese ouverte.
+function firstClauseEnd(text: string) {
+  let depth = 0;
+  let inCode = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i]!;
+    const blankAfter = i + 1 === text.length || /\s/.test(text[i + 1]!);
+    if (c === '`') inCode = !inCode;
+    else if (inCode) continue;
+    else if (c === '(' || c === '[') depth++;
+    else if ((c === ')' || c === ']') && depth > 0) depth--;
+    else if (depth === 0 && blankAfter && (c === '.' || ((c === ':' || c === ';') && i + 1 < text.length))) return i;
+  }
+  return -1;
+}
+
+const MAX_HEAD = 80;
 
 export function gestureHead(action: string | null) {
   if (action == null) return 'aucun geste — carte informative';
-  return action.split(FIRST_CLAUSE_END)[0]!.trim();
+  const end = firstClauseEnd(action);
+  if (end >= 0) return action.slice(0, end).trim();
+  if (action.length <= MAX_HEAD) return action.trim();
+  const cut = action.slice(0, MAX_HEAD);
+  const space = cut.lastIndexOf(' ');
+  return `${(space > 0 ? cut.slice(0, space) : cut).trimEnd()}…`;
 }
 
 export function compactCost(rec: Recommendation) {
