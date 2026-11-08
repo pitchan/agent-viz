@@ -85,9 +85,9 @@ async function demonFactice(port: number) {
   return { requetes, ferme };
 }
 
-// PID_FILE et LOG_FILE se calculent au chargement depuis os.tmpdir() : le
-// dossier temporaire est redirigé le temps de l'import, pour que chaque copie
-// ait les siens.
+// Chaque copie reçoit son propre dossier pour le fichier de pid et le journal :
+// aucune variable d'environnement n'est touchée, un test encore en cours ne
+// déplace pas les fichiers du suivant.
 async function chargeLifecycle(
   { portParDefaut, serveur = SERVEUR_QUI_SORT }: { portParDefaut: number; serveur?: string },
 ) {
@@ -100,17 +100,8 @@ async function chargeLifecycle(
   fs.writeFileSync(path.join(dossier, 'server.js'), serveur);
   const tmp = path.join(dossier, 'tmp');
   fs.mkdirSync(tmp);
-  const avant = { TEMP: process.env.TEMP, TMP: process.env.TMP, TMPDIR: process.env.TMPDIR };
-  Object.assign(process.env, { TEMP: tmp, TMP: tmp, TMPDIR: tmp });
-  let lifecycle;
-  try {
-    lifecycle = await import(pathToFileURL(path.join(dossier, 'lifecycle.ts')).href);
-  } finally {
-    for (const [cle, valeur] of Object.entries(avant)) {
-      if (valeur === undefined) delete process.env[cle];
-      else process.env[cle] = valeur;
-    }
-  }
+  const module = await import(pathToFileURL(path.join(dossier, 'lifecycle.ts')).href);
+  const lifecycle = module.creerLifecycle(tmp);
   if (path.dirname(lifecycle.PID_FILE) !== tmp) throw new Error(`PID_FILE hors du dossier du test : ${lifecycle.PID_FILE}`);
   return { lifecycle, dossier };
 }
@@ -281,17 +272,21 @@ test('start dont le serveur meurt au démarrage : rejette tout de suite en le di
   }
 });
 
-test('start dont le serveur vit sans écouter : rejette au bout de 3 s en disant qu\'il n\'a pas répondu', async () => {
+test('start dont le serveur vit sans écouter : rejette au bout du délai demandé en disant qu\'il n\'a pas répondu', async () => {
   // Arrange
   const [port, portParDefaut] = await portsLibres(2);
   const montage = await chargeLifecycle({ portParDefaut, serveur: SERVEUR_MUET });
   try {
+    const debut = Date.now();
+
     // Act
-    const erreur = await montage.lifecycle.start({ port }).then(() => null, (e: any) => e);
+    const erreur = await montage.lifecycle.start({ port, startupTimeoutMs: 500 }).then(() => null, (e: any) => e);
 
     // Assert
+    const duree = Date.now() - debut;
     expect(erreur, 'start aurait dû lever').toBeTruthy();
-    expect(erreur.message.includes('did not answer within 3s'), erreur.message).toBeTruthy();
+    expect(duree < 3000, `rejet attendu avant les 3 000 ms du délai par défaut, obtenu en ${duree} ms`).toBeTruthy();
+    expect(erreur.message.includes('did not answer within 0.5s'), erreur.message).toBeTruthy();
   } finally {
     nettoie(montage);
   }
@@ -303,11 +298,15 @@ test('stop sans fichier de pid vise le port demandé et y envoie POST /shutdown 
   const montage = await chargeLifecycle({ portParDefaut });
   const demon = await demonFactice(port);
   try {
+    const debut = Date.now();
+
     // Act
-    const resultat = await montage.lifecycle.stop({ port });
+    const resultat = await montage.lifecycle.stop({ port, shutdownTimeoutMs: 500 });
 
     // Assert
+    const duree = Date.now() - debut;
     expect(resultat).toEqual({ stopped: false, port, why: 'still-answering' });
+    expect(duree < 2000, `abandon attendu avant les 2 000 ms du délai par défaut, obtenu en ${duree} ms`).toBeTruthy();
     expect(demon.requetes.includes('POST /shutdown'), JSON.stringify(demon.requetes)).toBeTruthy();
   } finally {
     await demon.ferme();
@@ -358,11 +357,15 @@ test('stop sur un port où un serveur étranger répond sans sortir : rien n\'es
   const intrus = spawn(process.execPath, ['-e', 'setInterval(() => {}, 60000)'], { stdio: 'ignore' });
   fs.writeFileSync(montage.lifecycle.PID_FILE, `${intrus.pid}\n${port}\n2026-01-01T00:00:00.000Z\n`);
   try {
+    const debut = Date.now();
+
     // Act
-    const resultat = await montage.lifecycle.stop();
+    const resultat = await montage.lifecycle.stop({ shutdownTimeoutMs: 500 });
 
     // Assert
+    const duree = Date.now() - debut;
     expect(resultat).toEqual({ stopped: false, port, why: 'still-answering' });
+    expect(duree < 2000, `abandon attendu avant les 2 000 ms du délai par défaut, obtenu en ${duree} ms`).toBeTruthy();
     expect(demon.requetes.includes('POST /shutdown'), JSON.stringify(demon.requetes)).toBeTruthy();
     expect({ exitCode: intrus.exitCode, signalCode: intrus.signalCode }).toEqual({ exitCode: null, signalCode: null });
     expect(fs.existsSync(montage.lifecycle.PID_FILE), 'rien n\'a été arrêté : le fichier de pid reste').toBe(true);

@@ -5,12 +5,14 @@
 // Le modèle est sur les lignes `turn_context`, pas sur la ligne de jetons.
 // Un fil dérivé (`session_meta.forked_from_id`) copie l'historique de son parent sans marquer la fin
 // de la copie : ses jetons sont déclarés non lisibles et il n'a pas de question. La question est
-// l'item `UserMessage`.
+// l'item `UserMessage`. Un sous-agent a son propre transcript, dont le cumul part de zéro ; s'il
+// hérite de l'historique, `subagent_history_start_ordinal` marque la fin de la copie.
 
-import { ensureTokens, accumulateUsage } from '../tokens.ts';
+import { ensureTokens, accumulateUsage, newBucket } from '../tokens.ts';
 import { decodeJsonlLine } from '../../engine/core/jsonl.ts';
 import type { RawUsage } from '../../engine/core/events.ts';
 import type { UsageRecord } from './claude.ts';
+import type { SubagentTranscript } from './types.ts';
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -20,9 +22,20 @@ function asString(v: unknown): string | null {
   return typeof v === 'string' ? v : null;
 }
 
-function discoverPath(firstEvent: unknown): string | null {
-  if (!isRecord(firstEvent)) return null;
-  return asString(firstEvent.transcript_path);
+// Un événement de sous-agent porte le transcript de ce sous-agent, ou celui du fil qui l'a lancé
+// (sa fin) : aucun des deux n'est sûrement celui de la session.
+function discoverPath(evt: unknown): string | null {
+  if (!isRecord(evt) || asString(evt.agent_id)) return null;
+  return asString(evt.transcript_path);
+}
+
+// Les événements du hook lancés par un sous-agent portent son fil et son transcript propre. La fin
+// d'un sous-agent, elle, est écrite avec le transcript du fil qui l'a lancé.
+function subagentTranscript(evt: unknown): SubagentTranscript | null {
+  if (!isRecord(evt) || evt.hook_event_name === 'SubagentStop') return null;
+  const agentId = asString(evt.agent_id);
+  const path = asString(evt.transcript_path);
+  return agentId && path ? { agentId, path } : null;
 }
 
 function isForkedMeta(evt: Record<string, unknown>): boolean {
@@ -59,22 +72,57 @@ function toRawUsage(call: Counters): RawUsage {
 interface CodexState {
   model: string | null;
   cumul: number;
+  // Ordinal de la première ligne propre d'un sous-agent ; les lignes d'avant sont la copie du parent.
+  historyStart: number;
+  // Sous-agent dérivé sans fin de copie déclarée : aucune de ses lignes n'est comptée.
+  unreadable: boolean;
 }
 
-// L'état de lecture vit hors de l'enregistrement de session, que tous les lecteurs partagent :
-// il disparaît avec lui.
-const states = new WeakMap<object, CodexState>();
+const MAIN = '';
 
-function stateOf(tokens: object): CodexState {
-  let state = states.get(tokens);
+// L'état de lecture vit hors de l'enregistrement de session, que tous les lecteurs partagent :
+// il disparaît avec lui. Un état par fil : chaque transcript a son propre cumul.
+const states = new WeakMap<object, Map<string, CodexState>>();
+
+function stateOf(tokens: object, thread: string): CodexState {
+  let threads = states.get(tokens);
+  if (!threads) {
+    threads = new Map();
+    states.set(tokens, threads);
+  }
+  let state = threads.get(thread);
   if (!state) {
-    state = { model: null, cumul: 0 };
-    states.set(tokens, state);
+    state = { model: null, cumul: 0, historyStart: 0, unreadable: false };
+    threads.set(thread, state);
   }
   return state;
 }
 
-function parseUsageLine(line: string, rec: UsageRecord): boolean {
+function bucketOf(tokens: NonNullable<UsageRecord['tokens']>, agentId: string | undefined): unknown {
+  if (agentId === undefined) return tokens.main;
+  let bucket = tokens.perAgent.get(agentId);
+  if (bucket === undefined) {
+    bucket = newBucket();
+    tokens.perAgent.set(agentId, bucket);
+  }
+  return bucket;
+}
+
+// Un sous-agent qui hérite déclare où finit la copie ; un autre fil dérivé ne le dit pas. Un
+// sous-agent illisible n'est pas compté, le fil de la session illisible rend la session illisible.
+// Rend `false` quand c'est la session entière qui n'est pas lisible.
+function readMeta(evt: Record<string, unknown>, state: CodexState, agentId: string | undefined): boolean {
+  if (agentId === undefined) return !isForkedMeta(evt);
+  const start = isRecord(evt.payload) ? evt.payload.subagent_history_start_ordinal : undefined;
+  if (typeof start === 'number') state.historyStart = start;
+  else if (isForkedMeta(evt)) {
+    state.unreadable = true;
+    console.error(`[codex] sous-agent ${agentId.slice(-8)} : fil dérivé sans fin de copie, ses jetons ne sont pas comptés`);
+  }
+  return true;
+}
+
+function parseUsageLine(line: string, rec: UsageRecord, agentId?: string): boolean {
   if (!line || (line.indexOf('"token_count"') === -1 && line.indexOf('"turn_context"') === -1
     && line.indexOf('"session_meta"') === -1)) return false;
   const verdict = decodeJsonlLine(line);
@@ -86,10 +134,12 @@ function parseUsageLine(line: string, rec: UsageRecord): boolean {
   const tokens = rec.tokens;
   if (!tokens) return false;
   if (tokens.unsupported) return false;
-  const state = stateOf(tokens);
+  const state = stateOf(tokens, agentId ?? MAIN);
 
+  if (state.unreadable) return false;
+  if (typeof evt.ordinal === 'number' && evt.ordinal < state.historyStart) return false;
   if (evt.type === 'session_meta') {
-    if (!isForkedMeta(evt)) return false;
+    if (readMeta(evt, state, agentId)) return false;
     tokens.unsupported = true;
     return true;
   }
@@ -119,7 +169,7 @@ function parseUsageLine(line: string, rec: UsageRecord): boolean {
 
   // Le cumul ne baisse jamais et avance à chaque appel : il identifie l'appel, et une
   // relecture du fichier retombe sur le même identifiant.
-  accumulateUsage(tokens.main, toRawUsage(call), state.model, `codex:${cumul.total}`, asString(evt.timestamp));
+  accumulateUsage(bucketOf(tokens, agentId), toRawUsage(call), state.model, `codex:${cumul.total}`, asString(evt.timestamp));
   return true;
 }
 
@@ -165,6 +215,7 @@ const usageSnapshot = null;
 export {
   tokensSupported,
   discoverPath,
+  subagentTranscript,
   extractPrompt,
   parseUsageLine,
   usageSnapshot,

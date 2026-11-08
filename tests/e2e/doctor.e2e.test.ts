@@ -1,6 +1,5 @@
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, expect, test } from 'vitest';
@@ -137,24 +136,26 @@ test('le rendu terminal expose les faits qui fâchent (parse errors, coût parti
 });
 
 test('netgain doctor --json écrit un rapport JSON valide sur stdout, exit 0', () => {
+  // Arrange
   const netgainRoot = path.resolve(import.meta.dirname, '..', '..');
-  // Résolu par NOM et non par chemin figé : `tsx` est trouvé là où npm l'a
-  // installé. Le sous-chemin `tsx/dist/cli.mjs` n'est pas exporté, d'où le
-  // détour par le `package.json` de `tsx`, qui l'est.
-  const requireFromHere = createRequire(import.meta.url);
-  const tsxCli = path.join(path.dirname(requireFromHere.resolve('tsx/package.json')), 'dist', 'cli.mjs');
+  // Node efface lui-même les types de la source : un seul processus, sans
+  // second lanceur ni transpilation, pour que le test mesure la CLI et non le démarrage d'un outil.
+  const cli = path.join(netgainRoot, 'src', 'engine', 'cli.ts');
   // La CLI lit ~/.agent-viz/prices.json : un home vide la garde loin des adoptions de l'utilisateur.
   const emptyHome = mkdtempSync(path.join(tmpdir(), 'netgain-home-'));
   let out: string;
   try {
+    // Act
     out = execFileSync(
       process.execPath,
-      [tsxCli, path.join(netgainRoot, 'src', 'engine', 'cli.ts'), 'doctor', '--json', '--claude-dir', claudeDir],
+      [cli, 'doctor', '--json', '--claude-dir', claudeDir],
       { encoding: 'utf8', cwd: netgainRoot, env: { ...process.env, HOME: emptyHome, USERPROFILE: emptyHome } },
     );
   } finally {
     rmSync(emptyHome, { recursive: true, force: true });
   }
+
+  // Assert
   const parsed = JSON.parse(out) as { scan: { sessions: number }; totals: { costComplete: boolean } };
   expect(parsed.scan.sessions).toBe(1);
   expect(parsed.totals.costComplete).toBe(false);

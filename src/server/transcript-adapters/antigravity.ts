@@ -31,7 +31,8 @@ function extractPrompt(text: string): string | null {
   return null;
 }
 
-function parseUsageLine(_line: string, _rec: UsageRecord): false { return false; }
+function parseUsageLine(_line: string, _rec: UsageRecord, _agentId?: string): false { return false; }
+function subagentTranscript(_evt: unknown): null { return null; }
 
 const tokensSupported = true;
 const usageSnapshot = antigravityUsageSnapshot;
@@ -39,6 +40,7 @@ const usageSnapshot = antigravityUsageSnapshot;
 export {
   tokensSupported,
   discoverPath,
+  subagentTranscript,
   extractPrompt,
   parseUsageLine,
   usageSnapshot,

@@ -36,11 +36,26 @@ function normalizeAntigravity(raw: Payload, event: string | undefined): Payload 
   return out;
 }
 
+// Codex colle l'espace de noms d'un outil à son nom dans `tool_name` ; sa transcription
+// les garde séparés. Chaque groupe dit ce qui remplace son préfixe : `run` seul ne dirait
+// pas qu'il touche au web. Ceux d'MCP finissent par `__` et donnent déjà `mcp__<serveur>__<outil>`.
+const CODEX_GLUED_NAMESPACES: Record<string, string> = {
+  collaboration: '',
+  web: 'web.',
+};
+
+function normalizeCodex(raw: Payload): Payload {
+  const name = raw.tool_name;
+  if (typeof name !== 'string') return raw;
+  const ns = Object.keys(CODEX_GLUED_NAMESPACES).find(prefix => name.length > prefix.length && name.startsWith(prefix));
+  return ns === undefined ? raw : { ...raw, tool_name: CODEX_GLUED_NAMESPACES[ns] + name.slice(ns.length) };
+}
+
 export const NORMALIZERS: Record<HookSource, Normalizer> = {
   claude: identity,
   copilot: identity,
   antigravity: normalizeAntigravity,
-  codex: identity,
+  codex: normalizeCodex,
 };
 
 // Lue des clefs d'une table `Record<HookSource, …>` : un agent oublié ici ne compile pas.

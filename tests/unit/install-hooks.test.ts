@@ -96,7 +96,7 @@ test('install: refreshes existing hook whose timeout drifted (5 → 10)', () => 
   // 6e est posé au passage — d'où 'installed+updated' et non 'updated'.
   expect(r.action, `expected action='installed+updated', got '${r.action}'`).toBe('installed+updated');
   expect(r.updated?.length, `expected all 5 events refreshed, got ${r.updated?.length}`).toBe(5);
-  expect(r.missing, 'seul le nouvel evenement doit manquer').toEqual(['PostToolUseFailure']);
+  expect(r.missing, 'seul le nouvel evenement doit manquer').toEqual(['PostToolUseFailure', 'SessionEnd']);
 
   const persisted = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
   for (const ev of ['UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop', 'SessionStart']) {
@@ -159,12 +159,12 @@ test('EVENTS: l abonnement aux echecs d outil est declare', () => {
   expect(EVENTS.includes('PostToolUseFailure'), 'sans cet evenement, retryStorm ne peut se declencher sur aucune machine').toBeTruthy();
 });
 
-// Les cinq evenements que les deux agents partageaient avant PostToolUseFailure.
-const EVENTS_COPILOT_ATTENDUS = ['UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop', 'SessionStart'];
+// Les evenements que la reference des hooks de Copilot CLI documente, echec d'outil compris.
+const EVENTS_COPILOT_ATTENDUS = ['UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'Stop', 'SessionStart'];
 
-test('EVENTS: la liste de Claude porte l echec, celle de Copilot ne l invente pas', () => {
+test('EVENTS: les listes de Claude et de Copilot portent toutes deux l echec d outil', () => {
   expect(_internals.eventsFor('claude').includes('PostToolUseFailure'), 'PostToolUseFailure est un evenement Claude Code : il doit rester declare cote Claude').toBeTruthy();
-  expect(_internals.eventsFor('copilot'), 'rien ne prouve que Copilot connaisse PostToolUseFailure : ne pas ecrire ce nom chez lui').toEqual(EVENTS_COPILOT_ATTENDUS);
+  expect(_internals.eventsFor('copilot'), 'Copilot ne signale un outil en echec que par PostToolUseFailure : il doit etre declare chez lui').toEqual(EVENTS_COPILOT_ATTENDUS);
 });
 
 test('installCopilot: le fichier ecrit ne declare que les evenements connus de Copilot', () => {
@@ -178,7 +178,7 @@ test('installCopilot: le fichier ecrit ne declare que les evenements connus de C
   });
   const copilot = result.copilot as AgentInstallResult;
   const written = JSON.parse(fs.readFileSync(copilot.target!.file, 'utf8'));
-  expect(Object.keys(written.hooks), 'agent-viz ne doit ecrire aucun nom d evenement non mesure dans la config d un tiers').toEqual(EVENTS_COPILOT_ATTENDUS);
+  expect(Object.keys(written.hooks), 'agent-viz ne doit ecrire aucun nom d evenement non documente dans la config d un tiers').toEqual(EVENTS_COPILOT_ATTENDUS);
 });
 
 test('resolveScope: --local est refusé pour un agent sans fichier local', () => {
@@ -223,5 +223,5 @@ test('install: une configuration aux 5 anciens evenements ne gagne que le nouvea
   const missing = _internals.auditSettings(settings, cmd)
     .filter(a => !a.installed)
     .map(a => a.event);
-  expect(missing, 'la migration doit ajouter le nouvel evenement sans doublonner les autres').toEqual(['PostToolUseFailure']);
+  expect(missing, 'la migration doit ajouter le nouvel evenement sans doublonner les autres').toEqual(['PostToolUseFailure', 'SessionEnd']);
 });

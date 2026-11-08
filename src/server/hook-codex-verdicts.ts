@@ -52,7 +52,7 @@ interface ToolStates {
 }
 
 /** Les lancements que le fichier d'événements n'a pas encore clos, et les échecs qu'il porte déjà. */
-function toolStates(eventsText: string): ToolStates {
+export function toolStates(eventsText: string): ToolStates {
   const unfinished = new Map<string, Payload>();
   const failed = new Set<string>();
   for (const evt of records(eventsText, '"tool_use_id"')) {

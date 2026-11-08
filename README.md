@@ -44,8 +44,8 @@ agent-viz
 | Feature | Claude Code | Copilot CLI | Antigravity CLI | Codex |
 |---|:---:|:---:|:---:|:---:|
 | **Live view** | | | | |
-| Tool calls as they happen | ✅ | ✅ | ✅ | ✅ |
-| A failed tool shown as an error | ✅ | ❌ ¹ | ⚠️ ² | ⚠️ ⁷ |
+| Tool calls as they happen | ✅ | ⚠️ ¹¹ | ✅ | ✅ |
+| A failed tool shown as an error | ✅ | ⚠️ ¹ | ⚠️ ² | ⚠️ ⁷ |
 | Subagents in the topology | ✅ | 🚧 | ❌ | ⚠️ ¹⁰ |
 | Tokens | ✅ | ❌ ³ | ⚠️ ⁴ | ⚠️ ⁸ |
 | Cost | ✅ | ❌ | ⚠️ ⁵ | ⚠️ ⁹ |
@@ -53,23 +53,24 @@ agent-viz
 | **Live alerts** | | | | |
 | Loop | ✅ | ✅ | ✅ | ✅ |
 | Stuck | ✅ | 🚧 | ✅ | ✅ |
-| Retry storm | ✅ | ❌ ¹ | ⚠️ ² | ⚠️ ⁷ |
-| Bad invocation | ✅ | ❌ ¹ | 🚧 | ⚠️ ⁷ |
+| Retry storm | ✅ | 🚧 ¹ | ⚠️ ² | ⚠️ ⁷ |
+| Bad invocation | ✅ | 🚧 ¹ | 🚧 | ⚠️ ⁷ |
 | **Observatory** | | | | |
 | Advice, analysed sessions, tokens & prices, skills | ✅ | ❌ | ❌ | ❌ |
 
 ✅ works · ⚠️ works with a limit · ❌ not available · 🚧 not reliable yet: do not count on it for that agent
 
-1. Copilot CLI sends no tool-failure event.
+1. Counted in the header and listed in the error register, from the tool-failure event Copilot CLI documents; not yet checked on a real Copilot session.
 2. Known once the model call ends, not when the tool ends.
 3. Copilot CLI does not expose token usage.
 4. One model call behind during a turn, exact once it ends.
 5. Cost is an estimate from Google's public API prices, not what your Antigravity plan bills.
 6. Antigravity sends no session-start event.
 7. Shell commands only. Codex sends no tool-failure event, so the failure is read from the session transcript, which older Codex builds do not fill in. A command that never starts turns red at the next Codex event.
-8. No figure for a forked thread, nor for a session written by an older Codex. A subagent's tokens are not counted.
+8. No figure for a forked thread, nor for a session written by an older Codex. A subagent's tokens are counted from its first tool call.
 9. What the session would cost at OpenAI's API rates. A ChatGPT plan is billed differently, and codex-auto-review has no published price.
 10. A subagent appears at its first tool call, not when it is spawned. Its end time is read from the parent's transcript, which older Codex builds do not fill in.
+11. Copilot CLI sends no call identifier: agent-viz pairs each tool's end with the oldest unfinished start of the same tool with the same arguments in the session. Built from what Copilot CLI documents; not yet checked on a real Copilot session.
 
 Cursor is not supported.
 
@@ -241,7 +242,8 @@ Known limits:
 - A subagent is drawn under its session, named after its task (`/root/child` shows as `child`) with the nickname Codex gives its thread. It appears at its first tool call, not when it is spawned.
 - A subagent's start and end times are read from the transcript of the thread that spawned it. Older Codex builds do not write the end there: the subagent is then closed when its parent's turn ends, and its duration runs from its first tool call to that moment. Seen on 0.162.0-alpha.2, not on 0.148.0-alpha.9.
 - A subagent that receives a follow-up task after it finished is shown as finished while it works again. Once it finishes again, its duration is that of this latest run.
-- The tokens a subagent uses are not counted in the session total.
+- Each subagent's tokens are read from its own transcript and added to the session total, as for a Claude Code subagent. They show up at the subagent's first tool call: a subagent that calls no tool is not counted. The server finds them in the session's event file: past 500 KB that file keeps only its last 100 events, and a server restart then loses the tokens of a subagent none of whose events are left in it.
+- A subagent that starts with a copy of its parent's history counts only its own lines. A subagent transcript rewritten by a newer Codex holds nothing but that copy: its tokens are not shown. Seen on 0.147 and 0.148 transcripts. A subagent copied from another thread without saying where the copy ends is not counted; the rest of the session still is.
 
 ## Hook management
 
@@ -312,7 +314,7 @@ Claude Code:
   settings : /home/me/.claude/settings.json  (scope: user)
   hook cmd : node "<package dir>/bin/agent-viz.js" hook --source=claude  (mode: absolute)
   backup   : /home/me/.agent-viz/backups/-home-me-.claude-settings.json/2026-09-14T10-05-07.123Z.json
-  ✓ added: UserPromptSubmit, PreToolUse, PostToolUse, PostToolUseFailure, Stop, SessionStart
+  ✓ added: UserPromptSubmit, PreToolUse, PostToolUse, PostToolUseFailure, Stop, SessionStart, SessionEnd
   Coexisting hooks (run in parallel, untouched):
     - PreToolUse: 1 other(s)
 ```
@@ -357,7 +359,7 @@ If you reinstall agent-viz to a different path later (e.g. moved your dev clone)
 
 ## Captured events
 
-`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure` (Claude Code only), `Stop`, `SessionStart`. Antigravity and Codex send no such event: for them, agent-viz writes `PostToolUseFailure` itself, from the tool result the agent reports or from its session transcript. Events land as JSONL in `${tmpdir}/agent-events/<session_id>.jsonl` and are streamed to the dashboard via Server-Sent Events. Each event carries a `_source: "claude" | "copilot" | "antigravity" | "codex"` field set by the hook command's `--source` flag.
+`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `Stop`, `SessionStart`, `SessionEnd` (Claude Code only). Antigravity and Codex send no such event: for them, agent-viz writes `PostToolUseFailure` itself, from the tool result the agent reports or from its session transcript. Events land as JSONL in `${tmpdir}/agent-events/<session_id>.jsonl` and are streamed to the dashboard via Server-Sent Events. Each event carries a `_source: "claude" | "copilot" | "antigravity" | "codex"` field set by the hook command's `--source` flag.
 
 ## Configuration
 

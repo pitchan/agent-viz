@@ -70,3 +70,9 @@ export function errorsPresentation({ total, hasRepeat, lastFailed }: { total: nu
         : `Errors: ${total} in this session — session has moved on`,
   };
 }
+
+// The failures beside the tools count. Silent at zero: the errors chip next to it
+// already states that zero, and a second "0" in the same row would only repeat it.
+export function toolsPresentation(failed: number) {
+  return { failedText: failed > 0 ? `${failed} failed` : null };
+}

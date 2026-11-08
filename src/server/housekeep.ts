@@ -16,20 +16,28 @@ import {
   COMPACT_THRESHOLD_BYTES, COMPACT_KEEP_EVENTS,
   sessionIndex,
   idFromPath, indexSessionInitial,
+  type SessionRecord,
 } from './session-index.ts';
 import { broadcastSessionsChanged } from './sse.ts';
 import {
-  watchSession, unwatchSession, isWatched, resetFileOffset, deleteSession,
+  watchSession, unwatchSession, isWatched, rebaseFileOffset, deleteSession,
   readAndBroadcast,
 } from './event-reader.ts';
 import { ensureTranscriptWatcher } from './transcript.ts';
 import { decodeJsonlLine } from '../engine/core/jsonl.ts';
+import { withSessionLock } from './session-lock.ts';
 
 // Un objet exploitable par accès de champ — même garde locale que
 // session-index.ts et les adaptateurs de transcript : `decodeJsonlLine` ne
 // promet qu'un JSON valide, pas un objet.
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
+function countNewlines(buf: Buffer): number {
+  let n = 0;
+  for (const b of buf) if (b === 0x0a) n++;
+  return n;
 }
 
 interface CompactedTool {
@@ -49,12 +57,20 @@ interface SessionSummary {
 
 // For large files: read all events, keep the last COMPACT_KEEP_EVENTS, write a
 // companion .summary.json with session metadata, then rewrite the JSONL.
-async function compactSession(fp: string): Promise<void> {
+// La lecture et l'analyse se font sans verrou : le hook n'attend que la réécriture.
+// `readFile` is injected so a test can make the hook write between the read and the rewrite.
+async function compactSession(
+  fp: string,
+  readFile: (p: string) => Promise<string> = p => fsp.readFile(p, 'utf8'),
+): Promise<void> {
   const id = idFromPath(fp);
   const rec = sessionIndex.get(id);
   if (!rec) return;
-  let content: string;
-  try { content = await fsp.readFile(fp, 'utf8'); } catch { return; }
+  let read: string;
+  try { read = await readFile(fp); } catch { return; }
+  // Lu sans verrou, le fichier peut finir sur un ajout en cours : seules les lignes
+  // terminées comptent, le reste est relu sous verrou avec ce qui a été ajouté depuis.
+  const content = read.slice(0, read.lastIndexOf('\n') + 1);
   const allLines = content.trim().split('\n');
   if (allLines.length <= COMPACT_KEEP_EVENTS) return;
 
@@ -78,19 +94,29 @@ async function compactSession(fp: string): Promise<void> {
   const kept = allLines.slice(-COMPACT_KEEP_EVENTS);
   const summaryPath = fp.replace('.jsonl', '.summary.json');
   try {
+    await withSessionLock(fp, async () => rewriteTail(fp, rec, kept, Buffer.byteLength(content)));
+    // Après la réécriture : le tableau de bord affiche « compactée » toute session qui a un résumé.
     await fsp.writeFile(summaryPath, JSON.stringify(summary, null, 2));
-    await fsp.writeFile(fp, kept.join('\n') + '\n');
-    // Update index to reflect new file size.
-    const stat = await fsp.stat(fp);
-    rec.size = stat.size;
-    rec.eventCount = kept.length;
-    // Reset the read offset so readAndBroadcast doesn't skip the new smaller file.
-    resetFileOffset(fp, stat.size);
     console.log(`[housekeep] compacted ${id}: ${allLines.length} → ${kept.length} events, summary at ${path.basename(summaryPath)}`);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`[housekeep] compact failed for ${id}:`, message);
   }
+}
+
+// Sous verrou, et synchrone jusqu'au nouveau curseur : ce que le hook a écrit depuis la
+// lecture est recopié, et aucune lecture vive ne démarre entre la réécriture et le curseur.
+function rewriteTail(fp: string, rec: SessionRecord, kept: string[], readBytes: number): void {
+  const sizeBefore = fs.statSync(fp).size;
+  const appended = Buffer.alloc(sizeBefore - readBytes);
+  const fd = fs.openSync(fp, 'r');
+  try { fs.readSync(fd, appended, 0, appended.length, readBytes); } finally { fs.closeSync(fd); }
+  const rewritten = Buffer.concat([Buffer.from(kept.join('\n') + '\n'), appended]);
+  fs.writeFileSync(fp, rewritten);
+  // L'index compte ce que le lecteur a déjà lu : il reprend là où le curseur reprend.
+  const offset = rebaseFileOffset(fp, sizeBefore, rewritten.length);
+  rec.size = offset;
+  rec.eventCount = countNewlines(rewritten.subarray(0, offset));
 }
 
 interface SessionFileEntry {

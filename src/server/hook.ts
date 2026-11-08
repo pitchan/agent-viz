@@ -16,8 +16,11 @@ import { HOOK_SOURCES, NORMALIZERS, NEEDS_EVENT_FLAG, type HookSource } from './
 import { lateFailures } from './hook-antigravity-verdicts.ts';
 import { sessionStart } from './hook-antigravity-session-start.ts';
 import { codexEvents } from './hook-codex-verdicts.ts';
-import { agentIdentity, subagentStops } from './hook-codex-subagents.ts';
+import { agentIdentity, parentAgent, subagentStarts, subagentStops } from './hook-codex-subagents.ts';
+import { codexChildTranscript } from './codex-child-transcript.ts';
+import { copilotToolIds } from './hook-copilot-tool-ids.ts';
 import { validSessionId } from './session-id.ts';
+import { SessionLockError, withSessionLockSync } from './session-lock.ts';
 
 // node:http arrive par process.getBuiltinModule, pas par `import` : matérialiser son espace de
 // noms ESM se paie à chaque processus de hook, donc à chaque événement. getBuiltinModule rend le
@@ -88,9 +91,19 @@ function codexFromTranscript(raw: Payload, event: string | undefined): Payload[]
   const events = readEdge(path.join(DIR, `${session_id}.jsonl`), 'tail');
   const transcript = readEdge(transcript_path, 'tail');
   const evt = NORMALIZERS.codex(raw, event);
-  // L'événement d'un sous-agent pointe vers le transcript de son propre fil, qui s'ouvre sur son nom.
-  const named = typeof evt.agent_id === 'string' ? { ...evt, ...agentIdentity(readEdge(transcript_path, 'head')) } : evt;
-  return [...subagentStops(named, events, transcript), ...codexEvents(named, events, transcript)];
+  // L'événement d'un sous-agent pointe vers le transcript de son propre fil, qui s'ouvre sur son nom
+  // et sur le fil qui l'a lancé.
+  const head = typeof evt.agent_id === 'string' ? readEdge(transcript_path, 'head') : '';
+  const named = head ? { ...evt, ...agentIdentity(head), ...parentAgent(head) } : evt;
+  const child = (threadId: string, startedAt: string) => {
+    const found = codexChildTranscript(transcript_path, threadId, startedAt);
+    return found ? { path: found, head: readEdge(found, 'head') } : null;
+  };
+  return [
+    ...subagentStarts(named, events, transcript, child),
+    ...subagentStops(named, events, transcript),
+    ...codexEvents(named, events, transcript),
+  ];
 }
 
 const REPLACERS: Record<HookSource, Replacer | null> = {
@@ -98,6 +111,17 @@ const REPLACERS: Record<HookSource, Replacer | null> = {
   copilot: null,
   antigravity: antigravityPostInvocation,
   codex: codexFromTranscript,
+};
+
+// Un événement complété d'après ce que le fichier de sa session porte déjà. Lu et écrit sous le
+// même verrou : deux hooks simultanés de la session ne liraient pas le même état.
+type Pairer = (evt: Payload, eventsText: string) => Payload;
+
+const PAIRERS: Record<HookSource, Pairer | null> = {
+  claude: null,
+  copilot: copilotToolIds,
+  antigravity: null,
+  codex: null,
 };
 
 function parseSource(argv: string[]): HookSource {
@@ -157,8 +181,13 @@ function runHook(): void {
         process.exit(0);
       }
       const ts = new Date().toISOString();
-      const lines = events.map(evt => JSON.stringify({ ...evt, _ts: ts, _source: source }) + '\n');
-      fs.appendFileSync(path.join(DIR, `${sid}.jsonl`), lines.join(''));
+      const file = path.join(DIR, `${sid}.jsonl`);
+      const pair = PAIRERS[source];
+      withSessionLockSync(file, () => {
+        const written = pair ? events.map(evt => pair(evt, readEdge(file, 'tail'))) : events;
+        const lines = written.map(evt => JSON.stringify({ ...evt, _ts: ts, _source: source }) + '\n');
+        fs.appendFileSync(file, lines.join(''));
+      });
 
       const body = JSON.stringify({ session: sid });
       const req = http.request({
@@ -174,7 +203,8 @@ function runHook(): void {
       // JSON.parse en echec ne laissait AUCUNE trace. On sort toujours en 0 — on ne bloque
       // jamais l'agent — mais jamais sans trace.
       const message = err instanceof Error ? err.message : String(err);
-      logHookError(`payload rejected: ${message} source=${source}`);
+      // Une panne du verrou n'accuse pas la charge : elle se nomme pour ce qu'elle est.
+      logHookError(err instanceof SessionLockError ? `${message} source=${source}` : `payload rejected: ${message} source=${source}`);
     }
     process.exit(0);
   });

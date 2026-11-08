@@ -22,6 +22,7 @@ import {
   ensureFirstPrompt, ensureTranscriptWatcher, closeTranscriptResources,
 } from './transcript.ts';
 import { getWatchdogService } from './watchdog/index.ts';
+import { removeLock } from './session-lock.ts';
 
 // Un objet exploitable par accès de champ — même garde locale que
 // session-index.ts et les autres fichiers du serveur : `decodeJsonlLine` ne
@@ -92,22 +93,61 @@ function liveHandoffOffset(fp: string): number | null {
   return sessionIndex.has(idFromPath(fp)) ? null : 0;
 }
 
+// Bytes of `fp` from `offset` into `buf`; returns how many were read.
+async function readRange(fp: string, buf: Buffer, offset: number): Promise<number> {
+  const fh = await fsp.open(fp, 'r');
+  try { return (await fh.read(buf, 0, buf.length, offset)).bytesRead; }
+  finally { await fh.close(); }
+}
+
+type Stat = (p: string) => Promise<{ size: number }>;
+type Read = (p: string, buf: Buffer, offset: number) => Promise<number>;
+
+// The bytes of `fp` from `start()` to its end, all from one layout of the file.
+// A compaction that runs during an await rewrites the file under this read, so it
+// starts over from where `start()` places it in the new layout. null once `gone()`.
+async function readInOneLayout(
+  fp: string, start: () => number, gone: () => boolean, stat: Stat, read: Read,
+): Promise<{ offset: number; size: number; layout: number; bytes: Buffer } | null> {
+  for (;;) {
+    const layout = fileLayout(fp);
+    const offset = start();
+    const { size } = await stat(fp);
+    if (gone()) return null;
+    if (fileLayout(fp) !== layout) continue;
+    if (size <= offset) return { offset, size, layout, bytes: Buffer.alloc(0) };
+    const buf = Buffer.alloc(size - offset);
+    const bytesRead = await read(fp, buf, offset);
+    if (gone()) return null;
+    if (fileLayout(fp) !== layout) continue;
+    return { offset, size, layout, bytes: buf.subarray(0, bytesRead) };
+  }
+}
+
 // Read new bytes from a session file and broadcast via SSE.
-async function readAndBroadcast(filePath: string): Promise<void> {
+// `stat` and `read` are injected so a test can make the compaction run during
+// either await.
+async function readAndBroadcast(
+  filePath: string,
+  stat: Stat = p => fsp.stat(p),
+  read: Read = readRange,
+): Promise<void> {
   if (readInFlight.has(filePath)) { readPending.add(filePath); return; }
   readInFlight.add(filePath);
-  let fh;
   try {
-    const newStat = await fsp.stat(filePath);
-    const offset = fileOffsets.get(filePath) || 0;
-    if (newStat.size <= offset) return;
-    const len = newStat.size - offset;
-    const buf = Buffer.alloc(len);
-    fh = await fsp.open(filePath, 'r');
-    await fh.read(buf, 0, len, offset);
-    await fh.close();
-    fh = null;
-    fileOffsets.set(filePath, newStat.size);
+    // A compaction's new cursor still counts what this read had not taken as unread.
+    let cursor: number | undefined;
+    const got = await readInOneLayout(
+      filePath,
+      () => { cursor = fileOffsets.get(filePath); return cursor || 0; },
+      // Unwatched meanwhile: nobody follows the file any more.
+      () => cursor !== undefined && !fileOffsets.has(filePath),
+      stat, read,
+    );
+    if (!got || got.size <= got.offset) return;
+    const { offset, layout, bytes: buf } = got;
+    const len = buf.length;
+    fileOffsets.set(filePath, offset + len);
     const text = buf.toString('utf8');
     // Count newlines so we can update the in-memory index cheaply.
     let newlines = 0;
@@ -118,7 +158,7 @@ async function readAndBroadcast(filePath: string): Promise<void> {
     touchIndex(filePath, len, newlines);
     if (newRecord) broadcastSessionsChanged();
     const sessionName = path.basename(filePath, '.jsonl');
-    const lines = text.trim().split('\n');
+    let lineEnd = offset;
     const rec = sessionIndex.get(sessionName);
     // Read once, before the loop: nothing awaits inside it, so the service
     // cannot appear or vanish half-way through. And the first read that has a
@@ -134,7 +174,10 @@ async function readAndBroadcast(filePath: string): Promise<void> {
     // the sweep would re-read bytes already fed. Keep them adjacent.
     const wd = getWatchdogService();
     if (wd && !fedFrom.has(filePath)) fedFrom.set(filePath, offset);
-    for (const line of lines) {
+    for (const line of text.split('\n')) {
+      // The page moves its read cursor to the end of each line it is sent live,
+      // so that coming back to a hidden tab resumes after it.
+      lineEnd = Math.min(lineEnd + Buffer.byteLength(line) + 1, offset + len);
       // Le verdict sur une ligne vient de la primitive commune du moteur. C'est le chemin de
       // CAPTURE VIVE : une ligne préfixée d'un BOM y était perdue en silence, ni diffusée au
       // canevas ni donnée au chien de garde, donc invisible ET indétectable.
@@ -146,7 +189,7 @@ async function readAndBroadcast(filePath: string): Promise<void> {
         if (rec && !rec.agentSource && isRecord(evt) && typeof evt._source === 'string') {
           rec.agentSource = evt._source;
         }
-        broadcastSSE({ type: 'event', session: sessionName, event: evt });
+        broadcastSSE({ type: 'event', session: sessionName, event: evt, offset: lineEnd, layout });
         // The watchdog sees the same stream as the canvas but draws something
         // else from it: what deserves to be recorded. `onEvent` returns only
         // facts it has never seen, so re-reading a file broadcasts nothing.
@@ -166,7 +209,6 @@ async function readAndBroadcast(filePath: string): Promise<void> {
     // Discover transcript_path and start watching it for token usage.
     ensureTranscriptWatcher(filePath).catch(err => console.error('[event-reader] ensureTranscriptWatcher:', err.message));
   } catch {
-    if (fh) { try { await fh.close(); } catch {} }
   } finally {
     readInFlight.delete(filePath);
     if (readPending.has(filePath)) {
@@ -217,8 +259,7 @@ function unwatchSession(fp: string): void {
 
 function isWatched(fp: string): boolean { return watchers.has(fp); }
 
-// Reset the read offset for a file — used by housekeep.compactSession after
-// rewriting a smaller version of the JSONL so we don't skip the new content.
+// Set the read offset for a file whose layout has changed under the reader.
 //
 // The hand-off byte goes with it. The file has just been rewritten shorter, so
 // the old byte points into a layout that no longer exists — keeping it would
@@ -227,6 +268,55 @@ function isWatched(fp: string): boolean { return watchers.has(fp); }
 function resetFileOffset(fp: string, size: number): void {
   fileOffsets.set(fp, size);
   fedFrom.delete(fp);
+}
+
+// A compaction keeps the tail of the file, so what the reader had not read yet
+// is still its end: the reader resumes the same number of bytes before the end.
+// A file nobody follows has nothing unread. Returns the new offset.
+function rebaseFileOffset(fp: string, sizeBefore: number, sizeAfter: number): number {
+  const offset = rebased(sizeBefore - (fileOffsets.get(fp) ?? sizeBefore), sizeAfter);
+  resetFileOffset(fp, offset);
+  compactions.set(fp, [...(compactions.get(fp) ?? []), { sizeBefore, sizeAfter }]);
+  return offset;
+}
+
+function rebased(unread: number, sizeAfter: number): number {
+  return Math.max(0, sizeAfter - unread);
+}
+
+// Every compaction of a file, in order. A page's cursor is a byte offset in
+// one layout of the file — layout N is the file after N compactions — so a
+// cursor from an older layout is carried through each compaction since.
+const compactions = new Map<string, { sizeBefore: number; sizeAfter: number }[]>();
+
+function fileLayout(fp: string): number {
+  return compactions.get(fp)?.length ?? 0;
+}
+
+// What a page that has read `fp` up to `cursor`, in layout `layout`, has not
+// read yet, plus the size and layout that make its new cursor. A file that
+// cannot be read answers as empty: the page asks again at its next poll.
+// `stat` and `read` are injected so a test can make the compaction run during
+// either await.
+async function readUnread(
+  fp: string, cursor: number, layout: number,
+  stat: Stat = p => fsp.stat(p),
+  read: Read = readRange,
+): Promise<{ data: string; size: number; layout: number }> {
+  try {
+    const got = await readInOneLayout(
+      fp,
+      () => (compactions.get(fp)?.slice(layout) ?? []).reduce((o, c) => rebased(c.sizeBefore - o, c.sizeAfter), cursor),
+      () => false,
+      stat, read,
+    );
+    // Never null: nothing ends a page's read before it answers.
+    const { offset, size, layout: now, bytes } = got!;
+    if (size <= offset) return { data: '', size, layout: now };
+    return { data: bytes.toString('utf8'), size: offset + bytes.length, layout: now };
+  } catch {
+    return { data: '', size: 0, layout: fileLayout(fp) };
+  }
 }
 
 // Delete a session file + summary + clean everything related.
@@ -243,6 +333,7 @@ async function deleteSession(fp: string): Promise<void> {
     clearTokensTimer(rec as Parameters<typeof clearTokensTimer>[0]);
   }
   unwatchSession(fp);
+  compactions.delete(fp);
   sessionIndex.delete(id);
   readInFlight.delete(fp);
   readPending.delete(fp);
@@ -252,6 +343,12 @@ async function deleteSession(fp: string): Promise<void> {
       const message = err instanceof Error ? err.message : String(err);
       console.error(`[event-reader] unlink ${fp} failed: ${message}`);
     }
+  }
+  // Le verrou d'une session supprimée ne garde plus rien.
+  try { removeLock(fp); }
+  catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[event-reader] remove lock failed: ${message}`);
   }
   // Also remove companion summary if it exists.
   try { await fsp.unlink(fp.replace('.jsonl', '.summary.json')); }
@@ -266,6 +363,6 @@ async function deleteSession(fp: string): Promise<void> {
 export {
   readAndBroadcast,
   watchSession, unwatchSession, isWatched,
-  resetFileOffset, liveHandoffOffset,
-  deleteSession,
+  resetFileOffset, rebaseFileOffset, liveHandoffOffset,
+  readUnread, deleteSession,
 };

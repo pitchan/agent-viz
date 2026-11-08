@@ -8,12 +8,9 @@ import type { AgentName, AgentConfigEntry } from './types.ts';
 // commence ici, puis son adaptateur s'enregistre dans registry.ts.
 //
 // Pourquoi la liste d'evenements est PAR AGENT et non partagee : les agents
-// n'ont pas le meme vocabulaire. PostToolUseFailure a ete releve sur
-// machine cote Claude Code ; rien ne dit que Copilot CLI ou Antigravity le
-// connaissent, et on n'a aucun moyen de le verifier d'ici. Ecrire dans la
-// configuration d'un tiers un nom d'evenement qu'on n'a pas mesure, c'est lui
-// faire porter un risque qu'on n'a pas evalue — chaque agent ne recoit donc
-// que ce qu'on lui a constate.
+// n'ont pas le meme vocabulaire. Ecrire dans la configuration d'un tiers un
+// nom d'evenement qu'il ne connait pas, c'est lui faire porter un risque qu'on
+// n'a pas evalue — chaque agent ne recoit donc que ce qu'il declare emettre.
 export const AGENT_CONFIG = {
   claude: {
     label: 'Claude Code',
@@ -21,7 +18,8 @@ export const AGENT_CONFIG = {
     // PostToolUse ne se declenche que sur un succes. Sans cet abonnement, une
     // commande qui echoue ne laisse qu'un PreToolUse orphelin — un trou, que
     // rien ne distingue d'un outil encore en vol.
-    events: ['UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'Stop', 'SessionStart'],
+    // SessionEnd ferme les sous-agents en arriere-plan que le dernier Stop a laisses ouverts.
+    events: ['UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'Stop', 'SessionStart', 'SessionEnd'],
     userFile: () => path.join(os.homedir(), '.claude', 'settings.json'),
     projectFile: (root) => path.join(root, '.claude', 'settings.json'),
     localFile: (root) => path.join(root, '.claude', 'settings.local.json'),
@@ -30,7 +28,9 @@ export const AGENT_CONFIG = {
   },
   copilot: {
     label: 'Copilot CLI',
-    events: ['UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop', 'SessionStart'],
+    // Comme chez Claude Code, la référence des hooks de Copilot CLI réserve PostToolUse aux
+    // succès et signale un outil en échec par PostToolUseFailure, à la même forme de charge.
+    events: ['UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'Stop', 'SessionStart'],
     userFile: () => path.join(os.homedir(), '.copilot', 'hooks', 'agent-viz.json'),
     projectFile: (root) => path.join(root, '.github', 'hooks', 'agent-viz.json'),
     localFile: (root) => path.join(root, '.github', 'hooks', 'agent-viz.local.json'),

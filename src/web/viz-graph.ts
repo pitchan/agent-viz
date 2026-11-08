@@ -13,8 +13,12 @@ import {
 import { layoutDirtyRoots, markLayoutDirty } from './viz-layout.ts';
 import { markNarratorDirty } from './viz-narrator.ts';
 import { toolSubject, type ToolCallEvent, type ToolInput } from '../engine/core/tool-subject.ts';
-import { formatDuration } from './viz-duration.ts';
+import { calcDuration } from './viz-duration.ts';
 import { recordError, recordSuccess } from './viz-errors.ts';
+import { recomputeParallelFlags } from './viz-parallel.ts';
+import {
+  launchesSubagent, settleLaunchedSubagent, settleReportedSubagent, settleStoppedSubagent, stillRunningSubagents,
+} from './viz-subagent-end.ts';
 
 // L'evenement hook tel que ce module le lit : les champs de ToolCallEvent
 // (moteur, deja type) plus ceux que la carte du graphe consomme. Tous
@@ -28,12 +32,23 @@ export interface HookEvent extends ToolCallEvent {
   // Posés quand l'agent nomme son sous-agent : le nom de la tâche, et le surnom du fil.
   agent_name?: string;
   agent_nickname?: string;
+  // Posé quand l'agent dit quel sous-agent a lancé celui-ci.
+  parent_agent_id?: string;
   tool_use_id?: string;
   // `isolation` s'ajoute a ToolInput : seul le graphe s'en sert, pour la
   // pastille « worktree » d'un sous-agent isole.
-  tool_input?: ToolInput & { isolation?: string };
-  tool_response?: { agentId?: string; status?: string };
+  // `run_in_background` (Agent) et `task_id` (TaskStop) arrivent aussi : la fin d'un sous-agent
+  // se lit sur la réponse de l'outil, pas sur ces entrées.
+  tool_input?: ToolInput & { isolation?: string; run_in_background?: boolean; task_id?: string };
+  // Réponse de TaskStop : la tâche arrêtée et son type ; `message` et `command` la décrivent.
+  tool_response?: {
+    agentId?: string; status?: string;
+    task_id?: string; task_type?: string; message?: string; command?: string;
+  };
   message?: string;
+  // Fin du tour (Stop) : les tâches en arrière-plan encore en vol. Message (UserPromptSubmit) : son texte.
+  background_tasks?: Array<{ id: string; type: string; status: string }>;
+  prompt?: string;
   // Posé par un agent qui n'annonce son début qu'après coup : l'heure réelle du début.
   started_at?: string;
   // Posé sur un échec écrit après coup : l'heure réelle de la fin de l'outil.
@@ -86,10 +101,9 @@ function agentLabel(evt: HookEvent): string {
   return evt.agent_name || evt.agent_type || evt.subagent_type || 'Agent';
 }
 
-// Lazy-promote a node created by getNode('a:<aid>') with default type='tool'
-// into a real agent node. Claude Code does not emit SubagentStart hooks today,
-// so the first child PreToolUse carrying agent_id is our spawn signal.
-// Child events also carry agent_type, so we have a real label immediately.
+// Le premier outil d'un sous-agent le fait naître : agent-viz n'installe pas le hook SubagentStart,
+// qui ne porte d'ailleurs pas d'heure. Faute d'autre lien plus tôt, son début n'est corrigé
+// qu'au retour de l'outil qui le nomme : outil Agent, ou Skill en fork.
 function promoteAgentNode(n: VizNode, evt: HookEvent, sid: string, ts: string) {
   n.type = 'agent';
   n.label = agentLabel(evt);
@@ -100,7 +114,7 @@ function promoteAgentNode(n: VizNode, evt: HookEvent, sid: string, ts: string) {
   setRunning(n.id, true);
   if (!n.parentId) {
     const aid = (evt.agent_id || n.id.slice(2));
-    const forkedParentAid = state.forkedAgentParents.get(aid);
+    const forkedParentAid = evt.parent_agent_id || state.forkedAgentParents.get(aid);
     const forkedParent = forkedParentAid ? state.nodes.get(`a:${forkedParentAid}`) : null;
     let parent;
     if (forkedParent) {
@@ -136,28 +150,26 @@ function reparentNode(n: VizNode, newParentId: string) {
   markLayoutDirty(n);
 }
 
-// Mark all running agents under this session as parallel if 2+ run at once.
-// Sticky: once flagged, an agent keeps isParallel=true for the rest of its life.
-export function recomputeParallelFlags(sessionId: string) {
-  const session = state.nodes.get(sessionId);
-  if (!session) return;
-  const runningAgents = session.children.filter(c =>
-    c.type === 'agent' && c.status === 'running'
-  );
-  if (runningAgents.length >= 2) {
-    for (const a of runningAgents) a.isParallel = true;
-  }
+// Un sous-agent lancé par un sous-agent (outil Agent, ou Skill en fork) ne se dit qu'au retour
+// de l'outil, après son premier PreToolUse : il quitte alors la session pour son lanceur, et
+// ses événements suivants l'y retrouvent.
+function adoptSubagent(childAid: string, parentAid: string) {
+  state.forkedAgentParents.set(childAid, parentAid);
+  const childNode = state.nodes.get(`a:${childAid}`);
+  if (childNode) reparentNode(childNode, `a:${parentAid}`);
 }
 
 // On SessionEnd, close every descendant that was still running so particle
-// generation (which iterates vis.runningNodes) stops immediately.
-export function cascadeTerminate(rootNodeId: string, ts: string) {
+// generation (which iterates vis.runningNodes) stops immediately. `spared` nodes keep
+// working past this end, with their whole subtree.
+export function cascadeTerminate(rootNodeId: string, ts: string, spared: Set<string>) {
   const root = state.nodes.get(rootNodeId);
   if (!root) return;
   const stack = [...(root.children || [])];
   while (stack.length) {
     // La condition de boucle dit que la pile n'est pas vide : `pop` rend un noeud.
     const n = stack.pop()!;
+    if (spared.has(n.id)) continue;
     if (n.status === 'running') {
       n.status = 'done';
       n.endTime = ts;
@@ -192,14 +204,17 @@ function onSessionStart(evt: HookEvent, sid: string, ts: string) {
 
 function onSubagentStart(evt: HookEvent, sid: string, ts: string) {
   const aid = evt.agent_id || sid;
+  // Un début réécrit ne rouvre pas un sous-agent déjà au graphe : une relance s'annonce autrement.
+  if (state.nodes.get(`a:${aid}`)?.type === 'agent') return;
   const n = getNode(`a:${aid}`);
   n.type = 'agent';
   n.label = agentLabel(evt);
-  n.sub = (evt.tool_input && evt.tool_input.description) || aid.slice(0, 8);
-  n.color = COLORS.agent; n.data = evt; n.status = 'running'; n.startTime = ts;
+  n.sub = evt.agent_nickname || (evt.tool_input && evt.tool_input.description) || aid.slice(0, 8);
+  n.color = COLORS.agent; n.data = evt; n.status = 'running'; n.startTime = evt.started_at || ts;
   if (evt.tool_input && evt.tool_input.isolation === 'worktree') n.isIsolated = true;
   setRunning(n.id, true);
-  const parent = ensureSessionParent(sid);
+  const launcher = evt.parent_agent_id ? state.nodes.get(`a:${evt.parent_agent_id}`) : undefined;
+  const parent = launcher || ensureSessionParent(sid);
   if (!n.parentId) { n.parentId = parent.id; parent.children.push(n); }
   recomputeParallelFlags(parent.id);
   addTimelineEntry(evt, n.id, 'agent', n.label, n.sub);
@@ -242,30 +257,28 @@ function onPreToolUse(evt: HookEvent, sid: string, ts: string) {
     parent.type = 'session'; parent.label = parent.label || 'Session'; parent.color = COLORS.session;
   } else if (parent.type !== 'agent') {
     promoteAgentNode(parent, evt, sid, ts);
+  } else if (evt.agent_nickname && parent.sub === (evt.agent_id || '').slice(0, 8)) {
+    // Né d'un début sans surnom (transcript introuvable) : le surnom arrive avec ses outils.
+    parent.sub = evt.agent_nickname;
   }
   if (!n.parentId) { n.parentId = parent.id; parent.children.push(n); }
   addTimelineEntry(evt, n.id, n.type, n.label, n.sub);
 }
 
-// Subagent completion: PostToolUse on the main-thread Agent tool carries
-// tool_response.agentId. This is the canonical "subagent done" signal,
-// since SubagentStop hooks are not reliably emitted. terminalStatus is
-// 'done' (PostToolUse) or 'error' (PostToolUseFailure).
-function settleAgentFromAgentToolResponse(evt: HookEvent, ts: string, terminalStatus: 'done' | 'error') {
-  if (evt.tool_name !== 'Agent') return;
-  const aid = evt.tool_response && evt.tool_response.agentId;
-  const an = aid ? state.nodes.get(`a:${aid}`) : null;
-  if (!an || an.status !== 'running') return;
-  an.status = terminalStatus;
-  an.endTime = ts;
-  an.duration = calcDuration(an.startTime, ts);
-  an.color = terminalStatus === 'error' ? COLORS.error : COLORS.complete;
-  setRunning(an.id, false);
-  if (terminalStatus === 'done') {
-    const desc = evt.tool_input && evt.tool_input.description;
-    if (desc) an.sub = desc.slice(0, 45);
+// L'échec l'emporte : Antigravity annonce la fin d'un outil, puis son échec lu plus tard
+// dans le transcript ; une fin qui suit un échec ne le rouvre pas. Sans identifiant,
+// rien ne relie deux fins : chacune est un appel distinct.
+function countToolEnd(tid: string, outcome: 'done' | 'error') {
+  if (tid === '') {
+    state.toolsCompleted++;
+    if (outcome === 'error') state.toolsFailed++;
+    return;
   }
-  if (an.parentId) recomputeParallelFlags(an.parentId);
+  const prev = state.toolOutcomes.get(tid);
+  if (prev === 'error' || prev === outcome) return;
+  if (prev === undefined) state.toolsCompleted++;
+  if (outcome === 'error') state.toolsFailed++;
+  state.toolOutcomes.set(tid, outcome);
 }
 
 function onPostToolUse(evt: HookEvent, sid: string, ts: string) {
@@ -274,23 +287,13 @@ function onPostToolUse(evt: HookEvent, sid: string, ts: string) {
   if (n) {
     n.status = 'done'; n.data = evt; n.endTime = ts;
     n.duration = calcDuration(n.startTime, ts);
-    state.toolsCompleted++;
     setRunning(n.id, false);
   }
-  settleAgentFromAgentToolResponse(evt, ts, 'done');
-  // Skill fork → record the parent mapping and reparent the forked sub-agent
-  // under its launching agent. The child's first PreToolUse arrives before
-  // this PostToolUse, so the child is initially attached to the session by
-  // promoteAgentNode and must be moved retroactively here.
-  if (evt.tool_name === 'Skill' && evt.tool_response
-      && evt.tool_response.status === 'forked' && evt.tool_response.agentId
-      && evt.agent_id) {
-    const childAid = evt.tool_response.agentId;
-    const parentAid = evt.agent_id;
-    state.forkedAgentParents.set(childAid, parentAid);
-    const childNode = state.nodes.get(`a:${childAid}`);
-    if (childNode) reparentNode(childNode, `a:${parentAid}`);
-  }
+  countToolEnd(tid, 'done');
+  settleLaunchedSubagent(evt, ts, 'done');
+  settleStoppedSubagent(evt, ts);
+  const childAid = evt.tool_response && evt.tool_response.agentId;
+  if (evt.agent_id && childAid && launchesSubagent(evt)) adoptSubagent(childAid, evt.agent_id);
   // EN DERNIER, comme recordError dans le pendant echec : l'abonne repeint de
   // facon synchrone, il doit lire des noeuds deja a jour. C'est le fait de
   // continuite de la pastille — combien d'outils ont reussi depuis un echec.
@@ -305,7 +308,8 @@ function onPostToolUseFailure(evt: HookEvent, sid: string, ts: string) {
     n.endTime = evt.ended_at || ts; n.duration = calcDuration(n.startTime, n.endTime);
     setRunning(n.id, false);
   }
-  settleAgentFromAgentToolResponse(evt, ts, 'error');
+  settleLaunchedSubagent(evt, ts, 'error');
+  countToolEnd(tid, 'error');
   // HORS du `if (n)` : un echec dont le noeud manque (PreToolUse non recu, noeud deja
   // ramasse) se compte aussi. Et EN DERNIER : l'abonne de `recordError`, synchrone, repeint
   // le flux d'apres le STATUT des noeuds, qui doit deja porter la mutation ci-dessus.
@@ -329,7 +333,7 @@ function onSessionEnd(evt: HookEvent, sid: string, ts: string) {
   n.duration = calcDuration(n.startTime, ts);
   n.color = COLORS.complete;
   setRunning(n.id, false);
-  cascadeTerminate(n.id, ts);
+  cascadeTerminate(n.id, ts, stillRunningSubagents(evt));
 }
 
 type EventHandler = (evt: HookEvent, sid: string, ts: string) => void;
@@ -342,6 +346,7 @@ const EVENT_HANDLERS: Record<string, EventHandler> = {
   PostToolUse: onPostToolUse,
   PostToolUseFailure: onPostToolUseFailure,
   Notification: onNotification,
+  UserPromptSubmit: (evt, _sid, ts) => settleReportedSubagent(evt, ts),
   Stop: onSessionEnd,
   SessionEnd: onSessionEnd,
 };
@@ -361,13 +366,8 @@ export function processEvent(evt: HookEvent) {
   markNarratorDirty();
 }
 
-// Le format vit dans viz-duration.ts ; ici on ne garde que la
-// traduction de « pas de durée » propre à la carte du graphe : `null`, que
-// `viz-canvas` et le panneau de détail savent déjà taire.
-export function calcDuration(start: string | null | undefined, end: string | null | undefined): string | null {
-  if (!start || !end) return null;
-  return formatDuration(new Date(end).getTime() - new Date(start).getTime());
-}
+// Les cartes du graphe et leurs lecteurs prennent la durée ici, avec les noeuds.
+export { calcDuration };
 
 // Feed label: the shared subject rule, cut to the width the feed column can
 // show. The rule itself lives in the engine's tool-subject.ts — the watchdog
