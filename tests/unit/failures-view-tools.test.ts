@@ -131,3 +131,16 @@ test('sans aucune panne a traiter, la section des plus frequentes n apparait pas
   expect(parClasse(node, 'failures-section-title').length).toBe(0);
   expect(parClasse(node, 'failure-acked').length).toBe(1);
 });
+
+test('le chiffre de « Vues une seule fois » reste gris, meme quand la somme atteint le rouge', () => {
+  // Arrange
+  const outils = ['Read', 'Edit', 'Write', 'WebFetch', 'WebSearch', 'Grep'];
+  const node = fauxElement('div');
+  // Act
+  renderFailures(node, outils.map(toolName => alerte({ id: toolName, toolName })));
+  // Assert
+  const [once] = parClasse(node, 'is-once');
+  const [chiffre] = parClasse(once, 'failure-sev');
+  expect(texte(chiffre)).toBe('6×');
+  expect(chiffre.classList.contains('sev-low')).toBe(true);
+});

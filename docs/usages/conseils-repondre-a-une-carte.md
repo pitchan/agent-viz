@@ -48,6 +48,8 @@ Une carte **fermée** tient sur une ligne :
 4. le degré de certitude ;
 5. le projet concerné, s'il y en a un : son dernier dossier, le chemin complet au survol.
 
+Sur un écran étroit, la ligne passe à la ligne : aucun de ces éléments n'est masqué, le degré de certitude compris.
+
 Une carte **ouverte** montre en plus, de haut en bas :
 
 1. le bandeau de retour, pour une carte revenue (R19) ;

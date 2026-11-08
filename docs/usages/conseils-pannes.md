@@ -58,7 +58,7 @@ Sources : **vu**, **relevé**, **voulu** (confirmé par le mainteneur le 20/10/2
 |---|---|---|
 | P4 | Le chiffre d'une panne est le nombre de toutes ses apparitions sur la période, acquittées comprises. Il dit combien de fois elle est apparue, pas ce qui reste à acquitter. | voulu |
 | P5 | Le chiffre d'un outil est la somme des chiffres de ses pannes à traiter. | voulu |
-| P6 | Couleur du chiffre : rouge à partir de 5, orange de 2 à 4, gris pour 1. | voulu |
+| P6 | Couleur du chiffre : rouge à partir de 5, orange de 2 à 4, gris pour 1. Exception : le chiffre du groupe *Vues une seule fois* (la somme de ses pannes) reste gris quel que soit le total, car chaque outil n'y est vu qu'une fois. | voulu |
 | P7 | Aucune ligne ne porte de badge « à traiter » : c'est le chiffre qui dit ce qui compte. | voulu |
 
 ### Les plus fréquentes
