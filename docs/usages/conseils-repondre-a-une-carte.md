@@ -121,7 +121,7 @@ Chaque règle porte sa source :
 | R19 | Une carte revenue affiche un bandeau au-dessus de ses chiffres, puis repropose ses boutons. Une nouvelle réponse remplace la date et le coût retenus. | relevé |
 | R20 | Une nouvelle analyse met à jour les chiffres des cartes, sans jamais annuler une réponse déjà donnée. | relevé |
 | R21 | Un projet déplacé ou renommé est un nouveau projet : sa carte réapparaît comme neuve, et l'ancienne réponse reste attachée à l'ancien emplacement. | voulu |
-| R22 | Si une réponse ne s'enregistre pas, la carte s'ouvre et affiche « Décision non enregistrée : » suivi de la cause, et garde ses boutons pour réessayer. Le reste de la page ne bouge pas. | vu |
+| R22 | Si une réponse ne s'enregistre pas, la carte s'ouvre et affiche « Décision non enregistrée : » suivi de la cause, et garde ses boutons pour réessayer. Pour *Réactiver*, le même message s'affiche sur la ligne du journal *Décisions rendues*. Le reste de la page ne bouge pas. | vu |
 
 Texte du bandeau d'une carte revenue (R19) :
 

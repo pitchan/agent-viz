@@ -269,10 +269,11 @@ function render() {
   renderTop();
 }
 
-// La carte s'ouvre : l'erreur et les boutons pour reessayer vivent dans son corps.
+// L'erreur vit pres des boutons pour reessayer : dans le corps d'une carte, qui
+// s'ouvre ; sur la ligne elle-meme au journal, qui n'a pas de corps.
 export function showDecisionError(card: HTMLElement, message: string) {
   (card as HTMLDetailsElement).open = true;
-  card.querySelector('.advisor-card-body')!
+  (card.querySelector('.advisor-card-body') ?? card)
     .appendChild(el('div', 'advisor-card-error', decisionErrorLabel(message)));
 }
 
