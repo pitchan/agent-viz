@@ -32,16 +32,40 @@ export function fauxElement(tag: string): any {
       contains: (c: string) => classes.has(c),
     },
     setAttribute(k: string, v: any) { this.attrs[k] = v; },
-    append(...nodes: any[]) { this.children.push(...nodes); },
-    appendChild(n: any) { this.children.push(n); return n; },
+    parent: null as any,
+    append(...nodes: any[]) { for (const n of nodes) this.appendChild(n); },
+    appendChild(n: any) { n.parent = this; this.children.push(n); return n; },
     addEventListener(evt: string, fn: (...a: any[]) => void) { this.handlers[evt] = fn; },
     click() { this.handlers.click && this.handlers.click({ target: this, preventDefault() {} }); },
     scrollIntoView() { this.scrolled = true; },
-    // Seul le selecteur de classe « .nom » est lu : c'est le seul que les vues emploient.
+    matches(sel: string) { return correspond(this, sel); },
+    closest(sel: string) {
+      let n = this;
+      while (n && !correspond(n, sel)) n = n.parent;
+      return n ?? null;
+    },
     querySelector(sel: string) {
-      return aPlat(this).slice(1).find(n => n.classList.contains(sel.slice(1))) ?? null;
+      return aPlat(this).slice(1).find(n => correspond(n, sel)) ?? null;
     },
   };
+}
+
+// Les selecteurs que les vues emploient : `balise`, `.classe` et `[data-x]` ou
+// `[data-x="v"]`, combinables (`.advisor-card[data-rec-id="7"]`). Un autre se refuse.
+const SELECTEUR = /^([a-z]+)?(?:\.([\w-]+))?(?:\[data-([\w-]+)(?:="([^"]*)")?\])?$/;
+
+function correspond(n: any, sel: string) {
+  const m = SELECTEUR.exec(sel);
+  if (!m || sel === '') throw new Error(`selecteur non pris en charge par le faux DOM : ${sel}`);
+  const [, balise, classe, data, valeur] = m;
+  if (balise && n.tagName !== balise.toUpperCase()) return false;
+  if (classe && !n.classList.contains(classe)) return false;
+  if (data) {
+    const cle = data.replace(/-(\w)/g, (_: string, c: string) => c.toUpperCase());
+    if (!(cle in n.dataset)) return false;
+    if (valeur !== undefined && String(n.dataset[cle]) !== valeur) return false;
+  }
+  return true;
 }
 
 export const aPlat = (n: any): any[] => [n, ...n.children.flatMap(aPlat)];
