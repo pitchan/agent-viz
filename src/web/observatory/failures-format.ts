@@ -84,6 +84,10 @@ const MOTIFS: Record<string, string> = {
 // muette dans un tableau de bord se lit comme un bug de l'outil.
 const REGLAGE_INCONNU = 'un réglage du poste de travail';
 
+export function motifPhrase(patternId: string) {
+  return MOTIFS[patternId] || REGLAGE_INCONNU;
+}
+
 // Le detecteur compte des la premiere occurrence — c'est son role. Mais « 1
 // fois dans la session » n'apprend rien et occupe la ligne : le compte ne se
 // dit qu'a partir du moment ou il distingue quelque chose.

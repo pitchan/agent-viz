@@ -6,6 +6,8 @@ Une spec par usage : ce que la personne veut faire, ce que l'écran montre, les 
 
 | Page | Usage | Spec |
 |---|---|---|
+| Conseils | Voir d'un coup d'œil ce qui mérite l'attention | [conseils-vue-d-ensemble.md](conseils-vue-d-ensemble.md) |
+| Conseils | Repérer et acquitter les pannes | [conseils-pannes.md](conseils-pannes.md) |
 | Conseils | Répondre à une carte | [conseils-repondre-a-une-carte.md](conseils-repondre-a-une-carte.md) |
 
 ## Gabarit

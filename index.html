@@ -102,14 +102,20 @@
            paragraphe défensif carte par carte (doc/44). -->
       <div id="advisor-motto">L’Observatoire mesure et conseille ; il n’exécute jamais rien à ta place.</div>
       <div id="advisor-period" class="period-selector"></div>
+      <div id="advisor-bilan"></div>
       <div id="advisor-summary"></div>
-      <!-- Les pannes ET les recommandations partagent UN ascenseur : deux zones
-           de defilement concurrentes laissaient la seconde a 0 px de haut des
-           qu'une panne etait depliee. -->
+      <div id="advisor-tabs" role="tablist"></div>
+      <!-- Les deux onglets partagent UN ascenseur : deux zones de defilement
+           concurrentes laissaient la seconde a 0 px de haut des qu'une panne
+           etait depliee. -->
       <div id="advisor-body">
-        <div id="advisor-failures-error" class="failures-error"></div>
-        <div id="advisor-failures" class="failures-block"></div>
-        <div id="advisor-list"></div>
+        <div id="advisor-tab-pannes" role="tabpanel" hidden>
+          <div id="advisor-failures-error" class="failures-error"></div>
+          <div id="advisor-failures" class="failures-block"></div>
+        </div>
+        <div id="advisor-tab-conseils" role="tabpanel" hidden>
+          <div id="advisor-list"></div>
+        </div>
       </div>
       <div id="advisor-footer">
         <button type="button" class="obs-btn obs-btn--danger" id="advisor-purge"

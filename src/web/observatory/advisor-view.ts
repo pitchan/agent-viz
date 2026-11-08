@@ -16,6 +16,10 @@ import { evidenceLines } from './evidence.ts';
 import { initPeriodSelector } from './period-selector.ts';
 import { initConfirmButton } from './confirm-button.ts';
 import { renderFailures } from './failures-view.ts';
+import { splitProjectTitle, projectBadge, gestureHead, compactCost } from './card-line.ts';
+import { layoutPannes } from './failures-tools.ts';
+import { conseilsCounts, defaultTab, type Tab } from './overview-format.ts';
+import { renderOverview } from './overview-view.ts';
 import { renderDecisions, refusalControls } from './decisions-view.ts';
 import type { Alert } from '../../engine/watchdog/detector.ts';
 
@@ -80,15 +84,41 @@ function choice(content: HTMLElement, caption: string) {
 
 // Exported for its tests: the card IS the page's contract with the user —
 // the labels and captions are behavior here, not decoration.
-export function recommendationCard(rec: Recommendation, { actionable }: { actionable: boolean }) {
-  const card = el('div', 'advisor-card');
+// La ligne d'une carte fermee : de quoi decider s'il faut l'ouvrir.
+function cardLine(rec: Recommendation) {
+  const line = el('summary', 'advisor-card-line');
+  const { headline, project } = splitProjectTitle(rec.title);
+  const main = el('span', 'advisor-card-main');
+  main.append(
+    el('span', 'advisor-card-title', headline),
+    el('span', 'advisor-card-gesture', `→ ${gestureHead(rec.action)}`),
+  );
+  line.append(
+    el('span', 'advisor-card-cost', compactCost(rec)),
+    main,
+    el('span', `advisor-card-certainty is-${rec.confidence}`, confidenceLabel(rec.confidence)),
+  );
+  if (project) {
+    const badge = el('span', 'advisor-card-project', projectBadge(project));
+    badge.title = project;
+    line.appendChild(badge);
+  }
+  return line;
+}
+
+export function recommendationCard(rec: Recommendation, { actionable, open = false }: { actionable: boolean; open?: boolean }) {
+  const card = el('details', 'advisor-card') as HTMLDetailsElement;
   card.dataset.recId = String(rec.id);
-  card.appendChild(el('div', 'advisor-card-title', rec.title));
   // Une carte décidée qui re-surface dit son histoire avant ses mesures :
   // le statut choisit le bandeau (adoption interpellée, veille constatée).
+  // Elle s'ouvre d'elle-même : c'est elle qui demande une réponse.
   const banner = returnBanner(rec);
-  if (banner) card.appendChild(el('div', 'advisor-card-return', banner));
-  card.append(
+  card.open = open || banner !== '';
+  card.appendChild(cardLine(rec));
+  const body = el('div', 'advisor-card-body');
+  card.appendChild(body);
+  if (banner) body.appendChild(el('div', 'advisor-card-return', banner));
+  body.append(
     el('div', 'advisor-card-meta', `${confidenceLabel(rec.confidence)} · ${costLabel(rec)}`),
     el('div', 'advisor-card-period', periodLabel(rec)),
     el('div', 'advisor-card-action', rec.action
@@ -97,7 +127,7 @@ export function recommendationCard(rec: Recommendation, { actionable }: { action
 
   const evidence = el('ul', 'advisor-card-evidence');
   for (const line of evidenceLines(rec)) evidence.appendChild(el('li', null, line));
-  card.appendChild(evidence);
+  body.appendChild(evidence);
 
   if (actionable) {
     // « Je l'adopte » n'existe que s'il y a un geste à adopter ; une carte
@@ -120,20 +150,71 @@ export function recommendationCard(rec: Recommendation, { actionable }: { action
     buttons.appendChild(choice(
       refusalControls(reason => changeStatus(api, rec.id, 'arbitrated', reason)),
       CHOICE_CAPTIONS.refuse));
-    card.appendChild(buttons);
+    body.appendChild(buttons);
   }
   return card;
 }
 
+// Ce que la page retient tant qu'elle reste ouverte : un nouveau rendu (fin de
+// scan, decision) ne doit ni refermer ce que l'utilisateur a ouvert, ni
+// changer d'onglet sous ses yeux. `alerts` undefined = pas encore chargees,
+// null = chargement echoue.
+const page = {
+  alerts: undefined as Alert[] | null | undefined,
+  tab: null as Tab | null,
+  openCards: new Set<number>(),
+  periodOpen: false,
+};
+
+function rememberOpen(node: HTMLElement, onToggle: (open: boolean) => void) {
+  node.addEventListener('toggle', () => onToggle((node as HTMLDetailsElement).open));
+}
+
+// Le detail de la periode reste disponible, replie : la phrase-bilan le precede.
 function renderSummary(node: HTMLElement, summary: Summary | null | undefined) {
   node.textContent = '';
   if (!summary) return;
-  node.append(
+  const det = el('details', 'advisor-period-details') as HTMLDetailsElement;
+  det.open = page.periodOpen;
+  rememberOpen(det, open => { page.periodOpen = open; });
+  det.append(
+    el('summary', 'advisor-period-details-head', 'Détail de la période'),
     el('div', 'advisor-summary-headline', summaryHeadline(summary)),
     el('div', 'advisor-summary-period', periodHeader(summary.period)),
     el('div', 'advisor-summary-basis', basisLabel(summary.basis)),
     el('div', 'advisor-summary-details', summaryDetails(summary)),
   );
+  node.appendChild(det);
+}
+
+function listCard(rec: Recommendation, actionable: boolean) {
+  const card = recommendationCard(rec, { actionable, open: page.openCards.has(rec.id) });
+  rememberOpen(card, open => { if (open) page.openCards.add(rec.id); else page.openCards.delete(rec.id); });
+  return card;
+}
+
+// Les compteurs-onglets se rendent quand les DEUX sources ont repondu : un
+// compte a zero pendant le chargement se lirait comme « rien a traiter ».
+function renderTop() {
+  const state = getState();
+  if (state.error) {
+    // Sans analyse, pas de conseils a compter : seules les pannes restent lisibles.
+    document.getElementById('advisor-bilan')!.textContent = '';
+    document.getElementById('advisor-tabs')!.textContent = '';
+    document.getElementById('advisor-tab-pannes')!.hidden = false;
+    document.getElementById('advisor-tab-conseils')!.hidden = true;
+    return;
+  }
+  if (page.alerts === undefined || !state.summary) return;
+  const layout = page.alerts ? layoutPannes(page.alerts) : null;
+  // L'onglet par defaut se fixe au premier rendu : acquitter la derniere panne
+  // ne fait pas basculer la page.
+  const tab = page.tab ??= defaultTab(layout ? layout.toTreatCount : 0);
+  const { groups } = state.recommendations as RecommendationGroups;
+  renderOverview(document.getElementById('advisor-bilan')!, document.getElementById('advisor-tabs')!,
+    { layout, conseils: conseilsCounts(groups) }, tab, chosen => { page.tab = chosen; renderTop(); });
+  document.getElementById('advisor-tab-pannes')!.hidden = tab !== 'pannes';
+  document.getElementById('advisor-tab-conseils')!.hidden = tab !== 'conseils';
 }
 
 function renderList(node: HTMLElement, { groups, stale, decided }: RecommendationGroups) {
@@ -147,17 +228,17 @@ function renderList(node: HTMLElement, { groups, stale, decided }: Recommendatio
   }
   for (const group of groups) {
     node.appendChild(el('div', 'advisor-basis-title', basisTitle(group.basis)));
-    for (const rec of group.priority) node.appendChild(recommendationCard(rec, { actionable: true }));
+    for (const rec of group.priority) node.appendChild(listCard(rec, true));
     const rest = group.all.filter(r => !group.priority.some(p => p.id === r.id));
     if (rest.length) {
       node.appendChild(el('div', 'advisor-rest-title', `Autres observations (${rest.length})`));
-      for (const rec of rest) node.appendChild(recommendationCard(rec, { actionable: true }));
+      for (const rec of rest) node.appendChild(listCard(rec, true));
     }
   }
   if (stale.length) {
     node.appendChild(el('div', 'advisor-rest-title',
       `Ne se produit plus depuis la dernière analyse (${stale.length})`));
-    for (const rec of stale) node.appendChild(recommendationCard(rec, { actionable: false }));
+    for (const rec of stale) node.appendChild(listCard(rec, false));
   }
   // Dernière section, repliée mais jamais silencieuse : le compte reste
   // visible depuis la vue principale, la décision et sa date dans le dépliage.
@@ -171,6 +252,7 @@ function render() {
   if (state.error) {
     head.textContent = `Analyse indisponible : ${state.error}`;
     list.textContent = '';
+    renderTop();
     return;
   }
   if (state.loading && !state.summary) { head.textContent = 'Analyse en cours…'; return; }
@@ -182,9 +264,13 @@ function render() {
   renderList(list, state.recommendations as RecommendationGroups);
   const failed = state.decisionError;
   if (failed) {
-    list.querySelector(`.advisor-card[data-rec-id="${failed.id}"]`)!
+    // La carte s'ouvre : l'erreur et les boutons pour reessayer vivent dans son corps.
+    const card = list.querySelector(`.advisor-card[data-rec-id="${failed.id}"]`) as HTMLDetailsElement;
+    card.open = true;
+    card.querySelector('.advisor-card-body')!
       .appendChild(el('div', 'advisor-card-error', decisionErrorLabel(failed.message)));
   }
+  renderTop();
 }
 
 // L'acquittement d'un groupe : la route est unitaire, la serie est ici.
@@ -207,6 +293,7 @@ async function loadFailures() {
   try {
     const { alerts, rejetees } = await api.fetchAlerts({ days: getState().periodDays });
     erreur.textContent = '';
+    page.alerts = alerts;
     renderFailures(node, alerts, {
       rejetees,
       onAckGroup: episodes => ackEpisodes(api, episodes).then(
@@ -221,7 +308,10 @@ async function loadFailures() {
     });
   } catch (err) {
     erreur.textContent = `Pannes indisponibles : ${(err as Error).message}`;
+    // Des pannes deja affichees restent comptees ; jamais chargees, le compteur le dit.
+    if (page.alerts === undefined) page.alerts = null;
   }
+  renderTop();
 }
 
 export function initAdvisor() {
@@ -235,7 +325,13 @@ export function initAdvisor() {
 
   document.getElementById('btn-advisor')!.addEventListener('click', () => {
     panel.classList.toggle('visible');
-    if (panel.classList.contains('visible')) { loadAdvisor(api); loadFailures(); }
+    if (panel.classList.contains('visible')) {
+      // Une page rouverte se presente comme neuve : onglet par defaut, cartes fermees.
+      Object.assign(page, { alerts: undefined, tab: null, periodOpen: false });
+      page.openCards.clear();
+      loadAdvisor(api);
+      loadFailures();
+    }
   });
 
   document.getElementById('advisor-close')!.addEventListener('click', () => {
