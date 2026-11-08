@@ -4,6 +4,7 @@
 // Les textes sont ceux de la spec docs/usages/conseils-vue-d-ensemble.md.
 
 import { returnBanner, type Recommendation } from './format.ts';
+import { gravity } from './failures-tools.ts';
 
 export type Tab = 'pannes' | 'conseils';
 
@@ -14,14 +15,12 @@ export interface BilanInput {
   revenus: number;
 }
 
-// Le seuil du rouge (gravity, failures-tools.ts) : une panne « revient souvent ».
-const SOUVENT = 5;
-
 const NOTHING = 'Aucune recommandation sur la période — rien à corriger.';
 
 function pannesSentence(p: NonNullable<BilanInput['pannes']>) {
   if (p.toTreat === 0) return 'Aucune panne à traiter sur la période.';
-  if (p.top && p.top.count >= SOUVENT) {
+  // Une panne « revient souvent » quand son chiffre est rouge.
+  if (p.top && gravity(p.top.count) === 'high') {
     return `Une panne revient souvent : ${p.top.name} — ${p.top.tool} (${p.top.count} fois).`;
   }
   return `${p.toTreat} panne${p.toTreat > 1 ? 's' : ''} à traiter, aucune ne revient souvent.`;

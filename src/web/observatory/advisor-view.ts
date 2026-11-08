@@ -82,8 +82,6 @@ function choice(content: HTMLElement, caption: string) {
   return wrap;
 }
 
-// Exported for its tests: the card IS the page's contract with the user —
-// the labels and captions are behavior here, not decoration.
 // La ligne d'une carte fermee : de quoi decider s'il faut l'ouvrir.
 function cardLine(rec: Recommendation) {
   const line = el('summary', 'advisor-card-line');
@@ -106,6 +104,8 @@ function cardLine(rec: Recommendation) {
   return line;
 }
 
+// Exported for its tests: the card IS the page's contract with the user —
+// the labels and captions are behavior here, not decoration.
 export function recommendationCard(rec: Recommendation, { actionable, open = false }: { actionable: boolean; open?: boolean }) {
   const card = el('details', 'advisor-card') as HTMLDetailsElement;
   card.dataset.recId = String(rec.id);
@@ -155,10 +155,9 @@ export function recommendationCard(rec: Recommendation, { actionable, open = fal
   return card;
 }
 
-// Ce que la page retient tant qu'elle reste ouverte : un nouveau rendu (fin de
-// scan, decision) ne doit ni refermer ce que l'utilisateur a ouvert, ni
-// changer d'onglet sous ses yeux. `alerts` undefined = pas encore chargees,
-// null = chargement echoue.
+// Ce que la page retient tant qu'elle reste ouverte : un nouveau rendu ne referme
+// rien de ce que l'utilisateur a ouvert et ne change pas d'onglet sous ses yeux.
+// `alerts` undefined = pas encore chargees, null = chargement echoue.
 const page = {
   alerts: undefined as Alert[] | null | undefined,
   tab: null as Tab | null,

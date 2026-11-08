@@ -98,7 +98,7 @@ const HEADLINES: Record<AlertType, (a: Alert) => string> = {
   retryStorm: a => `${a.toolName} · ${a.count} échecs consécutifs`,
   stuck: a => `Aucun événement · ${a.count} outil${a.count > 1 ? 's' : ''} encore en vol`,
   badInvocation: a =>
-    `${a.toolName} · appel mal formé : ${MOTIFS[a.patternId] || REGLAGE_INCONNU}`
+    `${a.toolName} · appel mal formé : ${motifPhrase(a.patternId)}`
     + repetitionNote(a.count),
 };
 
@@ -185,7 +185,7 @@ function outilUniforme(episodes: Alert[]) {
 
 const CAUSES: Record<AlertType, (first: Alert, prefix: string) => string> = {
   badInvocation: (first, prefix) =>
-    `${prefix}appel mal formé : ${MOTIFS[first.patternId] || REGLAGE_INCONNU}`,
+    `${prefix}appel mal formé : ${motifPhrase(first.patternId)}`,
   loop: (_first, prefix) => `${prefix}même commande répétée`,
   retryStorm: (_first, prefix) => `${prefix}échecs consécutifs`,
   stuck: () => 'Aucun événement · outils encore en vol',

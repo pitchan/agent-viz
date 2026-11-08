@@ -1,9 +1,6 @@
 // failures-tools.ts — comment l'onglet Pannes range ses pannes : par outil, par
-// nombre d'apparitions, sous des noms lisibles.
-//
-// Module pur, comme failures-format.ts dont il reprend le regroupement par
-// cause : ce fichier ne decide que de l'ORDRE et des NOMS, pas des phrases
-// d'episode.
+// nombre d'apparitions, sous des noms lisibles. Module pur : il decide de l'ordre
+// et des noms, failures-format.ts du regroupement par cause et des phrases.
 
 import { groupAlerts, panelAlerts, motifPhrase, type AlertGroup } from './failures-format.ts';
 import type { Alert } from '../../engine/watchdog/detector.ts';

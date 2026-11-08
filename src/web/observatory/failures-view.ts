@@ -1,10 +1,6 @@
-// failures-view.ts — l'onglet « Pannes » : les plus frequentes, puis un
-// accordeon par outil et par cause.
-//
-// Rendu et interactions LOCALES seulement : depli d'une commande longue, retour
-// de copie. Aucun acces reseau — l'acquittement sort d'ici comme une INTENTION
-// (`onAckGroup`), advisor-view l'orchestre. Le regroupement et les phrases
-// viennent de failures-format.ts, les remedes de remedies.ts.
+// failures-view.ts — l'onglet « Pannes » : les plus frequentes, puis un accordeon
+// par outil et par cause. Rendu et gestes locaux seulement : l'acquittement sort
+// d'ici comme une intention (`onAckGroup`), advisor-view l'envoie au serveur.
 
 import { causeLabel, episodeLabel, projectLabel, type AlertGroup } from './failures-format.ts';
 import { layoutPannes, causeName, causeTool, toolDisplayName, gravity, type PannesLayout } from './failures-tools.ts';
