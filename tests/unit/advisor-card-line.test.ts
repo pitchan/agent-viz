@@ -28,6 +28,13 @@ test.each([
   ['Une description absente vient d’un réglage. Dans le second cas : passer en name-only.', 'Une description absente vient d’un réglage'],
   ['Déplacer le détail (Anthropic conseille un SKILL.md de moins de 500 lignes).',
     'Déplacer le détail (Anthropic conseille un SKILL.md de moins de 500 lignes)'],
+  ['Ajouter `disable-model-invocation: true` dans son SKILL.md : sa description sort de la liste.',
+    'Ajouter `disable-model-invocation: true` dans son SKILL.md'],
+  ['Désactiver ce serveur par défaut et ne l’activer que dans les projets qui s’en servent '
+    + '(effet non mesuré : action à tester).',
+  'Désactiver ce serveur par défaut et ne l’activer que dans les projets qui s’en servent '
+    + '(effet non mesuré : action à tester)'],
+  ['Relire [la note ; puis la suite] avant de clore', 'Relire [la note ; puis la suite] avant de clore'],
 ])('le geste « %s » se resume a sa premiere proposition', (geste, tete) => {
   expect(gestureHead(geste)).toBe(tete);
 });
@@ -47,4 +54,13 @@ test.each([
   [rec({ evidence: { sessions: [], costComplete: false } }), '≥ 20,38 $'],
 ])('le cout compact de la carte %# se lit « %s »', (carte, texte) => {
   expect(compactCost(carte)).toBe(texte);
+});
+
+test('sans fin de proposition hors parentheses, un geste trop long est tronque avec « … »', () => {
+  // Arrange
+  const geste = 'Ouvrir le réglage (puis choisir la valeur qui convient au projet et relancer la session entière';
+  // Act
+  const tete = gestureHead(geste);
+  // Assert
+  expect(tete).toBe('Ouvrir le réglage (puis choisir la valeur qui convient au projet et relancer la…');
 });
