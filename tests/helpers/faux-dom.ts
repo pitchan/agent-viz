@@ -36,6 +36,10 @@ export function fauxElement(tag: string): any {
     addEventListener(evt: string, fn: (...a: any[]) => void) { this.handlers[evt] = fn; },
     click() { this.handlers.click && this.handlers.click({ target: this, preventDefault() {} }); },
     scrollIntoView() { this.scrolled = true; },
+    // Seul le selecteur de classe « .nom » est lu : c'est le seul que les vues emploient.
+    querySelector(sel: string) {
+      return aPlat(this).slice(1).find(n => n.classList.contains(sel.slice(1))) ?? null;
+    },
   };
 }
 

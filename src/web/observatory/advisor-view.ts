@@ -264,13 +264,16 @@ function render() {
   renderList(list, state.recommendations as RecommendationGroups);
   const failed = state.decisionError;
   if (failed) {
-    // La carte s'ouvre : l'erreur et les boutons pour reessayer vivent dans son corps.
-    const card = list.querySelector(`.advisor-card[data-rec-id="${failed.id}"]`) as HTMLDetailsElement;
-    card.open = true;
-    card.querySelector('.advisor-card-body')!
-      .appendChild(el('div', 'advisor-card-error', decisionErrorLabel(failed.message)));
+    showDecisionError(list.querySelector(`.advisor-card[data-rec-id="${failed.id}"]`) as HTMLElement, failed.message);
   }
   renderTop();
+}
+
+// La carte s'ouvre : l'erreur et les boutons pour reessayer vivent dans son corps.
+export function showDecisionError(card: HTMLElement, message: string) {
+  (card as HTMLDetailsElement).open = true;
+  card.querySelector('.advisor-card-body')!
+    .appendChild(el('div', 'advisor-card-error', decisionErrorLabel(message)));
 }
 
 // L'acquittement d'un groupe : la route est unitaire, la serie est ici.
