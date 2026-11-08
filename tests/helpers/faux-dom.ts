@@ -17,6 +17,7 @@ export function fauxElement(tag: string): any {
     value: '',
     scrolled: false,
     _text: '',
+    set innerHTML(v: string) { this._text = v; this.children.length = 0; },
     get textContent() { return this._text; },
     set textContent(v: string) { this._text = v; this.children.length = 0; },
     set className(v: string) { classes.clear(); for (const c of v.split(/\s+/)) if (c) classes.add(c); },
