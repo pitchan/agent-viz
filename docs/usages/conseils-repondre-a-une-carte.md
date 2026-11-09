@@ -18,6 +18,8 @@
 
 ## Ce que l'écran montre
 
+L'onglet *Conseils* de la page (voir la spec [vue d'ensemble](conseils-vue-d-ensemble.md)) :
+
 ```
 INEFFICACITÉS OBSERVÉES
   Chiffré en jetons mesurés
@@ -33,12 +35,27 @@ INEFFICACITÉS OBSERVÉES
 ▸ Décisions rendues (n)                ← repliée
 ```
 
-Une carte, de haut en bas :
+Une carte **fermée** tient sur une ligne :
 
-1. le titre : le problème et le projet concerné ;
-2. le degré de certitude et le coût (« Fait mesuré · 20,38 $ — jetons mesurés ») ;
+```
+▸ 20,38 $   Sessions laissant des modifications non vérifiées      [Fait mesuré] [agent-viz]
+            → Terminer par la preuve
+```
+
+1. le coût (« 20,38 $ », « ≥ 20,38 $ » si une part n'a pas pu être tarifée, « non chiffré ») ;
+2. le titre : le problème, sans le projet ;
+3. le geste en une proposition, précédé de « → » ;
+4. le degré de certitude ;
+5. le projet concerné, s'il y en a un : son dernier dossier, le chemin complet au survol.
+
+Sur un écran étroit, la ligne passe à la ligne : aucun de ces éléments n'est masqué, le degré de certitude compris.
+
+Une carte **ouverte** montre en plus, de haut en bas :
+
+1. le bandeau de retour, pour une carte revenue (R19) ;
+2. le degré de certitude et le coût complet (« Fait mesuré · 20,38 $ — jetons mesurés ») ;
 3. la période observée (« constaté du 19/09 au 19/10 ») ;
-4. le geste conseillé ;
+4. le geste conseillé, en entier ;
 5. le détail chiffré (sessions concernées, volumes) ;
 6. les boutons de réponse, chacun avec une phrase dessous qui dit ce qu'il entraîne.
 
@@ -68,6 +85,8 @@ Chaque règle porte sa source :
 | R4 | Les 3 premières cartes d'un bloc sont en tête ; les suivantes sont sous *Autres observations (n)*. | vu |
 | R5 | Une carte dont le problème n'a pas été revu à la dernière analyse passe sous *Ne se produit plus depuis la dernière analyse (n)*. Elle n'a aucun bouton. | vu |
 | R6 | Sans aucune carte, la page dit : « Aucune recommandation sur la période — rien à corriger. » | relevé |
+| R6a | À l'ouverture de la page, les cartes sont fermées, sauf une carte revenue (R19), ouverte d'elle-même. Tant que la page reste ouverte, chaque carte et le journal *Décisions rendues* (R23) restent comme l'utilisateur les a laissés, ouverts ou fermés. | voulu |
+| R6b | Le geste de la ligne fermée est la première proposition du geste, coupée au premier « : », « ; » ou point de fin de phrase situé hors des parenthèses, des crochets et du code écrit entre accents graves (`` ` ``). S'il n'y en a pas, le geste est gardé entier ; au-delà de 80 caractères, il est coupé au dernier mot qui tient et suivi de « … ». Une carte sans geste affiche « → aucun geste — carte informative ». | voulu |
 
 ### Les réponses proposées
 
@@ -104,7 +123,7 @@ Chaque règle porte sa source :
 | R19 | Une carte revenue affiche un bandeau au-dessus de ses chiffres, puis repropose ses boutons. Une nouvelle réponse remplace la date et le coût retenus. | relevé |
 | R20 | Une nouvelle analyse met à jour les chiffres des cartes, sans jamais annuler une réponse déjà donnée. | relevé |
 | R21 | Un projet déplacé ou renommé est un nouveau projet : sa carte réapparaît comme neuve, et l'ancienne réponse reste attachée à l'ancien emplacement. | voulu |
-| R22 | Si une réponse ne s'enregistre pas, la carte affiche « Décision non enregistrée : » suivi de la cause, et garde ses boutons pour réessayer. Le reste de la page ne bouge pas. | vu |
+| R22 | Si une réponse ne s'enregistre pas, la carte s'ouvre et affiche « Décision non enregistrée : » suivi de la cause, et garde ses boutons pour réessayer. Pour *Réactiver*, le même message s'affiche sur la ligne du journal *Décisions rendues*. Le reste de la page ne bouge pas. | vu |
 
 Texte du bandeau d'une carte revenue (R19) :
 
@@ -154,6 +173,7 @@ Chaque critère se vérifie à l'écran, sur la page *Conseils*.
 
 ## Hors de cette spec
 
-- La liste *Pannes détectées* en haut de la page.
+- L'onglet *Pannes* : spec [conseils-pannes.md](conseils-pannes.md).
+- La phrase-bilan et les compteurs-onglets : spec [conseils-vue-d-ensemble.md](conseils-vue-d-ensemble.md).
 - Le calcul des chiffres d'une carte et le choix de la période (7, 30 ou 90 jours).
 - Ce que devient une raison en cours d'écriture quand une analyse se termine (jugé sans importance le 19/10/2026).

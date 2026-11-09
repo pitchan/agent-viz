@@ -13,12 +13,13 @@ import './viz-ui.ts';
 import { loadSessions, connectSSE, poll } from './viz-network.ts';
 import { garbageCollect } from './viz-graph.ts';
 import { requestRender } from './viz-state.ts';
+import * as api from './observatory/api.ts';
 import { initAdvisor } from './observatory/advisor-view.ts';
 import { initAnalysis } from './observatory/analysis-view.ts';
 import { initPricing } from './observatory/pricing-view.ts';
 import { initSkills } from './observatory/skills-view.ts';
 
-initAdvisor();
+initAdvisor(api);
 initAnalysis();
 initPricing();
 initSkills();

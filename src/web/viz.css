@@ -731,19 +731,13 @@ canvas { display: block; width: 100%; height: 100%; }
 .failures-error { color: var(--error); font-size: 12px; margin-bottom: 6px; }
 .failures-error:empty { display: none; }
 .failures-block { margin-bottom: 18px; }
-.failures-title {
-  display: flex; justify-content: space-between; align-items: baseline;
-  font-size: 12px; letter-spacing: .08em; text-transform: uppercase;
-  color: var(--text-dim); border-bottom: 1px solid var(--glass-border);
-  padding-bottom: 6px; margin-bottom: 10px;
-}
-.failures-count { color: var(--error); font-weight: 600; }
-.failures-count.is-quiet { color: var(--text-muted); font-weight: 400; }
+.failures-section-title { font-size: 12px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--text-muted); margin: 4px 0 8px; }
+.failures-section-title ~ .failures-section-title { margin-top: 18px; }
 .failures-empty { font-size: 13px; color: var(--text-dim); line-height: 1.5; }
 .failure-group {
-  border-left: 3px solid var(--error); border-radius: 0 8px 8px 0;
-  background: rgba(255, 85, 102, 0.04);
-  padding: 4px 10px 4px 8px; margin: 6px 0;
+  border-left: 2px solid var(--glass-border); border-radius: 0 8px 8px 0;
+  padding: 2px 10px 2px 8px; margin: 4px 0 4px 18px;
 }
 .failure-group.is-acked {
   border-left-color: var(--text-muted); background: rgba(102, 204, 255, 0.03); opacity: .7;
@@ -766,8 +760,6 @@ canvas { display: block; width: 100%; height: 100%; }
    droite : sur huit lignes, on balaie une colonne au lieu de huit fins de
    phrase. */
 .failure-group-meta { font-size: 11px; color: var(--text-dim); margin-left: auto; text-align: right; }
-.failure-a-traiter { font-size: 10px; color: var(--error); border: 1px solid var(--error);
-  border-radius: 3px; padding: 1px 5px; text-transform: uppercase; letter-spacing: .04em; }
 .failure-episode {
   margin: 6px 0 6px 18px; padding-left: 10px;
   border-left: 1px solid var(--glass-border);
@@ -799,3 +791,110 @@ canvas { display: block; width: 100%; height: 100%; }
   padding: 8px; margin: 6px 0; user-select: text; }
 .remede-copie { font-size: 11px; color: var(--text-dim); margin-left: 8px; }
 .failure-ack { margin: 8px 0 4px 18px; }
+
+/* Le chiffre de gravite : combien de fois la panne est apparue. Rouge des 5,
+   orange de 2 a 4, gris pour 1 — c'est lui, et non un badge par ligne, qui
+   dit ce qui compte. */
+.failure-sev {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  min-width: 40px; height: 26px; padding: 0 7px; border-radius: 6px;
+  font-weight: 800; font-size: 13px; font-variant-numeric: tabular-nums;
+}
+.failure-sev.sev-high { color: var(--error); background: rgba(255, 85, 102, 0.14); border: 1px solid var(--error-dim); }
+.failure-sev.sev-mid { color: var(--tool); background: rgba(255, 187, 68, 0.12); border: 1px solid var(--tool-dim); }
+.failure-sev.sev-low { color: var(--text-muted); background: rgba(102, 204, 255, 0.05); border: 1px solid var(--glass-border); }
+.failure-names { display: flex; flex-direction: column; min-width: 0; }
+.failure-cause-tech { font-family: ui-monospace, monospace; font-size: 10px; color: var(--text-muted); }
+
+.failures-top { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; }
+.failure-top {
+  display: flex; gap: 10px; align-items: flex-start; cursor: pointer;
+  border: 1px solid var(--glass-border); border-radius: 8px; padding: 10px;
+}
+.failure-top:hover, .failure-top:focus-visible { background: var(--glass-hover); }
+.failure-top .failure-sev { height: 32px; min-width: 46px; font-size: 16px; }
+.failure-top-name { font-size: 13px; font-weight: 600; }
+.failure-top-meta { font-size: 11px; color: var(--text-dim); }
+
+.failure-tool, .failure-acked {
+  border: 1px solid var(--glass-border); border-radius: 8px; margin: 6px 0; padding: 0 8px;
+}
+.failure-tool-head, .failure-acked-head {
+  cursor: pointer; display: flex; gap: 10px; align-items: center;
+  padding: 8px 2px; list-style: none;
+}
+.failure-tool-head::-webkit-details-marker, .failure-acked-head::-webkit-details-marker { display: none; }
+.failure-tool-head::before, .failure-acked-head::before {
+  content: '▸'; flex: none; width: 10px; color: var(--holo); font-size: 11px; transition: transform .15s;
+}
+.failure-tool[open] > .failure-tool-head::before,
+.failure-acked[open] > .failure-acked-head::before { transform: rotate(90deg); }
+.failure-tool-name { font-size: 13px; font-weight: 600; }
+.failure-tool-meta { font-size: 11px; color: var(--text-dim); }
+.failure-tool-ack { margin-left: auto; flex: none; }
+.failure-acked-head { font-size: 11px; color: var(--text-dim); }
+
+/* Haut de la page Conseils : la phrase-bilan, puis les compteurs qui servent
+   d'onglets. */
+#advisor-bilan { font-size: 15px; line-height: 1.5; margin: 6px 0 8px; flex-shrink: 0; }
+#advisor-bilan:empty { display: none; }
+#advisor-tabs {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px;
+  margin: 4px 0 12px; flex-shrink: 0;
+}
+#advisor-tabs:empty { display: none; }
+.advisor-counter {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; cursor: pointer;
+  text-align: left; padding: 8px 12px; border-radius: 8px; font: inherit; color: var(--text-dim);
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+}
+.advisor-counter:hover { background: var(--glass-hover); }
+.advisor-counter.is-active { border-color: var(--holo); box-shadow: inset 0 -3px 0 var(--holo); }
+.advisor-counter-n { font-size: 24px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.advisor-counter.is-pannes .advisor-counter-n { color: var(--error); }
+.advisor-counter.is-conseils .advisor-counter-n { color: var(--holo-bright); }
+.advisor-counter.is-returned .advisor-counter-n { color: var(--text-muted); }
+.advisor-counter-label { font-size: 11px; }
+.advisor-period-details { margin-bottom: 4px; }
+.advisor-period-details-head { cursor: pointer; font-size: 11px; color: var(--text-dim); }
+
+/* La carte conseil compacte : une ligne fermee, le detail au depliage. */
+.advisor-card { padding: 0; margin-bottom: 6px; }
+.advisor-card:hover { background: none; }
+.advisor-card-line {
+  display: flex; gap: 12px; align-items: center; cursor: pointer;
+  padding: 8px 12px; list-style: none; border-radius: 8px;
+}
+.advisor-card-line::-webkit-details-marker { display: none; }
+.advisor-card-line::before {
+  content: '▸'; flex: none; width: 10px; color: var(--holo); font-size: 11px; transition: transform .15s;
+}
+.advisor-card[open] > .advisor-card-line::before { transform: rotate(90deg); }
+.advisor-card-line:hover { background: var(--glass-hover); }
+.advisor-card-cost {
+  flex: none; min-width: 72px; font-weight: 700; color: var(--holo-bright);
+  font-variant-numeric: tabular-nums;
+}
+.advisor-card-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.advisor-card-main .advisor-card-title { margin: 0; }
+.advisor-card-gesture {
+  font-size: 11px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.advisor-card-certainty, .advisor-card-project {
+  flex: none; font-size: 10px; border-radius: 10px; padding: 1px 8px; white-space: nowrap;
+  border: 1px solid var(--glass-border); color: var(--text-dim);
+}
+.advisor-card-certainty.is-fait { color: var(--complete); border-color: var(--complete-dim); }
+.advisor-card-certainty.is-correlation { color: var(--tool); border-color: var(--tool-dim); }
+.advisor-card-project { color: var(--agent); border-color: var(--agent-dim); max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+.advisor-card-body { padding: 4px 12px 12px 34px; border-top: 1px solid var(--glass-border); }
+/* Les compteurs empilés rempliraient un panneau bas : sur écran étroit, le haut
+   de page défile avec le contenu au lieu de lui laisser 0 px. */
+@media (max-width: 700px) {
+  #advisor-overlay.visible { overflow-y: auto; }
+  #advisor-body { flex: none; overflow: visible; }
+  #advisor-tabs, .failures-top { grid-template-columns: 1fr; }
+  .advisor-card-line { flex-wrap: wrap; }
+  .advisor-card-body { padding-left: 12px; }
+}
+.advisor-decisions .advisor-card { padding: 12px; }

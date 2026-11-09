@@ -37,9 +37,9 @@ function button(className: string, label?: string): HTMLButtonElement {
 // section quand il n'y a rien — un tiroir vide se lirait comme une panne.
 // Le journal mêle les trois décisions (adopté, en veille, refusé) : une seule
 // destination pour « où est passée ma carte ? », et un Réactiver partout.
-export function renderDecisions(node: HTMLElement, decided: DecidedRecommendation[]): void {
-  if (decided.length === 0) return;
-  const section = el('details', 'advisor-decisions');
+export function renderDecisions(node: HTMLElement, decided: DecidedRecommendation[]): HTMLDetailsElement | null {
+  if (decided.length === 0) return null;
+  const section = el('details', 'advisor-decisions') as HTMLDetailsElement;
   section.appendChild(el('summary', 'advisor-decisions-summary',
     `Décisions rendues (${decided.length})`));
   for (const rec of decided) {
@@ -55,6 +55,7 @@ export function renderDecisions(node: HTMLElement, decided: DecidedRecommendatio
     section.appendChild(card);
   }
   node.appendChild(section);
+  return section;
 }
 
 // « Non merci » déplie un champ raison + « Consigner » ; la raison est

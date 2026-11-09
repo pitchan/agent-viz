@@ -84,6 +84,10 @@ const MOTIFS: Record<string, string> = {
 // muette dans un tableau de bord se lit comme un bug de l'outil.
 const REGLAGE_INCONNU = 'un réglage du poste de travail';
 
+export function motifPhrase(patternId: string) {
+  return MOTIFS[patternId] || REGLAGE_INCONNU;
+}
+
 // Le detecteur compte des la premiere occurrence — c'est son role. Mais « 1
 // fois dans la session » n'apprend rien et occupe la ligne : le compte ne se
 // dit qu'a partir du moment ou il distingue quelque chose.
@@ -94,7 +98,7 @@ const HEADLINES: Record<AlertType, (a: Alert) => string> = {
   retryStorm: a => `${a.toolName} · ${a.count} échecs consécutifs`,
   stuck: a => `Aucun événement · ${a.count} outil${a.count > 1 ? 's' : ''} encore en vol`,
   badInvocation: a =>
-    `${a.toolName} · appel mal formé : ${MOTIFS[a.patternId] || REGLAGE_INCONNU}`
+    `${a.toolName} · appel mal formé : ${motifPhrase(a.patternId)}`
     + repetitionNote(a.count),
 };
 
@@ -113,23 +117,6 @@ export function failureLine(alert: Alert) {
     headline: HEADLINES[alert.type](alert),
     subject: subjectOf(alert),
   };
-}
-
-// Ce que le titre du bloc a le droit de dire, et rien de plus.
-//
-// Ce bloc est la MEMOIRE des pannes : il rend ce qui a ete consigne sur la
-// fenetre, sans aucune notion de vivacite — le journal n'en a pas. « Encore en
-// cours » se decide ailleurs, a la pastille, et par une regle que ce bloc ne
-// peut pas rejouer sans la dupliquer : `standing` -> `activeIds`, evenementiel
-// -> fraicheur de deux minutes. Sur trente jours, une boucle non acquittee de
-// la semaine derniere n'est pas un incident en cours ; l'annoncer comme tel
-// confondrait la memoire des pannes avec l'etat present.
-//
-// Donc un compte, et le mot exact de ce qui est compte.
-export function failuresSummary(alerts: Alert[]) {
-  const n = alerts.filter(a => !a.acknowledged).length;
-  if (n === 0) return 'aucune';
-  return `${n} non acquittée${n > 1 ? 's' : ''}`;
 }
 
 // ── Ce que le panneau accepte de montrer ───────────────────────────────────
@@ -198,7 +185,7 @@ function outilUniforme(episodes: Alert[]) {
 
 const CAUSES: Record<AlertType, (first: Alert, prefix: string) => string> = {
   badInvocation: (first, prefix) =>
-    `${prefix}appel mal formé : ${MOTIFS[first.patternId] || REGLAGE_INCONNU}`,
+    `${prefix}appel mal formé : ${motifPhrase(first.patternId)}`,
   loop: (_first, prefix) => `${prefix}même commande répétée`,
   retryStorm: (_first, prefix) => `${prefix}échecs consécutifs`,
   stuck: () => 'Aucun événement · outils encore en vol',

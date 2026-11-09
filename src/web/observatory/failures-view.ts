@@ -1,11 +1,9 @@
-// failures-view.ts — le bloc « Pannes » en accordeon par cause.
-//
-// Rendu et interactions LOCALES seulement : depli d'une commande longue, retour
-// de copie. Aucun acces reseau — l'acquittement sort d'ici comme une INTENTION
-// (`onAckGroup`), advisor-view l'orchestre. Le regroupement et les phrases
-// viennent de failures-format.ts, les remedes de remedies.ts.
+// failures-view.ts — l'onglet « Pannes » : les plus frequentes, puis un accordeon
+// par outil et par cause. Rendu et gestes locaux seulement : l'acquittement sort
+// d'ici comme une intention (`onAckGroup`), advisor-view l'envoie au serveur.
 
-import { groupAlerts, causeLabel, episodeLabel, failuresSummary, projectLabel, panelAlerts, type AlertGroup } from './failures-format.ts';
+import { causeLabel, episodeLabel, projectLabel, type AlertGroup } from './failures-format.ts';
+import { layoutPannes, causeName, causeTool, toolDisplayName, gravity, type PannesLayout } from './failures-tools.ts';
 import { remedyFor, type Remedy } from './remedies.ts';
 import type { Alert } from '../../engine/watchdog/detector.ts';
 
@@ -94,14 +92,22 @@ function remedeNode(remede: NonNullable<Remedy>) {
   return bloc;
 }
 
-function groupNode(group: AlertGroup, onAckGroup: ((episodes: Alert[]) => void) | undefined) {
+// Le chiffre de gravite : combien de fois la panne est apparue sur la periode.
+function sevNode(n: number, level = gravity(n)) {
+  return el('span', `failure-sev sev-${level}`, `${n}×`);
+}
+
+const dayMonth = (ms: number) => stamp(ms).slice(0, 5);
+
+// `withTool` : dans « Vues une seule fois », aucun groupe d'outil ne nomme l'outil.
+function groupNode(group: AlertGroup, onAckGroup: AckGroup | undefined, withTool = false) {
   const det = el('details', group.unacked ? 'failure-group' : 'failure-group is-acked');
   const resume = el('summary', 'failure-group-head');
-  resume.appendChild(el('span', 'failure-cause', causeLabel(group)));
-  const n = group.episodes.length;
-  resume.appendChild(el('span', 'failure-group-meta',
-    `${n} épisode${n > 1 ? 's' : ''} · dernier ${stamp(group.lastAt)}`));
-  if (group.unacked) resume.appendChild(el('span', 'failure-a-traiter', 'à traiter'));
+  const noms = el('span', 'failure-names');
+  noms.append(el('span', 'failure-cause', causeName(group)), el('span', 'failure-cause-tech', causeLabel(group)));
+  const outil = withTool ? `${toolDisplayName(causeTool(group))} · ` : '';
+  resume.append(sevNode(group.episodes.length), noms,
+    el('span', 'failure-group-meta', `${outil}dernière ${stamp(group.lastAt)}`));
   det.appendChild(resume);
 
   for (const alert of group.episodes) det.appendChild(episodeNode(alert));
@@ -122,34 +128,135 @@ function groupNode(group: AlertGroup, onAckGroup: ((episodes: Alert[]) => void) 
   return det;
 }
 
+type AckGroup = (episodes: Alert[]) => void;
+
 export interface RenderFailuresOptions {
   // Les lignes du journal écartées à l'entrée parce qu'hors forme : elles ne
   // sont dans aucun compte du bloc, et le bloc dit combien il en a laissé.
   rejetees?: number;
-  onAckGroup?: (episodes: Alert[]) => void;
+  onAckGroup?: AckGroup;
+}
+
+// Le bouton vit dans l'en-tete repliable : sans preventDefault, le clic
+// replierait aussi le groupe.
+function toolAckNode(causes: AlertGroup[], onAckGroup: AckGroup) {
+  const unacked = causes.reduce((n, g) => n + g.unacked, 0);
+  const btn = el('button', 'obs-btn failure-tool-ack', `Tout acquitter (${unacked})`) as HTMLButtonElement;
+  btn.type = 'button';
+  btn.addEventListener('click', e => {
+    e.preventDefault();
+    btn.disabled = true;
+    onAckGroup(causes.flatMap(g => g.episodes));
+  });
+  return btn;
+}
+
+interface ToolBlock { label: string; meta: string; sev: HTMLElement; causes: AlertGroup[]; withTool: boolean }
+
+function toolNode(block: ToolBlock, causeNodes: Map<AlertGroup, HTMLElement>, onAckGroup: AckGroup | undefined) {
+  const det = el('details', block.withTool ? 'failure-tool is-once' : 'failure-tool');
+  const resume = el('summary', 'failure-tool-head');
+  const noms = el('span', 'failure-names');
+  noms.append(el('span', 'failure-tool-name', block.label), el('span', 'failure-tool-meta', block.meta));
+  resume.append(block.sev, noms);
+  if (onAckGroup) resume.appendChild(toolAckNode(block.causes, onAckGroup));
+  det.appendChild(resume);
+  for (const g of block.causes) {
+    const cause = groupNode(g, onAckGroup, block.withTool);
+    causeNodes.set(g, cause);
+    det.appendChild(cause);
+  }
+  return det;
+}
+
+const plural = (n: number, mot: string) => `${n} ${mot}${n > 1 ? 's' : ''}`;
+
+function toolBlocks({ tools, once }: PannesLayout): ToolBlock[] {
+  const blocks = tools.map(t => ({
+    label: t.label,
+    meta: `${t.causes.length > 1 ? `${t.causes.length} sortes de pannes` : '1 sorte de panne'}`
+      + ` · dernière le ${dayMonth(t.lastAt)}`,
+    sev: sevNode(t.total),
+    causes: t.causes,
+    withTool: false,
+  }));
+  if (once.length) {
+    blocks.push({
+      label: 'Vues une seule fois',
+      meta: `${plural(once.length, 'outil')} : ${once.map(g => toolDisplayName(causeTool(g))).join(', ')}`,
+      // Chacune n'est apparue qu'une fois : le total n'en fait pas une panne grave.
+      sev: sevNode(once.length, 'low'),
+      causes: once,
+      withTool: true,
+    });
+  }
+  return blocks;
+}
+
+// Un clic sur une panne frequente l'ouvre a sa place dans la liste par outil.
+function topNode(group: AlertGroup, target: () => { tool: HTMLElement; cause: HTMLElement }) {
+  const card = el('div', 'failure-top');
+  card.setAttribute('role', 'button');
+  card.setAttribute('tabindex', '0');
+  const texte = el('div', 'failure-names');
+  texte.append(
+    el('div', 'failure-top-name', causeName(group)),
+    el('div', 'failure-top-meta', `${toolDisplayName(causeTool(group))} · dernière le ${dayMonth(group.lastAt)}`),
+  );
+  card.append(sevNode(group.episodes.length), texte);
+  const ouvrir = () => {
+    const { tool, cause } = target();
+    (tool as HTMLDetailsElement).open = true;
+    (cause as HTMLDetailsElement).open = true;
+    cause.scrollIntoView({ block: 'nearest' });
+  };
+  card.addEventListener('click', ouvrir);
+  card.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    ouvrir();
+  });
+  return card;
+}
+
+function ackedNode(acked: AlertGroup[]) {
+  const det = el('details', 'failure-acked');
+  det.appendChild(el('summary', 'failure-acked-head', `Déjà acquittées (${acked.length})`));
+  for (const g of acked) det.appendChild(groupNode(g, undefined));
+  return det;
 }
 
 export function renderFailures(node: HTMLElement, alerts: Alert[], { rejetees = 0, onAckGroup }: RenderFailuresOptions = {}) {
   node.textContent = '';
-  // Le filtre se pose ICI, a l'affichage, et nulle part en amont : le journal
-  // continue de consigner les stuck (la pastille vivante les lit par la meme
-  // route), seul ce bloc refuse de les montrer — voir panelAlerts.
-  const pannes = panelAlerts(alerts);
-  const enAttente = pannes.some(a => !a.acknowledged);
-  const title = el('div', 'failures-title');
-  title.append(el('span', undefined, 'Pannes détectées'));
-  title.appendChild(el('span', enAttente ? 'failures-count' : 'failures-count is-quiet',
-    failuresSummary(pannes)));
-  node.appendChild(title);
   if (rejetees > 0) {
     const s = rejetees > 1 ? 's' : '';
     node.appendChild(el('div', 'failures-illisibles',
       `${rejetees} ligne${s} du journal illisible${s}, non comptée${s}`));
   }
-  if (pannes.length === 0) {
+  // Le filtre des stuck se pose a l'affichage (layoutPannes -> panelAlerts) :
+  // le journal continue de les consigner pour la pastille vivante.
+  const layout = layoutPannes(alerts);
+  if (layout.toTreatCount === 0 && layout.acked.length === 0) {
     node.appendChild(el('div', 'failures-empty',
       'Aucune panne sur la période. Ce bloc garde ce qui s’est produit même quand personne ne regardait.'));
     return;
   }
-  for (const group of groupAlerts(pannes)) node.appendChild(groupNode(group, onAckGroup));
+
+  const causeNodes = new Map<AlertGroup, HTMLElement>();
+  const toolOf = new Map<AlertGroup, HTMLElement>();
+  const outils = toolBlocks(layout).map(block => {
+    const tool = toolNode(block, causeNodes, onAckGroup);
+    for (const g of block.causes) toolOf.set(g, tool);
+    return tool;
+  });
+
+  if (layout.top.length) {
+    node.appendChild(el('div', 'failures-section-title', 'Les plus fréquentes'));
+    const tops = el('div', 'failures-top');
+    for (const g of layout.top) tops.appendChild(topNode(g, () => ({ tool: toolOf.get(g)!, cause: causeNodes.get(g)! })));
+    node.appendChild(tops);
+    node.appendChild(el('div', 'failures-section-title', 'Toutes les pannes, par outil'));
+  }
+  for (const tool of outils) node.appendChild(tool);
+  if (layout.acked.length) node.appendChild(ackedNode(layout.acked));
 }

@@ -48,7 +48,7 @@ function evaluate(ctx: EvaluationContext): R10Recommendation[] {
       estimatedCostUsd: 0,
       costBasis: COST_BASIS.NOT_PRICED,
       evidence: { sessions: agg.sessions, typedCount: agg.count, entryChars, excludedPendingRescan },
-      action: 'Ajouter disable-model-invocation: true dans son SKILL.md, ou "user-invocable-only" dans skillOverrides '
+      action: 'Ajouter `disable-model-invocation: true` dans son SKILL.md, ou "user-invocable-only" dans skillOverrides '
         + 'pour un skill de plugin : sa description sort de la liste. Claude ne pourra plus l’appeler seul.',
     });
   }
