@@ -357,7 +357,9 @@ body {
 #search-box::placeholder { color: var(--text-muted); }
 
 /* ─── Canvas area ─── */
-#main { position: relative; overflow: hidden; }
+/* La bande du narrateur, masquée, sort de la grille de #app : sans rangée nommée, #main
+   glisserait dans la rangée auto de la bande au lieu de prendre la hauteur restante. */
+#main { grid-row: 3; position: relative; overflow: hidden; }
 canvas { display: block; width: 100%; height: 100%; }
 
 /* ─── Floating panels ─── */
