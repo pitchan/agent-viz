@@ -32,6 +32,8 @@ Une panne revient souvent : Même appel répété à l’identique — Shell (Ba
 [contenu de l'onglet ouvert]
 ```
 
+Sur un écran étroit, les compteurs et les pannes les plus fréquentes passent sur une colonne, et tout le panneau défile d'un bloc.
+
 ## Situations d'usage
 
 - **J'ouvre la page** : je lis la phrase-bilan ; je sais s'il y a une panne qui revient souvent et combien de conseils attendent.

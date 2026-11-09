@@ -12,7 +12,7 @@ import type { Recommendation } from './types.ts';
 const EARLY_MCP_DOMINANCE = 0.5; // strictly more than 50 % of noMarker tokens
 
 const SEE_ALSO_ACTION =
-  'Voir aussi : « MCP chargé mais rarement utilisé » — les cassures sans marqueur de ce projet se concentrent '
+  'Voir aussi « MCP chargé mais rarement utilisé » : les cassures sans marqueur de ce projet se concentrent '
   + 'en début de session à serveurs MCP, cause probable (étude : corrélation ×6,3 sur 1 700 sessions, '
   + 'jamais une preuve causale).';
 

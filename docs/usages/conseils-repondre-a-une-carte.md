@@ -85,7 +85,7 @@ Chaque règle porte sa source :
 | R4 | Les 3 premières cartes d'un bloc sont en tête ; les suivantes sont sous *Autres observations (n)*. | vu |
 | R5 | Une carte dont le problème n'a pas été revu à la dernière analyse passe sous *Ne se produit plus depuis la dernière analyse (n)*. Elle n'a aucun bouton. | vu |
 | R6 | Sans aucune carte, la page dit : « Aucune recommandation sur la période — rien à corriger. » | relevé |
-| R6a | À l'ouverture de la page, les cartes sont fermées, sauf une carte revenue (R19), ouverte d'elle-même. Une carte ouverte ou refermée par l'utilisateur le reste tant que la page reste ouverte ; de même pour le journal *Décisions rendues* (R23). | voulu |
+| R6a | À l'ouverture de la page, les cartes sont fermées, sauf une carte revenue (R19), ouverte d'elle-même. Tant que la page reste ouverte, chaque carte et le journal *Décisions rendues* (R23) restent comme l'utilisateur les a laissés, ouverts ou fermés. | voulu |
 | R6b | Le geste de la ligne fermée est la première proposition du geste, coupée au premier « : », « ; » ou point de fin de phrase situé hors des parenthèses, des crochets et du code écrit entre accents graves (`` ` ``). S'il n'y en a pas, le geste est gardé entier ; au-delà de 80 caractères, il est coupé au dernier mot qui tient et suivi de « … ». Une carte sans geste affiche « → aucun geste — carte informative ». | voulu |
 
 ### Les réponses proposées
