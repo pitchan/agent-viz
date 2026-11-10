@@ -155,6 +155,10 @@ export const state = {
   // Skill en fork) quand ses propres événements ne portent pas de parent_agent_id ; ses
   // événements suivants le rangent sous son lanceur plutôt que sous la session.
   forkedAgentParents: new Map<string, string>(),
+  // Noeuds des sous-agents lancés par un workflow, et, par session, les workflows que la
+  // dernière fin de tour disait en cours : aucun événement ne relie l'un à l'autre.
+  workflowSubagents: new Set<string>(),
+  runningWorkflows: new Map<string, Set<string>>(),
 };
 
 // Visual/animation state.

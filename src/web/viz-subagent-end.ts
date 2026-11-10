@@ -1,8 +1,9 @@
 // viz-subagent-end.ts — la fin d'un sous-agent, lue sur un événement de l'agent qui le pilote.
 //
 // agent-viz n'installe pas le hook SubagentStop : un sous-agent se termine quand l'outil qui
-// l'a lancé rend la main, quand un outil d'arrêt le nomme, ou quand un message du fil principal
-// annonce sa fin. Ce module ferme alors son noeud.
+// l'a lancé rend la main, quand un outil d'arrêt le nomme, quand un message du fil principal
+// annonce sa fin, ou, lancé par un workflow, quand il rend sa sortie ou que le workflow finit.
+// Ce module ferme alors son noeud.
 
 import { COLORS, state, vis, type VizNode } from './viz-state.ts';
 import { calcDuration } from './viz-duration.ts';
@@ -56,19 +57,59 @@ export function settleStoppedSubagent(evt: HookEvent, ts: string) {
   if (an && an.status === 'running') endAgentNode(an, 'done', ts);
 }
 
+const WORKFLOW_SUBAGENT = 'workflow-subagent';
+
+export function noteWorkflowSubagent(evt: HookEvent) {
+  if (evt.agent_type === WORKFLOW_SUBAGENT && evt.agent_id) state.workflowSubagents.add(`a:${evt.agent_id}`);
+}
+
+// La fin du tour (et la fin de session, qui n'en liste aucun) dit quels workflows tournent encore.
+export function noteRunningWorkflows(evt: HookEvent, sid: string) {
+  state.runningWorkflows.set(sid, new Set((evt.background_tasks || [])
+    .filter(t => t.type === 'workflow' && t.status === 'running')
+    .map(t => t.id)));
+}
+
+function runningWorkflowSubagents(sid: string): VizNode[] {
+  return [...state.workflowSubagents]
+    .map(id => state.nodes.get(id))
+    .filter((n): n is VizNode => !!n && n.status === 'running' && n.parentId === `s:${sid}`);
+}
+
 // La fin du tour liste dans background_tasks ce qui travaille encore : un sous-agent lancé en
-// arrière-plan y figure, et sa fin arrive plus tard.
-export function stillRunningSubagents(evt: HookEvent): Set<string> {
-  return new Set((evt.background_tasks || [])
+// arrière-plan y figure. Un workflow y figure sans ses sous-agents : tant qu'un workflow de la
+// session tourne, tous ses sous-agents de workflow encore ouverts travaillent.
+export function stillRunningSubagents(evt: HookEvent, sid: string): Set<string> {
+  const spared = new Set((evt.background_tasks || [])
     .filter(t => t.type === 'subagent' && t.status === 'running')
     .map(t => `a:${t.id}`));
+  if (state.runningWorkflows.get(sid)?.size) for (const n of runningWorkflowSubagents(sid)) spared.add(n.id);
+  return spared;
+}
+
+// Un sous-agent de workflow rend sa sortie par l'outil StructuredOutput, son dernier outil.
+export function settleWorkflowSubagentOutput(evt: HookEvent, ts: string) {
+  if (evt.agent_type !== WORKFLOW_SUBAGENT || evt.tool_name !== 'StructuredOutput') return;
+  const an = state.nodes.get(`a:${evt.agent_id}`);
+  if (an && an.status === 'running') endAgentNode(an, 'done', ts);
+}
+
+const TASK_NOTIFICATION = /^<task-notification>\s*<task-id>([^<]+)<\/task-id>/;
+
+// Fin d'un workflow : faute de savoir quels sous-agents sont les siens, ceux restés ouverts ne
+// se ferment que quand plus aucun workflow de la session ne tourne.
+export function settleEndedWorkflow(evt: HookEvent, sid: string, ts: string) {
+  const taskId = (evt.prompt || '').match(TASK_NOTIFICATION)?.[1];
+  const running = state.runningWorkflows.get(sid);
+  if (!taskId || !running?.delete(taskId) || running.size) return;
+  for (const n of runningWorkflowSubagents(sid)) endAgentNode(n, 'done', ts);
 }
 
 // Messages du fil principal qui annoncent la fin d'un sous-agent en arrière-plan : son compte
 // rendu de fin, ou la notification de fin de sa tâche (seule trace d'un sous-agent interrompu).
 const SUBAGENT_END_MESSAGES: RegExp[] = [
   /^<agent-message from="([^"]+)">\s*\[Subagent hand-back\]/,
-  /^<task-notification>\s*<task-id>([^<]+)<\/task-id>/,
+  TASK_NOTIFICATION,
 ];
 
 export function settleReportedSubagent(evt: HookEvent, ts: string) {
