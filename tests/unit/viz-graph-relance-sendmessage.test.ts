@@ -70,6 +70,17 @@ test('relance en arrière-plan : le sous-agent fermé repasse en cours dès le S
   expect(vis.runningNodes.has(n.id)).toBe(true);
 });
 
+test('la relance ajoute au fil d\'événements une ligne du sous-agent, qui suit son noeud en cours', () => {
+  // Arrange
+  const evenements = [...PREMIERE_VIE, RELANCE_EN_ARRIERE_PLAN[0]!];
+  // Act
+  rejouer(evenements);
+  // Assert
+  const derniere = state.timelineEntries.at(-1)!;
+  expect(derniere.nodeId).toBe(`a:${AID}`);
+  expect(derniere.type).toBe('agent');
+});
+
 test('relance en arrière-plan : le sous-agent reste en cours pendant qu\'il travaille, fin de tour comprise', () => {
   // Arrange
   const evenements = [...PREMIERE_VIE, ...RELANCE_EN_ARRIERE_PLAN];
