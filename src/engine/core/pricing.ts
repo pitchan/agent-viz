@@ -17,6 +17,8 @@ const PRICES: Record<string, ModelPrices> = {
   'claude-fable-5': { input: 1e-5, output: 5e-5, cacheCreate: 1.25e-5, cacheRead: 1e-6 },
   // Même palier que Fable 5, sauf la relecture de cache : 0,25 $/M, soit 0,025 × l'entrée.
   'claude-fable-5-1': { input: 1e-5, output: 5e-5, cacheCreate: 1.25e-5, cacheRead: 2.5e-7 },
+  // Relecture de cache à 0,025 × l'entrée, comme Fable 5.1.
+  'claude-fable-5-2': { input: 8e-6, output: 4e-5, cacheCreate: 1e-5, cacheRead: 2e-7 },
   'claude-mythos-5-1': { input: 1e-5, output: 5e-5, cacheCreate: 1.25e-5, cacheRead: 2.5e-7 },
   'claude-mythos-5': { input: 1e-5, output: 5e-5, cacheCreate: 1.25e-5, cacheRead: 1e-6 },
   // Relecture de cache à 0,05 × l'entrée, et non 0,1 × comme les autres Opus.
@@ -52,6 +54,7 @@ const PRICES: Record<string, ModelPrices> = {
 // rapide y est servie en vitesse normale et marquée `"standard"`.
 const FAST_PRICES: Record<string, ModelPrices> = {
   'claude-opus-5-5': { input: 8e-6, output: 4e-5, cacheCreate: 1e-5, cacheRead: 4e-7 },
+  'claude-fable-5-2': { input: 1.6e-5, output: 8e-5, cacheCreate: 2e-5, cacheRead: 4e-7 },
   'claude-opus-5': { input: 1e-5, output: 5e-5, cacheCreate: 1.25e-5, cacheRead: 1e-6 },
   'claude-opus-4-8': { input: 1e-5, output: 5e-5, cacheCreate: 1.25e-5, cacheRead: 1e-6 },
 };
@@ -86,6 +89,7 @@ const ZERO_COST: Record<string, string> = {
 const MODEL_INFO: Record<string, { label: string; maxInput: number }> = {
   'claude-fable-5': { label: 'Fable 5', maxInput: 1_000_000 },
   'claude-fable-5-1': { label: 'Fable 5.1', maxInput: 1_000_000 },
+  'claude-fable-5-2': { label: 'Fable 5.2', maxInput: 1_000_000 },
   'claude-mythos-5': { label: 'Mythos 5', maxInput: 1_000_000 },
   'claude-mythos-5-1': { label: 'Mythos 5.1', maxInput: 1_000_000 },
   'claude-opus-5-5': { label: 'Opus 5.5', maxInput: 1_000_000 },

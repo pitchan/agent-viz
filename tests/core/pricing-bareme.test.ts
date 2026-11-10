@@ -28,6 +28,14 @@ test('claude-fable-5-1 : tarifs de fable-5, sauf la relecture de cache à 0,25 $
   expect(r.usd).toBeCloseTo(0.305, 12);
 });
 
+test('claude-fable-5-2 : 8 $/M entrée, 40 $/M sortie, relecture de cache à 0,20 $/M', () => {
+  // 1000×8e-6 + 2000×4e-5 + 4000×1e-5 + 6000×(8e-6×2) + 100000×2e-7
+  // = 0.008 + 0.08 + 0.04 + 0.096 + 0.02 = 0.244
+  const r = computeCost(usage, 'claude-fable-5-2');
+  expect(r.known).toBe(true);
+  expect(r.usd).toBeCloseTo(0.244, 12);
+});
+
 test('claude-mythos-5 : mêmes tarifs que fable-5', () => {
   const r = computeCost(usage, 'claude-mythos-5');
   expect(r.known).toBe(true);

@@ -12,6 +12,7 @@ interface Tarif { entree: number; sortie: number; ecritureCache: number; relectu
 const TARIFS: Record<string, Tarif> = {
   'claude-fable-5': { entree: 10, sortie: 50, ecritureCache: 12.5, relectureCache: 1 },
   'claude-fable-5-1': { entree: 10, sortie: 50, ecritureCache: 12.5, relectureCache: 0.25 },
+  'claude-fable-5-2': { entree: 8, sortie: 40, ecritureCache: 10, relectureCache: 0.2 },
   'claude-mythos-5': { entree: 10, sortie: 50, ecritureCache: 12.5, relectureCache: 1 },
   'claude-mythos-5-1': { entree: 10, sortie: 50, ecritureCache: 12.5, relectureCache: 0.25 },
   'claude-opus-5-5': { entree: 4, sortie: 20, ecritureCache: 5, relectureCache: 0.2 },

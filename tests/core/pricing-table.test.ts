@@ -8,7 +8,7 @@ test('source, unité, et les modèles de la table courante', () => {
   expect(t.source).toBe('netgain-table-embarquee');
   expect(t.unit).toBe('usd-par-jeton');
   expect(t.entries.map((e) => e.model).sort()).toEqual([
-    'claude-fable-5', 'claude-fable-5-1', 'claude-haiku-4-5', 'claude-haiku-5-5', 'claude-mythos-5', 'claude-mythos-5-1', 'claude-opus-4-5',
+    'claude-fable-5', 'claude-fable-5-1', 'claude-fable-5-2', 'claude-haiku-4-5', 'claude-haiku-5-5', 'claude-mythos-5', 'claude-mythos-5-1', 'claude-opus-4-5',
     'claude-opus-4-6', 'claude-opus-4-7', 'claude-opus-4-8', 'claude-opus-5', 'claude-opus-5-5',
     'claude-sonnet-4-5', 'claude-sonnet-4-6', 'claude-sonnet-5',
     'gemini-3.8-flash',

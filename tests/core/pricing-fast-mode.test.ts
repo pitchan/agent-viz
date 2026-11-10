@@ -52,6 +52,19 @@ test('Opus 5 en mode rapide : 10 $ / 50 $, cache 1 h à 2 × 10 $', () => {
   expect(r.usd).toBeCloseTo(0.08, 12);
 });
 
+test('Fable 5.2 en mode rapide coûte exactement le double, cache compris', () => {
+  // Arrange
+  const usage = { ...USAGE, speed: 'fast' };
+
+  // Act
+  const r = computeCost(usage, 'claude-fable-5-2');
+
+  // Assert
+  // 1000×1.6e-5 + 2000×8e-5 + 4000×2e-5 + 6000×(1.6e-5×2) + 100000×4e-7
+  // = 0.016 + 0.16 + 0.08 + 0.192 + 0.04 = 0.488, soit 2 × 0.244 au tarif normal
+  expect(r.usd).toBeCloseTo(0.488, 12);
+});
+
 test('speed null : tarif normal', () => {
   expect(computeCost({ input_tokens: 1000, speed: null }, 'claude-opus-5-5').usd).toBeCloseTo(0.004, 12);
 });
