@@ -14,6 +14,8 @@ export function resetGraph(): void {
   state.eventSeq = 0;
   state.startTimes.clear();
   state.forkedAgentParents.clear();
+  state.workflowSubagents.clear();
+  state.runningWorkflows.clear();
   vis.nodes.clear();
   vis.runningNodes.clear();
   layoutDirtyRoots.clear();

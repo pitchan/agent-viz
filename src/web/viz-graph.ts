@@ -18,6 +18,7 @@ import { recordError, recordSuccess } from './viz-errors.ts';
 import { recomputeParallelFlags } from './viz-parallel.ts';
 import {
   launchesSubagent, settleLaunchedSubagent, settleReportedSubagent, settleStoppedSubagent, stillRunningSubagents,
+  noteWorkflowSubagent, noteRunningWorkflows, settleWorkflowSubagentOutput, settleEndedWorkflow,
 } from './viz-subagent-end.ts';
 import { reopenResumedSubagent, settleInlineResume } from './viz-subagent-resume.ts';
 
@@ -257,6 +258,7 @@ function onPreToolUse(evt: HookEvent, sid: string, ts: string) {
   n.data = evt; n.status = 'running'; n.startTime = ts;
   setRunning(n.id, true);
   state.startTimes.set(tid, ts);
+  noteWorkflowSubagent(evt);
   const parentId = evt.agent_id ? `a:${evt.agent_id}` : `s:${sid}`;
   const parent = getNode(parentId);
   if (parentId.startsWith('s:')) {
@@ -302,6 +304,7 @@ function onPostToolUse(evt: HookEvent, sid: string, ts: string) {
   settleLaunchedSubagent(evt, ts, 'done');
   settleStoppedSubagent(evt, ts);
   settleInlineResume(evt, ts);
+  settleWorkflowSubagentOutput(evt, ts);
   const childAid = evt.tool_response && evt.tool_response.agentId;
   if (evt.agent_id && childAid && launchesSubagent(evt)) adoptSubagent(childAid, evt.agent_id);
   // EN DERNIER, comme recordError dans le pendant echec : l'abonne repeint de
@@ -343,7 +346,8 @@ function onSessionEnd(evt: HookEvent, sid: string, ts: string) {
   n.duration = calcDuration(n.startTime, ts);
   n.color = COLORS.complete;
   setRunning(n.id, false);
-  cascadeTerminate(n.id, ts, stillRunningSubagents(evt));
+  noteRunningWorkflows(evt, sid);
+  cascadeTerminate(n.id, ts, stillRunningSubagents(evt, sid));
 }
 
 type EventHandler = (evt: HookEvent, sid: string, ts: string) => void;
@@ -356,7 +360,7 @@ const EVENT_HANDLERS: Record<string, EventHandler> = {
   PostToolUse: onPostToolUse,
   PostToolUseFailure: onPostToolUseFailure,
   Notification: onNotification,
-  UserPromptSubmit: (evt, _sid, ts) => settleReportedSubagent(evt, ts),
+  UserPromptSubmit: (evt, sid, ts) => { settleReportedSubagent(evt, ts); settleEndedWorkflow(evt, sid, ts); },
   Stop: onSessionEnd,
   SessionEnd: onSessionEnd,
 };
