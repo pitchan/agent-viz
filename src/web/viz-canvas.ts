@@ -18,6 +18,7 @@ import {
 import {
   drawSessionNode, drawAgentNode, drawToolNode, drawMcpNode, drawSkillNode,
 } from './viz-drawers.ts';
+import { suivreTaille } from './viz-taille.ts';
 
 // ─── Canvas setup ─────────────────────────────────────────────────────────
 // Les trois elements sont declares dans index.html, et le script de module qui
@@ -66,8 +67,9 @@ const staticCtx = staticCanvas.getContext('2d')!;
 let _bgDirty = true;
 function markBgDirty() { _bgDirty = true; }
 
+const main = document.getElementById('main')!;
+
 function resize() {
-  const main = document.getElementById('main')!;
   W = main.clientWidth; H = main.clientHeight;
   canvas.width = W * devicePixelRatio;
   canvas.height = H * devicePixelRatio;
@@ -526,4 +528,7 @@ function draw() {
 // Register tick with viz-state so markDirty/requestRender can schedule it.
 setTickFn(tick);
 resize();
-window.addEventListener('resize', resize);
+suivreTaille(main, resize, {
+  fenetre: window,
+  creerObservateur: rappel => new ResizeObserver(rappel),
+});
