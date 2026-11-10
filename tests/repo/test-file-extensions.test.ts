@@ -33,6 +33,9 @@ const NOM_DE_TEST = /\.(test|spec)\.[^.]+$/;
 // Dossiers qui ne font pas partie du produit : dependances, historique git,
 // build, et .superpowers/, ou un arbre de travail d agent copie le depot entier.
 const DOSSIERS_IGNORES = new Set(['node_modules', '.git', 'dist', '.superpowers']);
+// Chaque sous-dossier de .claude/worktrees/ est une autre copie du dépôt, ignorée par git :
+// ses tests sont ceux d'une autre branche, pas des fichiers égarés de celle-ci.
+const CHEMINS_IGNORES = new Set(['.claude/worktrees']);
 
 // Hors de tests/, aucun executeur ne lit un fichier de test : chaque exception
 // dit pourquoi elle existe, et une exception qui ne couvre plus rien doit sortir.
@@ -58,7 +61,7 @@ function fichiersDeTestHorsDeTests() {
       const abs = path.join(dir, e.name);
       const rel = path.relative(ROOT, abs).replaceAll('\\', '/');
       if (e.isDirectory()) {
-        if (!DOSSIERS_IGNORES.has(e.name) && rel !== 'tests') marche(abs);
+        if (!DOSSIERS_IGNORES.has(e.name) && !CHEMINS_IGNORES.has(rel) && rel !== 'tests') marche(abs);
       } else if (NOM_DE_TEST.test(e.name)) {
         acc.push(rel);
       }

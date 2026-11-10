@@ -23,12 +23,16 @@ const ROOT = path.resolve(import.meta.dirname, '..', '..');
 // Généré (`dist/engine/` est rebâti depuis `src/engine/`), tiers, ou données
 // de test figées : rien de tout cela ne porte une citation à maintenir.
 const IGNORED_DIRS = new Set(['node_modules', '.git', 'dist', 'fixtures', 'resultats']);
+// Chaque sous-dossier de .claude/worktrees/ est une autre copie du dépôt, ignorée par git :
+// ses citations sont celles d'une autre branche, pas des adresses de celle-ci.
+const IGNORED_PATHS = new Set(['.claude/worktrees']);
 const SOURCE_EXT = new Set(['.js', '.mjs', '.cjs', '.ts', '.mts', '.html', '.css']);
 
 function sourceFiles(dir = ROOT, acc: string[] = []) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (entry.isDirectory()) {
-      if (!IGNORED_DIRS.has(entry.name)) sourceFiles(path.join(dir, entry.name), acc);
+      const rel = path.relative(ROOT, path.join(dir, entry.name)).replaceAll('\\', '/');
+      if (!IGNORED_DIRS.has(entry.name) && !IGNORED_PATHS.has(rel)) sourceFiles(path.join(dir, entry.name), acc);
     } else if (SOURCE_EXT.has(path.extname(entry.name))) {
       acc.push(path.join(dir, entry.name));
     }
