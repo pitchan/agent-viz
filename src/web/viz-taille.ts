@@ -8,6 +8,9 @@ export interface SourcesDeTaille {
   creerObservateur: (rappel: () => void) => { observe(element: Element): void };
 }
 
-export function suivreTaille(_element: Element, rappel: () => void, sources: SourcesDeTaille): void {
+export function suivreTaille(element: Element, rappel: () => void, sources: SourcesDeTaille): void {
+  sources.creerObservateur(rappel).observe(element);
+  // L'observateur compte en pixels CSS : il ne voit pas la densité de pixels qui
+  // change quand la fenêtre passe sur un écran d'une autre échelle.
   sources.fenetre.addEventListener('resize', rappel);
 }
