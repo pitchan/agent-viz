@@ -16,15 +16,17 @@ function resumedAgent(evt: HookEvent): VizNode | undefined {
   return an?.type === 'agent' ? an : undefined;
 }
 
-export function reopenResumedSubagent(evt: HookEvent) {
+// Rend le noeud rouvert, pour que le fil d'événements y ajoute sa ligne.
+export function reopenResumedSubagent(evt: HookEvent): VizNode | undefined {
   const an = resumedAgent(evt);
-  if (!an || an.status === 'running') return;
+  if (!an || an.status === 'running') return undefined;
   an.status = 'running';
   an.endTime = null;
   an.duration = null;
   an.color = COLORS.agent;
   vis.runningNodes.add(an.id);
   if (an.parentId) recomputeParallelFlags(an.parentId);
+  return an;
 }
 
 // Le retour d'une relance au premier plan porte le compte rendu du sous-agent : il a fini.

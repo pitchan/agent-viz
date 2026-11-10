@@ -269,7 +269,9 @@ function onPreToolUse(evt: HookEvent, sid: string, ts: string) {
   }
   if (!n.parentId) { n.parentId = parent.id; parent.children.push(n); }
   addTimelineEntry(evt, n.id, n.type, n.label, n.sub);
-  reopenResumedSubagent(evt);
+  // Une ligne du fil n'est jamais repeinte : la relance en écrit une neuve, qui la montre en cours.
+  const resumed = reopenResumedSubagent(evt);
+  if (resumed) addTimelineEntry(evt, resumed.id, 'agent', resumed.label, resumed.sub);
 }
 
 // L'échec l'emporte : Antigravity annonce la fin d'un outil, puis son échec lu plus tard
