@@ -342,6 +342,7 @@ export function clearState() {
   state.tokens.transcriptMissing = false;
   updateBudget();
   state.forkedAgentParents.clear();
+  state.workflowSubagents.clear(); state.runningWorkflows.clear();
   // Le registre des erreurs suit la session, comme le reste de l'etat. Sans ce
   // vidage, le rejeu du journal au changement de session compterait deux fois,
   // et le volet melangerait deux sessions — or le bandeau n'en montre qu'une.
