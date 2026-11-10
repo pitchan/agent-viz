@@ -19,6 +19,7 @@ import { recomputeParallelFlags } from './viz-parallel.ts';
 import {
   launchesSubagent, settleLaunchedSubagent, settleReportedSubagent, settleStoppedSubagent, stillRunningSubagents,
 } from './viz-subagent-end.ts';
+import { reopenResumedSubagent, settleInlineResume } from './viz-subagent-resume.ts';
 
 // L'evenement hook tel que ce module le lit : les champs de ToolCallEvent
 // (moteur, deja type) plus ceux que la carte du graphe consomme. Tous
@@ -38,12 +39,17 @@ export interface HookEvent extends ToolCallEvent {
   // `isolation` s'ajoute a ToolInput : seul le graphe s'en sert, pour la
   // pastille « worktree » d'un sous-agent isole.
   // `run_in_background` (Agent) et `task_id` (TaskStop) arrivent aussi : la fin d'un sous-agent
-  // se lit sur la réponse de l'outil, pas sur ces entrées.
-  tool_input?: ToolInput & { isolation?: string; run_in_background?: boolean; task_id?: string };
+  // se lit sur la réponse de l'outil, pas sur ces entrées. SendMessage nomme son destinataire.
+  tool_input?: ToolInput & {
+    isolation?: string; run_in_background?: boolean; task_id?: string;
+    recipient?: string; recipient_kind?: string;
+  };
   // Réponse de TaskStop : la tâche arrêtée et son type ; `message` et `command` la décrivent.
+  // Réponse de SendMessage : `inlineHandback` quand le sous-agent relancé a fini.
   tool_response?: {
     agentId?: string; status?: string;
     task_id?: string; task_type?: string; message?: string; command?: string;
+    inlineHandback?: unknown;
   };
   message?: string;
   // Fin du tour (Stop) : les tâches en arrière-plan encore en vol. Message (UserPromptSubmit) : son texte.
@@ -263,6 +269,7 @@ function onPreToolUse(evt: HookEvent, sid: string, ts: string) {
   }
   if (!n.parentId) { n.parentId = parent.id; parent.children.push(n); }
   addTimelineEntry(evt, n.id, n.type, n.label, n.sub);
+  reopenResumedSubagent(evt);
 }
 
 // L'échec l'emporte : Antigravity annonce la fin d'un outil, puis son échec lu plus tard
@@ -292,6 +299,7 @@ function onPostToolUse(evt: HookEvent, sid: string, ts: string) {
   countToolEnd(tid, 'done');
   settleLaunchedSubagent(evt, ts, 'done');
   settleStoppedSubagent(evt, ts);
+  settleInlineResume(evt, ts);
   const childAid = evt.tool_response && evt.tool_response.agentId;
   if (evt.agent_id && childAid && launchesSubagent(evt)) adoptSubagent(childAid, evt.agent_id);
   // EN DERNIER, comme recordError dans le pendant echec : l'abonne repeint de

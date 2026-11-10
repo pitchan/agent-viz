@@ -9,7 +9,7 @@ import { calcDuration } from './viz-duration.ts';
 import { recomputeParallelFlags } from './viz-parallel.ts';
 import type { HookEvent } from './viz-graph.ts';
 
-function endAgentNode(an: VizNode, status: 'done' | 'error', ts: string) {
+export function endAgentNode(an: VizNode, status: 'done' | 'error', ts: string) {
   an.status = status;
   an.endTime = ts;
   an.duration = calcDuration(an.startTime, ts);
